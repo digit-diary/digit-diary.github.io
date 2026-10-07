@@ -204,9 +204,19 @@ async function _completaPromemoriaEsegui(id) {
             ripetizione: p.ripetizione,
             reparto_dip: p.reparto_dip || currentReparto,
           });
-          promemoriaCache.push(nr[0]);
+          if (nr && nr[0]) promemoriaCache.push(nr[0]);
           toast('Prossimo: ' + nuovaData);
-        } catch (e) {}
+        } catch (e) {
+          // la serie si fermerebbe senza dirlo: si avvisa con la data da ricreare
+          toastErrore(
+            'Completato, ma il prossimo promemoria (' +
+              nuovaData.split('-').reverse().join('.') +
+              ') non e stato creato: ' +
+              ((e && e.message) || e) +
+              '. Crealo a mano.',
+            10000,
+          );
+        }
       }
     }
     logAzione('Promemoria completato', p ? p.titolo : '');

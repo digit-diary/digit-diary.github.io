@@ -728,16 +728,17 @@ function _pianoAccompagnamentoAvviso(overrides) {
 }
 async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
   try {
-    // limiti di legge sempre attivi (decisione del titolare 05.10): come Valida e la bozza
-    const { maxCons, minRiposo } = _pianoLimitiLegge();
     const maxSett = _pianoOreSettimanaMax();
     const d0 = new Date(dstr + 'T12:00:00');
     const weekend = d0.getDay() === 0 || d0.getDay() === 6;
     const iso = (d) => d.toISOString().substring(0, 10);
-    const da = new Date(d0);
-    da.setDate(da.getDate() - Math.max(14, maxCons + 1));
-    const fin = new Date(d0);
-    fin.setDate(fin.getDate() + Math.max(14, maxCons + 1));
+    // dal 14 del mese prima a 14 giorni dopo la fine del mese: le regole di Valida
+    // (settimane, serie, riposi) per tutto il mese della cella
+    const da = new Date(dstr.substring(0, 7) + '-01T12:00:00');
+    da.setDate(da.getDate() - 14);
+    const fin = new Date(dstr.substring(0, 7) + '-01T12:00:00');
+    fin.setMonth(fin.getMonth() + 1);
+    fin.setDate(fin.getDate() + 13);
     const righe =
       (await secGet(
         'piano?collaboratore=eq.' +
@@ -746,7 +747,7 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
           iso(da) +
           '&data=lte.' +
           iso(fin) +
-          '&limit=100',
+          '&limit=200',
       )) || [];
     const mappa = {};
     const codPrec = {};
@@ -858,12 +859,54 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
       vfz = _pianoViolazioneFunzioneTurno(nome, tNuovo, new Date(dstr + 'T12:00:00').getDay(), false);
       if (vfz) avvisiExtra.push(vfz);
     }
+    // REGOLE DI VALIDA sulla persona: le violazioni NUOVE che la scrittura creerebbe nel
+    // mese (riposo con gli orari veri e JG, giorni di fila nei due sensi, riposo singolo
+    // dopo 4 giorni, ore della settimana, ND del Diario, chi fa cosa). Prima qui c erano
+    // riposo con l orario base del turno e giorni di fila: un JG 15-02 seguito da L1 alle 8
+    // non dava avviso, Valida si. Domenica e giorni a settimana hanno gli avvisi sopra.
+    if (codiceNuovo !== undefined) {
+      const ymC = dstr.substring(0, 7);
+      const primo = new Date(ymC + '-01T12:00:00');
+      const dIdx = (k) => {
+        const d = new Date(primo);
+        d.setDate(d.getDate() + k - 1);
+        return dataLocaleISO(d);
+      };
+      const perData = {};
+      righe.forEach((r) => (perData[String(r.data).substring(0, 10)] = r));
+      const ctxV = _pianoCtxViolazioni(ymC);
+      const viol = (cod) =>
+        _pianoViolazioniPersona(
+          nome,
+          ...(() => {
+            const mese = [];
+            const sett = [];
+            for (let k = -13; k <= _pianoUltimoGiorno(ymC) + 14; k++) {
+              const d = dIdx(k);
+              const c = d === dstr ? cod : (perData[d] || {}).codice;
+              if (!c) continue;
+              const r = perData[d];
+              const riga = r && r.codice === c ? r : { collaboratore: nome, data: d, codice: c };
+              sett.push(riga);
+              if (d.startsWith(ymC)) mese.push(riga);
+            }
+            return [mese, sett];
+          })(),
+          ctxV,
+        ).filter((v) => !/SOTTO il minimo|domenica|giorni di lavoro nella settimana/i.test(v.msg));
+      const chiave = (v) => v.giorno + '|' + v.msg.replace(/[0-9]+([.,][0-9]+)?/g, '#');
+      const prima = new Set(viol(codPrec[dstr] || '').map(chiave));
+      viol(codiceNuovo || '')
+        .filter((v) => !prima.has(chiave(v)))
+        .forEach((v) => avvisiExtra.push(v.msg));
+    }
     return avvisiExtra.concat(
       PianoRegole.violazioniCella({
         mappaGiorni: mappa,
         giorno: dstr,
-        minRiposo: minRiposo,
-        maxCons: maxCons,
+        // riposo e giorni di fila li controllano ora le regole di Valida qui sopra
+        minRiposo: 0,
+        maxCons: 0,
         turnoDi: (c) => _pianoTurnoInfo(c),
         isLavoro: (c) => _pianoIsLavoro(c),
         // scritta a mano: un turno bloccato non da avviso, un reparto non formato si

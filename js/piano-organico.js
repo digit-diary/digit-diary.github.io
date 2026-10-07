@@ -1129,18 +1129,41 @@ function organicoAggiungiIpotesi() {
     vacanze: pVac,
     tredicesima: p13,
   };
+  const fattoreCosto = (1 + pNotte / 100) * (1 + (pVac + p13) / 100);
+  const quanti = Math.max(1, Math.min(50, parseInt(v('org-quanti')) || 1));
+  // AUSILIARIO CON ORARIO E COSTO ORARIO: si paga solo il lavorato, come nel calcolatore
+  // (prima si pagavano le ore di contratto, assenze comprese, e lo stesso ausiliario
+  // costava diverso nei due strumenti). Ore = orario x giorni a settimana nel periodo;
+  // i festivi parificati che cadono nei giorni di lavoro hanno il 50% in piu (RAP).
+  let costoCalcolato = null;
+  if (jolly && orario && costo > 0) {
+    let giorniPeriodo = 0;
+    for (let d = new Date(dal + 'T12:00:00'); dataLocaleISO(d) <= al; d.setDate(d.getDate() + 1)) giorniPeriodo++;
+    const quotaGiorni = (orario.giorni || 5) / 7;
+    const oreTot = orario.ore * giorniPeriodo * quotaGiorni * quanti;
+    const festPar = (typeof pianoFestiviCache !== 'undefined' ? pianoFestiviCache : []).filter(
+      (f) =>
+        f.data >= dal && f.data <= al && typeof _pianoFestivoParificato === 'function' && _pianoFestivoParificato(f),
+    ).length;
+    const oreFestivi = orario.ore * festPar * quotaGiorni * quanti;
+    costoCalcolato = {
+      ore: Math.round(oreTot),
+      chf: Math.round(oreTot * costo * fattoreCosto + oreFestivi * costo * 0.5),
+    };
+  }
   _orgStato.scenario.aggiunte.push({
     maggiorazioni: maggiorazioni,
     prezzoTipo: jolly ? prezzoTipo : null,
     // indennita RAP calcolate anche sul supplemento notturno (salario delle ore lavorate)
-    fattoreCosto: (1 + pNotte / 100) * (1 + (pVac + p13) / 100),
+    fattoreCosto: fattoreCosto,
     jolly: jolly,
     pct: pct,
-    quanti: Math.max(1, Math.min(50, parseInt(v('org-quanti')) || 1)),
+    quanti: quanti,
     dal: dal,
     al: al,
     orario: orario,
     oraCosto: costo > 0 ? costo : null,
+    costoCalcolato: costoCalcolato,
   });
   _organicoRicalcolaScenario();
   renderPiano();
@@ -1601,20 +1624,22 @@ function organicoCalcola() {
     oreNotte += n;
     return { r: r, durata: durata, giorni: giorni, ore: o, notte: n };
   });
-  // persone insieme: il massimo di postazioni aperte nello stesso quarto d ora, giorno per giorno
-  let insieme = 0;
-  for (let k = 0; k < 7; k++) {
-    const conta = new Array(96 * 2).fill(0); // due giorni di quarti (orari oltre la mezzanotte)
-    righe
-      .filter((r) => r.giorni.includes(k))
-      .forEach((r) => {
-        let a = min(r.da) / 15;
-        let b = min(r.a) / 15;
-        if (b <= a) b += 96;
-        for (let q = a; q < b; q++) conta[q] += r.quante;
-      });
-    insieme = Math.max(insieme, ...conta);
-  }
+  // persone insieme: il massimo di postazioni aperte nello stesso quarto d ora, su una
+  // settimana intera (lunedi 00.00 - domenica 24.00, poi si ricomincia): chi lavora oltre
+  // la mezzanotte si somma a chi comincia il giorno dopo (prima no) e gli orari non al
+  // quarto d ora (15.10) occupano tutto il quarto (prima l indice non era intero e il
+  // conteggio si perdeva)
+  const Q = 7 * 96;
+  const conta = new Array(Q).fill(0);
+  righe.forEach((r) =>
+    r.giorni.forEach((k) => {
+      const a = Math.floor(min(r.da) / 15);
+      let b = Math.ceil(min(r.a) / 15);
+      if (b <= a) b += 96;
+      for (let q = a; q < b; q++) conta[(k * 96 + q) % Q] += r.quante;
+    }),
+  );
+  const insieme = Math.max(0, ...conta);
   // quota netta (assenze medie: malattie, impegni, vacanze dei fissi) dallo storico
   // del settore, solo i mesi rimasti e il tipo di persona scelto
   const jolly = c.tipo === 'jolly';

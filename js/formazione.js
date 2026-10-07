@@ -280,13 +280,10 @@ function livelloDiCollaboratore(c) {
   if (!comps.length) return 0;
   const spunte = (c && c.competenze) || {};
   let lv = 0;
-  const maxLv = Math.max.apply(
-    null,
-    comps.map((k) => parseInt(k.livello) || 0),
-  );
-  for (let n = 1; n <= maxLv; n++) {
-    const richieste = comps.filter((k) => k.livello <= n);
-    if (!richieste.length) continue;
+  // solo i livelli che esistono (L1, L2, L4 senza L3: chi ha L1 e L2 e L2, non L3)
+  const livelli = [...new Set(comps.map((k) => parseInt(k.livello) || 0))].filter((n) => n > 0).sort((a, b) => a - b);
+  for (const n of livelli) {
+    const richieste = comps.filter((k) => (parseInt(k.livello) || 0) <= n);
     if (richieste.every((k) => spunte[k.key] === true)) lv = n;
     else break;
   }
@@ -1852,7 +1849,13 @@ async function registraPremioConsegnato(nome, premio) {
             return;
         } else {
           item.qta = q - 1;
-          await savePuntiConfig(cfg);
+          try {
+            await savePuntiConfig(cfg);
+          } catch (e) {
+            item.qta = q; // il pezzo non e stato scaricato: la memoria torna come il database
+            toastErrore('Inventario non aggiornato: ' + ((e && e.message) || e) + '. Consegna non registrata.');
+            return;
+          }
           logAzione('Inventario premi', item.nome + ' −1 (consegna a ' + nome + '), restano ' + item.qta);
         }
       }
@@ -2584,9 +2587,29 @@ async function unisciCompetenzaCfg(rep, idx) {
   const via = cfg[rep].filter((x, j) => j !== idx && _compNomeNorm(x.label) === _compNomeNorm(tieni.label));
   if (!via.length) return;
   const chiavi = via.map((x) => x.key).filter((x) => x !== tieni.key);
-  const daCambiare = collaboratoriCache.filter((c) =>
+  // TUTTI i collaboratori, anche i disattivati (in memoria ci sono solo gli attivi: chi
+  // tornava attivo perdeva la certificazione) e le formazioni gia pianificate (alla
+  // fine avrebbero spuntato la chiave tolta, senza alzare il livello)
+  let tutti;
+  try {
+    tutti = (await secGet('collaboratori?select=id,nome,competenze,attivo&limit=5000')) || [];
+  } catch (e) {
+    toastErrore('Unione non possibile: elenco dei collaboratori non letto');
+    return;
+  }
+  const daCambiare = tutti.filter((c) =>
     chiavi.some((k) => (c.competenze || {})[k] !== undefined || (c.competenze || {})['fmt_' + k] !== undefined),
   );
+  let formazioni = [];
+  try {
+    formazioni = (
+      (await secGet(
+        'moduli?tipo=eq.' +
+          encodeURIComponent(typeof FORM_TIPO !== 'undefined' ? FORM_TIPO : 'formazione_piano') +
+          '&limit=5000',
+      )) || []
+    ).filter((m) => m.dati && m.dati.comp && chiavi.includes(m.dati.comp.key));
+  } catch (e) {}
   const conSpunta = daCambiare.filter((c) => chiavi.some((k) => (c.competenze || {})[k] === true)).length;
   if (
     !(await chiediConferma(
@@ -2613,7 +2636,20 @@ async function unisciCompetenzaCfg(rep, idx) {
     });
     try {
       await secPatch('collaboratori', 'id=eq.' + c.id, { competenze: nuove });
-      c.competenze = nuove;
+      const inMem = collaboratoriCache.find((x) => x.id === c.id);
+      if (inMem) inMem.competenze = nuove;
+    } catch (e) {
+      errori++;
+    }
+  }
+  for (const m of formazioni) {
+    const dati = Object.assign({}, m.dati, {
+      comp: Object.assign({}, m.dati.comp, { key: tieni.key, label: tieni.label }),
+    });
+    try {
+      await secPatch('moduli', 'id=eq.' + m.id, { dati: dati });
+      const mm = (typeof moduliCache !== 'undefined' ? moduliCache : []).find((x) => x.id === m.id);
+      if (mm) mm.dati = dati;
     } catch (e) {
       errori++;
     }

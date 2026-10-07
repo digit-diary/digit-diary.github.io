@@ -29,6 +29,11 @@ function _briefIsValet() {
 }
 function _briefGruppo(cod) {
   if (!cod) return 9;
+  // le lettere (C cassa, S sala, R reception, Z, L1/9) sono delle sigle Slots (e del Valet,
+  // che ne usa alcune): nei Tavoli e nel Cleaning le sigle sono numeri o altro e si
+  // ordinano solo per orario (prima il "9" dei Tavoli finiva in un gruppo a parte)
+  const rep = typeof _pianoReparto === 'function' ? _pianoReparto() : 'slots';
+  if (rep === 'tavoli' || rep === 'cleaning') return 1;
   const u = String(cod).toUpperCase();
   if (u === '9' || u === 'L1') return 3;
   if (u[0] === 'Z') return 4;
@@ -1846,7 +1851,12 @@ async function pianoInserisciCorso() {
     const compatibili = [];
     const conflitti = [];
     const occupateAltre = [];
+    const fuoriContratto = []; // prima dell assunzione o dopo la fine del contratto: niente corso
     for (const nome of nomi) {
+      if (typeof _pianoOperativoIl === 'function' && !_pianoOperativoIl(nome, data)) {
+        fuoriContratto.push(nome + ' (' + _pianoMotivoFuoriRapporto(nome, data) + ')');
+        continue;
+      }
       const ex = esistenti.find((r) => r.collaboratore === nome);
       if (!ex) {
         liberi.push(nome);
@@ -1897,7 +1907,8 @@ async function pianoInserisciCorso() {
           (occupateAltre.length
             ? '\n• Altre celle (assenze/congedi), esclusi: ' +
               occupateAltre.map((x) => x.nome + ' (' + x.ex.codice + ')').join(', ')
-            : ''),
+            : '') +
+          (fuoriContratto.length ? '\n• Fuori dal contratto quel giorno, esclusi: ' + fuoriContratto.join(', ') : ''),
       ))
     )
       return;

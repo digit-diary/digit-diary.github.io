@@ -881,14 +881,8 @@ async function _pianoVacDirittoCard(anno) {
   // i 35 giorni di diritto che sono 5 settimane). Prima si contavano le V del
   // SOLO mese aperto nel calendario, e "Restano" cambiava numero a ogni mese.
   const gia = {};
-  (_pianoVacCache || []).forEach((v) => {
-    const sett = parseInt(v.settimana);
-    if (!sett || !v.confermata || !_vacEVacanza(v)) return; // provvisorie e altre assenze (PC, MT) non contano
-    // una settimana a cavallo d'anno porta giorni nell'altro anno: non contano
-    // settimana parziale (dal / al, es. 7-8.12 per chi ha pochi giorni): solo quei giorni
-    const gg = _vacGiorni(Object.assign({}, v, { anno: anno }), anno).filter((d) => d.substring(0, 4) === String(anno));
-    gia[v.collaboratore] = (gia[v.collaboratore] || 0) + gg.length;
-  });
+  const pianif = await _vacPianificateNellAnno(anno);
+  Object.keys(pianif).forEach((n) => (gia[n] = pianif[n].giorni));
   // Colonna di controllo: le V davvero scritte nel calendario dell'anno. Se il
   // numero non corrisponde alle settimane, vuol dire che "Applica al piano" non
   // e' ancora stato fatto per tutti i mesi.
@@ -905,20 +899,7 @@ async function _pianoVacDirittoCard(anno) {
     )) || []
   ).forEach((r) => (vCal[r.collaboratore] = (vCal[r.collaboratore] || 0) + 1));
   // vacanze restituite: giorni V coperti da una malattia (M con "Ex V" o, nelle note vecchie, "era V")
-  const vRest = {};
-  (
-    (await secGet(
-      'piano?codice=eq.M&data=gte.' +
-        anno +
-        '-01-01&data=lte.' +
-        anno +
-        '-12-31&reparto_dip=eq.' +
-        _pianoReparto() +
-        '&select=collaboratore,data,commento&limit=5000',
-    )) || []
-  ).forEach((r) => {
-    if (/(?:era|^Ex) V1?\b/.test(String(r.commento || ''))) vRest[r.collaboratore] = (vRest[r.collaboratore] || 0) + 1;
-  });
+  const vRest = await _vacRestituiteNellAnno(anno);
   const righe = collaboratoriCache
     .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && _pianoMaturaCgf(c) && c.data_assunzione)
     .map((c) => ({
@@ -2113,8 +2094,10 @@ async function salvaNuovaVacanza() {
   const sett = parseInt((document.getElementById('nv-sett') || {}).value);
   const conf = (document.getElementById('nv-conf') || {}).checked;
   const tipo = String((document.getElementById('nv-tipo') || {}).value || 'V').toUpperCase();
-  if (!nome || isNaN(sett) || sett < 1 || sett > 53) {
-    toast('Collaboratore e settimana (1-53) obbligatori');
+  const annoNv = window._pianoVacAnno || parseInt(_pianoMeseSel.split('-')[0]);
+  const maxNv = _vacSettimaneAnno(annoNv);
+  if (!nome || isNaN(sett) || sett < 1 || sett > maxNv) {
+    toast('Collaboratore e settimana (1-' + maxNv + ' nel ' + annoNv + ') obbligatori');
     return;
   }
   document.getElementById('pwd-modal').classList.add('hidden');
@@ -2154,6 +2137,10 @@ async function toggleVacanzaConfermata(id) {
   }
 }
 // settimana ISO (anno, numero) di una data
+// settimane ISO dell anno: 53 quando il 28 dicembre cade nella settimana 53 (2026, 2032...)
+function _vacSettimaneAnno(anno) {
+  return _vacSettimanaDi(parseInt(anno) + '-12-28').settimana;
+}
 function _vacSettimanaDi(dstr) {
   const d = new Date(dstr + 'T12:00:00');
   const gio = new Date(d);
@@ -2416,6 +2403,47 @@ function _vacDateDaNota(nota, anno, settimana) {
   return dal || al ? { dal: dal, al: al } : null;
 }
 // giorni del piano di una riga di piano_vacanze (dal / al se ci sono)
+// GIORNI DI VACANZA PIANIFICATI NELL ANNO (scheda Vacanze e Crediti, stesso numero):
+// settimane confermate, solo vacanze (PC, MT... no), contate giorno per giorno con le
+// date dal/al. Ogni settimana si calcola con il SUO anno ISO e conta nell anno solare
+// del giorno: la settimana 1 del 2026 porta 29-31.12 nel 2025, la 53 del 2026 porta
+// 1-3.01 nel 2027 (prima quei giorni non contavano in nessun anno). Ritorna
+// { nome: { giorni, settimane: [{ sett, dal, al }] } }.
+async function _vacPianificateNellAnno(anno) {
+  anno = parseInt(anno);
+  const lista =
+    (await secGet(
+      'piano_vacanze?anno=in.(' + (anno - 1) + ',' + anno + ',' + (anno + 1) + ')&confermata=eq.true&limit=6000',
+    )) || [];
+  const out = {};
+  lista.forEach((v) => {
+    const sett = parseInt(v.settimana);
+    if (!sett || !_vacEVacanza(v)) return;
+    const gg = _vacGiorni(v, parseInt(v.anno) || anno).filter((d) => d.substring(0, 4) === String(anno));
+    if (!gg.length) return;
+    const o = (out[v.collaboratore] = out[v.collaboratore] || { giorni: 0, settimane: [] });
+    o.giorni += gg.length;
+    o.settimane.push({ sett: sett, dal: gg[0], al: gg[gg.length - 1] });
+  });
+  return out;
+}
+// giorni di vacanza restituiti per malattia nell anno (M sopra una V: "Ex V"), per
+// persona e non per settore: il diritto e della persona
+async function _vacRestituiteNellAnno(anno) {
+  const out = {};
+  (
+    (await secGet(
+      'piano?codice=eq.M&data=gte.' +
+        anno +
+        '-01-01&data=lte.' +
+        anno +
+        '-12-31&select=collaboratore,data,commento&limit=8000',
+    )) || []
+  ).forEach((r) => {
+    if (/(?:era|^Ex) V1?\b/.test(String(r.commento || ''))) out[r.collaboratore] = (out[r.collaboratore] || 0) + 1;
+  });
+  return out;
+}
 function _vacGiorni(v, annoDefault) {
   const dal = v.dal ? String(v.dal).substring(0, 10) : '';
   const al = v.al ? String(v.al).substring(0, 10) : '';
@@ -2630,7 +2658,20 @@ async function _applicaVacanzeMese(interattivo) {
   }
   // le altre assenze (PC, MT...) seguono la stessa regola delle vacanze per i C
   // prima e dopo (e i diurni prima): insieme alle V formano un unico blocco
-  const nomiBlocchi = [...new Set(Object.keys(vacGiorni).concat(Object.keys(altreGiorni)))];
+  // VACANZE FINITE IL MESE PRIMA (es. fino al 31.10): le C dopo le vacanze cadono in
+  // questo mese (1 e 2.11). Prima si perdevano: il mese della vacanza saltava i giorni
+  // oltre la fine e questo mese non sapeva della vacanza. Chi ha la vacanza (V, o
+  // un altra assenza del file) l ultimo giorno del mese prima entra nei blocchi.
+  const codaPrec = {};
+  if (cAttorno) {
+    const ultPrec = dataLocaleISO(new Date(anno, mese - 1, 0, 12));
+    ((await secGet('piano?data=eq.' + ultPrec + '&reparto_dip=eq.' + _pianoReparto() + '&limit=2000')) || []).forEach(
+      (r) => {
+        if (r.codice === 'V' || daVacanze(r)) codaPrec[r.collaboratore] = true;
+      },
+    );
+  }
+  const nomiBlocchi = [...new Set(Object.keys(vacGiorni).concat(Object.keys(altreGiorni), Object.keys(codaPrec)))];
   if (!nomiBlocchi.length) {
     if (interattivo)
       toast(
@@ -2729,19 +2770,22 @@ async function _applicaVacanzeMese(interattivo) {
       }
       if (await scrivi(nome, g, 'V', true, false, COMMENTO_V)) nV++;
     }
-    // blocchi contigui
+    // blocchi contigui; una vacanza che arriva dal mese prima e continua il giorno 1
+    // inizia "prima" del mese (giorno 0): niente C prima, le C dopo si mettono qui
     const blocchi = [];
-    let bIni = giorni[0];
-    let bFine = giorni[0];
-    for (const g of giorni.slice(1)) {
-      if (g === bFine + 1) bFine = g;
-      else {
-        blocchi.push([bIni, bFine]);
-        bIni = g;
-        bFine = g;
+    if (giorni.length) {
+      let bIni = giorni[0] === 1 && codaPrec[nome] ? 0 : giorni[0];
+      let bFine = giorni[0];
+      for (const g of giorni.slice(1)) {
+        if (g === bFine + 1) bFine = g;
+        else {
+          blocchi.push([bIni, bFine]);
+          bIni = g;
+          bFine = g;
+        }
       }
-    }
-    blocchi.push([bIni, bFine]);
+      blocchi.push([bIni, bFine]);
+    } else if (codaPrec[nome]) blocchi.push([0, 0]); // vacanza finita l ultimo giorno del mese prima
     const pct = info.percentuale != null ? info.percentuale : 1.0;
     const nCPrima = info.is_jolly ? cPrimaJolly : cPrimaFissi;
     const nCDopo = pct >= 1.0 ? cDopo[100] : pct >= 0.8 ? cDopo[80] : pct >= 0.6 ? cDopo[60] : cDopo[40];
@@ -2750,7 +2794,7 @@ async function _applicaVacanzeMese(interattivo) {
     const dPrec = new Date(anno, mese - 2, 15);
     const nGiorniPrec = new Date(dPrec.getFullYear(), dPrec.getMonth() + 1, 0).getDate();
     for (const [bstart, bend] of blocchi) {
-      for (let off = 1; off <= nCPrima; off++) {
+      for (let off = 1; off <= (bstart >= 1 ? nCPrima : 0); off++) {
         const prima = bstart - off;
         if (prima >= 1 && prima <= nGiorni && !setVac.has(prima)) cGiorni.add(prima);
         else if (prima < 1) {
@@ -2770,6 +2814,7 @@ async function _applicaVacanzeMese(interattivo) {
     if (nWd > 0) {
       const wdSet = new Set();
       for (const [bstart] of blocchi) {
+        if (bstart < 1) continue; // vacanza iniziata il mese prima
         const primoC = bstart - nCPrima;
         for (let off = 1; off <= nWd; off++) {
           const g = primoC - off;
@@ -2810,7 +2855,8 @@ async function _applicaVacanzeMese(interattivo) {
       }
       if (es.length) {
         if (!es[0].protetto) {
-          await secPatch('piano', 'id=eq.' + es[0].id, { codice: 'C', generato: true, operatore: op });
+          // protetta come le C dentro il mese: una bozza rifatta del mese prima non la toglie
+          await secPatch('piano', 'id=eq.' + es[0].id, { codice: 'C', generato: true, protetto: true, operatore: op });
           nC++;
         } else cNonMesse.push({ nome: nome, data: dstrP, attuale: es[0].codice }); // turno protetto: si segnala
       } else {
@@ -2818,7 +2864,7 @@ async function _applicaVacanzeMese(interattivo) {
           collaboratore: nome,
           data: dstrP,
           codice: 'C',
-          protetto: false,
+          protetto: true,
           generato: true,
           reparto_dip: _pianoReparto(),
           operatore: op,
@@ -3092,22 +3138,32 @@ function _vacRigheDaExcel(wb) {
   const commento = (i, col) => {
     const cell = ws && ws[XLSX.utils.encode_cell({ r: inizio.r + i, c: inizio.c + col })];
     if (!cell || !cell.c || !cell.c.length) return '';
+    // solo il nome dell autore ("OpTable:" e a capo): una nota con un orario o con i due
+    // punti ("MT: 10:00") non perde piu il testo
     return cell.c
-      .map((x) => String(x.t || ''))
+      .map((x) => {
+        let t = String(x.t || '');
+        if (x.a && t.startsWith(x.a + ':')) t = t.slice(x.a.length + 1);
+        else t = t.replace(/^[^\n:]{1,40}:[ \t]*\r?\n/, '');
+        return t;
+      })
       .join(' ')
-      .replace(/^[^\n:]{1,40}:\s*\n?/, '')
       .replace(/\s+/g, ' ')
       .trim();
   };
   const out = [];
   const ignoti = [];
   const noteSenzaX = []; // commenti su settimane senza X (richieste, cambi): da controllare
+  // SETTIMANA 53 (2026): il file la ha solo se l intestazione ha la colonna "53" dopo la 52.
+  // Le settimane oltre quelle del file non si toccano all import (prima una 53 inserita
+  // a mano veniva tolta perche il file non la leggeva)
+  const maxW = rows.some((r) => String(r[4 + 52]).trim() === '52' && String(r[4 + 53]).trim() === '53') ? 53 : 52;
   rows.forEach((r, i) => {
     const cognome = String(r[0] || '').trim();
     const nome = String(r[1] || '').trim();
     if (!cognome || /cognome/i.test(cognome)) return;
     const sett = [];
-    for (let w = 1; w <= 52; w++) {
+    for (let w = 1; w <= maxW; w++) {
       const c = _vacLeggiCella(r[4 + w]);
       const nota = commento(i, 4 + w);
       if (c && c.ignoto) ignoti.push('"' + c.ignoto + '" per ' + (cognome + ' ' + nome).trim() + ', settimana ' + w);
@@ -3116,7 +3172,7 @@ function _vacRigheDaExcel(wb) {
     }
     out.push({ cognome: cognome, nome: nome, settimane: sett });
   });
-  return { righe: out, ignoti: ignoti, noteSenzaX: noteSenzaX };
+  return { righe: out, ignoti: ignoti, noteSenzaX: noteSenzaX, maxW: maxW };
 }
 async function _vacRigheDaPdf(file) {
   // pdf.js: si prendono le posizioni orizzontali dei numeri di settimana
@@ -3127,6 +3183,7 @@ async function _vacRigheDaPdf(file) {
   const buf = await file.arrayBuffer();
   const pdf = await lib.getDocument({ data: buf }).promise;
   const out = [];
+  let maxWPdf = 52; // 53 se l intestazione ha la settimana 53
   const ignoti = [];
   for (let np = 1; np <= pdf.numPages; np++) {
     const page = await pdf.getPage(np);
@@ -3158,8 +3215,9 @@ async function _vacRigheDaPdf(file) {
     if (!head) continue;
     const colonne = {};
     head.forEach((v) => {
-      if (v.n >= 1 && v.n <= 52 && colonne[v.n] == null) colonne[v.n] = v.x;
+      if (v.n >= 1 && v.n <= 53 && colonne[v.n] == null) colonne[v.n] = v.x;
     });
+    if (colonne[53] != null) maxWPdf = 53;
     const headY = righe.find((r) => r.items.some((i) => head.some((h) => h.x === i.x)))?.y;
     const primaColonna = Math.min(...Object.values(colonne));
     const colonnaDi = (x) => {
@@ -3194,7 +3252,7 @@ async function _vacRigheDaPdf(file) {
       out.push({ cognome: cognome, nome: nome, settimane: sett.sort((a, b) => a.w - b.w) });
     });
   }
-  return { righe: out, ignoti: ignoti };
+  return { righe: out, ignoti: ignoti, maxW: maxWPdf };
 }
 async function importaVacanzePiano(input) {
   if (!_pianoAzioneAutoConsentita('vacanze')) return; // azione automatica: permesso apposito
@@ -3286,6 +3344,18 @@ async function importaVacanzePiano(input) {
         if (dd && dd.fuori) fuoriSett.push(t.nome + ', settimana ' + w + ': ' + nota);
         const extra = { nota: nota || null };
         if (dd && !dd.fuori) Object.assign(extra, { dal: dd.dal, al: dd.al });
+        else if (!dd && v && v.nota && (v.dal || v.al)) {
+          // le date erano quelle della nota vecchia del file e la nota non c e piu: la
+          // settimana torna intera (le date corrette a mano nel programma invece restano)
+          const ddV = _vacDateDaNota(v.nota, anno, parseInt(w));
+          if (
+            ddV &&
+            !ddV.fuori &&
+            ddV.dal === String(v.dal || '').substring(0, 10) &&
+            ddV.al === String(v.al || '').substring(0, 10)
+          )
+            Object.assign(extra, { dal: null, al: null });
+        }
         if (!v) agg.push(Object.assign({ w: parseInt(w), codice: c }, extra));
         else {
           const diverse =
@@ -3298,7 +3368,8 @@ async function importaVacanzePiano(input) {
       });
       if (diQui)
         vecchie.forEach((v) => {
-          if (t.settimane[v.settimana] === undefined) tolte.push(v);
+          // solo le settimane che il file contiene (la 53 di un file a 52 colonne resta)
+          if (parseInt(v.settimana) <= (letto.maxW || 52) && t.settimane[v.settimana] === undefined) tolte.push(v);
         });
       if (!agg.length && !tolte.length && !camb.length) return;
       piano.push({ nome: t.nome, agg, tolte, camb });
@@ -3450,11 +3521,14 @@ function _vacFasce(anno) {
     };
     for (var w = 22; w <= 37; w++) m[w] = 'verde';
     for (var w2 = 46; w2 <= 48; w2++) m[w2] = 'giallo';
+    m[53] = 'rosso'; // settimana 53 del 2026 (28.12-03.01): Natale
     return m;
   }
+  var nW = _vacSettimaneAnno(anno);
   var out = { 0: 'rosso', 1: 'rosso', 51: 'rosso', 52: 'rosso' };
+  if (nW === 53) out[53] = 'rosso';
   var settDi = function (dstr) {
-    for (var w3 = 1; w3 <= 52; w3++) if (_pianoGiorniSettimana(anno, w3).includes(dstr)) return w3;
+    for (var w3 = 1; w3 <= nW; w3++) if (_pianoGiorniSettimana(anno, w3).includes(dstr)) return w3;
     return null;
   };
   try {
@@ -3482,7 +3556,7 @@ function _vacFasce(anno) {
   } catch (e) {}
   var wN = settDi(anno + '-11-02');
   if (wN) out[wN] = 'arancio'; // vacanze autunnali
-  for (var w4 = 1; w4 <= 52; w4++) {
+  for (var w4 = 1; w4 <= nW; w4++) {
     var gg = _pianoGiorniSettimana(anno, w4);
     var mm = parseInt(gg[0].split('-')[1]);
     if (mm >= 6 && mm <= 8 && !out[w4]) out[w4] = 'verde';
@@ -3590,8 +3664,11 @@ async function esportaVacanzeExcel() {
   set(4, 1, 'NOME', { font: { bold: true }, border: bordo });
   set(4, 2, String(anno), { font: { bold: true }, alignment: { horizontal: 'center' }, border: bordo });
   set(4, 3, 'Pianificate', { font: { bold: true }, alignment: { horizontal: 'center' }, border: bordo });
-  set(4, 4, 52, hStile(0));
-  for (let w = 1; w <= 52; w++) set(4, 4 + w, w, hStile(w));
+  // settimane dell anno (53 nel 2026) e ultima settimana dell anno prima nella colonna 0
+  const nW = _vacSettimaneAnno(anno);
+  const nPrev = _vacSettimaneAnno(anno - 1);
+  set(4, 4, nPrev, hStile(0));
+  for (let w = 1; w <= nW; w++) set(4, 4 + w, w, hStile(w));
   // righe collaboratori
   dati.forEach((d, i) => {
     const r = 5 + i;
@@ -3600,7 +3677,7 @@ async function esportaVacanzeExcel() {
     set(r, 2, '', { border: bordo });
     set(r, 3, d.nVacanze, { alignment: { horizontal: 'center' }, border: bordo });
     set(r, 4, '', { border: bordo, fill: fillDi(0) });
-    for (let w = 1; w <= 52; w++) {
+    for (let w = 1; w <= nW; w++) {
       const stile = { alignment: { horizontal: 'center' }, border: bordo, font: { bold: true, sz: 9 } };
       const f = fillDi(w);
       if (f) stile.fill = f;
@@ -3616,21 +3693,21 @@ async function esportaVacanzeExcel() {
   const legRiga = (rr, w, wLbl, annoW) => {
     const gg = _pianoGiorniSettimana(annoW, w);
     const f = fillDi(wLbl);
-    set(rr, cL, wLbl === 0 ? 52 : wLbl, { alignment: { horizontal: 'center' }, border: bordo, font: { sz: 9 } });
+    set(rr, cL, wLbl === 0 ? nPrev : wLbl, { alignment: { horizontal: 'center' }, border: bordo, font: { sz: 9 } });
     const stD = { border: bordo, font: { sz: 9 } };
     if (f) stD.fill = f;
     set(rr, cL + 1, _vacDataIt(gg[0]), stD);
     set(rr, cL + 2, _vacDataIt(gg[6]), Object.assign({}, stD));
   };
-  legRiga(2, 52, 0, anno - 1); // settimana 52 dell'anno precedente
-  for (let w = 1; w <= 52; w++) legRiga(2 + w, w, w, anno);
+  legRiga(2, nPrev, 0, anno - 1); // ultima settimana dell anno precedente
+  for (let w = 1; w <= nW; w++) legRiga(2 + w, w, w, anno);
   ws['!ref'] = XS.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(5 + dati.length, 55), c: cL + 2 } });
   ws['!cols'] = [{ wch: 30 }, { wch: 20 }, { wch: 9 }, { wch: 11 }].concat(
-    Array.from({ length: 53 }, () => ({ wch: 3.2 })),
+    Array.from({ length: nW + 1 }, () => ({ wch: 3.2 })),
     [{ wch: 2 }, { wch: 2 }],
     [{ wch: 8 }, { wch: 11 }, { wch: 11 }],
   );
-  ws['!merges'] = [{ s: { r: 3, c: 3 }, e: { r: 3, c: 56 } }];
+  ws['!merges'] = [{ s: { r: 3, c: 3 }, e: { r: 3, c: 4 + nW } }];
   const wb = XS.utils.book_new();
   XS.utils.book_append_sheet(wb, ws, 'preferenze');
   XS.writeFile(wb, 'VACANZE ' + repartoNomeDocumento(_pianoReparto()).toUpperCase() + ' ' + anno + '.xlsx');
@@ -3671,11 +3748,13 @@ async function esportaVacanzePdf() {
     8,
     17.5,
   );
-  const head = ['COGNOME', 'NOME', 'Pianificate', '52'];
-  for (let w = 1; w <= 52; w++) head.push(String(w));
+  const nW = _vacSettimaneAnno(anno);
+  const nPrev = _vacSettimaneAnno(anno - 1);
+  const head = ['COGNOME', 'NOME', 'Pianificate', String(nPrev)];
+  for (let w = 1; w <= nW; w++) head.push(String(w));
   const body = dati.map((d) => {
     const r = [d.cognome, d.nome, String(d.nVacanze), ''];
-    for (let w = 1; w <= 52; w++) r.push(d.segni[w] || '');
+    for (let w = 1; w <= nW; w++) r.push(d.segni[w] || '');
     return r;
   });
   const colStyles = {
@@ -3683,7 +3762,7 @@ async function esportaVacanzePdf() {
     1: { cellWidth: 21, halign: 'left' },
     2: { cellWidth: 11 },
   };
-  for (let i = 3; i < 57; i++) colStyles[i] = { cellWidth: 4.6 };
+  for (let i = 3; i < 4 + nW; i++) colStyles[i] = { cellWidth: nW === 53 ? 4.5 : 4.6 };
   doc.autoTable({
     startY: 20,
     head: [head],
@@ -3710,9 +3789,9 @@ async function esportaVacanzePdf() {
   });
   // LEGENDA a destra
   const legBody = [];
-  const gg52 = _pianoGiorniSettimana(anno - 1, 52);
-  legBody.push(['52', _vacDataIt(gg52[0]), _vacDataIt(gg52[6])]);
-  for (let w = 1; w <= 52; w++) {
+  const ggPrev = _pianoGiorniSettimana(anno - 1, nPrev);
+  legBody.push([String(nPrev), _vacDataIt(ggPrev[0]), _vacDataIt(ggPrev[6])]);
+  for (let w = 1; w <= nW; w++) {
     const gg = _pianoGiorniSettimana(anno, w);
     legBody.push([String(w), _vacDataIt(gg[0]), _vacDataIt(gg[6])]);
   }

@@ -127,6 +127,17 @@ function renderCestino() {
     '<div style="margin-top:16px;display:flex;gap:8px"><button class="btn-salva" style="background:var(--accent);font-size:var(--fs-sm,.8125rem);padding:8px 16px" onclick="svuotaCestino()">Svuota cestino</button></div>';
   el.innerHTML = html;
 }
+async function _cestinoRiallineaRegistrazione(r) {
+  try {
+    if (r.tipo === nomeCorrente('Non Disponibilità') && typeof _diarioNdRiallinea === 'function')
+      await _diarioNdRiallinea([r]);
+    if (r.tipo === nomeCorrente('Malattia') && typeof sincronizzaMalattiaPiano === 'function')
+      await sincronizzaMalattiaPiano(r.nome, '', r.data, r.testo || '');
+    if (typeof _rapportoRimettiRegistrazione === 'function') await _rapportoRimettiRegistrazione(r);
+  } catch (e) {
+    toastErrore('Ripristinata, ma piano o Rapporto non allineati: ' + ((e && e.message) || e));
+  }
+}
 async function ripristinaCestino(tabella, id) {
   if (!(await chiediConferma('Ripristinare questo elemento?'))) return;
   try {
@@ -148,6 +159,9 @@ async function ripristinaCestino(tabella, id) {
         r.eliminato_at = null;
         datiCache.unshift(r);
         _cestinoReg = _cestinoReg.filter((x) => x.id !== id);
+        // la registrazione torna valida: piano, modulo ND e Rapporto come alla creazione
+        // (prima tornava solo nel Diario: la ND o la malattia restavano fuori dal piano)
+        await _cestinoRiallineaRegistrazione(r);
       }
     }
     logAzione('Ripristinato da cestino', tabella + ' ID ' + id);

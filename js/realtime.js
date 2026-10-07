@@ -403,6 +403,7 @@ async function _renewTokenUnaVolta() {
       const r = await sbRpc('renew_op_session', { p_token: tk });
       if (r && r.session_token) {
         setOpToken(r.session_token);
+        window._sessioneScadutaAvvisata = false; // una scadenza vera piu avanti si avvisa di nuovo
         return true;
       }
     }
@@ -411,6 +412,7 @@ async function _renewTokenUnaVolta() {
       const r2 = await sbRpc('create_bio_session', { p_nome: op, p_impronta: impronta });
       if (r2 && r2.session_token) {
         setOpToken(r2.session_token);
+        window._sessioneScadutaAvvisata = false;
         return true;
       }
     }
@@ -418,7 +420,12 @@ async function _renewTokenUnaVolta() {
   if (!window._sessioneScadutaAvvisata) {
     window._sessioneScadutaAvvisata = true;
     if (typeof toastErrore === 'function')
-      toastErrore('Sessione scaduta: esci e rientra con la password per continuare a salvare.', 9000);
+      toastErrore(
+        typeof navigator !== 'undefined' && navigator.onLine === false
+          ? 'Connessione assente: le modifiche non vengono salvate finche la rete non torna.'
+          : 'Sessione scaduta: esci e rientra con la password per continuare a salvare.',
+        9000,
+      );
   }
   return false;
 }
@@ -691,28 +698,21 @@ function _erroreDalDatabase(e) {
 }
 async function _secPostRaw(table, data) {
   const tk = getOpToken();
-  if (tk) {
-    try {
-      const r = await sbRpc('secure_insert', {
-        p_token: tk,
-        p_table: table,
-        p_data: data,
-      });
-      if (r) return [r];
-      if (_sbUltimoErrore && _erroreDalDatabase({ message: _sbUltimoErrore.testo })) {
-        const err = new Error(_sbUltimoErrore.testo);
-        err.dalDatabase = true;
-        throw err;
-      }
-      console.warn('secPost: secure_insert null, fallback');
-      return sbPost(table, data);
-    } catch (e) {
-      if (_erroreDalDatabase(e)) throw e; // lo gestisce chi ha chiamato
-      console.warn('secPost fallback:', e.message);
-      return sbPost(table, data);
-    }
+  if (!tk) return sbPost(table, data);
+  // come secPatch e secDel: token scaduto o rete caduta -> rinnovo e UN nuovo tentativo;
+  // ogni altro errore del database arriva a chi chiama. Prima la sessione scaduta non si
+  // rinnovava qui (le registrazioni nuove fallivano con "Errore salvataggio") e un
+  // errore di rete ripiegava sulla scrittura anonima, bloccata in silenzio dalle regole.
+  const scrivi = (t) => _rpcSicura('secure_insert', { p_token: t, p_table: table, p_data: data });
+  let r;
+  try {
+    r = await scrivi(tk);
+  } catch (e) {
+    if ((e.sessione || /Failed to fetch|NetworkError/i.test(e.message || '')) && (await _renewToken(tk)))
+      r = await scrivi(getOpToken());
+    else throw e;
   }
-  return sbPost(table, data);
+  return r ? [r] : [];
 }
 // Converte un filtro REST (id=eq.123&nome=eq.X) nel filtro SQL per le RPC secure_*
 // Ogni clausola passa da _filtroSqlClausola: un operatore che il canale non

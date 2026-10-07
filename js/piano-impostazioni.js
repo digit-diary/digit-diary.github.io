@@ -1722,8 +1722,17 @@ function _renderPianoPreferenzeCard() {
     '<div style="display:flex;margin-bottom:8px"><input type="text" id="pref-collab-cerca" class="piano-cerca campo-cerca" placeholder="Cerca collaboratore..." oninput="_filtraPrefCollab(this.value)"></div>';
   // Preferisce L1 e Accoglienza riguardano solo le slot (turni L1, gruppo ACCOGLIENZA)
   const soloSlots = _pianoReparto() === 'slots';
+  // chi vede lo Storico HR senza poterlo modificare (e senza gestire il piano) legge le
+  // preferenze ma non le cambia: campi disattivati (prima li spuntava e il salvataggio
+  // veniva rifiutato con la spunta che restava a schermo)
+  const prefSolaLettura = !puoGestirePiano() && !puoModificareStoricoHr();
+  if (prefSolaLettura)
+    h +=
+      '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:6px">Sola lettura: le preferenze le cambia chi gestisce il piano o chi puo modificare lo Storico HR.</p>';
   h +=
-    '<div style="overflow-x:auto"><table class="piano-table" id="pref-collab-table" style="min-width:760px;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Funzione</th><th>%</th><th>Solo diurni</th><th title="Solo turni notturni">Solo notturni</th><th style="text-align:left" title="Giorni in cui lavora: negli altri non viene mai proposto (bozza, Migliora, generazione automatica, cerca cambio, copertura malattia, formazioni). Nessuna spunta = tutti i giorni">Giorni di lavoro</th><th style="text-align:left">Turni bloccati (CSV)</th><th style="text-align:left" title="Eccezioni alle regole Turni per livello: questi turni li puo fare anche senza il livello richiesto (CSV)">Turni consentiti</th>' +
+    '<fieldset' +
+    (prefSolaLettura ? ' disabled' : '') +
+    ' style="border:0;padding:0;margin:0;min-width:0"><div style="overflow-x:auto"><table class="piano-table" id="pref-collab-table" style="min-width:760px;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Funzione</th><th>%</th><th>Solo diurni</th><th title="Solo turni notturni">Solo notturni</th><th style="text-align:left" title="Giorni in cui lavora: negli altri non viene mai proposto (bozza, Migliora, generazione automatica, cerca cambio, copertura malattia, formazioni). Nessuna spunta = tutti i giorni">Giorni di lavoro</th><th style="text-align:left">Turni bloccati (CSV)</th><th style="text-align:left" title="Eccezioni alle regole Turni per livello: questi turni li puo fare anche senza il livello richiesto (CSV)">Turni consentiti</th>' +
     (soloSlots
       ? '<th title="La bozza le privilegia sui turni L1">Preferisce L1</th><th title="Livello accoglienza (0-2): serve per il gruppo ACCOGLIENZA">Accoglienza</th>'
       : '') +
@@ -1792,7 +1801,7 @@ function _renderPianoPreferenzeCard() {
       escP((_pianoSettoriEffettivi(c) || []).join(', ') || '-') +
       '</td></tr>';
   });
-  h += '</tbody></table></div>';
+  h += '</tbody></table></div></fieldset>';
   h +=
     '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:6px">"Solo diurni" e i turni bloccati vengono rispettati dalla bozza automatica. Funzione e percentuale si modificano in Impostazioni del Diario → Gestione collaboratori; i <b>Settori</b> derivano dalle competenze certificate in <b>Formazione</b> (spunta = idoneo, sola lettura qui).</p>';
   h += '</div></div>';

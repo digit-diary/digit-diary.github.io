@@ -141,6 +141,16 @@ async function _salvaEsegui() {
       );
       return;
     }
+    // nome che non e (ancora) un collaboratore: verrebbe creato come fisso con la ND.
+    // Prima si crea il collaboratore come jolly (Gestione collaboratori), poi la ND.
+    if (typeof _pianoCollabInfo === 'function' && !_pianoCollabInfo(nome)) {
+      await mostraAvviso(
+        nome +
+          ' non e fra i collaboratori attivi. La non disponibilita vale solo per i jolly: crealo prima come jolly in Gestione collaboratori (o controlla il nome), poi registra la ND.',
+        { titolo: 'Non disponibilita' },
+      );
+      return;
+    }
     const sorted = [..._ndSelectedDates].sort();
     const dateLabel = sorted.map((ds) => new Date(ds + 'T12:00:00').toLocaleDateString('it-IT')).join(', ');
     const nGiorni = sorted.length;
@@ -389,17 +399,22 @@ async function elimina(id) {
     datiCache = datiCache.filter((e) => !e.eliminato);
     _diarioTogliArchivioLeggero(id);
     pinnedIds.delete(id);
-    if (_e) logAzione('Registrazione nel cestino', _e.nome + ' - ' + _e.tipo + ' (da ' + op + ')');
     // ND cancellata: modulo e piano tornano come prima ("Ex R22")
     if (_e && _e.tipo === nomeCorrente('Non Disponibilità')) await _diarioNdRiallinea([_e]);
     // malattia cancellata: nel Piano tornano le sigle che la M aveva coperto ("Ex R23")
     if (_e && _e.tipo === nomeCorrente('Malattia') && typeof sincronizzaMalattiaPiano === 'function') {
       try {
         await sincronizzaMalattiaPiano(_e.nome, _e.testo || '', _e.data, '');
-      } catch (e2) {}
+      } catch (e2) {
+        toastErrore('Registrazione nel cestino, ma il piano non e allineato: ' + ((e2 && e2.message) || e2));
+      }
     }
     // nata dal Rapporto giornaliero: la persona sparisce anche da li
     const _rap = _e && typeof _rapportoTogliRegistrazione === 'function' ? await _rapportoTogliRegistrazione(_e) : null;
+    // il registro chiude l azione per Annulla: DOPO modulo ND e Rapporto, cosi Annulla
+    // rimette insieme registrazione, modulo e Rapporto (prima erano due azioni e Annulla
+    // annullava solo modulo e Rapporto, lasciando la registrazione nel cestino)
+    if (_e) logAzione('Registrazione nel cestino', _e.nome + ' - ' + _e.tipo + ' (da ' + op + ')');
     if (_rap)
       setTimeout(
         () =>
@@ -733,17 +748,31 @@ async function _diarioNdNelPiano(nome, giorni) {
       return;
     }
   }
-  let r = { messe: 0 };
+  let r = { messe: 0, riservate: [] };
   try {
     for (const ym of mesi) {
       const x = await ndAllineaPiano(nome, ym);
-      if (x) r.messe += x.messe;
+      if (x) {
+        r.messe += x.messe;
+        r.riservate = r.riservate.concat(x.riservate || []);
+      }
     }
   } catch (e) {
     toastErrore('Piano non aggiornato per la ND (' + elenco + '): da sistemare da chi gestisce il piano.');
     return;
   }
   if (r.messe) toast(nome + ': ' + r.messe + ' turni diventati ND (' + elenco + '), posti da coprire', 6000);
+  // celle con lucchetto (visita medica, corso...) non si cambiano in ND: si dice
+  if (r.riservate.length)
+    await mostraAvviso(
+      nome +
+        ': la ND cade su celle bloccate con motivo, rimaste come sono:\n' +
+        r.riservate
+          .map((x) => x.data.split('-').reverse().join('.') + ' ' + x.codice + ' (' + x.motivo + ')')
+          .join('\n') +
+        '\n\nSe la ND vale comunque, togli il lucchetto dalla cella nel piano.',
+      { titolo: 'ND e celle bloccate' },
+    );
 }
 // ND tolta o cambiata (elimina, modifica, Annulla): modulo e piano dei mesi toccati
 // tornano allineati alle registrazioni rimaste (i turni coperti dalla ND tornano)
@@ -813,6 +842,19 @@ async function confermaCambioTipo() {
     now.toLocaleDateString('it-IT') +
     ' alle ' +
     now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+  const tipoNd = nomeCorrente('Non Disponibilità');
+  const e0 = datiCache.find((x) => x.id === modalEntryId);
+  // l ND vale solo per i jolly: come alla registrazione
+  if (
+    modalTipoSel === tipoNd &&
+    e0 &&
+    typeof _pianoEJolly === 'function' &&
+    _pianoCollabInfo(e0.nome) &&
+    !_pianoEJolly(e0.nome)
+  ) {
+    toastErrore(e0.nome + ' e fisso: la non disponibilita vale solo per i jolly.');
+    return;
+  }
   try {
     await secPatch('registrazioni', 'id=eq.' + modalEntryId, {
       tipo: modalTipoSel,
@@ -828,6 +870,9 @@ async function confermaCambioTipo() {
         { nome: e.nome, tipo: tipoVecchio, testo: e.testo, data: e.data },
         { nome: e.nome, tipo: modalTipoSel, testo: e.testo, data: e.data },
       );
+      // diventata (o non piu) ND: modulo ND e piano dei mesi toccati si riallineano
+      if ((tipoVecchio === tipoNd || modalTipoSel === tipoNd) && typeof _diarioNdRiallinea === 'function')
+        await _diarioNdRiallinea([{ nome: e.nome, tipo: tipoNd, testo: e.testo, data: e.data }]);
     }
     render();
     updateStats();

@@ -5270,7 +5270,11 @@ function _pcAvvisiFoglio(c) {
   const gia = new Set();
   out.forEach((x) => x.celle.forEach((k) => gia.add(k)));
   const persone = _pcPersone(_briefState.righe, _briefData);
-  window.PauseControlli.controlla(c, persone, { biglietti: _pcBigliettiFoglio(c) }).forEach((x) => {
+  const dowF = _briefData ? new Date(_briefData + 'T12:00:00').getDay() : -1;
+  window.PauseControlli.controlla(c, persone, {
+    biglietti: _pcBigliettiFoglio(c),
+    venSab: dowF === 5 || dowF === 6,
+  }).forEach((x) => {
     if (x.tipo === 'riga' && x.celle.some((k) => gia.has(k))) return;
     out.push(x);
   });

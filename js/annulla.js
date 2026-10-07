@@ -341,6 +341,17 @@
     function onCambio(f) {
       st.ascoltatori.push(f);
     }
+    // scritture di conseguenza (riallineamenti dopo Annulla o Ripristina): non sono
+    // azioni dell utente, quindi non entrano nella pila e non svuotano Ripristina
+    async function senzaTraccia(fn) {
+      const prima = st.inCorso;
+      st.inCorso = true;
+      try {
+        return await fn();
+      } finally {
+        st.inCorso = prima;
+      }
+    }
     function azzera() {
       st.pila = [];
       st.redo = [];
@@ -357,6 +368,7 @@
       chiudiGruppo,
       annulla,
       ripristina,
+      senzaTraccia,
       stato,
       onCambio,
       azzera,
@@ -445,9 +457,41 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   window._annullaAggiornaBarra = _annullaAggiornaBarra;
   window.Annulla.onCambio(_annullaAggiornaBarra);
   // dopo un annullamento i dati in memoria vanno riletti e la pagina ridisegnata
-  async function _annullaRicarica(g) {
+  // MALATTIE annullate o ripristinate: il piano non fa parte di Annulla, quindi le M si
+  // riallineano allo stato della registrazione prima e dopo (come quando si crea, si
+  // modifica o si cancella dal Diario). annullato = true per Annulla, false per Ripristina.
+  async function _annullaMalattie(g, annullato) {
+    if (typeof sincronizzaMalattiaPiano !== 'function' || typeof nomeCorrente !== 'function') return;
+    const tipoMal = nomeCorrente('Malattia');
+    const attiva = (x) => (x && !x.eliminato && x.tipo === tipoMal ? x.testo || '' : '');
+    for (const o of g.ops || []) {
+      if (o.table !== 'registrazioni') continue;
+      for (const r of o.righe || o.prima || []) {
+        // stato prima (A) e dopo (B) l azione originale
+        let A = null;
+        let B = null;
+        if (o.tipo === 'post') B = r;
+        else if (o.tipo === 'del') A = r;
+        else if (o.tipo === 'patch') {
+          A = r;
+          B = Object.assign({}, r, o.dati);
+        }
+        const da = annullato ? B : A;
+        const a = annullato ? A : B;
+        if (attiva(da) === attiva(a) || (!attiva(da) && !attiva(a))) continue;
+        try {
+          await sincronizzaMalattiaPiano(r.nome, attiva(da), r.data, attiva(a));
+        } catch (e) {
+          if (typeof toastErrore === 'function')
+            toastErrore('Malattia di ' + r.nome + ': piano non riallineato (' + ((e && e.message) || e) + ')');
+        }
+      }
+    }
+  }
+  async function _annullaRicarica(g, annullato) {
     const tab = new Set((g.ops || []).map((o) => (o.tipo === 'imp' ? 'impostazioni' : o.table)));
     if (typeof loadAll === 'function') await loadAll();
+    await window.Annulla.senzaTraccia(() => _annullaMalattie(g, annullato));
     // non disponibilita del Diario annullate o ripristinate: modulo e piano si riallineano
     // (il piano non fa parte di Annulla: le ND scritte sopra i turni tornano al turno)
     const regND = [];
@@ -455,7 +499,8 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       if (o.table !== 'registrazioni') return;
       (o.righe || o.prima || []).forEach((r) => regND.push(r));
     });
-    if (regND.length && typeof _diarioNdRiallinea === 'function') await _diarioNdRiallinea(regND);
+    if (regND.length && typeof _diarioNdRiallinea === 'function')
+      await window.Annulla.senzaTraccia(() => _diarioNdRiallinea(regND));
     const toccaPiano = [...tab].some((t) => /^piano_|^collab_congedi/.test(t));
     if (toccaPiano && typeof _pianoCaricaCfg === 'function') await _pianoCaricaCfg();
     const pg = localStorage.getItem('pagina_corrente') || 'dashboard';
@@ -480,7 +525,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       const g = await window.Annulla.annulla();
       if (!g) return;
       if (typeof logAzione === 'function') logAzione('Annullata azione', g.etichetta);
-      await _annullaRicarica(g);
+      await _annullaRicarica(g, true);
       toast('Annullato: ' + g.etichetta);
     } catch (e) {
       toastErrore(e.message || 'Annullamento non riuscito');
@@ -503,7 +548,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       const g = await window.Annulla.ripristina();
       if (!g) return;
       if (typeof logAzione === 'function') logAzione('Ripristinata azione', g.etichetta);
-      await _annullaRicarica(g);
+      await _annullaRicarica(g, false);
       toast('Ripristinato: ' + g.etichetta);
     } catch (e) {
       toastErrore(e.message || 'Ripristino non riuscito');

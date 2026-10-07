@@ -99,9 +99,11 @@ async function _ricercaPrepara(opz) {
   // blocco, sono riposi che si possono spostare; un riposo si scrive come C
   // opz.cMobiliPer (Set di nomi): i C del file si spostano solo per queste persone
   // (chi ha l errore), mai quelli dei colleghi
+  // il congedo del compleanno e le celle con motivo sono riservati (_pianoCellaRiservata):
+  // mai spostati (prima la C del compleanno, generata e non protetta, poteva diventare turno)
   const riempimento = (r) =>
     r.codice === 'C' &&
-    !r.motivo_blocco &&
+    !_pianoCellaRiservata(r) &&
     ((r.generato && !r.protetto) ||
       (opz.cMobili && !String(r.commento || '').trim() && (!opz.cMobiliPer || opz.cMobiliPer.has(r.collaboratore))));
   const conRiempimento = !!opz.cMobili || _pianoRighe.some((r) => (r.reparto_dip || 'slots') === rep && riempimento(r));
@@ -123,7 +125,7 @@ async function _ricercaPrepara(opz) {
       if (rr.length > 1) return;
       const r = rr[0];
       if (!_pianoCopreQui(r)) return; // giorno passato in un altro settore
-      if (r.motivo_blocco) return;
+      if (_pianoCellaRiservata(r)) return;
       if (!opz.estesa && (!r.generato || r.protetto)) return;
       if (r.codice === 'WD' || turniSettore.has(r.codice) || riempimento(r)) mobile[n + '|' + d] = true;
     });

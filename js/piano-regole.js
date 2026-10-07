@@ -277,7 +277,9 @@
         _settori: settoriC || [],
         _livello: typeof ctx.livelloDi === 'function' ? ctx.livelloDi(info) : info._livello,
       });
-      if (violazioneFunzioneTurno(infoS, turno, null, ctx.regoleTurnoFunzione())) return false;
+      // con il giorno (ctx.dow) valgono anche le regole per giorno (funzione_turni_giorni)
+      if (violazioneFunzioneTurno(infoS, turno, ctx.dow != null ? ctx.dow : null, ctx.regoleTurnoFunzione()))
+        return false;
     }
     return true;
   }

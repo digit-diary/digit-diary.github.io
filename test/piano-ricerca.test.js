@@ -162,11 +162,7 @@ persone.forEach((n) => {
   statoV[n] = {};
   giorni.forEach((d) => (statoV[n][d] = ''));
 });
-const r7 = R.cerca(
-  problema({ stato: statoV, riposo: '', ammessi: () => ['M', 'N', ''] }),
-  { seme: 7 },
-  40000,
-);
+const r7 = R.cerca(problema({ stato: statoV, riposo: '', ammessi: () => ['M', 'N', ''] }), { seme: 7 }, 40000);
 ok(r7.dopo.scoperti === 0, 'con riposo vuoto copre tutti i posti (' + r7.dopo.scoperti + ')');
 ok(
   persone.every((n) => giorni.every((d) => ['M', 'N', ''].includes(r7.stato[n][d] || ''))),

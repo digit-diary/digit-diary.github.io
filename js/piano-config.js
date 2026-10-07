@@ -1731,7 +1731,10 @@ async function importaPianoExcel(input) {
     toast('Errore lettura file piano');
     return;
   }
-  await _importaPianoDaWb(wb, ym);
+  const esito = {};
+  await _importaPianoDaWb(wb, ym, esito);
+  // import annullato dall utente: il mese in corso non si propone
+  if (esito.annullato) return;
   // ANCHE IL MESE IN CORSO (07.10, richiesta del titolare): importando il mese dopo, se il
   // file ha anche il foglio del mese in corso (con i cambi fatti nel file), si confronta e,
   // se ci sono differenze, si propone di aggiornarlo con le stesse regole (giorni chiusi,
@@ -1748,6 +1751,17 @@ async function importaPianoExcel(input) {
       renderPiano();
     }
   }
+}
+// COMMENTO DEL FILE CHE BLOCCA LA CELLA: una visita medica (o un controllo medico)
+// scritta nel commento della cella diventa un lucchetto con quel motivo, come
+// "Blocca questa cella (con motivo)" fatto a mano: scambi, cerca cambio, coperture e
+// strumenti automatici non la toccano. Ritorna il motivo o null.
+function _pianoMotivoBloccoDaNota(nota) {
+  const t = String(nota || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!t) return null;
+  return /\bvisit[ae]\b|\bmedic[oaie]\b|controll[oi] medic|certificat[oi] medic/i.test(t) ? t.slice(0, 200) : null;
 }
 // opz.meseInCorso: secondo giro sul mese in corso dello stesso file (si chiede prima)
 async function _importaPianoDaWb(wb, ym, opz) {
@@ -1776,8 +1790,19 @@ async function _importaPianoDaWb(wb, ym, opz) {
       try {
         const cel = wsCommenti[XLSX.utils.encode_cell({ r: rIdx, c: cIdx })];
         if (!cel || !cel.c || !cel.c.length) return '';
-        return String(cel.c.map((x) => x.t || '').join(' '))
-          .replace(/^[^:\n]{0,20}:\s*/, '')
+        // il nome dell autore all inizio ("Musa:" e a capo) si toglie; prima si tagliava
+        // tutto fino al primo ":" e una nota con un orario ("Visita medica ore 10:00",
+        // "DALLE 14:30") perdeva il testo
+        return String(
+          cel.c
+            .map((x) => {
+              let t = String(x.t || '');
+              if (x.a && t.startsWith(x.a + ':')) t = t.slice(x.a.length + 1);
+              else t = t.replace(/^[^:\n]{1,40}:[ \t]*\r?\n/, '');
+              return t;
+            })
+            .join(' '),
+        )
           .replace(/\r/g, '')
           .replace(/\n+/g, ' ')
           .trim();
@@ -1899,18 +1924,28 @@ async function _importaPianoDaWb(wb, ym, opz) {
       } else if (celle.length >= 3 && celle.some((c) => c.cod !== 'C')) {
         // collaboratore NUOVO trovato nel file: funzione e % dalle colonne
         // accanto (chi ha solo congedo C non viene creato)
-        const fz = String(riga[colNome + 1] || '')
+        // Solo nel foglio del piano (colonne dei giorni riconosciute) le due colonne dopo il
+        // nome sono funzione e percentuale; nel formato semplice sono gia i giorni 1 e 2 e
+        // prima ogni persona nuova diventava jolly HOST. Percentuale come 0.8, 80 o 80%.
+        const giorniCol = mappa ? new Set(Object.values(mappa)) : null;
+        const colInfo = (k) => (giorniCol && !giorniCol.has(colNome + k) ? riga[colNome + k] : null);
+        const fz = String(colInfo(1) || '')
           .trim()
           .toUpperCase();
         const funzioni = window._pianoFunzioni || ['RESP', 'SOSTRESP', 'SUP', 'BO', 'HOST'];
-        const pct = parseFloat(riga[colNome + 2]);
+        let pct = parseFloat(String(colInfo(2) == null ? '' : colInfo(2)).replace(',', '.'));
+        if (pct > 1 && pct <= 100) pct = pct / 100;
+        const pctLetta = !isNaN(pct) && pct > 0 && pct <= 1;
         righeCollab.push({
           nome: titolo(raw),
           celle: celle,
           stato: 'nuovo',
           funzione: funzioni.includes(fz) ? fz : 'HOST',
-          percentuale: !isNaN(pct) && pct > 0 && pct <= 1 ? pct : 1,
-          isJolly: isNaN(pct) || !pct,
+          percentuale: pctLetta ? pct : 1,
+          // jolly = nel foglio del piano la colonna della percentuale e vuota (come nel file
+          // HR); nel formato semplice non si sa: fisso al 100%, da controllare nella scheda
+          isJolly: !!giorniCol && !pctLetta,
+          daControllare: !giorniCol || !funzioni.includes(fz),
         });
       }
     });
@@ -1935,6 +1970,7 @@ async function _importaPianoDaWb(wb, ym, opz) {
           protetto: true,
           generato: false,
           commento: c.commento || null,
+          motivo_blocco: _pianoMotivoBloccoDaNota(c.commento),
           colore: c.colore || null,
           ora_inizio: c.ora_inizio,
           ora_fine: c.ora_fine,
@@ -1998,6 +2034,7 @@ async function _importaPianoDaWb(wb, ym, opz) {
       return nuovo === (_stileStr(_stileCella(ora)) || '') ? ora : nuovo;
     };
     const orariNuovi = []; // JG gia nel piano senza orario, con l orario nella nota del file
+    const lucchettiNuovi = []; // stessa sigla, nel file un commento di visita medica: si blocca
     nuove.forEach((x) => {
       const r = perChiave[x.collaboratore + '|' + x.data];
       if (!r) {
@@ -2008,6 +2045,8 @@ async function _importaPianoDaWb(wb, ym, opz) {
       if (cod === x.codice) {
         // JG gia nel piano senza orario: l orario della nota del file si aggiunge
         if (x.ora_inizio && !r.ora_inizio && (r.reparto_dip || 'slots') === rep) orariNuovi.push({ riga: r, nuovo: x });
+        if (x.motivo_blocco && !r.motivo_blocco && (r.reparto_dip || 'slots') === rep)
+          lucchettiNuovi.push({ riga: r, nuovo: x });
         const voluto = coloreVoluto(r, x);
         if (
           voluto !== (r.colore || '') &&
@@ -2029,6 +2068,27 @@ async function _importaPianoDaWb(wb, ym, opz) {
       else if (r.motivo_blocco) tenute.bloccata.push(voce + ' · ' + r.motivo_blocco);
       else cambiate.push({ riga: r, nuovo: x });
     });
+    // CELLE TOLTE NEL FILE (decisione del 07.10): una cella che nel file e vuota, per una
+    // persona presente nel file e in un giorno in cui il file ha dati, si svuota anche nel
+    // programma (prima restava senza avviso). Restano: malattie, ND, congedi non pagati,
+    // celle con lucchetto o compleanno, vacanze, giorni chiusi, riposi messi dal programma
+    // (C della bozza e attorno alle vacanze) e celle di altri settori.
+    const svuotate = [];
+    {
+      const fileChiave = new Set(nuove.map((x) => x.collaboratore + '|' + x.data));
+      const giorniFile = new Set(nuove.map((x) => x.data));
+      esistenti.forEach((r) => {
+        const d = String(r.data).substring(0, 10);
+        if (!giorniFile.has(d) || fileChiave.has(r.collaboratore + '|' + d)) return;
+        if ((r.reparto_dip || 'slots') !== rep) return;
+        const cod = String(r.codice || '').toUpperCase();
+        if (!cod || MAL.includes(cod) || cod === 'ND' || cod === 'CNP' || /^V/.test(cod)) return;
+        if (_pianoCellaRiservata(r) || /^Piano vacanze/.test(String(r.commento || ''))) return;
+        if (_pianoGiornoBloccato(d) && !_pianoGiornoSbloccato(d)) return;
+        if (r.generato && !_pianoTurnoInfo(cod)) return;
+        svuotate.push(r);
+      });
+    }
     // colori delle sigle: quello che le regole di Excel danno piu spesso alla
     // sigla, se diverso dal colore del turno nel programma (lo cambia l admin,
     // come nella tabella dei turni)
@@ -2049,7 +2109,7 @@ async function _importaPianoDaWb(wb, ym, opz) {
       .filter((x) => x[0].length)
       .map((x) => '   ' + x[0].length + ' ' + x[1] + (x[0].length <= 3 ? ': ' + x[0].join('; ') : ''));
     // mese in corso: se nel file e uguale al programma non si chiede niente
-    if (opz.meseInCorso && !nuoveCelle.length && !cambiate.length) {
+    if (opz.meseInCorso && !nuoveCelle.length && !cambiate.length && !lucchettiNuovi.length && !svuotate.length) {
       toast(lbl + ' nel file e uguale al piano: niente da aggiornare');
       return;
     }
@@ -2080,6 +2140,32 @@ async function _importaPianoDaWb(wb, ym, opz) {
           ? '\n• ' + coloriDiversi.length + ' celle con il colore da allineare al file (stessa sigla)'
           : '') +
         (orariNuovi.length ? '\n• ' + orariNuovi.length + ' JG con l orario preso dalla nota del file' : '') +
+        (svuotate.length
+          ? '\n• ' +
+            svuotate.length +
+            ' celle vuote nel file, da svuotare anche nel piano: ' +
+            svuotate
+              .slice(0, 10)
+              .map((r) => r.collaboratore + ' ' + gg(String(r.data).substring(0, 10)) + ' ' + r.codice)
+              .join('; ') +
+            (svuotate.length > 10 ? ' e altre ' + (svuotate.length - 10) : '')
+          : '') +
+        (lucchettiNuovi.length || nuoveCelle.some((x) => x.motivo_blocco) || cambiate.some((c) => c.nuovo.motivo_blocco)
+          ? '\n• ' +
+            (lucchettiNuovi.length +
+              nuoveCelle.filter((x) => x.motivo_blocco).length +
+              cambiate.filter((c) => c.nuovo.motivo_blocco).length) +
+            ' celle bloccate con lucchetto per il commento del file (visita medica): ' +
+            lucchettiNuovi
+              .map((c) => c.nuovo)
+              .concat(
+                nuoveCelle.filter((x) => x.motivo_blocco),
+                cambiate.filter((c) => c.nuovo.motivo_blocco).map((c) => c.nuovo),
+              )
+              .slice(0, 6)
+              .map((x) => x.collaboratore + ' ' + gg(x.data))
+              .join('; ')
+          : '') +
         (coloriTurni.length
           ? '\n• Colore delle sigle nel file diverso dal programma: ' +
             coloriTurni.map((c) => c.turno.codice + ' ' + (c.turno.colore || 'bianco') + ' > ' + c.colore).join('; ') +
@@ -2091,7 +2177,19 @@ async function _importaPianoDaWb(wb, ym, opz) {
         (nTenute ? '\n• ' + nTenute + ' celle diverse che restano come sono:\n' + righeTenute.join('\n') : '') +
         (sigleScartate ? '\n• ' + sigleScartate + ' sigle sconosciute scartate' : '') +
         (nuoviCollab.length
-          ? '\n• NUOVI collaboratori da creare: ' + nuoviCollab.map((x) => x.nome + ' (' + x.funzione + ')').join(', ')
+          ? '\n• NUOVI collaboratori da creare: ' +
+            nuoviCollab
+              .map(
+                (x) =>
+                  x.nome +
+                  ' (' +
+                  x.funzione +
+                  ', ' +
+                  (x.isJolly ? 'jolly' : Math.round(x.percentuale * 100) + '%') +
+                  (x.daControllare ? ', da controllare nella scheda' : '') +
+                  ')',
+              )
+              .join(', ')
           : '') +
         (saltatiDisattivati.length
           ? '\n• Disattivati presenti nel file: restano disattivati, le loro celle non si importano: ' +
@@ -2122,6 +2220,7 @@ async function _importaPianoDaWb(wb, ym, opz) {
                     ' celle corrette, ' +
                     nuoveCelle.length +
                     ' nuove' +
+                    (svuotate.length ? ', ' + svuotate.length + ' svuotate' : '') +
                     (coloriDiversi.length ? ', ' + coloriDiversi.length + ' colori' : ''),
                 },
                 { valore: 'nuove', etichetta: 'Solo le ' + nuoveCelle.length + ' celle nuove' },
@@ -2152,7 +2251,10 @@ async function _importaPianoDaWb(wb, ym, opz) {
       ),
       { titolo: 'Importa piano da Excel', ok: 'Importa' },
     );
-    if (!scelta) return;
+    if (!scelta) {
+      opz.annullato = true; // chi chiama non propone il mese in corso
+      return;
+    }
     const aggiorna = scelta.modo !== 'nuove';
     // CONTROLLO PRIMA DI SCRIVERE (v374), come il file Excel di controllo del titolare:
     // riposo minimo e giorni di fila, con la fine del mese prima, sul mese come sara
@@ -2206,6 +2308,7 @@ async function _importaPianoDaWb(wb, ym, opz) {
           erroriBase,
         );
         if (!sc) {
+          opz.annullato = true; // chi chiama non propone il mese in corso
           toast('Import annullato: il piano non e stato modificato');
           return;
         }
@@ -2342,6 +2445,7 @@ async function _importaPianoDaWb(wb, ym, opz) {
             };
             // la nota del file sostituisce quella vecchia solo se c e
             if (c.nuovo.commento) patch.commento = c.nuovo.commento;
+            if (c.nuovo.motivo_blocco) patch.motivo_blocco = c.nuovo.motivo_blocco;
             const voluto = coloreVoluto(c.riga, c.nuovo);
             if (voluto !== (c.riga.colore || '')) patch.colore = voluto || null;
             await secPatch('piano', 'id=eq.' + c.riga.id, patch);
@@ -2352,6 +2456,14 @@ async function _importaPianoDaWb(wb, ym, opz) {
         await secPatch('piano', 'id=eq.' + c.riga.id, {
           ora_inizio: c.nuovo.ora_inizio,
           ora_fine: c.nuovo.ora_fine,
+          operatore: op,
+          updated_at: ora,
+        });
+      for (const r of svuotate) await secDel('piano', 'id=eq.' + r.id);
+      for (const c of lucchettiNuovi)
+        await secPatch('piano', 'id=eq.' + c.riga.id, {
+          motivo_blocco: c.nuovo.motivo_blocco,
+          commento: c.nuovo.commento || c.riga.commento || null,
           operatore: op,
           updated_at: ora,
         });
@@ -2371,6 +2483,8 @@ async function _importaPianoDaWb(wb, ym, opz) {
         ' nuove, ' +
         aggiornate +
         ' corrette, ' +
+        (aggiorna ? svuotate.length : 0) +
+        ' svuotate, ' +
         (aggiorna ? coloriDiversi.length : 0) +
         ' colori, ' +
         uguali +

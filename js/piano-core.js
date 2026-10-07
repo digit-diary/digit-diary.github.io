@@ -281,12 +281,11 @@ function _pianoLivelloNelSettore(info, rep) {
   const comps = (getCompetenzeConfigAll()[rep || _pianoReparto()] || []).filter((k) => parseInt(k.livello) >= 1);
   if (!comps.length) return null;
   const spunte = info.competenze || {};
-  const maxLv = Math.max(...comps.map((k) => parseInt(k.livello)));
+  // solo i livelli che esistono (come livelloDiCollaboratore in Formazione)
+  const livelli = [...new Set(comps.map((k) => parseInt(k.livello)))].sort((a, b) => a - b);
   let lv = 0;
-  for (let n = 1; n <= maxLv; n++) {
-    const richieste = comps.filter((k) => parseInt(k.livello) <= n);
-    if (!richieste.length) continue;
-    if (richieste.every((k) => spunte[k.key] === true)) lv = n;
+  for (const n of livelli) {
+    if (comps.filter((k) => parseInt(k.livello) <= n).every((k) => spunte[k.key] === true)) lv = n;
     else break;
   }
   return lv;
@@ -947,6 +946,9 @@ function _pianoNdMese(ym) {
   const tipoNd = typeof nomeCorrente === 'function' ? nomeCorrente('Non Disponibilità') : 'Non Disponibilità';
   (typeof datiCache !== 'undefined' ? datiCache : []).forEach((e) => {
     if (e.tipo !== tipoNd || e.eliminato) return;
+    // l ND vale solo per i jolly (decisione del titolare): quelle vecchie di un fisso
+    // non entrano nel piano (bozza, Valida, allineamento)
+    if (typeof _pianoEJolly === 'function' && _pianoCollabInfo(e.nome) && !_pianoEJolly(e.nome)) return;
     const m = String(e.testo || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/g);
     if (!m) return;
     m.forEach((dd) => {
@@ -1088,8 +1090,10 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
     }
     return { tolte: tolte, messe: messe };
   } catch (e) {
+    // l errore arriva a chi chiama, che lo mostra ("Piano non allineato alla malattia"):
+    // prima si scriveva solo in console e l utente leggeva "salvato" con le M sbagliate
     console.error('sync malattia piano', e);
-    return null;
+    throw e;
   }
 }
 // ND DAL DIARIO NEL PIANO (05.10, segnalazione del titolare): un giorno di non
@@ -1113,7 +1117,7 @@ async function ndAllineaPiano(nome, ym) {
   const chiuso = (d) =>
     typeof _pianoGiornoBloccato === 'function' && _pianoGiornoBloccato(d) && !_pianoGiornoSbloccato(d);
   const op = getOperatore();
-  const out = { messe: 0, tolte: 0, scoperti: [] };
+  const out = { messe: 0, tolte: 0, scoperti: [], riservate: [] };
   for (const r of righe) {
     const d = String(r.data).substring(0, 10);
     if (chiuso(d)) continue;
@@ -1134,6 +1138,11 @@ async function ndAllineaPiano(nome, ym) {
       else await secDel('piano', 'id=eq.' + r.id);
       out.tolte++;
     } else if (!mia && voluti.has(d) && r.codice !== 'ND' && _pianoIsLavoro(r.codice)) {
+      // cella con lucchetto (visita medica, corso...): resta, si segnala
+      if (_pianoCellaRiservata(r)) {
+        out.riservate.push({ data: d, codice: r.codice, motivo: _pianoCellaRiservata(r) });
+        continue;
+      }
       await secPatch('piano', 'id=eq.' + r.id, {
         codice: 'ND',
         protetto: true,

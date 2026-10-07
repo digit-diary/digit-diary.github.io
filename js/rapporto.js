@@ -892,13 +892,17 @@ async function _eseguiAssenzeOps(ops, ds, turno) {
     for (const { c } of salvate.creates) {
       try {
         await sincronizzaMalattiaPiano(c.nome, '', c.record.data, c.record.testo || '');
-      } catch (e) {}
+      } catch (e) {
+        toastErrore(c.nome + ': piano non allineato alla malattia (' + ((e && e.message) || e) + ')');
+      }
     }
     for (const u of salvate.updates) {
       try {
         const rec = datiCache.find((x) => x.id === u.id);
         await sincronizzaMalattiaPiano(u.nome, u.vecchioTesto || '', rec ? rec.data : '', u.nuovoTesto || '');
-      } catch (e) {}
+      } catch (e) {
+        toastErrore(u.nome + ': piano non allineato alla malattia (' + ((e && e.message) || e) + ')');
+      }
     }
   }
   // SKIPPED: solo audit + toast
@@ -1309,6 +1313,35 @@ async function _rapportoTogliRegistrazione(rec) {
     return o;
   } catch (e) {
     console.error('rapporto: togli', e);
+    return false;
+  }
+}
+// ripristinata (cestino) o rimessa da Annulla: la voce torna nel Rapporto del giorno,
+// scritta come la scrive la correzione, se il nome non c e gia
+async function _rapportoRimettiRegistrazione(rec) {
+  const o = _rapportoOrigineDi(rec);
+  if (!o) return false;
+  try {
+    const riga = await _rapportoRiga(o);
+    if (!riga) return false;
+    const vecchio = _rapportoValoreCampo(riga, o.campo);
+    if (_rapportoParolaNome(vecchio, rec.nome)) return false; // gia presente
+    const parola = String(rec.nome).split(/\s+/)[0];
+    let voce = '';
+    if (o.campo === 'assenze') {
+      const rg = _getRangeMalattiaRec(rec);
+      if (!rg) return false;
+      const f = (d) => d.split('-').reverse().join('/');
+      voce = parola + ' malato dal ' + f(rg.i) + ' al ' + f(rg.f);
+    } else {
+      const segno = /eccedenza/i.test(rec.testo || '') ? '+' : '-';
+      voce = parola + ' ' + segno + (parseFloat(rec.importo) || 0).toFixed(2);
+    }
+    await _rapportoScriviCampo(o, riga, String(vecchio || '').trim() ? String(vecchio).trim() + ', ' + voce : voce);
+    logAzione('Rapporto aggiornato dal Diario', rec.nome + ' rimesso nel rapporto ' + o.turno + ' del ' + o.ds);
+    return o;
+  } catch (e) {
+    console.error('rapporto: rimetti', e);
     return false;
   }
 }

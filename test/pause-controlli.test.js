@@ -376,5 +376,30 @@ eq(
 );
 ok(ppC['BIANCHI M.'].rotazione, 'il C8 senza colonna resta una rotazione (non si controlla)');
 
+console.log('\nCassa venerdi e sabato: niente pause di sala nella colonna di chi sta in cassa');
+const casseSala = foglio([
+  {
+    base: 7,
+    post: 'CD 03',
+    nome: 'CARLAJOY',
+    righe: [
+      ['C5', '21.00 - 21.30'],
+      ['S5', '24.00 - 24.15'],
+      ['PAUSA', '23.30 - 24.00'],
+    ],
+  },
+]);
+const conSala = cassieri.concat([persona('ROSSI', 'S5', '20.00', '04.00', [30, 15])]);
+const avVS = PC.controlla(casseSala, conSala, { venSab: true }).filter((x) => x.tipo === 'cassa');
+ok(
+  avVS.length === 1 && /CARLAJOY .*S5 in sala/.test(avVS[0].testo),
+  'venerdi/sabato: S5 nella colonna di CD 03 segnalata',
+);
+eq(
+  PC.controlla(casseSala, conSala, { venSab: false }).filter((x) => x.tipo === 'cassa').length,
+  0,
+  'negli altri giorni la stessa riga va bene',
+);
+
 console.log('\n' + passati + ' passati, ' + falliti + ' falliti');
 if (falliti) process.exit(1);

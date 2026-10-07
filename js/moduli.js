@@ -1891,16 +1891,43 @@ async function disattivaCollaboratore(nome) {
     }
     return;
   }
+  // celle del piano da domani in poi: con la persona tolta del tutto restavano nel piano
+  // (posti che sembravano coperti); il passato resta come documento
+  const domani = new Date();
+  domani.setDate(domani.getDate() + 1);
+  const daDomani = dataLocaleISO(domani);
+  let futuri = [];
+  try {
+    futuri =
+      (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=gte.' + daDomani + '&limit=2000')) ||
+      [];
+  } catch (e) {}
+  const turniFuturi = futuri.filter((r) => typeof _pianoTurnoInfo === 'function' && _pianoTurnoInfo(r.codice)).length;
   if (
-    !(await chiediConferma('Rimuovere del tutto "' + nome + '"? Sparisce da elenchi, autocompletamento e calendario.'))
+    !(await chiediConferma(
+      'Rimuovere del tutto "' +
+        nome +
+        '"? Sparisce da elenchi, autocompletamento e calendario.' +
+        (futuri.length
+          ? '\n\nNel piano da domani in poi ha ' +
+            futuri.length +
+            ' celle (' +
+            turniFuturi +
+            ' turni): vengono tolte, i posti tornano scoperti. Il passato resta.'
+          : ''),
+    ))
   )
     return;
   try {
+    for (const r of futuri) await secDel('piano', 'id=eq.' + r.id);
     await secPatch('collaboratori', 'nome=eq.' + encodeURIComponent(nome), {
       attivo: false,
     });
     collaboratoriCache = collaboratoriCache.filter((c) => c.nome !== nome);
-    logAzione('Collaboratore disattivato', nome);
+    logAzione(
+      'Collaboratore disattivato',
+      nome + (futuri.length ? ' · ' + futuri.length + ' celle future tolte dal piano' : ''),
+    );
     renderCollaboratoriUI();
     aggiornaNomi();
     toast('Collaboratore disattivato');
@@ -2127,6 +2154,7 @@ async function importaCollaboratori(input) {
   }
   let aggiunti = 0,
     duplicati = 0;
+  const errori = []; // rete, permesso, sessione: non sono doppioni (prima si contavano cosi)
   for (const nome of nomi) {
     if (collaboratoriCache.find((c) => c.nome.toLowerCase() === nome.toLowerCase())) {
       duplicati++;
@@ -2138,10 +2166,12 @@ async function importaCollaboratori(input) {
         attivo: true,
         reparto_dip: currentReparto,
       });
-      collaboratoriCache.push(r[0]);
+      if (r && r[0]) collaboratoriCache.push(r[0]);
       aggiunti++;
     } catch (e) {
-      duplicati++;
+      // un nome gia presente fra i disattivati e un doppione; il resto e un errore vero
+      if (/duplicate|unique|23505|gia/i.test((e && e.message) || '')) duplicati++;
+      else errori.push(nome + ': ' + ((e && e.message) || e));
     }
   }
   collaboratoriCache.sort((a, b) => a.nome.localeCompare(b.nome));
@@ -2149,6 +2179,10 @@ async function importaCollaboratori(input) {
   aggiornaNomi();
   input.value = '';
   toast(aggiunti + ' collaboratori importati' + (duplicati ? ' (' + duplicati + ' già esistenti)' : ''));
+  if (errori.length)
+    await mostraAvviso(errori.length + ' nomi non importati per un errore:\n' + errori.slice(0, 15).join('\n'), {
+      titolo: 'Import collaboratori',
+    });
   if (aggiunti) logAzione('Importa collaboratori', aggiunti + ' nomi importati da ' + file.name);
 }
 

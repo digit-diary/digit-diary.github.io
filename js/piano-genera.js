@@ -446,7 +446,12 @@ function _pianoSabatoEntro23(codice, dstrSab, riga) {
 // (regola turno_prima_domenica_libera). Un sabato di malattia o vacanza non si
 // lavora: la domenica dopo conta. sabatoMalato = malattia registrata nel Diario.
 function _pianoDomenicaValida(codDom, codSab, dstrSab, rigaSab, sabatoMalato, nome) {
-  if (codDom && _pianoTurnoInfo(codDom)) return false;
+  // decisione del titolare 05.10: la domenica libera valida e C, CGF o ND (vuota =
+  // riposo). Prima bastava che non fosse un turno: JG, U, F (lavoro) e WD, PC... contavano
+  const cDom = String(codDom || '')
+    .trim()
+    .toUpperCase();
+  if (cDom && !['C', 'CGF', 'ND'].includes(cDom)) return false;
   if (_pianoDomenicaEsclusa(codDom)) return false;
   // malattia del sabato registrata solo nel Diario (non ancora nel piano):
   // vale come nel calendario, in ogni controllo che passa il nome
@@ -521,7 +526,9 @@ function _pianoDomenicaPersa(dstr, codiceNuovo, righe, nomeP) {
   // la riga nuova del sabato non ha ancora l orario scritto: vale quello del turno
   if (_pianoDomenicaValida(nuovoDom, nuovoSab && nuovoSab.codice, sab, dow === 6 ? null : rs, undefined, nome))
     return null;
-  if (!_pianoTurnoInfo(codiceNuovo) && !(dow === 6 && !_pianoSabatoEntro23(codiceNuovo, sab, null))) return null;
+  // si avvisa per il lavoro (turni, JG, U, corsi) e per un sabato che finisce dopo le 23;
+  // una V o una M scritte di domenica non sono una "domenica persa" da segnalare
+  if (!_pianoIsLavoro(codiceNuovo) && !(dow === 6 && !_pianoSabatoEntro23(codiceNuovo, sab, null))) return null;
   return dom;
 }
 // Testo dell avviso: quante domeniche valide resterebbero nell anno.
@@ -788,10 +795,11 @@ function _pianoViolazioniPersona(nome, righeMese, righeSett, ctx) {
     }
   }
   // NON DISPONIBILITA': un turno assegnato in un giorno dichiarato ND
+  // (anche JG, U, corsi: e lavoro come un turno, decisione del 05.10)
   righeMese.forEach((r) => {
-    if (!_pianoTurnoInfo(r.codice)) return;
+    if (!_pianoIsLavoro(r.codice) || r.codice === 'ND') return;
     if (ctx.ndV[r.collaboratore + '|' + r.data])
-      aggiungi(parseInt(r.data.split('-')[2]), "turno su un giorno di NON disponibilita' (dal Diario)");
+      aggiungi(parseInt(r.data.split('-')[2]), r.codice + " su un giorno di NON disponibilita' (dal Diario)");
   });
   // DOMENICHE LIBERE (OLL2 art. 24: minimo 12 all'anno · regola aziendale:
   // la domenica conta solo se il sabato si finisce entro le 23)
@@ -1068,11 +1076,70 @@ function _pianoCalcolaViolazioni() {
     else if (info.solo_diurni && t.tipo === 'NOTTURNO') msg = 'preferenza solo diurni: ' + r.codice + ' e notturno';
     else if (info.solo_notti && t.tipo !== 'NOTTURNO')
       msg = 'preferenza solo notturni: ' + r.codice + ' non e notturno';
+    // fuori dal contratto (dopo la fine o prima dell assunzione): arriva da incolla vecchi o
+    // dall import; a mano e bloccato
+    else if (!_pianoOperativoIl(r.collaboratore, dstr))
+      msg = r.codice + ': ' + _pianoMotivoFuoriRapporto(r.collaboratore, dstr);
+    // gruppo non idoneo (settori, competenze, regole di gruppo): come l avviso a mano
+    // "non risulta formato". I turni bloccati della persona non contano: a mano si possono
+    // scrivere senza avviso (decisione S1/S3)
+    else if (_pianoCopreQui(r) && !_pianoIdoneoAMano(r.collaboratore, t))
+      msg = r.codice + ': non risulta formato/idoneo per il gruppo ' + (t.gruppo || '');
     if (msg) metti({ nome: r.collaboratore, giorno: parseInt(dstr.substring(8, 10)), msg: msg, celle: [dstr] });
   });
   return { celle: celle, lista: lista };
 }
 
+// CANDIDATO VALIDO (cerca cambio, copertura malattia/ND, Migliora ore): le violazioni
+// di una persona come le vede Valida (_pianoViolazioniPersona: riposo con gli orari
+// veri, giorni di fila nei due sensi, 4+1+1, ore della settimana, riposo attorno alla
+// domenica, giorni a settimana, chi fa cosa, ND...) come insieme di chiavi giorno|regola.
+// Uno spostamento e valido se dopo non c e nessuna chiave nuova per nessuna delle
+// persone toccate. Le ore del mese sotto il minimo non contano (spostare un turno serve
+// proprio a quello). codIdx(k) / rigaIdx(k): codice e riga della persona nel giorno k
+// del mese ym (0, -1... = mese prima, oltre l ultimo = mese dopo, fino a 14 giorni).
+function _pianoChiaviViolazioni(nome, ym, codIdx, rigaIdx, ctxV) {
+  const nG = _pianoUltimoGiorno(ym);
+  const primo = new Date(ym + '-01T12:00:00');
+  const dataIdx = (k) => {
+    const d = new Date(primo);
+    d.setDate(d.getDate() + k - 1);
+    return dataLocaleISO(d);
+  };
+  const mese = [];
+  const sett = [];
+  for (let k = -13; k <= nG + 14; k++) {
+    const c = codIdx(k);
+    if (!c || c === 'FINE') continue;
+    const r = rigaIdx ? rigaIdx(k) : null;
+    const riga = r && r.codice === c ? r : { collaboratore: nome, data: dataIdx(k), codice: c };
+    sett.push(riga);
+    if (k >= 1 && k <= nG) mese.push(riga);
+  }
+  return new Set(
+    _pianoViolazioniPersona(nome, mese, sett, ctxV || _pianoCtxViolazioni(ym))
+      .filter((v) => !/SOTTO il minimo/.test(v.msg))
+      .map((v) => v.giorno + '|' + v.msg.replace(/[0-9]+([.,][0-9]+)?/g, '#')),
+  );
+}
+function _pianoViolazioniNuove(prima, dopo) {
+  return [...dopo].filter((k) => !prima.has(k));
+}
+// ASSENZE che rendono una persona non disponibile in un giorno anche se la cella del
+// piano e libera: ND e malattie registrate nel Diario, congedi non pagati, fuori dal
+// contratto. Una funzione per ricerca, con i mesi letti una volta sola.
+function _pianoAssenzeLettore() {
+  const perMese = {};
+  const di = (ym) =>
+    perMese[ym] ||
+    (perMese[ym] = Object.assign(
+      {},
+      _pianoNdMese(ym),
+      _pianoMalattieMese(ym),
+      typeof _pianoCnpMese === 'function' ? _pianoCnpMese(ym) : {},
+    ));
+  return (nome, dstr) => !!di(String(dstr).substring(0, 7))[nome + '|' + dstr] || !_pianoOperativoIl(nome, dstr);
+}
 function validaPiano() {
   if (!_pianoAzioneAutoConsentita('genera')) return; // Valida regole: con il permesso Genera
   setTimeout(() => controllaFormazioniCompletate(true), 800);
@@ -1666,19 +1733,31 @@ async function generaBozzaPiano(usaCoperture) {
   }
   let primoApertoG = 1;
   while (giorniChiusi.has(primoApertoG)) primoApertoG++;
-  const primoAperto = ym + '-' + String(primoApertoG).padStart(2, '0');
   // le C di RIEMPIMENTO generate da una bozza precedente si tolgono e si
-  // rimettono alla fine: così rigenerare non trova i giorni "occupati"
-  await secDel(
-    'piano',
-    'data=gte.' +
-      primoAperto +
-      '&data=lte.' +
-      a +
-      '&reparto_dip=eq.' +
-      _pianoReparto() +
-      '&codice=eq.C&generato=eq.true&protetto=eq.false',
-  );
+  // rimettono alla fine: così rigenerare non trova i giorni "occupati". Solo nei
+  // giorni APERTI, a tratti: con un giorno passato sbloccato (es. il 3, oggi il 10) i
+  // giorni chiusi in mezzo restano com erano (prima si cancellava dal primo giorno
+  // aperto a fine mese e le C dei giorni chiusi sparivano: il riempimento li salta)
+  for (let g = primoApertoG; g <= nGiorni; g++) {
+    if (giorniChiusi.has(g)) continue;
+    let g2 = g;
+    while (g2 + 1 <= nGiorni && !giorniChiusi.has(g2 + 1)) g2++;
+    await secDel(
+      'piano',
+      'data=gte.' +
+        ym +
+        '-' +
+        String(g).padStart(2, '0') +
+        '&data=lte.' +
+        ym +
+        '-' +
+        String(g2).padStart(2, '0') +
+        '&reparto_dip=eq.' +
+        _pianoReparto() +
+        '&codice=eq.C&generato=eq.true&protetto=eq.false',
+    );
+    g = g2;
+  }
   // Step 0 come Turnivo: prima le vacanze (V protette + C + WD)
   await _applicaVacanzeMese(false);
   // ricarico includendo le celle degli ALTRI reparti dei multi-reparto
@@ -1822,7 +1901,7 @@ async function generaBozzaPiano(usaCoperture) {
     let k = 0;
     for (let d = 1; d <= nGiorni; d++) {
       if (new Date(ym + '-' + String(d).padStart(2, '0') + 'T12:00:00').getDay() !== 0) continue;
-      if (_pianoTurnoInfo(cella[n + '|' + d] || '')) k++;
+      if (_pianoIsLavoro(cella[n + '|' + d] || '')) k++; // anche JG, U, corsi: domenica lavorata
     }
     return k;
   };

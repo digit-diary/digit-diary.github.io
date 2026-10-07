@@ -555,6 +555,34 @@
       const chi = p.nome + ' (' + norm(p.turno) + (p.ini != null ? ', ' + ora(p.ini) + '-' + ora(p.fin) : '') + ')';
       e.prob.forEach((x) => avvisi.push({ tipo: x.tipo, nome: p.nome, testo: chi + ': ' + x.testo, celle: celle }));
     });
+    // VENERDI E SABATO chi da le pause in cassa (colonne CD, C8...) resta in cassa: una
+    // riga di una postazione di sala nella sua colonna si segnala (decisione del titolare
+    // 05.10). Prima la regola valeva solo quando le pause si generavano: una riga scritta
+    // a mano o un foglio vecchio non dava avviso.
+    if (o.venSab) {
+      const diSala = new Set(persone.filter((p) => settore(p) === 'S').map((p) => norm(p.turno)));
+      blocchi(c)
+        .filter((b) => /^C/.test(b.post) && !/ALT/.test(b.post) && b.nome)
+        .forEach((b) =>
+          b.righe.forEach((x) => {
+            if (!diSala.has(x.pos)) return;
+            avvisi.push({
+              tipo: 'cassa',
+              nome: b.nome,
+              testo:
+                b.nome +
+                ' (' +
+                b.post +
+                ') copre la pausa di ' +
+                x.pos +
+                ' in sala alle ' +
+                ora(x.ini) +
+                ': il venerdi e il sabato chi da le pause in cassa resta in cassa',
+              celle: [x.r + '|' + b.base],
+            });
+          }),
+        );
+    }
     attribuisci(c, persone, o.biglietti).avanzi.forEach((k) => {
       const [r, col] = k.split('|');
       const a = c.celle[k];

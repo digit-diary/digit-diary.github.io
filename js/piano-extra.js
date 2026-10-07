@@ -318,6 +318,7 @@ async function pianoAnnullaTutto() {
       ym: snap.ym,
       rep: snap.rep,
       label: 'annulla tutte le modifiche',
+      quando: new Date().toISOString(),
       righe: _pianoMappaRighe(cur, snap.rep),
     });
   } catch (e) {}
@@ -345,14 +346,29 @@ async function pianoRipristina() {
   const memoria = _pianoMemoriaDi(st);
   _pianoMeseSel = st.ym;
   if (st.rep !== currentReparto) _pianoRepartoSel = st.rep;
-  // lo stato corrente torna sull'Annulla (senza svuotare il redo)
+  // lo stato corrente del MESE DA RIPRISTINARE torna sull'Annulla (senza svuotare il
+  // redo), letto dal database come fa Annulla. Prima si fotografava _pianoRighe, cioe
+  // il mese sullo schermo: con Ripristina premuto da un altro mese la fotografia aveva
+  // le righe sbagliate e un Annulla successivo cancellava il mese intero.
   try {
-    const prima = _pianoStatoMese();
-    prima.label = st.label;
-    prima.quando = new Date().toISOString();
+    const fine = st.ym + '-' + String(_pianoUltimoGiorno(st.ym)).padStart(2, '0');
+    const cur =
+      (await secGet(
+        'piano?data=gte.' + st.ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + st.rep + '&limit=8000',
+      )) || [];
     window._pianoUndo = window._pianoUndo || [];
-    window._pianoUndo.push(prima);
-  } catch (e) {}
+    window._pianoUndo.push({
+      ym: st.ym,
+      rep: st.rep,
+      label: st.label,
+      quando: new Date().toISOString(),
+      righe: _pianoMappaRighe(cur, st.rep),
+    });
+  } catch (e) {
+    rd.push(st);
+    toastErrore('Ripristina non riuscito: lettura del mese non riuscita');
+    return;
+  }
   try {
     await _pianoRipristinaStato(st, { memoria: memoria });
   } catch (e) {
@@ -1685,6 +1701,8 @@ async function pianoIncollaDaClipboard(target) {
   let scartate = 0;
   let fuori = 0;
   let fuoriContratto = 0;
+  const riservate = []; // celle con lucchetto (motivo) o compleanno: come a mano, non si sovrascrivono
+  const ndFissi = []; // ND solo ai jolly (come a mano)
   grid.forEach((riga, i) => {
     const nome = nomiVis[start + i];
     if (!nome) {
@@ -1712,6 +1730,14 @@ async function pianoIncollaDaClipboard(target) {
         return;
       }
       const ex = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
+      if (ex && ex.codice !== cod && _pianoCellaRiservata(ex)) {
+        riservate.push(nome + ' ' + dstr.substring(8, 10) + ' (' + _pianoCellaRiservata(ex) + ')');
+        return;
+      }
+      if (cod === 'ND' && !(ex && ex.codice === 'ND') && !_pianoEJolly(nome)) {
+        ndFissi.push(nome + ' ' + dstr.substring(8, 10));
+        return;
+      }
       if (ex) {
         if (ex.codice !== cod) daPatch.push({ id: ex.id, codice: cod, nomeRef: nome, data: dstr, prima: ex.codice });
       } else {
@@ -1727,7 +1753,12 @@ async function pianoIncollaDaClipboard(target) {
     });
   });
   if (!daPatch.length && !daInserire.length) {
-    toast('Niente da incollare' + (scartate ? ' (' + scartate + ' sigle sconosciute)' : ''));
+    toast(
+      'Niente da incollare' +
+        (scartate ? ' (' + scartate + ' sigle sconosciute)' : '') +
+        (riservate.length ? ' · ' + riservate.length + ' celle bloccate con motivo' : '') +
+        (ndFissi.length ? ' · ND ai fissi non ammessa' : ''),
+    );
     return;
   }
   if (
@@ -1745,6 +1776,16 @@ async function pianoIncollaDaClipboard(target) {
         (fuori ? '\n• ' + fuori + ' celle oltre i bordi del mese/lista (ignorate)' : '') +
         (fuoriContratto
           ? '\n• ' + fuoriContratto + ' celle fuori dal contratto (dopo la fine o prima dell assunzione: ignorate)'
+          : '') +
+        (riservate.length
+          ? '\n• ' +
+            riservate.length +
+            ' celle bloccate con motivo, non toccate: ' +
+            riservate.slice(0, 6).join('; ') +
+            (riservate.length > 6 ? ' e altre' : '')
+          : '') +
+        (ndFissi.length
+          ? '\n• ND ai fissi non incollata (vale solo per i jolly): ' + ndFissi.slice(0, 6).join('; ')
           : ''),
     ))
   )
@@ -2088,30 +2129,16 @@ async function miglioraOrePiano() {
   // controllavano solo riposo 11 ore e giorni di fila: il resto lo scopriva Valida dopo.
   // Le ore del mese sono lo scopo dello spostamento: non contano qui.
   const ctxV = _pianoCtxViolazioni(ym);
-  const primoMO = new Date(da + 'T12:00:00');
-  const dataIdx = (k) => {
-    const d = new Date(primoMO);
-    d.setDate(d.getDate() + k - 1);
-    return dataLocaleISO(d);
-  };
-  const violPersona = (n) => {
-    const mese = [];
-    const sett = [];
-    for (let k = -13; k <= nGiorni + 14; k++) {
-      const c = cella[n + '|' + k];
-      if (!c) continue;
-      const r = rigaDi[n + '|' + k];
-      const riga = r && r.codice === c ? r : { collaboratore: n, data: dataIdx(k), codice: c };
-      sett.push(riga);
-      if (k >= 1 && k <= nGiorni) mese.push(riga);
-    }
-    return new Set(
-      _pianoViolazioniPersona(n, mese, sett, ctxV)
-        .filter((v) => !/^ore mese /.test(v.msg))
-        .map((v) => v.giorno + '|' + v.msg.replace(/[0-9]+([.,][0-9]+)?/g, '#')),
+  const assenteMO = _pianoAssenzeLettore();
+  const violPersona = (n) =>
+    _pianoChiaviViolazioni(
+      n,
+      ym,
+      (k) => cella[n + '|' + k],
+      (k) => rigaDi[n + '|' + k],
+      ctxV,
     );
-  };
-  const nuoveViolazioni = (n, prima) => [...violPersona(n)].some((k) => !prima.has(k));
+  const nuoveViolazioni = (n, prima) => _pianoViolazioniNuove(prima, violPersona(n)).length > 0;
   const scambi = [];
   const mediaPrima = fissi.reduce((acc, n) => acc + Math.abs(saldo[n] || 0), 0) / (fissi.length || 1);
   for (const rT of donatrici) {
@@ -2129,9 +2156,10 @@ async function miglioraOrePiano() {
       const kR = ric + '|' + g;
       const celR = cella[kR] || '';
       const rigaR = rigaDi[kR];
-      const libera = !celR || (celR === 'C' && rigaR && rigaR.generato && !rigaR.protetto);
+      const libera =
+        !celR || (celR === 'C' && rigaR && rigaR.generato && !rigaR.protetto && !_pianoCellaRiservata(rigaR));
       if (!libera) continue;
-      if (malattie[ric + '|' + rT.data]) continue;
+      if (malattie[ric + '|' + rT.data] || assenteMO(ric, rT.data)) continue; // anche ND e congedi del Diario
       if (!_pianoIdoneoPerTurno(ric, t, rT.data)) continue;
       if (!consecOk(ric, g)) continue;
       if (!riposoOk(ric, g, t)) continue;
@@ -2246,18 +2274,28 @@ function _pianoGruppoCompInv() {
   });
   return inv;
 }
-// ritorna il gruppo (SALA/REC/CASSA) per cui il collaboratore NON risulta
-// formato, oppure null. I commenti di formazione/affiancamento non contano.
+// gruppi del piano collegati a una competenza di Formazione (in ogni settore: SALA, REC,
+// CASSA nelle Slots, TAVOLI, VALET...): solo per questi ha senso "non formato"
+function _pianoGruppiConFormazione() {
+  return new Set(
+    Object.values(_pianoCompetenzeGruppi())
+      .filter(Boolean)
+      .map((g) => String(g).toUpperCase()),
+  );
+}
+// ritorna il gruppo per cui il collaboratore NON risulta formato, oppure null. I commenti
+// di formazione/affiancamento non contano. Prima valeva solo per SALA, REC e CASSA.
 function _pianoGruppoNonFormato(nome, codTurno, commento) {
   const t = _pianoTurnoInfo(codTurno);
   if (!t) return null;
   const g = (t.gruppo || '').toUpperCase();
-  if (!['SALA', 'REC', 'CASSA'].includes(g)) return null;
+  if (!_pianoGruppiConFormazione().has(g)) return null;
   if (/formazion|affianc/i.test(commento || '')) return null;
   const info = _pianoCollabInfo(nome);
   if (!info) return null;
   const fz = ((info.funzione || '') + '').toUpperCase();
-  if (['SUP', 'SOSTRESP', 'RESP'].includes(fz)) return null;
+  // chi "fa tutto" (regola funzioni_fanno_tutto, es. SUP e RESP) non riceve l avviso
+  if (fz && (_pianoFunzioniFannoTutto().has(fz) || ['SUP', 'SOSTRESP', 'RESP'].includes(fz))) return null;
   // chi lavora quel settore IN ACCOMPAGNAMENTO (es. guardaroba con la rec)
   // è una situazione voluta: nessun avviso
   if (_pianoAccompagnamentoDi(info).includes(g)) return null;
@@ -2331,7 +2369,7 @@ async function controllaFormazioniCompletate(silenzioso) {
     const t = _pianoTurnoInfo(r.codice);
     if (!t) return;
     const sett = _pianoSettoreDaCommento(r.commento, (t.gruppo || '').toUpperCase());
-    if (!['SALA', 'REC', 'CASSA'].includes(sett)) return;
+    if (!_pianoGruppiConFormazione().has(sett)) return;
     const k = r.collaboratore + '|' + sett;
     gruppi[k] = gruppi[k] || { giorni: new Set(), ultimo: '' };
     gruppi[k].giorni.add(r.data);
@@ -2403,31 +2441,16 @@ async function _pianoCreditiDati(anno, soloNomi) {
         _pianoReparto(),
       );
   const cfg = _pianoVacCfg();
-  // vacanze: settimane registrate nell anno (come la scheda Vacanze)
-  const vac = (await secGet('piano_vacanze?anno=eq.' + anno + '&limit=2000')) || [];
+  // vacanze: settimane registrate nell anno e restituite per malattia, con le stesse
+  // funzioni della scheda Vacanze (stesso numero nelle due schede)
+  const pianif = await _vacPianificateNellAnno(anno);
   const gia = {};
   const settDi = {}; // nome -> [{ sett, dal, al }] per la finestrella
-  vac.forEach((v) => {
-    const sett = parseInt(v.settimana);
-    if (!sett || !v.confermata || !_vacEVacanza(v)) return; // come la scheda Vacanze: provvisorie e altre assenze non contano
-    // settimana parziale (dal / al, es. 7-8.12 per chi ha pochi giorni): solo quei giorni
-    const gg = _vacGiorni(Object.assign({}, v, { anno: anno }), anno).filter((d) => d.substring(0, 4) === String(anno));
-    gia[v.collaboratore] = (gia[v.collaboratore] || 0) + gg.length;
-    if (gg.length)
-      (settDi[v.collaboratore] = settDi[v.collaboratore] || []).push({ sett: sett, dal: gg[0], al: gg[gg.length - 1] });
+  Object.keys(pianif).forEach((n) => {
+    gia[n] = pianif[n].giorni;
+    settDi[n] = pianif[n].settimane;
   });
-  const vRest = {};
-  (
-    (await secGet(
-      'piano?codice=eq.M&data=gte.' +
-        anno +
-        '-01-01&data=lte.' +
-        anno +
-        '-12-31&select=collaboratore,data,commento&limit=5000',
-    )) || []
-  ).forEach((r) => {
-    if (/(?:era|^Ex) V1?\b/.test(String(r.commento || ''))) vRest[r.collaboratore] = (vRest[r.collaboratore] || 0) + 1;
-  });
+  const vRest = await _vacRestituiteNellAnno(anno);
   // CGF: fino alla fine del mese aperto nel Piano, mai i mesi futuri
   const annoSel = _pianoMeseSel.substring(0, 4);
   const finoA =
