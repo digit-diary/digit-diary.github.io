@@ -510,7 +510,8 @@ async function _renderPianoBriefingTab() {
     (cdDaAggiornare
       ? '<span style="font-size:var(--fs-sm,.8125rem);background:#ffd166;color:#5a4300;padding:3px 10px;border-radius:3px;font-weight:700">I numeri cassa di ieri sono cambiati: premi "Aggiorna numeri cassa"</span>'
       : '') +
-    (puoGestireBriefing() ? _briefAnnullaBottoni() : '') +
+    // Annulla / Ripristina del briefing: quelli generici in basso (Ctrl+Z / Ctrl+Y)
+    '' +
     '<span id="brief-stato" style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
     (salvato
       ? 'Salvato'
@@ -739,7 +740,7 @@ function _briefRicorda(gruppo) {
   }
   u.gruppo = gruppo || null;
   u.t = ora;
-  u.passi.push(_briefFoto());
+  u.passi.push(_briefFotoQuando());
   if (u.passi.length > 40) u.passi.shift();
   u.rifatti = [];
   _briefAggiornaAnnulla();
@@ -761,7 +762,18 @@ function _briefAnnullaBottoni() {
     '>Ripristina</button></span>'
   );
 }
+// fotografia con l istante, per l Annulla unico (l azione piu recente del programma)
+function _briefFotoQuando() {
+  try {
+    const f = JSON.parse(_briefFoto());
+    f.quando = new Date().toISOString();
+    return JSON.stringify(f);
+  } catch (e) {
+    return _briefFoto();
+  }
+}
 function _briefAggiornaAnnulla() {
+  if (window._annullaAggiornaBarra) setTimeout(window._annullaAggiornaBarra, 0);
   const u = _briefUndoCorrente() || { passi: [], rifatti: [] };
   const a = document.getElementById('brief-btn-annulla');
   const r = document.getElementById('brief-btn-ripristina');
@@ -809,7 +821,7 @@ async function briefAnnulla() {
   if (!puoGestireBriefing() || !_briefState) return;
   const u = _briefUndoCorrente();
   if (!u.passi.length) return toast('Niente da annullare nel briefing');
-  const ora = _briefFoto();
+  const ora = _briefFotoQuando();
   const prima = u.passi.pop();
   u.rifatti.push(ora);
   u.gruppo = null;
@@ -821,7 +833,7 @@ async function briefRipristina() {
   if (!puoGestireBriefing() || !_briefState) return;
   const u = _briefUndoCorrente();
   if (!u.rifatti.length) return toast('Niente da ripristinare');
-  u.passi.push(_briefFoto());
+  u.passi.push(_briefFotoQuando());
   u.gruppo = null;
   await _briefApplicaFoto(u.rifatti.pop());
   logAzione('Briefing: ripristinata modifica', _briefData);

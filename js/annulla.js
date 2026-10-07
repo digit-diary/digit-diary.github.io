@@ -298,6 +298,7 @@
       } finally {
         st.inCorso = false;
       }
+      g.quandoAnnullato = canale.adesso();
       st.redo.push(g);
       notifica();
       return g;
@@ -315,6 +316,7 @@
       } finally {
         st.inCorso = false;
       }
+      g.quando = canale.adesso(); // ripristinato: torna l ultima azione
       st.pila.push(g);
       notifica();
       return g;
@@ -326,6 +328,13 @@
         ripristina: st.redo.length,
         ultima: st.pendenti.length ? etichettaAuto() : st.pila.length ? st.pila[st.pila.length - 1].etichetta : '',
         prossima: st.redo.length ? st.redo[st.redo.length - 1].etichetta : '',
+        // istanti per scegliere, fra programma, calendario e briefing, l azione piu recente
+        quandoUltima: st.pendenti.length
+          ? canale.adesso()
+          : st.pila.length
+            ? st.pila[st.pila.length - 1].quando || ''
+            : '',
+        quandoProssima: st.redo.length ? st.redo[st.redo.length - 1].quandoAnnullato || '' : '',
         inCorso: st.inCorso,
       };
     }
@@ -375,24 +384,65 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     attesa: (ms, fn) => setTimeout(fn, ms),
     annullaAttesa: (id) => clearTimeout(id),
   });
+  // UN SOLO ANNULLA (07.10, richiesta del titolare): la barra annulla l azione piu recente
+  // di tutto il programma, compreso il calendario del piano e il briefing (che hanno le
+  // loro fotografie: _pianoUndo / _briefUndo). Prima il calendario aveva le sue frecce e
+  // Ctrl+Z li non faceva niente.
+  function _annullaFonti(redo) {
+    const out = [];
+    const g = window.Annulla.stato();
+    if (!redo && g.annulla) out.push({ tipo: 'g', quando: g.quandoUltima || '', etichetta: g.ultima });
+    if (redo && g.ripristina) out.push({ tipo: 'g', quando: g.quandoProssima || '', etichetta: g.prossima });
+    const puoPiano = typeof puoGestirePiano === 'function' && puoGestirePiano();
+    const pila = redo ? window._pianoRedo || [] : window._pianoUndo || [];
+    if (puoPiano && pila.length) {
+      const x = pila[pila.length - 1];
+      out.push({ tipo: 'p', quando: x.quando || '', etichetta: 'Piano: ' + (x.label || 'modifica') });
+    }
+    const u = typeof _briefUndoCorrente === 'function' ? _briefUndoCorrente() : null;
+    const puoBrief = typeof puoGestireBriefing === 'function' && puoGestireBriefing();
+    const bl = u && puoBrief ? (redo ? u.rifatti : u.passi) : [];
+    if (bl && bl.length) {
+      const x = bl[bl.length - 1];
+      let q = '';
+      try {
+        q = JSON.parse(x).quando || '';
+      } catch (e) {}
+      out.push({
+        tipo: 'b',
+        quando: q,
+        etichetta:
+          'Briefing: modifica del ' +
+          String(_briefData || '')
+            .split('-')
+            .reverse()
+            .join('.'),
+      });
+    }
+    out.sort((a, b) => String(b.quando).localeCompare(String(a.quando)));
+    return out[0] || null;
+  }
   function _annullaAggiornaBarra() {
     const bar = document.getElementById('annulla-bar');
     if (!bar) return;
     const s = window.Annulla.stato();
-    bar.style.display = s.annulla || s.ripristina ? 'flex' : 'none';
+    const a = _annullaFonti(false);
+    const r = _annullaFonti(true);
+    bar.style.display = a || r ? 'flex' : 'none';
     const bA = document.getElementById('annulla-btn');
     const bR = document.getElementById('ripristina-btn');
     if (bA) {
-      bA.disabled = !s.annulla || s.inCorso;
-      bA.title = s.annulla ? 'Annulla: ' + s.ultima : 'Niente da annullare';
+      bA.disabled = !a || s.inCorso;
+      bA.title = a ? 'Annulla: ' + a.etichetta + ' (Ctrl+Z)' : 'Niente da annullare';
     }
     if (bR) {
-      bR.disabled = !s.ripristina || s.inCorso;
-      bR.title = s.ripristina ? 'Ripristina: ' + s.prossima : 'Niente da ripristinare';
+      bR.disabled = !r || s.inCorso;
+      bR.title = r ? 'Ripristina: ' + r.etichetta + ' (Ctrl+Y)' : 'Niente da ripristinare';
     }
     const lbl = document.getElementById('annulla-lbl');
-    if (lbl) lbl.textContent = s.annulla ? s.ultima : s.prossima ? 'Ripristina: ' + s.prossima : '';
+    if (lbl) lbl.textContent = a ? a.etichetta : r ? 'Ripristina: ' + r.etichetta : '';
   }
+  window._annullaAggiornaBarra = _annullaAggiornaBarra;
   window.Annulla.onCambio(_annullaAggiornaBarra);
   // dopo un annullamento i dati in memoria vanno riletti e la pagina ridisegnata
   async function _annullaRicarica(g) {
@@ -415,8 +465,17 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   }
   async function annullaGlobale() {
     const s = window.Annulla.stato();
-    if (!s.annulla || s.inCorso) return;
-    if (!(await chiediConferma('Annullare: ' + s.ultima + '?'))) return;
+    const f = _annullaFonti(false);
+    if (!f || s.inCorso) return;
+    if (!(await chiediConferma('Annullare: ' + f.etichetta + '?'))) return;
+    if (f.tipo === 'p') {
+      await pianoAnnulla();
+      return _annullaAggiornaBarra();
+    }
+    if (f.tipo === 'b') {
+      await briefAnnulla();
+      return _annullaAggiornaBarra();
+    }
     try {
       const g = await window.Annulla.annulla();
       if (!g) return;
@@ -430,7 +489,16 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   }
   async function ripristinaGlobale() {
     const s = window.Annulla.stato();
-    if (!s.ripristina || s.inCorso) return;
+    const f = _annullaFonti(true);
+    if (!f || s.inCorso) return;
+    if (f.tipo === 'p') {
+      await pianoRipristina();
+      return _annullaAggiornaBarra();
+    }
+    if (f.tipo === 'b') {
+      await briefRipristina();
+      return _annullaAggiornaBarra();
+    }
     try {
       const g = await window.Annulla.ripristina();
       if (!g) return;
@@ -446,25 +514,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   document.addEventListener('keydown', (e) => {
     if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
     if (e.target && e.target.closest && e.target.closest('input,textarea,select,[contenteditable]')) return;
-    const pg = localStorage.getItem('pagina_corrente') || '';
-    if (pg === 'piano' && typeof _pianoTab !== 'undefined' && _pianoTab === 'calendario') return;
     const k = String(e.key || '').toLowerCase();
-    // nel briefing vale il suo Annulla (righe e pause del giorno aperto)
-    if (
-      pg === 'piano' &&
-      typeof _pianoTab !== 'undefined' &&
-      _pianoTab === 'briefing' &&
-      typeof briefAnnulla === 'function'
-    ) {
-      if (k === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        briefAnnulla();
-      } else if (k === 'y' || (k === 'z' && e.shiftKey)) {
-        e.preventDefault();
-        briefRipristina();
-      }
-      return;
-    }
     if (k === 'z' && !e.shiftKey) {
       e.preventDefault();
       annullaGlobale();

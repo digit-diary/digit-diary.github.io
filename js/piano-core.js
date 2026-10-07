@@ -1811,24 +1811,9 @@ async function _renderPianoCore() {
         });
       h += '</select>';
       if (puoMod) {
-        const nU = (window._pianoUndo || []).length;
-        const nR = (window._pianoRedo || []).length;
+        // Annulla / Ripristina: quelli generici in basso (Ctrl+Z / Ctrl+Y), per tutto il programma
         h +=
-          '<button class="btn-act pin pundo' +
-          (nU ? ' pundo-on' : '') +
-          '" title="' +
-          (nU ? 'Annulla: ' + escP(window._pianoUndo[nU - 1].label) : 'Niente da annullare') +
-          '"' +
-          (nU ? '' : ' disabled') +
-          ' onclick="pianoAnnulla()">&#8630;</button>' +
-          '<button class="btn-act pin pundo' +
-          (nR ? ' pundo-on' : '') +
-          '" title="' +
-          (nR ? 'Ripristina: ' + escP(window._pianoRedo[nR - 1].label) : 'Niente da ripristinare') +
-          '"' +
-          (nR ? '' : ' disabled') +
-          ' onclick="pianoRipristina()">&#8631;</button>' +
-          '<span id="piano-autosave" title="Ogni modifica al piano si salva da sola nel database, subito. Le frecce servono per tornare indietro o avanti se sbagli.">Salvataggio automatico</span>' +
+          '<span id="piano-autosave" title="Ogni modifica al piano si salva da sola nel database, subito. Per tornare indietro o avanti: Annulla e Ripristina in basso (Ctrl+Z, Ctrl+Y).">Salvataggio automatico</span>' +
           '<input type="text" id="piano-cerca" class="campo-cerca" placeholder="Cerca nome o sigla..." value="' +
           escP(window._pianoCercaTesto || '') +
           '" oninput="pianoCercaFiltra(this.value)" title="Mostra solo i collaboratori il cui nome contiene il testo, oppure chi ha quella sigla nel mese (es. C8). Vuoto = tutti">';

@@ -2423,6 +2423,9 @@ function _pianoInitSelezione() {
         }
         if (e.ctrlKey || e.metaKey) tdTot.classList.toggle('tot-sel');
         else {
+          // click semplice: solo questa cella (anche il blocco di turni si toglie), cosi
+          // resta in evidenza un collaboratore solo
+          if (typeof _pianoBloccoPulisci === 'function') _pianoBloccoPulisci();
           document.querySelectorAll('#piano-content .tot-sel').forEach((x) => x.classList.remove('tot-sel'));
           tdTot.classList.add('tot-sel');
         }

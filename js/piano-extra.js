@@ -13,7 +13,19 @@ window._pianoBlocco = null; // {tab, t1, t2, completo}
 // BARRA DI CALCOLO (come la barra di stato di Excel): con una selezione
 // attiva mostra in basso Conteggio, Somma e Media dei valori selezionati;
 // per le celle coi turni la somma usa le ORE del turno
+// COLLABORATORE IN EVIDENZA (07.10, richiesta del titolare): selezionando una cella del
+// calendario (turno) o delle colonne delle ore, il nome della sua riga si colora, cosi
+// si vede subito di chi e. Vale per ogni selezione (click, trascinamento, Ctrl+click).
+function _pianoNomiInEvidenza() {
+  document.querySelectorAll('#piano-content .nome-focus').forEach((x) => x.classList.remove('nome-focus'));
+  document.querySelectorAll('#piano-content .blocco-sel, #piano-content .tot-sel').forEach((c) => {
+    const tr = c.closest('tr');
+    const nome = tr && tr.querySelector('td.piano-nome');
+    if (nome) nome.classList.add('nome-focus');
+  });
+}
 function _pianoStatSelezione() {
+  _pianoNomiInEvidenza();
   let box = document.getElementById('piano-statbar');
   const sel = [
     ...document.querySelectorAll('#piano-content .blocco-sel, #piano-content .col-selected, #piano-content .tot-sel'),
@@ -82,10 +94,12 @@ function _pianoUndoSnap(label) {
   try {
     const st = _pianoStatoMese();
     st.label = label;
+    st.quando = new Date().toISOString(); // per l Annulla unico (l azione piu recente)
     window._pianoUndo = window._pianoUndo || [];
     window._pianoUndo.push(st);
     if (window._pianoUndo.length > 15) window._pianoUndo.shift();
     window._pianoRedo = [];
+    if (window._annullaAggiornaBarra) setTimeout(window._annullaAggiornaBarra, 0);
     // prima modifica di questo mese+settore nella sessione: si conserva lo
     // stato di partenza per "Annulla tutto" (non limitato ai 15 passi)
     window._pianoSessSnap = window._pianoSessSnap || {};
@@ -251,7 +265,13 @@ async function pianoAnnulla() {
         'piano?data=gte.' + st.ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + st.rep + '&limit=8000',
       )) || [];
     window._pianoRedo = window._pianoRedo || [];
-    window._pianoRedo.push({ ym: st.ym, rep: st.rep, label: st.label, righe: _pianoMappaRighe(cur, st.rep) });
+    window._pianoRedo.push({
+      ym: st.ym,
+      rep: st.rep,
+      label: st.label,
+      quando: new Date().toISOString(),
+      righe: _pianoMappaRighe(cur, st.rep),
+    });
     redoAggiunto = true;
   } catch (e) {}
   try {
@@ -329,6 +349,7 @@ async function pianoRipristina() {
   try {
     const prima = _pianoStatoMese();
     prima.label = st.label;
+    prima.quando = new Date().toISOString();
     window._pianoUndo = window._pianoUndo || [];
     window._pianoUndo.push(prima);
   } catch (e) {}

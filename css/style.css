@@ -4032,6 +4032,16 @@ body.dark-theme .piano-dom-valida {
 .piano-table td.blocco-sel-head {
   font-weight: 900 !important;
 }
+/* collaboratore della cella selezionata (turno o ore): nome colorato con barra a sinistra */
+.piano-table td.piano-nome.nome-focus {
+  background: #217346 !important;
+  color: #fff !important;
+  font-weight: 900 !important;
+  box-shadow: inset 4px 0 0 #f39c12;
+}
+.piano-table td.piano-nome.nome-focus * {
+  color: #fff !important;
+}
 /* niente selezione del TESTO del browser sulle tabelle del piano: partirebbe
    dai nomi e confonderebbe; si copia col blocco arancione (o Copia per Excel).
    Gli input (editor inline, briefing) restano selezionabili normalmente */
