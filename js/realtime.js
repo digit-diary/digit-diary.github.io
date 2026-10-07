@@ -407,15 +407,9 @@ async function _renewTokenUnaVolta() {
         return true;
       }
     }
-    const impronta = typeof _bioImprontaLocale === 'function' ? await _bioImprontaLocale(op) : null;
-    if (impronta) {
-      const r2 = await sbRpc('create_bio_session', { p_nome: op, p_impronta: impronta });
-      if (r2 && r2.session_token) {
-        setOpToken(r2.session_token);
-        window._sessioneScadutaAvvisata = false;
-        return true;
-      }
-    }
+    // la biometria NON rinnova piu la sessione in silenzio (v407): serve un gesto della
+    // persona (impronta o volto) alla schermata di accesso, altrimenti il segreto salvato
+    // nel browser bastava da solo a rientrare
   } catch (e) {}
   if (!window._sessioneScadutaAvvisata) {
     window._sessioneScadutaAvvisata = true;

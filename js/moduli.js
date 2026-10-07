@@ -259,7 +259,7 @@ function _moduloScadenzaAiuti() {
       .map(
         (v) =>
           '<button type="button" onclick="_moduloScadenzaMetti(\'' +
-          escP(v.replace(/'/g, "\\'")) +
+          _jsArg(v) +
           '\')" style="font-size:var(--fs-sm,.8125rem);padding:2px 8px;border:1px solid var(--line);border-radius:10px;background:var(--paper2);color:var(--ink);cursor:pointer">' +
           escP(v) +
           '</button>',
@@ -907,7 +907,7 @@ function aggiornaModuliLista() {
     .slice(0, 50)
     .map((m) => {
       const d = new Date(m.created_at);
-      const me = m.collaboratore.replace(/'/g, "\\'");
+      const me = _jsArg(m.collaboratore);
       return (
         '<div class="scad-item" style="flex-wrap:wrap;padding:12px 0"><div style="display:flex;align-items:center;gap:10px;width:100%;flex-wrap:wrap"><span class="scad-date">' +
         d.toLocaleDateString('it-IT') +
@@ -1288,9 +1288,9 @@ async function renderCollaboratoriUI() {
           '</select>' +
           _coperturaChipHtml(c) +
           '<button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2)" onclick="rinominaCollaboratore(\'' +
-          c.nome.replace(/'/g, "\\'") +
+          _jsArg(c.nome) +
           '\')">Rinomina</button><button class="btn-del-tipo" onclick="disattivaCollaboratore(\'' +
-          c.nome.replace(/'/g, "\\'") +
+          _jsArg(c.nome) +
           '\')">Disattiva</button>' +
           (c.data_fine_rapporto
             ? '<span class="mini-badge" style="background:#7f8c8d" title="Ultimo giorno di lavoro: dal giorno dopo non e piu nel piano e nelle ore dovute">fine contratto ' +
@@ -1338,7 +1338,7 @@ async function renderCollaboratoriUI() {
         .map(
           (c) =>
             '<button style="padding:4px 10px;font-size:var(--fs-sm,.8125rem);border:1px solid var(--line);border-radius:2px;cursor:pointer;background:var(--paper);color:var(--muted)" onclick="riattivaCollaboratore(\'' +
-            c.nome.replace(/'/g, "\\'") +
+            _jsArg(c.nome) +
             '\')">+ ' +
             escP(c.nome) +
             '</button>',
@@ -1400,7 +1400,7 @@ function rinominaCollaboratore(nome) {
     '" readonly style="background:var(--paper2);color:var(--muted)"></div><div class="pwd-field"><label>Nuovo nome</label><input type="text" id="rin-collab-nuovo" value="' +
     escP(nome) +
     '"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaRinominaCollaboratore(\'' +
-    nome.replace(/'/g, "\\'") +
+    _jsArg(nome) +
     '\')">Salva</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
   setTimeout(() => {
@@ -1413,23 +1413,6 @@ function rinominaCollaboratore(nome) {
 }
 // Chat e note colleghi di un nome (usata solo quando la persona NON e un
 // operatore: allora i messaggi a suo nome non sono legati a un accesso)
-async function _rinominaChatOperatore(vecchio, nuovo) {
-  const q = encodeURIComponent(vecchio);
-  const passi = [
-    ['chat_messages', 'da_operatore'],
-    ['chat_messages', 'a_operatore'],
-    ['chat_group_members', 'operatore'],
-    ['chat_message_letti', 'operatore'],
-    ['chat_message_hidden', 'operatore'],
-    ['note_colleghi', 'da_operatore'],
-    ['note_colleghi', 'a_operatore'],
-  ];
-  for (const [tab, col] of passi) {
-    try {
-      await secPatch(tab, col + '=eq.' + q, { [col]: nuovo });
-    } catch (_) {}
-  }
-}
 // BRIEFING DA OGGI IN POI: il nome nelle righe gia preparate segue la rinomina
 // (quelli passati restano documenti con il nome di allora)
 async function _rinominaBriefingFuturi(vecchio, nuovo) {
@@ -1456,6 +1439,88 @@ async function _rinominaBriefingFuturi(vecchio, nuovo) {
   }
   return n;
 }
+// RINOMINA DI UN COLLABORATORE IN TUTTO IL PROGRAMMA (v407). Il database rinomina tutte
+// le tabelle in una sola transazione (rinomina_collaboratore: o tutto o niente; prima il
+// programma lo faceva tabella per tabella e un errore a meta lasciava i dati divisi); qui
+// si aggiornano le impostazioni con il nome dentro (ordine del piano, giubilei avvisati,
+// vacanze confermate), i briefing da oggi in poi e la memoria. La usano la finestra
+// Rinomina e Annulla / Ripristina (che la chiamano al contrario). Ritorna
+// { eOperatore, nonRiuscite } o lancia l errore del database.
+async function _rinominaCollaboratoreTutto(vecchio, nuovo) {
+  // CHAT: e legata al NOME DI ACCESSO dell operatore, non all anagrafica. Se chi si
+  // rinomina e anche un operatore del programma, la chat resta al nome di accesso.
+  let eOperatore = false;
+  try {
+    eOperatore = (JSON.parse((await getImp('operatori_lista')) || '[]') || []).includes(vecchio);
+  } catch (_) {}
+  await _rpcSicura('rinomina_collaboratore', {
+    p_token: getOpToken(),
+    p_vecchio: vecchio,
+    p_nuovo: nuovo,
+    p_chat: !eOperatore,
+  });
+  const nonRiuscite = [];
+  // impostazioni con il nome dentro: ordine manuale del piano, avvisi di giubileo gia
+  // inviati ("nome|anni"), vacanze confermate giuste ("nome|data")
+  const rinominaImp = async (chiave, fn) => {
+    try {
+      const v = JSON.parse((await getImp(chiave)) || 'null');
+      if (v == null) return null;
+      const v2 = fn(v);
+      if (JSON.stringify(v) !== JSON.stringify(v2)) await setImp(chiave, JSON.stringify(v2));
+      return v2;
+    } catch (_) {
+      nonRiuscite.push(chiave);
+      return null;
+    }
+  };
+  const ord = await rinominaImp('piano_ordine_collab', (o) => {
+    Object.keys(o).forEach((rep) => {
+      if (Array.isArray(o[rep])) o[rep] = o[rep].map((n) => (n === vecchio ? nuovo : n));
+    });
+    return o;
+  });
+  if (ord) window._pianoOrdineCollab = ord;
+  await rinominaImp('giubileo_notificati', (gn) =>
+    (Array.isArray(gn) ? gn : []).map((k) =>
+      String(k).startsWith(vecchio + '|') ? nuovo + String(k).substring(vecchio.length) : k,
+    ),
+  );
+  await rinominaImp('piano_vacanze_ok', (ok) => {
+    const out = {};
+    Object.keys(ok || {}).forEach(
+      (k) => (out[k.startsWith(vecchio + '|') ? nuovo + k.substring(vecchio.length) : k] = ok[k]),
+    );
+    return out;
+  });
+  try {
+    await _rinominaBriefingFuturi(vecchio, nuovo);
+  } catch (_) {
+    nonRiuscite.push('briefing futuri');
+  }
+  // memoria
+  const ci = collaboratoriCache.findIndex((c) => c.nome === vecchio);
+  if (ci !== -1) collaboratoriCache[ci].nome = nuovo;
+  (typeof moduliCache !== 'undefined' ? moduliCache : []).forEach((m) => {
+    if (m.collaboratore === vecchio) m.collaboratore = nuovo;
+  });
+  datiCache.forEach((e) => {
+    if (e.nome === vecchio) e.nome = nuovo;
+  });
+  [
+    typeof valutazioniCache !== 'undefined' ? valutazioniCache : [],
+    typeof puntiEventiCache !== 'undefined' ? puntiEventiCache : [],
+    typeof hrEventiCache !== 'undefined' ? hrEventiCache : [],
+    typeof _pianoRighe !== 'undefined' ? _pianoRighe : [],
+    typeof _pianoCongediNp !== 'undefined' ? _pianoCongediNp : [],
+  ].forEach((cache) => {
+    cache.forEach((r) => {
+      if (r.collaboratore === vecchio) r.collaboratore = nuovo;
+    });
+  });
+  collaboratoriCache.sort((a, b) => a.nome.localeCompare(b.nome));
+  return { eOperatore: eOperatore, nonRiuscite: nonRiuscite };
+}
 async function salvaRinominaCollaboratore(vecchio) {
   if (!_soloAdminAnagrafica()) return;
   const nuovo = document.getElementById('rin-collab-nuovo').value.trim();
@@ -1467,121 +1532,41 @@ async function salvaRinominaCollaboratore(vecchio) {
     document.getElementById('pwd-modal').classList.add('hidden');
     return;
   }
+  let esito;
   try {
-    await secPatch('collaboratori', 'nome=eq.' + encodeURIComponent(vecchio), {
-      nome: nuovo,
-    });
-    await secPatch('registrazioni', 'nome=eq.' + encodeURIComponent(vecchio), {
-      nome: nuovo,
-    });
-    // CHAT: e legata al NOME DI ACCESSO dell operatore, non all anagrafica. Se chi
-    // si rinomina e anche un operatore del programma, la chat resta al nome di
-    // accesso (prima si spostava e al login l operatore non vedeva piu i suoi
-    // messaggi); il nome di accesso per ora non si rinomina dal programma.
-    let eOperatore = false;
-    try {
-      eOperatore = (JSON.parse((await getImp('operatori_lista')) || '[]') || []).includes(vecchio);
-    } catch (_) {}
-    if (!eOperatore) await _rinominaChatOperatore(vecchio, nuovo);
-    await secPatch('moduli', 'collaboratore=eq.' + encodeURIComponent(vecchio), { collaboratore: nuovo });
-    // TUTTE le tabelle con il nome del collaboratore: valutazioni, punti, storico HR,
-    // allegati, piano e i dati del piano legati alla persona (vacanze, riporti CGF e
-    // ore, recupero ore, timbrature, ore del mese, congedi non pagati). Prima le
-    // ultime sette restavano con il nome vecchio: le vacanze sparivano dalla persona.
-    const tabelle = [
-      'valutazioni',
-      'punti_eventi',
-      'hr_eventi',
-      'hr_allegati',
-      'piano',
-      'piano_vacanze',
-      'piano_cgf_riporto',
-      'piano_saldo_iniziale',
-      'piano_recupero_ore',
-      'piano_timbrature',
-      'piano_ore_mese',
-      'collab_congedi_np',
-    ];
-    const nonRiuscite = [];
-    for (const tab of tabelle) {
-      try {
-        await secPatch(tab, 'collaboratore=eq.' + encodeURIComponent(vecchio), { collaboratore: nuovo });
-      } catch (_) {
-        nonRiuscite.push(tab);
-      }
-    }
-    // ordine manuale delle righe del piano (per nome): la persona resta al suo posto
-    try {
-      const ord = JSON.parse((await getImp('piano_ordine_collab')) || '{}');
-      let cambiato = false;
-      Object.keys(ord).forEach((rep) => {
-        if (Array.isArray(ord[rep]))
-          ord[rep] = ord[rep].map((n) => {
-            if (n !== vecchio) return n;
-            cambiato = true;
-            return nuovo;
-          });
-      });
-      if (cambiato && (await salvaImp('piano_ordine_collab', JSON.stringify(ord)))) window._pianoOrdineCollab = ord;
-    } catch (_) {}
-    try {
-      await _rinominaBriefingFuturi(vecchio, nuovo);
-    } catch (_) {
-      nonRiuscite.push('briefing futuri');
-    }
-    // avvisi di giubileo gia inviati: la chiave e "nome|anni", altrimenti HR li riceverebbe di nuovo
-    try {
-      const gn = JSON.parse((await getImp('giubileo_notificati')) || '[]');
-      const gn2 = gn.map((k) =>
-        String(k).startsWith(vecchio + '|') ? nuovo + String(k).substring(vecchio.length) : k,
-      );
-      if (JSON.stringify(gn) !== JSON.stringify(gn2)) await setImp('giubileo_notificati', JSON.stringify(gn2));
-    } catch (_) {}
-    const ci = collaboratoriCache.findIndex((c) => c.nome === vecchio);
-    if (ci !== -1) collaboratoriCache[ci].nome = nuovo;
-    // moduli in memoria (prima restavano al nome vecchio fino al ricaricamento)
-    (typeof moduliCache !== 'undefined' ? moduliCache : []).forEach((m) => {
-      if (m.collaboratore === vecchio) m.collaboratore = nuovo;
-    });
-    datiCache.forEach((e) => {
-      if (e.nome === vecchio) e.nome = nuovo;
-    });
-    // aggiorna anche le cache in memoria delle tabelle nome-collaboratore
-    [
-      typeof valutazioniCache !== 'undefined' ? valutazioniCache : [],
-      typeof puntiEventiCache !== 'undefined' ? puntiEventiCache : [],
-      typeof hrEventiCache !== 'undefined' ? hrEventiCache : [],
-      typeof _pianoRighe !== 'undefined' ? _pianoRighe : [],
-      typeof _pianoCongediNp !== 'undefined' ? _pianoCongediNp : [],
-    ].forEach((cache) => {
-      cache.forEach((r) => {
-        if (r.collaboratore === vecchio) r.collaboratore = nuovo;
-      });
-    });
-    collaboratoriCache.sort((a, b) => a.nome.localeCompare(b.nome));
-    logAzione(
-      'Rinomina collaboratore',
-      vecchio + ' → ' + nuovo + (nonRiuscite.length ? ' · non aggiornate: ' + nonRiuscite.join(', ') : ''),
-    );
-    if (nonRiuscite.length) toast('Rinominato, ma non aggiornate: ' + nonRiuscite.join(', '));
-    document.getElementById('pwd-modal').classList.add('hidden');
-    renderCollaboratoriUI();
-    aggiornaNomi();
-    render();
-    toast('Collaboratore rinominato');
-    if (eOperatore)
-      await mostraAvviso(
-        vecchio +
-          ' e anche un operatore del programma. Anagrafica, Diario, Piano e schede sono passati a "' +
-          nuovo +
-          '"; il nome di ACCESSO e la chat restano "' +
-          vecchio +
-          '", cosi al login ritrova i suoi messaggi. Il nome di accesso per ora non si cambia dal programma.',
-        { titolo: 'Anche operatore' },
-      );
+    // le scritture interne (impostazioni) non sono azioni separate per Annulla
+    esito =
+      window.Annulla && typeof window.Annulla.senzaTraccia === 'function'
+        ? await window.Annulla.senzaTraccia(() => _rinominaCollaboratoreTutto(vecchio, nuovo))
+        : await _rinominaCollaboratoreTutto(vecchio, nuovo);
   } catch (e) {
-    toast('Errore: nome già esistente?');
+    // il database non ha cambiato niente (una sola transazione): il messaggio dice perche
+    toastErrore('Rinomina non fatta: ' + ((e && e.message) || e), 9000);
+    return;
   }
+  // una sola azione per Annulla: si annulla rinominando al contrario, ovunque
+  if (window.Annulla && typeof window.Annulla.azione === 'function')
+    window.Annulla.azione({ tipo: 'rinomina', da: vecchio, a: nuovo }, 'Rinomina ' + vecchio + ' → ' + nuovo);
+  logAzione(
+    'Rinomina collaboratore',
+    vecchio + ' → ' + nuovo + (esito.nonRiuscite.length ? ' · non aggiornate: ' + esito.nonRiuscite.join(', ') : ''),
+  );
+  if (esito.nonRiuscite.length) toast('Rinominato, ma non aggiornate: ' + esito.nonRiuscite.join(', '));
+  document.getElementById('pwd-modal').classList.add('hidden');
+  renderCollaboratoriUI();
+  aggiornaNomi();
+  render();
+  toast('Collaboratore rinominato');
+  if (esito.eOperatore)
+    await mostraAvviso(
+      vecchio +
+        ' e anche un operatore del programma. Anagrafica, Diario, Piano e schede sono passati a "' +
+        nuovo +
+        '"; il nome di ACCESSO e la chat restano "' +
+        vecchio +
+        '", cosi al login ritrova i suoi messaggi. Il nome di accesso per ora non si cambia dal programma.',
+      { titolo: 'Anche operatore' },
+    );
 }
 // ===== COPERTURA ALTRI SETTORI =====
 // Il collaboratore appartiene al SUO settore; se serve puo' coprire i buchi
@@ -2828,7 +2813,7 @@ function render() {
       .map((e) => {
         const d = new Date(e.data),
           bc = 'badge-' + e.tipo.replace(/ /g, '-'),
-          te = e.tipo.replace(/'/g, "\\'"),
+          te = _jsArg(e.tipo),
           pin = pinnedIds.has(e.id);
         const rep = e.reparto
           ? '<span style="display:inline-block;margin-left:6px;padding:2px 8px;background:var(--muted);color:white;border-radius:2px;font-size:var(--fs-sm,.8125rem);font-weight:600">' +
@@ -2871,7 +2856,7 @@ function render() {
           '</div><div class="entry-time">' +
           d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) +
           '</div></div><div class="entry-body"><div class="entry-top"><span class="entry-name" onclick="apriProfilo(\'' +
-          e.nome.replace(/'/g, "\\'") +
+          _jsArg(e.nome) +
           '\')">' +
           esc(e.nome) +
           '</span><span class="badge ' +
@@ -2902,7 +2887,7 @@ function render() {
           ')">Modifica</button>' +
           (e.tipo === nomeCorrente('Malattia') && typeof apriPopupCopertura === 'function'
             ? '<button class="btn-act" style="color:var(--c-verdeacqua,#1a7a6d);border-color:var(--c-verdeacqua,#1a7a6d)" onclick="apriPopupCopertura(\'' +
-              e.nome.replace(/'/g, "\\'") +
+              _jsArg(e.nome) +
               "','" +
               _dataRifCopertura(e) +
               '\')" title="Chi copre / chi ha rifiutato">Copertura</button>'
@@ -2953,15 +2938,7 @@ function acFiltra(inputId, dropId) {
     .slice(0, 15)
     .map(
       (n) =>
-        '<div onmousedown="acScegli(\'' +
-        inputId +
-        "','" +
-        dropId +
-        "','" +
-        n.replace(/'/g, "\\'") +
-        '\')">' +
-        escP(n) +
-        '</div>',
+        '<div onmousedown="acScegli(\'' + inputId + "','" + dropId + "','" + _jsArg(n) + '\')">' + escP(n) + '</div>',
     )
     .join('');
   drop.classList.add('show');
@@ -2996,7 +2973,7 @@ function acFiltraModuli(inputId, dropId) {
         "','" +
         dropId +
         "','" +
-        n.replace(/'/g, "\\'") +
+        _jsArg(n) +
         '\')">' +
         escP(n) +
         '</div>',

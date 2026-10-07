@@ -259,6 +259,8 @@
         for (const r of op.righe) await canale.post(op.table, r);
       } else if (op.tipo === 'imp') {
         await canale.imp(op.chiave, op.prima == null ? '' : op.prima);
+      } else if (op.tipo === 'rinomina') {
+        await canale.rinomina(op.a, op.da); // al contrario, in tutto il programma
       }
     }
     async function riapplica(op) {
@@ -283,6 +285,8 @@
         for (const r of op.righe) await canale.del(op.table, filtroRiga(op.table, r));
       } else if (op.tipo === 'imp') {
         await canale.imp(op.chiave, op.dopo);
+      } else if (op.tipo === 'rinomina') {
+        await canale.rinomina(op.da, op.a);
       }
     }
     async function annulla() {
@@ -341,6 +345,14 @@
     function onCambio(f) {
       st.ascoltatori.push(f);
     }
+    // AZIONE COMPOSTA che il canale sa invertire da sola (es. rinomina di un collaboratore
+    // in tutte le tabelle): entra nella pila come un azione unica con la sua etichetta
+    function azione(op, etichetta) {
+      if (st.inCorso) return;
+      chiudiGruppo();
+      aggiungi(op);
+      chiudiGruppo(etichetta);
+    }
     // scritture di conseguenza (riallineamenti dopo Annulla o Ripristina): non sono
     // azioni dell utente, quindi non entrano nella pila e non svuotano Ripristina
     async function senzaTraccia(fn) {
@@ -369,6 +381,7 @@
       annulla,
       ripristina,
       senzaTraccia,
+      azione,
       stato,
       onCambio,
       azzera,
@@ -391,6 +404,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     post: (t, r) => secPost(t, r),
     del: (t, f) => secDel(t, f),
     imp: (k, v) => setImp(k, v),
+    rinomina: (da, a) => _rinominaCollaboratoreTutto(da, a),
     adesso: () => new Date().toISOString(),
     operatore: () => (typeof getOperatore === 'function' && getOperatore()) || 'Admin',
     attesa: (ms, fn) => setTimeout(fn, ms),

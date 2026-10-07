@@ -958,7 +958,7 @@ function renderFormazione() {
   collabs.forEach((c) => {
     const lv = livelloDiCollaboratore(c);
     const pts = puntiTotali(c.nome);
-    const ne = c.nome.replace(/'/g, "\\'");
+    const ne = _jsArg(c.nome);
     html +=
       '<tr data-matr-nome="' +
       escP(c.nome).toLowerCase() +
@@ -1193,9 +1193,9 @@ function renderFormazione() {
               ')</span></span>' +
               (adm || puoPunti
                 ? '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px" onclick="registraPremioConsegnato(\'' +
-                  a.collaboratore.replace(/'/g, "\\'") +
+                  _jsArg(a.collaboratore) +
                   "','" +
-                  prem.replace(/'/g, "\\'") +
+                  _jsArg(prem) +
                   '\')">Consegna ora</button>'
                 : '') +
               '</div>'
@@ -1632,11 +1632,11 @@ async function toggleCompetenza(collabId, key, cb) {
           ? '<p style="margin-bottom:16px">Premio previsto: <strong>' +
             escP(premio) +
             '</strong></p><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="registraPremioConsegnato(\'' +
-            c.nome.replace(/'/g, "\\'") +
+            _jsArg(c.nome) +
             "','Livello " +
             dopo +
             ': ' +
-            escP(premio.replace(/'/g, "\\'")) +
+            _jsArg(premio) +
             '\')">Registra premio consegnato</button><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Più tardi</button></div>'
           : '<div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">OK</button></div>');
       document.getElementById('pwd-modal').classList.remove('hidden');
@@ -1773,9 +1773,9 @@ async function assegnaPuntiRapido() {
           ' punti</strong>.</p><p style="margin-bottom:16px">Premio: <strong>' +
           escP(raggiunta.premio) +
           '</strong></p><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="registraPremioConsegnato(\'' +
-          nome.replace(/'/g, "\\'") +
+          _jsArg(nome) +
           "','" +
-          escP(raggiunta.premio.replace(/'/g, "\\'")) +
+          _jsArg(raggiunta.premio) +
           '\')">Registra premio consegnato</button><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Più tardi</button></div>';
         document.getElementById('pwd-modal').classList.remove('hidden');
       }, 300);
@@ -3286,7 +3286,7 @@ function _renderGiubileiCard(collabs) {
     daConsegnare.forEach((x) => {
       html +=
         '<div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--line);flex-wrap:wrap"><strong style="min-width:170px;cursor:pointer" onclick="apriSchedaCollaboratore(\'' +
-        x.nome.replace(/'/g, "\\'") +
+        _jsArg(x.nome) +
         '\')">' +
         escP(x.nome) +
         '</strong><span class="mini-badge" style="background:#8b6914;font-size:var(--fs-sm,.8125rem)">' +

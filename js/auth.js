@@ -268,7 +268,7 @@ function chiediOperatore() {
   ].sort();
   document.getElementById('operatore-modal-content').innerHTML =
     '<h3>Chi sei?</h3><p>Seleziona o inserisci il tuo nome (per tracciare chi inserisce)</p><div class="pwd-field"><label>Nome operatore</label><input type="text" id="inp-operatore" list="op-list" placeholder="Il tuo nome..."><datalist id="op-list">' +
-    nomi.map((n) => '<option value="' + n + '">').join('') +
+    nomi.map((n) => '<option value="' + escP(n).replace(/"/g, '&quot;') + '">').join('') +
     '</datalist></div><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="confermaOperatore()">Conferma</button></div>';
   document.getElementById('operatore-modal').classList.remove('hidden');
   setTimeout(() => document.getElementById('inp-operatore').focus(), 100);

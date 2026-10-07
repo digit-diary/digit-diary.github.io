@@ -761,7 +761,7 @@ async function _renderPianoFormulariTab() {
     titolo +
     '</b><br><span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">Modulo ufficiale Word da stampare/compilare. In alternativa, la versione Excel si compila al computer e si reimporta in Formazione per la certificazione automatica.</span></div>' +
     '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 14px;border-color:var(--c-blu,#1a4a7a);color:var(--c-blu,#1a4a7a)" onclick="apriFormularioPerNome(\'' +
-    nomeOriginale.replace(/'/g, "\\'") +
+    _jsArg(nomeOriginale) +
     '\')">Scarica Word (originale)</button>' +
     '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px" onclick="pianoScaricaProtocollo(\'' +
     chiave +

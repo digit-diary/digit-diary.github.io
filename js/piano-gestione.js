@@ -2252,7 +2252,7 @@ async function _renderPianoRecuperoTab() {
       '<tr data-nome="' +
       escP(nome) +
       '"><td class="piano-nome" onclick="pianoRecSelRiga(event,\'' +
-      escP(nome.replace(/'/g, "\\'")) +
+      _jsArg(nome) +
       '\',this)" title="Click: seleziona la riga &middot; Ctrl+click: aggiunge &middot; ' +
       escP(nome) +
       '" style="text-align:left;cursor:pointer">' +
@@ -2276,9 +2276,7 @@ async function _renderPianoRecuperoTab() {
         '" onmousedown="pianoRecSelCella(event,this)" type="text" inputmode="decimal" value="' +
         (v === '' ? '' : v) +
         '"' +
-        (puoMod
-          ? ' onchange="pianoRecuperoCella(this,\'' + escP(nome.replace(/'/g, "\\'")) + "','" + dstr + '\')"'
-          : ' readonly') +
+        (puoMod ? ' onchange="pianoRecuperoCella(this,\'' + _jsArg(nome) + "','" + dstr + '\')"' : ' readonly') +
         ' title="' +
         escP(nome) +
         ' &middot; ' +

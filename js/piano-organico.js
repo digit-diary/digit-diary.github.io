@@ -877,7 +877,7 @@ function _organicoConfrontoHtml(s) {
           '<span class="mini-badge" style="background:#1a7a6d;font-size:var(--fs-sm,.8125rem)">' +
           escP(n + ' ' + Math.round(sc.percentuali[n] * 100) + '%') +
           ' <a href="#" style="color:#fff" onclick="organicoTogliPercentuale(\'' +
-          escP(n).replace(/'/g, "\\'") +
+          _jsArg(n) +
           '\');return false">x</a></span>',
       ),
     )

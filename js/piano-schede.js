@@ -1489,7 +1489,7 @@ function _renderPianoSaldoAnnoCard() {
         ? 'Aggiornato al ' + String(rec.data_riferimento).split('-').reverse().join('.')
         : 'Clic per scrivere il riporto') +
       '" onclick="pianoSaldoIniziale(\'' +
-      escP(nome.replace(/'/g, "\\'")) +
+      _jsArg(nome) +
       '\')">' +
       (rip ? (rip > 0 ? '+' : '') + rip : '–') +
       '</td>';

@@ -2013,7 +2013,7 @@ async function _renderPianoCore() {
         '<span class="pbar-info">' +
         _pianoRighe.length +
         ' assegnazioni' +
-        (puoMod ? ' · click modifica, trascina o Shift+click per selezionare' : ' · sola lettura') +
+        (puoMod ? ' · doppio clic modifica, trascina o Shift+clic per selezionare' : ' · sola lettura') +
         '</span></div></div>';
       h += '<div id="piano-violazioni"></div><div id="piano-auto-avviso"></div><div id="piano-confine"></div>';
 
@@ -2135,7 +2135,7 @@ async function _renderPianoCore() {
       await _pianoCaricaOreMese(_pianoMeseSel);
       const _oggiCal = oggiLocale();
       nomi.forEach((nome) => {
-        const ne = nome.replace(/'/g, "\\'");
+        const ne = _jsArg(nome);
         const infoC0 = _pianoCollabInfo(nome);
         const perc0 = infoC0 ? parseFloat(infoC0.percentuale) || 1 : 1;
         let ore = 0; // solo turni (colonna Ore = ore_stimate Turnivo)

@@ -1248,11 +1248,14 @@ async function eseguiCambioPwdOp() {
     return;
   }
   const nh = await secureHash(p1, op);
+  // con il token di chi cambia: le altre sessioni e i dispositivi biometrici della
+  // persona si chiudono, questa resta aperta (v407)
   const res = await sbRpc('change_op_pwd', {
     p_nome: op,
     p_old_hash: oh,
     p_new_hash: nh,
     p_old_legacy_hash: ohL,
+    p_token: getOpToken(),
   });
   if (!res || !res.success) {
     err.textContent = 'Password attuale errata';

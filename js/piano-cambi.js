@@ -2632,7 +2632,7 @@ function _schedaCambiTurnoRiga(nome) {
     )
     .sort((a, b) => String(b.data_modulo || '').localeCompare(String(a.data_modulo || '')));
   if (!fogli.length) return '';
-  const nomeJs = escP(nome.replace(/'/g, "\\'"));
+  const nomeJs = _jsArg(nome);
   const righe = fogli
     .slice(0, 3)
     .map((m) => {

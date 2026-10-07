@@ -357,6 +357,24 @@ function canaleSicuro(c, A) {
     ok(/qualcun altro/.test(String(err2)), 'un orario davvero diverso resta un conflitto');
   }
 
+  // RINOMINA: azione composta che il canale inverte da solo, scritture interne senza traccia
+  {
+    const c = canaleFinto();
+    const chiamate = [];
+    c.rinomina = async (da, a) => chiamate.push(da + '>' + a);
+    const A = creaAnnulla(c, { limite: 30, quiete: 2000 });
+    await A.senzaTraccia(async () => {
+      await A.dopoImp(await A.primaDiImp('piano_ordine_collab'), 'piano_ordine_collab', '[]');
+    });
+    eq(A.stato().annulla, 0, 'scritture dentro senzaTraccia: nessuna azione');
+    A.azione({ tipo: 'rinomina', da: 'Rossi Mario', a: 'Rossi Marco' }, 'Rinomina Rossi Mario');
+    eq(A.stato().ultima, 'Rinomina Rossi Mario', 'rinomina = una sola azione con la sua etichetta');
+    await A.annulla();
+    eq(chiamate, ['Rossi Marco>Rossi Mario'], 'Annulla rinomina al contrario');
+    await A.ripristina();
+    eq(chiamate, ['Rossi Marco>Rossi Mario', 'Rossi Mario>Rossi Marco'], 'Ripristina rinomina di nuovo');
+  }
+
   console.log(
     '\n=======================================\n  ' +
       passati +
