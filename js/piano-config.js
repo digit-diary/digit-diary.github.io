@@ -1724,10 +1724,36 @@ async function importaPianoExcel(input) {
   input.value = '';
   if (!file || !window.XLSX) return;
   const ym = _pianoMeseSel;
+  let wb;
+  try {
+    wb = XLSX.read(await file.arrayBuffer(), { bookFiles: true }); // file interni: servono per i colori delle celle
+  } catch (e) {
+    toast('Errore lettura file piano');
+    return;
+  }
+  await _importaPianoDaWb(wb, ym);
+  // ANCHE IL MESE IN CORSO (07.10, richiesta del titolare): importando il mese dopo, se il
+  // file ha anche il foglio del mese in corso (con i cambi fatti nel file), si confronta e,
+  // se ci sono differenze, si propone di aggiornarlo con le stesse regole (giorni chiusi,
+  // malattie, celle bloccate e altri settori restano come sono)
+  const meseOggi = oggiLocale().substring(0, 7);
+  if (meseOggi !== ym && _xlsFoglioMese(wb, meseOggi)) {
+    const prima = _pianoMeseSel;
+    try {
+      _pianoMeseSel = meseOggi;
+      await renderPiano();
+      await _importaPianoDaWb(wb, meseOggi, { meseInCorso: true });
+    } finally {
+      _pianoMeseSel = prima;
+      renderPiano();
+    }
+  }
+}
+// opz.meseInCorso: secondo giro sul mese in corso dello stesso file (si chiede prima)
+async function _importaPianoDaWb(wb, ym, opz) {
+  opz = opz || {};
   const nGiorni = _pianoUltimoGiorno(ym);
   try {
-    const buf = await file.arrayBuffer();
-    const wb = XLSX.read(buf, { bookFiles: true }); // file interni: servono per i colori delle celle
     const collabs = collaboratoriCache.filter((c) => c.attivo !== false);
     // match nomi robusto: maiuscole/minuscole, ordine parole, refusi tipo 0/O e 1/I
     const trova = (nome) => _xlsTrovaCollab(nome, collabs);
@@ -2022,10 +2048,16 @@ async function importaPianoExcel(input) {
     ]
       .filter((x) => x[0].length)
       .map((x) => '   ' + x[0].length + ' ' + x[1] + (x[0].length <= 3 ? ': ' + x[0].join('; ') : ''));
+    // mese in corso: se nel file e uguale al programma non si chiede niente
+    if (opz.meseInCorso && !nuoveCelle.length && !cambiate.length) {
+      toast(lbl + ' nel file e uguale al piano: niente da aggiornare');
+      return;
+    }
     const scelta = await chiediModulo(
-      'Importare il piano di ' +
-        lbl +
-        '?\n\n• Letto da: ' +
+      (opz.meseInCorso
+        ? 'Il file contiene anche il MESE IN CORSO (' + lbl + ') con differenze dal piano. Aggiorno anche ' + lbl + '?'
+        : 'Importare il piano di ' + lbl + '?') +
+        '\n\n• Letto da: ' +
         fonte +
         '\n• ' +
         nomiOk.size +
@@ -2231,7 +2263,7 @@ async function importaPianoExcel(input) {
             !lavoranti.has(c.nome) &&
             !String(c.reparti_extra || '').trim(), // i multi-reparto lavorano altrove
         );
-    if (!fileCompleto && lavoranti.size)
+    if (!fileCompleto && lavoranti.size && !opz.meseInCorso)
       toast('Nel file il mese e compilato solo in parte: nessuna proposta di disattivare collaboratori');
     // chi non e nel file: FINE CONTRATTO all ultimo giorno del mese prima (la storia resta),
     // non piu disattivato del tutto; chi ha gia una fine contratto non si propone
@@ -2240,7 +2272,7 @@ async function importaPianoExcel(input) {
       d.setDate(d.getDate() - 1);
       return dataLocaleISO(d);
     })();
-    const daFermare = daDisattivare.filter((c) => !c.data_fine_rapporto);
+    const daFermare = opz.meseInCorso ? [] : daDisattivare.filter((c) => !c.data_fine_rapporto);
     if (
       daFermare.length &&
       (await chiediConferma(
@@ -2356,7 +2388,7 @@ async function importaPianoExcel(input) {
     );
     // il fabbisogno del mese dallo stesso file (o dai turni importati se il file non l ha)
     try {
-      await _pianoFabbisognoDopoImport(wb, ym);
+      if (!opz.meseInCorso) await _pianoFabbisognoDopoImport(wb, ym);
     } catch (e) {
       toastErrore('Fabbisogno non caricato dal file: ' + ((e && e.message) || e));
     }
