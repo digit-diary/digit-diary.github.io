@@ -1437,7 +1437,60 @@ async function pianoStoriaCella(nome, dstr) {
       r.generato ? 'Messa dalla bozza' : r.protetto ? 'Scritta a mano o confermata (protetta)' : 'Scritta a mano',
     );
   } else righe.push('Oggi: cella vuota');
-  if (typeof pianoTabVisibile !== 'function' || pianoTabVisibile('storico') || isAdmin()) {
+  // STORICO DELLA CELLA (v408): ogni cambio registrato dal database, com era e com e
+  // diventata, chi e quando (anche bozza, import, vacanze, Annulla)
+  let esatte = null;
+  try {
+    esatte = await _rpcSicura('piano_storico_cella', { p_token: getOpToken(), p_collaboratore: nome, p_data: dstr });
+  } catch (e) {
+    esatte = null; // database senza la migrazione 20260901: resta il registro
+  }
+  if (esatte && esatte.length) {
+    // il ripristino (Annulla, versioni) cancella e riscrive: le due righe dello stesso
+    // operatore nello stesso momento sono un cambio solo ("S7 -> S1")
+    const uniti = [];
+    for (let i = 0; i < esatte.length; i++) {
+      const x = esatte[i];
+      const y = esatte[i + 1];
+      if (
+        y &&
+        x.azione === 'nuova' &&
+        y.azione === 'cancellata' &&
+        (x.operatore || '') === (y.operatore || '') &&
+        Math.abs(new Date(x.quando) - new Date(y.quando)) < 5000
+      ) {
+        uniti.push(Object.assign({}, x, { da: y.da }));
+        i++;
+      } else uniti.push(x);
+    }
+    esatte = uniti.filter((x) => (x.da || '') !== (x.a || '') || x.azione === 'modifica');
+    righe.push('');
+    righe.push('Cambi registrati (' + esatte.length + '):');
+    esatte.forEach((x) =>
+      righe.push(
+        '\u2022 ' +
+          new Date(x.quando).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' }) +
+          ' · ' +
+          (x.operatore || '') +
+          ' · ' +
+          (x.da || 'vuota') +
+          ' \u2192 ' +
+          (x.a || 'vuota') +
+          (x.ora_inizio && x.ora_fine
+            ? ' ' + String(x.ora_inizio).substring(0, 5) + '-' + String(x.ora_fine).substring(0, 5)
+            : '') +
+          (x.motivo_blocco
+            ? ' · lucchetto: ' + x.motivo_blocco
+            : x.commento
+              ? ' · ' + String(x.commento).substring(0, 80)
+              : ''),
+      ),
+    );
+  }
+  if (
+    !(esatte && esatte.length) &&
+    (typeof pianoTabVisibile !== 'function' || pianoTabVisibile('storico') || isAdmin())
+  ) {
     let log = [];
     try {
       log =

@@ -1673,6 +1673,172 @@ function pianoStoricoSort(campo) {
   window._pianoStoricoSort = { campo: campo, dir: s0.campo === campo ? -s0.dir : campo === 'created_at' ? -1 : 1 };
   renderPiano();
 }
+// VERSIONI DEL MESE (storico del piano, v408): ogni cambio di cella registrato dal
+// database (piano_storico). Si sceglie un momento e si riporta il mese di questo settore
+// a com era subito PRIMA (oppure a un giorno e un ora scelti). Il ripristino usa le
+// scritture normali: e registrato a sua volta e si annulla con Annulla.
+async function _pianoVersioniHtml() {
+  const ym = _pianoMeseSel;
+  const rep = _pianoReparto();
+  let momenti = null;
+  try {
+    momenti = (await _rpcSicura('piano_storico_momenti', { p_token: getOpToken(), p_reparto: rep, p_ym: ym })) || [];
+  } catch (e) {
+    return '<div class="main-card" style="margin-bottom:16px"><div class="card-header">Versioni del mese</div><div style="padding:12px 14px;color:var(--muted)">Lo storico delle celle non e ancora disponibile su questo database (serve la migrazione 20260901).</div></div>';
+  }
+  const puo = puoGestirePiano();
+  const ora = (t) => new Date(t).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
+  let h =
+    '<div class="main-card" style="margin-bottom:16px"><div class="card-header">Versioni del mese · ' +
+    escP(typeof MESI_FULL !== 'undefined' ? MESI_FULL[parseInt(ym.split('-')[1]) - 1] + ' ' + ym.split('-')[0] : ym) +
+    ' · ' +
+    escP(repartoLabel(rep)) +
+    '</div><div style="padding:10px 14px">' +
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Ogni cambio di cella e registrato dal database con chi e quando (a mano, bozza, import, vacanze, Annulla), da qualsiasi PC. ' +
+    (puo
+      ? 'Con <b>Riporta a prima</b> il mese torna com era subito prima di quel momento: vedi le differenze e confermi; i giorni chiusi restano come sono e tutto si annulla con Annulla.'
+      : 'Riportare il mese indietro e di chi gestisce il piano.') +
+    '</p>';
+  if (puo)
+    h +=
+      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><label for="storico-quando" style="font-size:var(--fs-sm,.8125rem)">Riporta il mese a com era il</label><input type="datetime-local" id="storico-quando" style="padding:4px 6px"><button class="btn-act" onclick="pianoStoricoRiportaA()">Vedi e riporta</button></div>';
+  if (!momenti.length) {
+    h +=
+      '<p style="color:var(--muted)">Nessuna modifica registrata per questo mese (lo storico parte dall installazione).</p></div></div>';
+    return h;
+  }
+  h +=
+    '<div style="overflow-x:auto;max-height:380px;overflow-y:auto"><table class="piano-table" style="min-width:640px;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Quando</th><th style="text-align:left">Chi</th><th>Celle</th><th style="text-align:left">Esempi</th>' +
+    (puo ? '<th></th>' : '') +
+    '</tr></thead><tbody>';
+  momenti.forEach((m) => {
+    const det = [
+      m.nuove ? m.nuove + ' nuove' : '',
+      m.modificate ? m.modificate + ' cambiate' : '',
+      m.cancellate ? m.cancellate + ' tolte' : '',
+    ]
+      .filter(Boolean)
+      .join(', ');
+    h +=
+      '<tr><td style="text-align:left;white-space:nowrap">' +
+      escP(ora(m.primo)) +
+      '</td><td style="text-align:left">' +
+      escP(m.operatore || '-') +
+      '</td><td title="' +
+      escP(det) +
+      '"><b>' +
+      m.celle +
+      '</b></td><td style="text-align:left;font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
+      escP((m.esempi || []).join(' · ')) +
+      (m.celle > (m.esempi || []).length ? ' …' : '') +
+      '</td>' +
+      (puo
+        ? '<td><button class="btn-act" title="Riporta il mese a com era subito prima di questo momento" onclick="pianoStoricoRiporta(\'' +
+          _jsArg(m.primo) +
+          '\')">Riporta a prima</button></td>'
+        : '') +
+      '</tr>';
+  });
+  h += '</tbody></table></div></div></div>';
+  return h;
+}
+function pianoStoricoRiportaA() {
+  const v = (document.getElementById('storico-quando') || {}).value;
+  if (!v) {
+    toast('Scegli giorno e ora');
+    return;
+  }
+  // l ora scelta e quella di Lugano: la data locale del browser la converte
+  pianoStoricoRiporta(new Date(v).toISOString(), true);
+}
+async function pianoStoricoRiporta(quando, esatto) {
+  if (!puoGestirePiano()) return;
+  const ym = _pianoMeseSel;
+  const rep = _pianoReparto();
+  // "prima di questo momento": un millesimo prima della prima cella cambiata
+  const istante = esatto ? quando : new Date(new Date(quando).getTime() - 1).toISOString();
+  let stato;
+  let cur;
+  try {
+    stato =
+      (await _rpcSicura('piano_storico_al', { p_token: getOpToken(), p_reparto: rep, p_ym: ym, p_quando: istante })) ||
+      [];
+    const fine = ym + '-' + String(_pianoUltimoGiorno(ym)).padStart(2, '0');
+    cur =
+      (await secGet('piano?data=gte.' + ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + rep + '&limit=8000')) || [];
+  } catch (e) {
+    toastErrore('Storico non letto: ' + ((e && e.message) || e));
+    return;
+  }
+  const k = (r) => r.collaboratore + '|' + String(r.data).substring(0, 10);
+  const firma = (r) =>
+    r ? [r.codice, r.ora_inizio || '', r.ora_fine || '', r.commento || '', r.motivo_blocco || ''].join('|') : '';
+  const prima = new Map(stato.map((r) => [k(r), r]));
+  const oggi = new Map(cur.map((r) => [k(r), r]));
+  const diverse = [...new Set([...prima.keys(), ...oggi.keys()])].filter(
+    (x) => firma(prima.get(x)) !== firma(oggi.get(x)),
+  );
+  const quandoIt = new Date(istante).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'medium' });
+  if (!diverse.length) {
+    toast('Il mese e gia com era il ' + quandoIt);
+    return;
+  }
+  diverse.sort((a, b) => a.split('|')[1].localeCompare(b.split('|')[1]) || a.localeCompare(b));
+  const esempi = diverse
+    .slice(0, 14)
+    .map((x) => {
+      const [n, d] = x.split('|');
+      return (
+        '\u2022 ' +
+        n +
+        ' ' +
+        d.split('-').reverse().join('.') +
+        ': oggi ' +
+        ((oggi.get(x) || {}).codice || 'vuota') +
+        ' \u2192 allora ' +
+        ((prima.get(x) || {}).codice || 'vuota')
+      );
+    })
+    .join('\n');
+  if (
+    !(await chiediConferma(
+      'Riporto ' +
+        ym +
+        ' (' +
+        repartoLabel(rep) +
+        ') a com era il ' +
+        quandoIt +
+        '?\n\n' +
+        diverse.length +
+        (diverse.length === 1 ? ' cella cambia:' : ' celle cambiano:') +
+        '\n' +
+        esempi +
+        (diverse.length > 14 ? '\n... e altre ' + (diverse.length - 14) : '') +
+        '\n\nI giorni chiusi restano come sono. Si torna indietro con Annulla.',
+      { titolo: 'Versioni del mese' },
+    ))
+  )
+    return;
+  // Annulla: lo stato di adesso (dal database) va sulla pila del piano
+  window._pianoUndo = window._pianoUndo || [];
+  window._pianoUndo.push({
+    ym: ym,
+    rep: rep,
+    label: 'riporta a ' + quandoIt,
+    quando: new Date().toISOString(),
+    righe: _pianoMappaRighe(cur, rep),
+  });
+  window._pianoRedo = [];
+  try {
+    const esito = await _pianoRipristinaStato({ ym: ym, rep: rep, righe: _pianoMappaRighe(stato, rep) });
+    logAzione('Piano: riportato a una versione', ym + ' ' + rep + ' · ' + quandoIt + ' · ' + esito.cambiate + ' celle');
+    toast('Mese riportato al ' + quandoIt + ' (' + esito.cambiate + ' celle)');
+  } catch (e) {
+    window._pianoUndo.pop();
+    toastErrore('Ripristino non riuscito: ' + ((e && e.message) || e));
+  }
+  await renderPiano();
+}
 async function _renderPianoStoricoTab() {
   const filtro = window._pianoStoricoFiltro || '';
   const cerca = (window._pianoStoricoCerca || '').toLowerCase();
@@ -1694,7 +1860,8 @@ async function _renderPianoStoricoTab() {
         (b.created_at || '').localeCompare(a.created_at || ''),
     );
   const azioni = [...new Set(logs.map((l) => l.azione))].sort();
-  let h =
+  let h = await _pianoVersioniHtml();
+  h +=
     '<div class="main-card"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Storico modifiche piano (' +
     visibili.length +
     ')';
