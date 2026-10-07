@@ -72,14 +72,42 @@ function _pianoGiorniSettOk(nome, dstr, codRel) {
   for (let off = -i; off <= 6 - i; off++) if (off !== 0 && _pianoIsLavoro(codRel(off) || '')) n++;
   return n <= max;
 }
+// FASCE DI UN JG (v409): un JG puo lavorare in piu fasce nello stesso giorno (10-12 e
+// 19-03). La cella le tiene in r.fasce [{da, a}]; con una fascia sola valgono ora_inizio
+// e ora_fine come prima. Ore e notturno si sommano fascia per fascia; il riposo si conta
+// dall inizio della prima alla fine dell ultima (ora_inizio / ora_fine della cella).
+function _pianoFasceRiga(r) {
+  if (!r) return [];
+  let f = r.fasce;
+  if (typeof f === 'string') {
+    try {
+      f = JSON.parse(f);
+    } catch (e) {
+      f = null;
+    }
+  }
+  if (Array.isArray(f) && f.length > 1) return f.filter((x) => x && x.da && x.a);
+  return r.ora_inizio && r.ora_fine ? [{ da: r.ora_inizio, a: r.ora_fine }] : [];
+}
+function _pianoDurataFascia(x) {
+  const e = _pianoOra(String(x.da).substring(0, 5));
+  const u = _pianoOra(String(x.a).substring(0, 5));
+  if (e == null || u == null) return 0;
+  return u >= e ? u - e : 24 + u - e;
+}
+// "10:00-12:00 + 19:00-03:00"
+function _pianoFasceTesto(r) {
+  return _pianoFasceRiga(r)
+    .map((x) => String(x.da).substring(0, 5) + '-' + String(x.a).substring(0, 5))
+    .join(' + ');
+}
 function _pianoOreLavorateCella(r) {
   if (!r || !r.codice) return 0;
   const t = _pianoTurnoInfo(r.codice);
   if (t) return _pianoOreEffettiveTurno(t, r);
   if (String(r.codice).toUpperCase() === 'JG' && r.ora_inizio && r.ora_fine) {
-    const e = _pianoOra(r.ora_inizio);
-    const u = _pianoOra(r.ora_fine);
-    if (e != null && u != null) return Math.round((u >= e ? u - e : 24 + u - e) * 100) / 100;
+    const ore = _pianoFasceRiga(r).reduce((tot, x) => tot + _pianoDurataFascia(x), 0);
+    return Math.round(ore * 100) / 100;
   }
   return 0;
 }
@@ -94,8 +122,14 @@ function _pianoNotturnoCella(r) {
       ora_inizio: r.ora_inizio || (eff && eff.ora_inizio) || t.ora_inizio,
       ora_fine: r.ora_fine || (eff && eff.ora_fine) || t.ora_fine,
     };
-  } else if (String(r.codice).toUpperCase() === 'JG' && r.ora_inizio && r.ora_fine)
-    orari = { ora_inizio: r.ora_inizio, ora_fine: r.ora_fine };
+  } else if (String(r.codice).toUpperCase() === 'JG' && r.ora_inizio && r.ora_fine) {
+    // fascia per fascia: l intervallo fra le fasce non e lavoro
+    const notte = _pianoFasceRiga(r).reduce(
+      (tot, x) => tot + _pianoOreNotturneTurno({ ora_inizio: x.da, ora_fine: x.a }),
+      0,
+    );
+    return _pianoNotteRecupero(notte);
+  }
   return orari ? _pianoNotteRecupero(_pianoOreNotturneTurno(orari)) : 0;
 }
 // il massimo si confronta con il totale compreso il 10% notturno (di base) o con le

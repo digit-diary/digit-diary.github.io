@@ -3167,8 +3167,21 @@ function _peJgCella(r) {
   );
 }
 // orario di un JG: quello della riga del briefing, altrimenti quello della cella
+// JG con piu fasce (v409, es. 10-12 e 19-03): le pause seguono la fascia piu lunga, non
+// l arco intero dalle 10 alle 3 (se la riga del briefing ha ancora l orario della cella)
 function _peJgOrario(r) {
   const x = _peJgCella(r);
+  const fasce = x && typeof _pianoFasceRiga === 'function' ? _pianoFasceRiga(x) : [];
+  if (fasce.length > 1) {
+    const arco = (v) => _pcOraMin(v);
+    const stessoArco =
+      (_pcOraMin(r.oi) == null || arco(r.oi) === arco(x.ora_inizio)) &&
+      (_pcOraMin(r.of) == null || arco(r.of) === arco(x.ora_fine));
+    if (stessoArco) {
+      const lunga = fasce.reduce((m, f) => (_pianoDurataFascia(f) > _pianoDurataFascia(m) ? f : m), fasce[0]);
+      return { ini: _pcOraMin(lunga.da), fin: _pcOraMin(lunga.a) };
+    }
+  }
   const oi = _pcOraMin(r.oi) != null ? r.oi : x && x.ora_inizio;
   const of = _pcOraMin(r.of) != null ? r.of : x && x.ora_fine;
   return { ini: _pcOraMin(oi), fin: _pcOraMin(of) };

@@ -852,9 +852,9 @@ function _pianoOreDiRiga(r, pct) {
     return eff ? eff.durata : parseFloat(t.durata_ore) || 0;
   }
   if (r.ora_inizio && r.ora_fine) {
-    const e = _pianoOra(r.ora_inizio);
-    const u = _pianoOra(r.ora_fine);
-    if (e != null && u != null) return Math.round((u >= e ? u - e : 24 + u - e) * 100) / 100;
+    // JG con piu fasce: la somma delle fasce (l intervallo fra le fasce non conta)
+    const ore = _pianoFasceRiga(r).reduce((tot, x) => tot + _pianoDurataFascia(x), 0);
+    if (ore > 0) return Math.round(ore * 100) / 100;
   }
   const cs = _pianoCodiceInfo(r.codice);
   const infoR = r && r.collaboratore ? _pianoCollabInfo(r.collaboratore) : null;
@@ -2181,8 +2181,7 @@ async function _renderPianoCore() {
                 (_eff.prolungato ? ' (prolungato: chiusura tardi) ' + _eff.durata + 'h' : '');
             } else if (cs) {
               oreSpec += _pianoOreDiRiga(r, perc0);
-              titolo =
-                (cs.descrizione || codice) + (r.ora_inizio && r.ora_fine ? ' ' + r.ora_inizio + '-' + r.ora_fine : '');
+              titolo = (cs.descrizione || codice) + (r.ora_inizio && r.ora_fine ? ' ' + _pianoFasceTesto(r) : '');
             }
             // DUE COSE DIVERSE: "bloccata con motivo" (lucchetto rosso, l'ha
             // chiesto un operatore: visita medica, corso...) e "protetta"

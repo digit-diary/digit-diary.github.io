@@ -142,8 +142,33 @@ async function _pianoRipristinaStato(st, opz) {
   const cur =
     (await secGet('piano?data=gte.' + st.ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + st.rep + '&limit=8000')) ||
     [];
-  const CAMPI = ['codice', 'protetto', 'generato', 'ora_inizio', 'ora_fine', 'commento', 'colore', 'motivo_blocco'];
-  const val = (v) => (v == null || v === '' || v === false ? '' : String(v).substring(0, v === true ? 4 : 400));
+  const CAMPI = [
+    'codice',
+    'protetto',
+    'generato',
+    'ora_inizio',
+    'ora_fine',
+    'commento',
+    'colore',
+    'motivo_blocco',
+    'fasce',
+  ];
+  // oggetti (fasce del JG) confrontati con le chiavi in ordine: il database le restituisce
+  // ordinate, la memoria nell ordine in cui sono state scritte
+  const canon = (v) =>
+    JSON.stringify(v, (k, x) =>
+      x && typeof x === 'object' && !Array.isArray(x)
+        ? Object.keys(x)
+            .sort()
+            .reduce((o, kk) => ((o[kk] = x[kk]), o), {})
+        : x,
+    );
+  const val = (v) =>
+    v == null || v === '' || v === false
+      ? ''
+      : typeof v === 'object'
+        ? canon(v)
+        : String(v).substring(0, v === true ? 4 : 400);
   const firma = (r) => CAMPI.map((c) => val(r[c])).join('|');
   const chiave = (r) => r.collaboratore + '|' + String(r.data).substring(0, 10);
   const salvato = new Map(st.righe.map((r) => [chiave(r), r]));
@@ -236,6 +261,7 @@ function _pianoMappaRighe(rows, rep) {
     generato: r.generato,
     ora_inizio: r.ora_inizio,
     ora_fine: r.ora_fine,
+    fasce: r.fasce || null,
     commento: r.commento,
     colore: r.colore,
     motivo_blocco: r.motivo_blocco,

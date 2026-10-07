@@ -206,7 +206,9 @@
           const t = r && typeof _pianoTurnoInfo === 'function' ? _pianoTurnoInfo(r.codice) : null;
           const orario =
             r && r.ora_inizio && r.ora_fine
-              ? String(r.ora_inizio).substring(0, 5) + '-' + String(r.ora_fine).substring(0, 5)
+              ? typeof _pianoFasceTesto === 'function'
+                ? _pianoFasceTesto(r)
+                : String(r.ora_inizio).substring(0, 5) + '-' + String(r.ora_fine).substring(0, 5)
               : t
                 ? String(t.ora_inizio).substring(0, 5) + '-' + String(t.ora_fine).substring(0, 5)
                 : '';

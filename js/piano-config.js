@@ -1895,6 +1895,8 @@ async function _importaPianoDaWb(wb, ym, opz) {
           coloreVecchio: cs ? cs.diretto : '',
           ora_inizio: or && or.ini && or.fin ? or.ini : null,
           ora_fine: or && or.ini && or.fin ? or.fin : null,
+          // JG con piu fasce nella nota ("dalle 10 alle 12 e dalle 19 alle 3")
+          fasce: or && or.fasce && or.fasce.length > 1 ? or.fasce : null,
         });
       }
       const hit = trovaTutti(raw);
@@ -1974,6 +1976,7 @@ async function _importaPianoDaWb(wb, ym, opz) {
           colore: c.colore || null,
           ora_inizio: c.ora_inizio,
           ora_fine: c.ora_fine,
+          fasce: c.fasce || null,
           reparto_dip: _pianoReparto(),
         });
       }),
@@ -2439,6 +2442,7 @@ async function _importaPianoDaWb(wb, ym, opz) {
               protetto: true,
               generato: false,
               ora_inizio: c.nuovo.ora_inizio || null,
+              fasce: c.nuovo.fasce || null,
               ora_fine: c.nuovo.ora_fine || null,
               operatore: op,
               updated_at: ora,
@@ -2456,6 +2460,7 @@ async function _importaPianoDaWb(wb, ym, opz) {
         await secPatch('piano', 'id=eq.' + c.riga.id, {
           ora_inizio: c.nuovo.ora_inizio,
           ora_fine: c.nuovo.ora_fine,
+          fasce: c.nuovo.fasce || null,
           operatore: op,
           updated_at: ora,
         });

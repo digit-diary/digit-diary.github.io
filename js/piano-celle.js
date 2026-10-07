@@ -261,7 +261,7 @@ function mostraPianoCtx(e, nome, dstr) {
   if (csCtx && csCtx.richiede_orario)
     h += voce(
       r.ora_inizio
-        ? 'Orario ' + r.codice + ' (' + r.ora_inizio + '-' + (r.ora_fine || '?') + ')'
+        ? 'Orario ' + r.codice + ' (' + (_pianoFasceTesto(r) || r.ora_inizio + '-' + (r.ora_fine || '?')) + ')'
         : 'Aggiungi orario ' + r.codice,
       'icx-modifica',
       "pianoCtxAzione('orario')",
@@ -1069,16 +1069,19 @@ async function _pianoSalvaCellaBase(nome, dstr, codice) {
   let orarioJG = null;
   const csOr = codice ? _pianoCodiceInfo(codice) : null;
   if (csOr && csOr.richiede_orario) {
-    const ini = await chiediTesto('Orario di INIZIO per ' + codice + ' (es. 10:00):', (r && r.ora_inizio) || '10:00');
-    if (ini === null) return;
-    const fin = await chiediTesto('Orario di FINE per ' + codice + ' (es. 18:00):', (r && r.ora_fine) || '18:00');
-    if (fin === null) return;
-    const okOra = (v) => /^\d{1,2}[:.]\d{2}$/.test(String(v).trim());
-    if (!okOra(ini) || !okOra(fin)) {
-      toast('Orario non valido (usa hh:mm)');
+    // una o piu fasce (es. 10:00-12:00 e 19:00-03:00)
+    const prima = r && r.codice === codice ? _pianoFasceRiga(r) : [];
+    const fasce = await _pianoChiediFasce(
+      'Orario ' + codice,
+      'Orario del ' + codice + ' di ' + nome + ' il ' + dstr.split('-').reverse().join('.'),
+      prima.length ? prima : [{ da: '10:00', a: '18:00' }],
+    );
+    if (fasce === null) return;
+    if (!fasce.length) {
+      toast('Scrivi almeno una fascia (dalle - alle)');
       return;
     }
-    orarioJG = { ora_inizio: String(ini).trim().replace('.', ':'), ora_fine: String(fin).trim().replace('.', ':') };
+    orarioJG = _pianoCampiFasce(fasce);
   }
   // REGOLE ANCHE A MANO: controllo prima di salvare (riposo minimo e
   // consecutivi, anche a cavallo di mese); se si conferma comunque, la
@@ -1143,6 +1146,7 @@ async function _pianoSalvaCellaBase(nome, dstr, codice) {
         generato: false,
         ora_inizio: orarioJG ? orarioJG.ora_inizio : null,
         ora_fine: orarioJG ? orarioJG.ora_fine : null,
+        fasce: orarioJG ? orarioJG.fasce : null,
         operatore: getOperatore(),
         updated_at: new Date().toISOString(),
       };
@@ -1161,8 +1165,10 @@ async function _pianoSalvaCellaBase(nome, dstr, codice) {
       if (patchCella.commento !== undefined) r.commento = patchCella.commento;
       r.codice = codice;
       r.protetto = true;
+      r.generato = false; // come nel database: senza, Annulla vedeva una "modifica di altri"
       r.ora_inizio = orarioJG ? orarioJG.ora_inizio : null;
       r.ora_fine = orarioJG ? orarioJG.ora_fine : null;
+      r.fasce = orarioJG ? orarioJG.fasce : null;
     } else {
       const nuovo = await _pianoInserisciCella({
         collaboratore: nome,
@@ -1172,6 +1178,7 @@ async function _pianoSalvaCellaBase(nome, dstr, codice) {
         generato: false,
         ora_inizio: orarioJG ? orarioJG.ora_inizio : null,
         ora_fine: orarioJG ? orarioJG.ora_fine : null,
+        fasce: orarioJG ? orarioJG.fasce : null,
         commento: commentoRegole ? commentoRegole.substring(0, 400) : null,
         reparto_dip: _pianoReparto(),
         operatore: getOperatore(),
@@ -1224,6 +1231,86 @@ async function pianoCellaPrompt(nome, dstr) {
 // il JG arriva senza orario, con la nota della cella ("CORSO CONCIERGE DALLE 14:30
 // ALLE 21:30", "INIZIO 9:45 C4"). Qui si aggiunge o corregge l orario; la sigla e
 // la nota restano come sono. La nota si usa per proporre l orario.
+// FASCE DEL JG (v409): fino a tre fasce nello stesso giorno (es. 10:00-12:00 e
+// 19:00-03:00). Ritorna [{da, a}] in ordine, [] per togliere l orario, null se si annulla.
+// Le fasce non si sovrappongono e stanno in 24 ore dall inizio della prima.
+async function _pianoChiediFasce(titolo, testo, iniziali, nota) {
+  const f = (iniziali || []).slice(0, 3);
+  const gruppo = (i) => ({
+    titolo: i === 0 ? 'Fascia 1' : 'Fascia ' + (i + 1) + ' (facoltativa)',
+    nota: i === 0 ? nota || '' : i === 1 ? 'Se il JG esce e rientra (es. 19:00 - 03:00)' : '',
+    campi: [
+      {
+        id: 'da' + i,
+        etichetta: 'Dalle',
+        valore: (f[i] && f[i].da) || '',
+        segnaposto: i === 0 ? '10:00' : '',
+        larghezza: 70,
+      },
+      {
+        id: 'a' + i,
+        etichetta: 'Alle',
+        valore: (f[i] && f[i].a) || '',
+        segnaposto: i === 0 ? '18:00' : '',
+        larghezza: 70,
+      },
+    ],
+  });
+  const v = await chiediModulo(testo, [gruppo(0), gruppo(1), gruppo(2)], { titolo: titolo, ok: 'Salva' });
+  if (!v) return null;
+  const norma = (x) => {
+    const t = String(x || '')
+      .trim()
+      .replace('.', ':');
+    if (!t) return '';
+    const m = t.match(/^(\d{1,2})(?::(\d{2}))?$/);
+    if (!m || parseInt(m[1]) > 24 || parseInt(m[2] || '0') > 59) return null;
+    return String(parseInt(m[1]) % 24).padStart(2, '0') + ':' + (m[2] || '00');
+  };
+  const out = [];
+  for (let i = 0; i < 3; i++) {
+    const da = norma(v['da' + i]);
+    const a = norma(v['a' + i]);
+    if (da === null || a === null) {
+      toast('Fascia ' + (i + 1) + ': orario non valido (usa hh:mm, es. 09:45)');
+      return null;
+    }
+    if (!da && !a) continue;
+    if (!da || !a || da === a) {
+      toast('Fascia ' + (i + 1) + ': servono "dalle" e "alle" diversi');
+      return null;
+    }
+    out.push({ da: da, a: a });
+  }
+  // in ordine e senza sovrapposizioni, entro 24 ore dall inizio della prima
+  const min = (h) => parseInt(h.substring(0, 2)) * 60 + parseInt(h.substring(3, 5));
+  let fine = null;
+  let base = null;
+  for (const x of out) {
+    let s = min(x.da);
+    if (base == null) base = s;
+    while (fine != null && s < fine) s += 1440;
+    let e = min(x.a);
+    while (e <= s) e += 1440;
+    // una fascia che comincia prima della fine della precedente passa al giorno dopo:
+    // se cosi si va oltre le 24 ore, le fasce si sovrappongono o non sono in ordine
+    if (e - base > 1440) {
+      toast('Fasce non valide: in ordine, senza sovrapporsi, entro 24 ore (es. 10:00-12:00 e poi 19:00-03:00)');
+      return null;
+    }
+    fine = e;
+  }
+  return out;
+}
+// campi della cella dalle fasce: inizio della prima, fine dell ultima, fasce se piu di una
+function _pianoCampiFasce(fasce) {
+  if (!fasce || !fasce.length) return { ora_inizio: null, ora_fine: null, fasce: null };
+  return {
+    ora_inizio: fasce[0].da,
+    ora_fine: fasce[fasce.length - 1].a,
+    fasce: fasce.length > 1 ? fasce : null,
+  };
+}
 function _pianoOrarioDaNota(testo) {
   const t = String(testo || '').replace(/(\d)\.(\d{2})/g, '$1:$2');
   // ora con o senza minuti ("12" = 12:00), parole intere ("alle" non dentro "dalle")
@@ -1234,6 +1321,18 @@ function _pianoOrarioDaNota(testo) {
     const hh = parseInt(h);
     return hh >= 0 && hh <= 24 ? String(hh).padStart(2, '0') + ':' + (m || '00') : '';
   };
+  // piu fasce nella nota ("dalle 10 alle 12 e dalle 19 alle 3", "10:00-12:00 / 19:00-03:00")
+  const tutte = [
+    ...t.matchAll(new RegExp('\\bdalle\\s+(?:ore\\s+)?' + ora + '\\s+alle\\s+(?:ore\\s+)?' + ora + '\\b', 'gi')),
+  ];
+  const tutte2 = tutte.length > 1 ? tutte : [...t.matchAll(/(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})/g)];
+  if (tutte2.length > 1) {
+    const fasce = tutte2
+      .slice(0, 3)
+      .map((m) => ({ da: piena(m[1]), a: piena(m[2]) }))
+      .filter((x) => x.da && x.a && x.da !== x.a);
+    if (fasce.length > 1) return { ini: fasce[0].da, fin: fasce[fasce.length - 1].a, fasce: fasce };
+  }
   const due =
     t.match(new RegExp('\\bdalle\\s+(?:ore\\s+)?' + ora + '\\s+alle\\s+(?:ore\\s+)?' + ora + '\\b', 'i')) ||
     t.match(/(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})/);
@@ -1254,7 +1353,13 @@ async function pianoOrarioJG(nome, dstr) {
   if (!r) return;
   if (!(await _pianoConsentiScrittura(dstr))) return;
   const dalla = _pianoOrarioDaNota(r.commento);
-  const v = await chiediModulo(
+  const attuali = _pianoFasceRiga(r);
+  const proposte = attuali.length
+    ? attuali
+    : dalla.fasce || (dalla.ini || dalla.fin ? [{ da: dalla.ini || '', a: dalla.fin || '' }] : []);
+  // una o piu fasce; tutte vuote = orario tolto
+  const fasce = await _pianoChiediFasce(
+    'Orario ' + r.codice,
     'Orario del ' +
       r.codice +
       ' di ' +
@@ -1262,47 +1367,21 @@ async function pianoOrarioJG(nome, dstr) {
       ' il ' +
       dstr.split('-').reverse().join('.') +
       (r.commento ? '\n\nNota: ' + r.commento : ''),
-    [
-      {
-        titolo: 'Orario',
-        nota: !r.ora_inizio && (dalla.ini || dalla.fin) ? 'Proposto dalla nota della cella' : '',
-        campi: [
-          {
-            id: 'ini',
-            etichetta: 'Inizio',
-            valore: r.ora_inizio || dalla.ini || '',
-            segnaposto: '10:00',
-            larghezza: 70,
-          },
-          { id: 'fin', etichetta: 'Fine', valore: r.ora_fine || dalla.fin || '', segnaposto: '18:00', larghezza: 70 },
-        ],
-      },
-    ],
-    { titolo: 'Orario ' + r.codice, ok: 'Salva' },
+    proposte,
+    !attuali.length && proposte.length ? 'Proposto dalla nota della cella' : '',
   );
-  if (!v) return;
-  const norma = (x) =>
-    String(x || '')
-      .trim()
-      .replace('.', ':');
-  const ini = norma(v.ini);
-  const fin = norma(v.fin);
-  const ok = (x) => /^\d{1,2}:\d{2}$/.test(x);
-  if ((ini || fin) && (!ok(ini) || !ok(fin))) {
-    toast('Orario non valido: inizio e fine nel formato hh:mm (es. 09:45)');
-    return;
-  }
+  if (fasce === null) return;
+  const campi = _pianoCampiFasce(fasce);
   try {
-    await secPatch('piano', 'id=eq.' + r.id, {
-      ora_inizio: ini || null,
-      ora_fine: fin || null,
-      operatore: getOperatore(),
-      updated_at: new Date().toISOString(),
-    });
-    r.ora_inizio = ini || null;
-    r.ora_fine = fin || null;
-    logAzione('Piano: orario ' + r.codice, nome + ' ' + dstr + ' · ' + (ini ? ini + '-' + fin : 'tolto'));
-    toast(ini ? 'Orario salvato: ' + ini + ' - ' + fin : 'Orario tolto');
+    await secPatch(
+      'piano',
+      'id=eq.' + r.id,
+      Object.assign({}, campi, { operatore: getOperatore(), updated_at: new Date().toISOString() }),
+    );
+    Object.assign(r, campi);
+    const testo = fasce.length ? _pianoFasceTesto(r) : '';
+    logAzione('Piano: orario ' + r.codice, nome + ' ' + dstr + ' · ' + (testo || 'tolto'));
+    toast(testo ? 'Orario salvato: ' + testo : 'Orario tolto');
     renderPiano();
   } catch (e) {
     toastErrore('Orario non salvato: ' + (e.message || ''));
@@ -1418,13 +1497,7 @@ async function pianoStoriaCella(nome, dstr) {
   } catch (e) {}
   const righe = [];
   if (r) {
-    righe.push(
-      'Oggi: ' +
-        r.codice +
-        (r.ora_inizio && r.ora_fine
-          ? ' ' + String(r.ora_inizio).substring(0, 5) + '-' + String(r.ora_fine).substring(0, 5)
-          : ''),
-    );
+    righe.push('Oggi: ' + r.codice + (r.ora_inizio && r.ora_fine ? ' ' + _pianoFasceTesto(r) : ''));
     if (r.updated_at || r.created_at)
       righe.push(
         'Ultima modifica: ' +
