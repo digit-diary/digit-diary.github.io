@@ -1291,7 +1291,12 @@ async function renderCollaboratoriUI() {
           c.nome.replace(/'/g, "\\'") +
           '\')">Rinomina</button><button class="btn-del-tipo" onclick="disattivaCollaboratore(\'' +
           c.nome.replace(/'/g, "\\'") +
-          '\')">Rimuovi</button>'
+          '\')">Disattiva</button>' +
+          (c.data_fine_rapporto
+            ? '<span class="mini-badge" style="background:#7f8c8d" title="Ultimo giorno di lavoro: dal giorno dopo non e piu nel piano e nelle ore dovute">fine contratto ' +
+              String(c.data_fine_rapporto).substring(0, 10).split('-').reverse().join('.') +
+              '</span>'
+            : '')
         : '') +
       '</div>'
     );
@@ -1817,9 +1822,64 @@ async function cambiaCategoriaCollaboratore(id, cat) {
     toast('Errore cambio categoria');
   }
 }
+// DISATTIVA (07.10, richiesta del titolare): chi lascia si ferma DA UNA DATA, non sparisce.
+// Scelta consigliata = fine contratto (ultimo giorno di lavoro): la storia resta, dal giorno
+// dopo non e piu nel piano, nella bozza e nelle ore dovute. "Rimuovi del tutto" solo per
+// chi non e mai entrato o e stato inserito per errore (sparisce da elenchi e calendario).
 async function disattivaCollaboratore(nome) {
   if (!_soloAdminAnagrafica()) return;
-  if (!(await chiediConferma('Disattivare "' + nome + '"? Non apparirà più nell\'autocomplete.'))) return;
+  const c = collaboratoriCache.find((x) => x.nome === nome) || {};
+  const r = await chiediModulo(
+    nome,
+    [
+      {
+        titolo: 'Ultimo giorno di lavoro',
+        campi: [
+          {
+            id: 'data',
+            tipo: 'data',
+            valore: c.data_fine_rapporto ? String(c.data_fine_rapporto).substring(0, 10) : oggiLocale(),
+            larghezza: 160,
+          },
+        ],
+      },
+      {
+        titolo: 'Come',
+        campi: [
+          {
+            id: 'modo',
+            tipo: 'scelta',
+            valore: 'fine',
+            opzioni: [
+              {
+                valore: 'fine',
+                etichetta:
+                  'Fine contratto da questa data (consigliato): fino a quel giorno resta tutto (piano, ore, Diario, storico); dal giorno dopo non e piu nel piano, nella bozza e nelle ore dovute',
+              },
+              {
+                valore: 'tutto',
+                etichetta: 'Rimuovi del tutto: solo per chi non e mai entrato o e stato inserito per errore',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+    { titolo: 'Disattiva collaboratore', ok: 'Avanti' },
+  );
+  if (!r) return;
+  if (r.modo !== 'tutto') {
+    if (!r.data) return toast('Scegli l ultimo giorno di lavoro');
+    if (typeof _salvaFineContratto === 'function' && (await _salvaFineContratto(nome, r.data, false))) {
+      renderCollaboratoriUI();
+      aggiornaNomi();
+    }
+    return;
+  }
+  if (
+    !(await chiediConferma('Rimuovere del tutto "' + nome + '"? Sparisce da elenchi, autocompletamento e calendario.'))
+  )
+    return;
   try {
     await secPatch('collaboratori', 'nome=eq.' + encodeURIComponent(nome), {
       attivo: false,

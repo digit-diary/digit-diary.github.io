@@ -3130,18 +3130,24 @@ async function salvaFineRapporto(nome, togli) {
     toast('Non hai il permesso');
     return;
   }
+  var val = togli ? null : (document.getElementById('hr-fine') || {}).value || '';
+  if (await _salvaFineContratto(nome, val, togli)) apriSchedaCollaboratore(nome);
+}
+// FINE CONTRATTO (scheda > Storico HR e Gestione collaboratori > Disattiva): ultimo giorno
+// di lavoro; dal giorno dopo fuori da calendario, bozza, coperture, cambi e ore dovute,
+// prima tutto resta. Ritorna true se salvata. Chi chiama controlla il permesso.
+async function _salvaFineContratto(nome, val, togli) {
   var c = collaboratoriCache.find(function (x) {
     return x.nome === nome;
   });
-  if (!c) return;
-  var val = togli ? null : (document.getElementById('hr-fine') || {}).value || '';
+  if (!c) return false;
   if (!togli && !val) {
     toast('Scegli l ultimo giorno di lavoro');
-    return;
+    return false;
   }
   if (val && c.data_assunzione && val < String(c.data_assunzione).substring(0, 10)) {
     toastErrore('La fine del contratto e prima dell inizio del contratto');
-    return;
+    return false;
   }
   // turni gia scritti nel piano dopo la fine: si dicono (non si cancellano da soli)
   var dopo = [];
@@ -3170,7 +3176,7 @@ async function salvaFineRapporto(nome, togli) {
           String(dopo[0].data).substring(0, 10).split('-').reverse().join('.') +
           '): restano scritti finche non li sposti o li cancelli; nel calendario sono a righe grigie.'
         : '');
-  if (!(await chiediConferma(msg, { titolo: togli ? 'Torna operativo' : 'Fine contratto' }))) return;
+  if (!(await chiediConferma(msg, { titolo: togli ? 'Torna operativo' : 'Fine contratto' }))) return false;
   try {
     await secPatch('collaboratori', 'id=eq.' + c.id, { data_fine_rapporto: val });
     c.data_fine_rapporto = val;
@@ -3184,9 +3190,10 @@ async function salvaFineRapporto(nome, togli) {
     );
     logAzione(togli ? 'Fine contratto tolta' : 'Fine contratto', nome + (val ? ' · ultimo giorno ' + val : ''));
     toast(togli ? nome + ' torna operativo' : 'Fine contratto salvata');
-    apriSchedaCollaboratore(nome);
+    return true;
   } catch (e) {
     toastErrore('Fine contratto non salvata: ' + ((e && e.message) || e));
+    return false;
   }
 }
 async function eliminaHrEvento(id, nome) {
