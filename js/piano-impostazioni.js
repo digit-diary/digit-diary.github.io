@@ -407,13 +407,17 @@ async function salvaPianoFunzioni(v) {
     toastErrore('Funzioni non valide (solo lettere, cifre e _, max 12): ' + nonValide.join(', '));
     return;
   }
-  // una funzione ancora assegnata a qualcuno non si toglie per sbaglio
+  // una funzione ancora assegnata a qualcuno non si toglie per sbaglio. Conta solo quelle
+  // che erano nell elenco e sono state cancellate: prima si confrontava con tutte le
+  // funzioni in uso e aggiungendo ACCOGLIENZA chiedeva di "togliere" CR, DI e CL dei
+  // Tavoli e del Cleaning, mai state nell elenco (segnalazione del titolare 08/10/2026)
   const inUso = [
     ...new Set(
       collaboratoriCache.filter((c) => c.attivo !== false && c.funzione).map((c) => String(c.funzione).toUpperCase()),
     ),
   ];
-  const tolteInUso = inUso.filter((f) => !lista.includes(f));
+  const prima = (window._pianoFunzioni || []).map((x) => String(x).toUpperCase());
+  const tolteInUso = inUso.filter((f) => prima.includes(f) && !lista.includes(f));
   if (
     tolteInUso.length &&
     !(await chiediConferma(
