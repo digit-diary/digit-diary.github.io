@@ -539,7 +539,11 @@ const ctxSt = (storia, mapp) =>
     mappFunzione: () => mapp || null,
   });
 const CASSA = { codice: 'C23', gruppo: 'CASSA', tipo: 'DIURNO' };
-eq(R.idoneoPerTurno({ funzione: 'HOST' }, CASSA, ctxSt(['SALA'])), false, 'senza settori: gruppo mai fatto = non idoneo');
+eq(
+  R.idoneoPerTurno({ funzione: 'HOST' }, CASSA, ctxSt(['SALA'])),
+  false,
+  'senza settori: gruppo mai fatto = non idoneo',
+);
 eq(R.idoneoPerTurno({ funzione: 'HOST' }, CASSA, ctxSt(['SALA', 'CASSA'])), true, 'gruppo gia fatto = idoneo');
 eq(R.idoneoPerTurno({ funzione: 'HOST' }, CASSA, ctxSt(null)), true, 'storia non letta = regola di prima');
 eq(
@@ -551,6 +555,34 @@ eq(
   R.idoneoPerTurno({ funzione: 'HOST' }, CASSA, Object.assign(ctxSt([]), { settoriDi: () => ['CASSA'] })),
   true,
   'con i settori la storia non conta',
+);
+
+// TURNI RISERVATI A COLLABORATORI SCELTI (turni_solo_collaboratori, 08/10/2026)
+const RC = [{ tipo_regola: 'turni_solo_collaboratori', valore: 'AX,Z*:ROSSI MARIO;BIANCHI ANNA' }];
+const tAX = { codice: 'AX', gruppo: 'SALA' };
+const tZ0 = { codice: 'Z0', gruppo: 'SUP' };
+eq(R.violazioneFunzioneTurno({ nome: 'Rossi Mario' }, tAX, 2, RC), null, 'AX a un collaboratore scelto: ok');
+eq(R.violazioneFunzioneTurno({ nome: 'bianchi anna' }, tAX, 2, RC), null, 'nome senza maiuscole: ok');
+eq(R.violazioneFunzioneTurno({ nome: 'Verdi Luca' }, tAX, 2, RC) !== null, true, 'AX a un altro = riservato');
+eq(R.violazioneFunzioneTurno({ nome: 'Verdi Luca' }, tZ0, 2, RC) !== null, true, 'modello Z* vale per Z0');
+eq(R.violazioneFunzioneTurno({ nome: 'Verdi Luca' }, tS1, 2, RC), null, 'turno non nella regola: libero');
+eq(
+  R.idoneoPerTurno(
+    { nome: 'Verdi Luca', funzione: 'BO' },
+    tAX,
+    Object.assign(ctxSt([]), { settoriDi: () => ['SALA'], regoleTurnoFunzione: () => RC }),
+  ),
+  false,
+  'idoneita: AX non idoneo a chi non e scelto',
+);
+eq(
+  R.idoneoPerTurno(
+    { nome: 'Rossi Mario', funzione: 'BO' },
+    tAX,
+    Object.assign(ctxSt([]), { settoriDi: () => ['SALA'], regoleTurnoFunzione: () => RC }),
+  ),
+  true,
+  'idoneita: AX idoneo a chi e scelto',
 );
 
 console.log('\n=======================================');

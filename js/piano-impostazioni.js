@@ -702,6 +702,8 @@ const _REGOLE_GRUPPO_TIPI = {
     'Questi turni solo da un livello di Formazione in su (es: 10,10C,9:L2 · L1-L2 = solo L1 e L2 · eccezioni per persona in Preferenze, Turni consentiti)',
   minimo_livello_giorno:
     'Almeno N persone di un livello di Formazione al giorno, con filtri (es: L3:2:NOTTURNO:4,5 = 2 di livello L3 o piu sui turni notturni, venerdi e sabato · 0=lun ... 6=dom)',
+  turni_solo_collaboratori:
+    'Questi turni li fanno solo i collaboratori scelti (es: AX solo a tre persone): vale per bozza, Migliora, proposte e Valida',
   coordinatori:
     'Ogni giorno un coordinatore di giorno (turni di apertura) e uno di notte (turni di chiusura: vale quello che finisce piu tardi), scelti fra i collaboratori indicati; se mancano, ne propone un altro. Escono in rosso nel piano e nel briefing',
 };
@@ -719,6 +721,7 @@ const _REGOLE_GRUPPO_ETICHETTE = {
   livello_turni: 'Turni per livello di Formazione',
   minimo_livello_giorno: 'Minimo di un livello al giorno',
   coordinatori: 'Coordinatori (apertura e chiusura)',
+  turni_solo_collaboratori: 'Turni riservati a collaboratori scelti',
 };
 // MODULO GUIDATO DELLE REGOLE DI GRUPPO (v415, richiesta del titolare 08/10/2026): per
 // ogni tipo i campi giusti (funzione, livello, numero, tipo di turno, giorni con le
@@ -763,6 +766,20 @@ const _RG_SCHEMI = {
     leggi: (v) => {
       const p = v.split(':');
       return { fz: p[0] || '', turni: p[1] || '', gg: (p[2] || '').split(',').filter((x) => x !== '') };
+    },
+  },
+  turni_solo_collaboratori: {
+    campi: ['turni', 'collab'],
+    componi: (c) => (c.turni && c.collab.length ? c.turni + ':' + c.collab.join(';') : ''),
+    leggi: (v) => {
+      const i = v.indexOf(':');
+      return {
+        turni: i < 0 ? v : v.substring(0, i),
+        collab: (i < 0 ? '' : v.substring(i + 1))
+          .split(';')
+          .map((x) => x.trim())
+          .filter(Boolean),
+      };
     },
   },
   coordinatori: {
@@ -827,6 +844,7 @@ function _rgLeggi(tipo, v) {
     turniG: '',
     turniN: '',
     coord: [],
+    collab: [],
     campo: '',
     op: '>',
     val: '',
@@ -895,6 +913,13 @@ function _rgFrase(r) {
       return c.fz + ' fa solo i turni ' + c.turni + (c.gg.length ? giorniTxt : ', sempre');
     case 'livello_turni':
       return 'I turni ' + c.turni + ' solo da ' + (c.lvmax ? c.lv + ' a ' + c.lvmax : c.lv + ' in su');
+    case 'turni_solo_collaboratori': {
+      const nomeV = (x) => {
+        const cc = collaboratoriCache.find((k) => k.nome.toLowerCase() === x.toLowerCase());
+        return cc ? cc.nome : x;
+      };
+      return 'I turni ' + c.turni + ' li fanno solo: ' + c.collab.map(nomeV).join(', ');
+    }
     case 'coordinatori': {
       const nomeVero = (x) => {
         const cc = collaboratoriCache.find((k) => k.nome.toLowerCase() === x.toLowerCase());
@@ -1158,6 +1183,22 @@ function _rgCampiHtml(tipo, c) {
           '</div>',
       );
     }
+    if (k === 'collab') {
+      const persone = ordineCollabPiano(
+        collaboratoriCache.filter((x) => x.attivo !== false && _pianoAppartieneAlReparto(x)).map((x) => x.nome),
+        _pianoReparto(),
+      );
+      const scelti = c.collab.map((x) => x.toLowerCase());
+      out.push(
+        '<div class="field" style="flex-basis:100%"><label>Collaboratori che possono fare questi turni (tutti gli altri no)</label>' +
+          spunte(
+            'rgc-collab',
+            persone.map((n) => ({ v: n, l: n })),
+            persone.filter((n) => scelti.includes(n.toLowerCase())),
+          ) +
+          '</div>',
+      );
+    }
     if (k === 'campo')
       out.push(
         campo(
@@ -1217,6 +1258,7 @@ function _rgLeggiCampi() {
     turniG: turniDi('rgc-turniG'),
     turniN: turniDi('rgc-turniN'),
     coord: [...document.querySelectorAll('input[name="rgc-coord"]:checked')].map((x) => x.value),
+    collab: [...document.querySelectorAll('input[name="rgc-collab"]:checked')].map((x) => x.value),
     campo: val('rgc-campo'),
     op: (document.getElementById('rgc-op') || {}).value || '>',
     val: val('rgc-val'),
@@ -1869,6 +1911,32 @@ function _pianoValidaRegolaGruppo(gruppo, tipo, valore, settore) {
     }
     return null;
   }
+  if (t === 'turni_solo_collaboratori') {
+    const i = v.indexOf(':');
+    if (i < 0) return 'Scegli i turni e almeno un collaboratore';
+    const turni = v
+      .substring(0, i)
+      .split(',')
+      .map((x) => x.trim())
+      .filter(Boolean);
+    if (!turni.length) return 'Scegli almeno un turno';
+    const ign = sigleIgnote(turni);
+    if (ign.length) return 'Sigle di turno che in ' + ctx.label + ' non esistono: ' + ign.join(', ');
+    const nomi = v
+      .substring(i + 1)
+      .split(';')
+      .map((x) => x.trim())
+      .filter(Boolean);
+    if (!nomi.length) return 'Scegli almeno un collaboratore';
+    const ignoti = nomi.filter(
+      (n) =>
+        !collaboratoriCache.some(
+          (c) => c.attivo !== false && c.nome.toLowerCase() === n.toLowerCase() && _pianoAppartieneAlReparto(c),
+        ),
+    );
+    if (ignoti.length) return 'Collaboratori che non risultano attivi in ' + ctx.label + ': ' + ignoti.join(', ');
+    return null;
+  }
   if (t === 'coordinatori') {
     const p = v.split('|');
     if (p.length !== 3) return 'Scegli i turni di apertura o di chiusura e almeno un coordinatore';
@@ -1929,7 +1997,10 @@ async function aggiungiRegolaGruppo() {
   if (!isAdmin()) return;
   const tipo = (document.getElementById('rg-tipo') || {}).value;
   // i coordinatori valgono per il settore intero
-  const gruppo = tipo === 'coordinatori' ? '*' : (document.getElementById('rg-gruppo') || {}).value;
+  const gruppo =
+    tipo === 'coordinatori' || tipo === 'turni_solo_collaboratori'
+      ? '*'
+      : (document.getElementById('rg-gruppo') || {}).value;
   const valore = _rgComponi(tipo, _rgLeggiCampi()).trim().toUpperCase();
   if (
     tipo === 'coordinatori' &&

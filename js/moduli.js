@@ -1517,6 +1517,26 @@ async function _rinominaCollaboratoreTutto(vecchio, nuovo) {
   } catch (_) {
     nonRiuscite.push('regole coordinatori');
   }
+  // regole TURNI RISERVATI A COLLABORATORI: i nomi scelti sono dopo i due punti
+  try {
+    for (const r of (typeof pianoRegoleGruppoCache !== 'undefined' ? pianoRegoleGruppoCache : []).filter(
+      (x) => String(x.tipo_regola || '').toLowerCase() === 'turni_solo_collaboratori',
+    )) {
+      const i = String(r.valore || '').indexOf(':');
+      if (i < 0) continue;
+      const nomi = r.valore
+        .substring(i + 1)
+        .split(';')
+        .map((n) => (n.trim().toLowerCase() === vecchio.toLowerCase() ? nuovo.toUpperCase() : n));
+      const v2 = r.valore.substring(0, i + 1) + nomi.join(';');
+      if (v2 !== r.valore) {
+        await secPatch('piano_regole_gruppo', 'id=eq.' + r.id, { valore: v2 });
+        r.valore = v2;
+      }
+    }
+  } catch (_) {
+    nonRiuscite.push('regole turni riservati');
+  }
   // memoria
   const ci = collaboratoriCache.findIndex((c) => c.nome === vecchio);
   if (ci !== -1) collaboratoriCache[ci].nome = nuovo;

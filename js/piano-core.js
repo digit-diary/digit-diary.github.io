@@ -255,7 +255,9 @@ function _pianoRegoleTurnoFunzione() {
     (r) =>
       r.attivo !== false &&
       (r.reparto_dip || 'slots') === _pianoReparto() &&
-      /^(turni_solo_funzioni|funzione_turni_giorni|livello_turni)$/.test(String(r.tipo_regola || '').toLowerCase()),
+      /^(turni_solo_funzioni|funzione_turni_giorni|livello_turni|turni_solo_collaboratori)$/.test(
+        String(r.tipo_regola || '').toLowerCase(),
+      ),
   );
 }
 // Funzioni che a mano possono fare qualsiasi turno (regola funzioni_fanno_tutto):

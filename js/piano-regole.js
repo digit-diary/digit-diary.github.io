@@ -138,6 +138,9 @@
   //                         Formazione in su; '1,21:1-2' = solo L1 e L2. Chi ha la
   //                         sigla fra i "turni consentiti" (Preferenze) e un'eccezione.
   //                         info._livello: livello nel settore (null = senza scala)
+  //   turni_solo_collaboratori 'AX,AY:ROSSI MARIO;BIANCHI ANNA' -> quei turni solo a quei
+  //                         collaboratori (richiesta del titolare 08/10/2026); nomi in
+  //                         maiuscolo, confronto senza maiuscole/minuscole
   // dow: giorno JS (0=dom) oppure null quando il giorno non e' noto (in quel
   // caso le regole a giorni non si applicano). Ritorna il motivo o null.
   function violazioneFunzioneTurno(info, turno, dow, regole) {
@@ -167,6 +170,21 @@
         if (!turni.some(combacia)) continue;
         if (funzioni.includes(fz) || settori.some((x) => funzioni.includes(String(x).toUpperCase()))) continue;
         return 'turno ' + cod + ' riservato a ' + funzioni.join(', ') + ' (funzione: ' + (fz || 'nessuna') + ')';
+      }
+      if (tipo === 'turni_solo_collaboratori') {
+        const i = String(rg.valore || '').indexOf(':');
+        const turni = String(rg.valore || '')
+          .substring(0, i < 0 ? 0 : i)
+          .split(',')
+          .map((x) => x.trim());
+        if (!turni.some(combacia)) continue;
+        const nomi = String(rg.valore || '')
+          .substring(i + 1)
+          .split(';')
+          .map((x) => x.trim().toLowerCase())
+          .filter(Boolean);
+        if (nomi.includes(String((info && info.nome) || '').toLowerCase())) continue;
+        return 'turno ' + cod + ' riservato ad alcuni collaboratori (Regole di gruppo)';
       }
       if (tipo === 'livello_turni') {
         const turni = (parti[0] || '').split(',').map((x) => x.trim());
