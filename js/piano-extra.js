@@ -2340,9 +2340,16 @@ async function miglioraOrePiano() {
 // ============================================================
 function _pianoGruppoCompInv() {
   const m = _pianoCompetenzeGruppi();
+  // livello di ogni competenza (in tutti i settori): se piu competenze portano allo
+  // stesso gruppo (Tavoli: croupier, ispettore, cassa tavoli -> TAVOLI) vale quella di
+  // livello piu basso, la piu prudente (prima era la prima trovata)
+  const lv = {};
+  Object.values(typeof getCompetenzeConfigAll === 'function' ? getCompetenzeConfigAll() : {}).forEach((arr) =>
+    (arr || []).forEach((k) => (lv[k.key] = parseInt(k.livello) || 99)),
+  );
   const inv = {};
   Object.entries(m).forEach(([k, g]) => {
-    if (!inv[g]) inv[g] = k;
+    if (!inv[g] || (lv[k] || 99) < (lv[inv[g]] || 99)) inv[g] = k;
   });
   return inv;
 }
@@ -2388,31 +2395,89 @@ async function _pianoProponiCertificazione(nome, gruppo) {
   const key = _pianoGruppoCompInv()[gruppo];
   if (key && typeof certificaCompetenzaDaPiano === 'function') await certificaCompetenzaDaPiano(nome, key, true);
 }
-// riepilogo bulk (import/incolla): certificazione SENZA punti
-async function _pianoProponiCertificazioniBulk(coppie) {
-  const mancanti = [];
-  const visti = new Set();
+// LIVELLI DAI TURNI (import, incolla, Formazione > Livelli dai turni del piano): chi fa
+// turni di un gruppo per cui non risulta formato (es. reception con solo L1) riceve la
+// competenza e quelle dei livelli sotto, con l avviso prima e l INCENTIVO dei livelli
+// raggiunti (decisione del titolare 08/10/2026). Un livello non scende mai.
+async function _pianoProponiCertificazioniBulk(coppie, opz) {
+  opz = opz || {};
+  const inv = _pianoGruppoCompInv();
+  const cfgAll = typeof getCompetenzeConfigAll === 'function' ? getCompetenzeConfigAll() : {};
+  const perNome = {}; // nome -> { gruppi: {GRUPPO: n turni}, key piu alta }
   coppie.forEach((c) => {
     const g = _pianoGruppoNonFormato(c.nome, c.codice, c.commento);
-    if (g && !visti.has(c.nome + '|' + g)) {
-      visti.add(c.nome + '|' + g);
-      mancanti.push({ nome: c.nome, gruppo: g });
-    }
+    if (!g || !inv[g]) return;
+    const p = (perNome[c.nome] = perNome[c.nome] || { gruppi: {} });
+    p.gruppi[g] = (p.gruppi[g] || 0) + 1;
   });
-  if (!mancanti.length) return;
+  const proposte = [];
+  Object.keys(perNome).forEach((nome) => {
+    const info = _pianoCollabInfo(nome) || {};
+    const rep = info.reparto_dip || 'slots';
+    const comps = (cfgAll[rep] || []).filter((k) => parseInt(k.livello) >= 1);
+    const livDi = (key) => parseInt((comps.find((k) => k.key === key) || {}).livello) || 0;
+    // la competenza del livello piu alto fra i gruppi fatti: le altre vengono in cascata
+    const gruppi = Object.keys(perNome[nome].gruppi).filter((g) => livDi(inv[g]) > 0);
+    if (!gruppi.length) return;
+    gruppi.sort((a, b) => livDi(inv[b]) - livDi(inv[a]));
+    const key = inv[gruppi[0]];
+    const prima = _pianoLivelloNelSettore(info, rep) || 0;
+    const sim = Object.assign({}, info.competenze || {});
+    comps.forEach((k) => {
+      if ((parseInt(k.livello) || 0) <= livDi(key)) sim[k.key] = true;
+    });
+    const dopo = _pianoLivelloNelSettore(Object.assign({}, info, { competenze: sim }), rep) || 0;
+    proposte.push({
+      nome: nome,
+      key: key,
+      prima: prima,
+      dopo: dopo,
+      testo: gruppi
+        .map((g) => g + ' ' + perNome[nome].gruppi[g] + (perNome[nome].gruppi[g] === 1 ? ' turno' : ' turni'))
+        .join(', '),
+    });
+  });
+  if (!proposte.length) {
+    if (opz.avvisaVuoto) toast('Nessun livello da aggiornare: i turni fatti corrispondono ai livelli di Formazione');
+    return;
+  }
+  const cfgPunti = typeof getPuntiConfig === 'function' ? getPuntiConfig() : { punti_livello: {}, azioni: [] };
+  const azComp = (cfgPunti.azioni || []).find((a) => a.key === 'competenza');
+  // incentivo come la spunta in Formazione: punti della competenza + punti dei livelli
+  // raggiunti; il premio del livello si legge a parte
+  const puntiDi = (p) => {
+    let t = (azComp && parseInt(azComp.punti)) || 0;
+    for (let lv = p.prima + 1; lv <= p.dopo; lv++) t += parseInt((cfgPunti.punti_livello || {})[String(lv)]) || 0;
+    return t;
+  };
+  const premioDi = (p) => (p.dopo > p.prima && p.dopo >= 2 ? (cfgPunti.premi_livello || {})[String(p.dopo)] : '');
+  const incentivi = typeof incentiviAttivi !== 'function' || incentiviAttivi();
   if (
     !(await chiediConferma(
-      'Alcuni collaboratori hanno ricevuto turni di settori per cui NON risultano formati:\n\n' +
-        mancanti.map((x) => '• ' + x.nome + ' → ' + x.gruppo).join('\n') +
-        '\n\nVuoi certificarli in Formazione? (senza punti: i punti si assegnano poi dalla pagina Formazione)',
+      (opz.titolo || 'Turni di settori per cui non risultano formati') +
+        ':\n\n' +
+        proposte
+          .map(
+            (p) =>
+              '• ' +
+              p.nome +
+              ': ' +
+              (p.dopo > p.prima ? 'livello ' + p.prima + ' → ' + p.dopo : 'competenza nuova') +
+              ' (' +
+              p.testo +
+              ')' +
+              (incentivi && puntiDi(p) ? ' · incentivo ' + puntiDi(p) + ' punti' : '') +
+              (incentivi && premioDi(p) ? ' · premio livello ' + p.dopo + ': ' + premioDi(p) : ''),
+          )
+          .join('\n') +
+        '\n\nLi certifico in Formazione (con le competenze dei livelli sotto)' +
+        (incentivi ? ' e assegno l incentivo dei livelli raggiunti' : '') +
+        '?',
     ))
   )
     return;
-  const inv = _pianoGruppoCompInv();
-  for (const m of mancanti) {
-    const key = inv[m.gruppo];
-    if (key && typeof certificaCompetenzaDaPiano === 'function') await certificaCompetenzaDaPiano(m.nome, key, false);
-  }
+  for (const p of proposte)
+    if (typeof certificaCompetenzaDaPiano === 'function') await certificaCompetenzaDaPiano(p.nome, p.key, 'livelli');
 }
 // FORMAZIONI COMPLETATE dai commenti: cella con turno + commento
 // "formazione/affianc..." = giorno di affiancamento; al raggiungimento

@@ -915,10 +915,14 @@ function renderFormazione() {
   html += _renderProtocolliCard();
   html +=
     '<div class="main-card"><div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span>Matrice competenze · chi sa fare cosa</span>' +
+    '<span style="display:flex;gap:6px;flex-wrap:wrap">' +
+    (isAdmin() || (typeof puoModificare === 'function' && puoModificare('gestione_formazioni'))
+      ? '<button onclick="formLivelliDaTurni()" title="Chi fa turni di un settore per cui non risulta formato riceve il livello (con l avviso prima e l incentivo)" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:none;border:1px solid var(--paper);color:var(--paper);border-radius:2px;cursor:pointer">Livelli dai turni del piano</button>'
+      : '') +
     (isAdmin()
       ? '<button onclick="apriRiordinoCompetenze()" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:none;border:1px solid var(--paper);color:var(--paper);border-radius:2px;cursor:pointer">Riordina competenze</button>'
       : '') +
-    '</div>';
+    '</span></div>';
   html +=
     '<div class="filters" style="padding:10px 16px"><div class="filter-group filter-cerca"><span class="filter-label">Cerca</span><input type="text" id="form-matr-cerca" class="campo-cerca" placeholder="Cerca collaboratore..." aria-label="Cerca collaboratore" oninput="_filtraMatrice()"></div>' +
     '<div class="export-btns"><button class="btn-export" onclick="esportaMatriceCSV()">CSV</button><button class="btn-export btn-export-pdf" onclick="esportaMatricePDF()">PDF</button></div></div>';
@@ -3393,17 +3397,63 @@ function _renderPanoramicaHrCard(collabs) {
   return html;
 }
 
+// LIVELLI DAI TURNI DEL PIANO (Formazione, per chi c e gia): gli ultimi 12 mesi del
+// settore e il piano gia scritto a mano o importato; chi ha turni di un gruppo per cui non risulta formato
+// riceve il livello, con l elenco prima e l incentivo (stessa funzione dell import)
+async function formLivelliDaTurni() {
+  if (!isAdmin() && !(typeof puoModificare === 'function' && puoModificare('gestione_formazioni'))) return;
+  if (typeof _pianoProponiCertificazioniBulk !== 'function') return;
+  const rep = currentReparto || 'slots';
+  const salvaRep = _pianoRepartoSel; // null = il piano segue il settore dell app
+  try {
+    if (!pianoTurniCache.length && typeof _pianoCaricaCfg === 'function') await _pianoCaricaCfg();
+    _pianoRepartoSel = rep; // sigle dei turni del settore della Formazione
+    const oggi = new Date();
+    const da = new Date(oggi);
+    da.setFullYear(da.getFullYear() - 1);
+    const oggiStr = dataLocaleISO(oggi);
+    const righe = (
+      (await secGet(
+        'piano?reparto_dip=eq.' +
+          encodeURIComponent(rep) +
+          '&data=gte.' +
+          dataLocaleISO(da) +
+          '&limit=30000&select=collaboratore,codice,commento,data,generato',
+      )) || []
+    )
+      // i turni gia fatti, e quelli futuri scritti a mano o importati (il piano ufficiale);
+      // non quelli futuri della bozza, che non mette nessuno dove non e formato
+      .filter((r) => String(r.data).substring(0, 10) <= oggiStr || !r.generato);
+    await _pianoProponiCertificazioniBulk(
+      righe.map((r) => ({ nome: r.collaboratore, codice: r.codice, commento: r.commento || '' })),
+      { titolo: 'Livelli dai turni del piano (ultimi 12 mesi e piano gia scritto)', avvisaVuoto: true },
+    );
+  } catch (e) {
+    console.error(e);
+    toastErrore('Livelli dai turni non calcolati: ' + ((e && e.message) || e));
+  } finally {
+    _pianoRepartoSel = salvaRep;
+  }
+  renderFormazione();
+}
 // Certificazione HEADLESS richiamata dal Piano (avviso "non formato" e
 // formazioni completate dai commenti): stesso flusso della spunta in
 // Formazione · scala dei livelli, storico HR, punti su conferma.
+// chiediPunti: true = chiede punti e formatore; false = niente punti; 'livelli' = solo
+// l incentivo dei livelli raggiunti, senza domande (livelli dai turni, gia confermati).
+// Le competenze sono quelle del SETTORE DELLA PERSONA (prima: del settore aperto nel
+// Diario, sbagliato importando un piano di un altro settore).
 async function certificaCompetenzaDaPiano(nome, key, chiediPunti) {
   const c = collaboratoriCache.find((x) => x.nome === nome);
   if (!c) return false;
-  const prima = livelloDiCollaboratore(c);
+  const repC = c.reparto_dip || 'slots';
+  const livDi = (x) =>
+    typeof _pianoLivelloNelSettore === 'function' ? _pianoLivelloNelSettore(x, repC) || 0 : livelloDiCollaboratore(x);
+  const prima = livDi(c);
   const nuove = Object.assign({}, c.competenze || {});
   if (nuove[key] === true) return true;
   nuove[key] = true;
-  const compsRep = getCompetenzeReparto();
+  const compsRep = (getCompetenzeConfigAll()[repC] || []).slice();
   const compAtt = compsRep.find((k) => k.key === key);
   const lvAtt = compAtt ? parseInt(compAtt.livello) || 0 : 0;
   const implicate = [];
@@ -3422,16 +3472,50 @@ async function certificaCompetenzaDaPiano(nome, key, chiediPunti) {
     nome + ' · ' + (compAtt ? compAtt.label : key) + (implicate.length ? ' + ' + implicate.join(', ') : ''),
   );
   if (typeof _insertHrEvento === 'function') {
-    const fmt = chiediPunti
-      ? ((await chiediTesto('Formatore che ha svolto la formazione (opzionale):', '')) || '').trim()
-      : '';
+    const fmt =
+      chiediPunti === true
+        ? ((await chiediTesto('Formatore che ha svolto la formazione (opzionale):', '')) || '').trim()
+        : '';
     _insertHrEvento(
       nome,
       'formazione',
-      'Competenza certificata: ' + (compAtt ? compAtt.label : key) + (fmt ? ' · formatore: ' + fmt : ''),
+      'Competenza certificata: ' +
+        (compAtt ? compAtt.label : key) +
+        (fmt ? ' · formatore: ' + fmt : '') +
+        (chiediPunti === 'livelli' ? ' · dai turni del piano' : ''),
     );
   }
-  if (chiediPunti) {
+  if (chiediPunti === 'livelli') {
+    // INCENTIVO come la spunta in Formazione, gia confermato nell elenco: punti della
+    // competenza, punti dei livelli raggiunti, premio del livello (anti-doppioni in
+    // _insertPuntiEvento)
+    const cfgP = getPuntiConfig();
+    const az = (cfgP.azioni || []).find((a) => a.key === 'competenza');
+    if (az && az.punti)
+      await _insertPuntiEvento(
+        nome,
+        az.punti,
+        'competenza',
+        'Competenza certificata: ' + (compAtt ? compAtt.label : key) + ' (dai turni del piano)',
+      );
+    const dopo = livDi(c);
+    for (let lv = prima + 1; lv <= dopo; lv++) {
+      const pl = parseInt(cfgP.punti_livello[String(lv)]) || 0;
+      if (pl) await _insertPuntiEvento(nome, pl, 'livello_' + lv, 'Raggiunto Livello ' + lv + ' multidisciplinare');
+    }
+    if (dopo > prima && dopo >= 2) {
+      const premio = (cfgP.premi_livello || {})[String(dopo)];
+      logAzione('Passaggio livello', nome + ' → Livello ' + dopo + ' (dai turni del piano)');
+      if (typeof _insertHrEvento === 'function')
+        _insertHrEvento(nome, 'livello', 'Raggiunto Livello ' + dopo + ' multidisciplinare (dai turni del piano)');
+      if (typeof _notificaIncentivo === 'function')
+        _notificaIncentivo(
+          nome,
+          nome + ' · raggiunto il livello ' + dopo,
+          'Competenze fino al livello ' + dopo + ' certificate' + (premio ? ' · premio: ' + premio : ''),
+        );
+    }
+  } else if (chiediPunti) {
     const az = getPuntiConfig().azioni.find((a) => a.key === 'competenza');
     if (
       az &&
@@ -3446,7 +3530,7 @@ async function certificaCompetenzaDaPiano(nome, key, chiediPunti) {
         'competenza',
         'Competenza certificata: ' + (compAtt ? compAtt.label : key),
       );
-    const dopo = livelloDiCollaboratore(c);
+    const dopo = livDi(c);
     for (let lv = prima + 1; lv <= dopo; lv++) {
       const pl = parseInt(getPuntiConfig().punti_livello[String(lv)]) || 0;
       if (pl) await _insertPuntiEvento(nome, pl, 'livello_' + lv, 'Raggiunto Livello ' + lv + ' multidisciplinare');

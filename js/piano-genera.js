@@ -924,11 +924,15 @@ function _pianoViolazioniGruppi(righe, ctx) {
       const gr = (t.gruppo || '').toUpperCase();
       const g = parseInt(r.data.split('-')[2]);
       const fz = (((_pianoCollabInfo(r.collaboratore) || {}).funzione || '') + '').toUpperCase();
-      (perGruppoGiornoFz[gr + '|' + fz + '|' + g] = perGruppoGiornoFz[gr + '|' + fz + '|' + g] || []).push(
-        r.collaboratore,
-      );
-      (perGruppoMeseFz[gr + '|' + fz] = perGruppoMeseFz[gr + '|' + fz] || new Set()).add(r.collaboratore);
-      perGruppoGiornoTot[gr + '|' + g] = (perGruppoGiornoTot[gr + '|' + g] || 0) + 1;
+      // anche sotto "*" (gruppo "tutti" nelle regole): prima le regole di funzione con
+      // gruppo "tutti" non contavano nessuno (il minimo segnalava sempre, il massimo mai)
+      for (const gk of [gr, '*']) {
+        (perGruppoGiornoFz[gk + '|' + fz + '|' + g] = perGruppoGiornoFz[gk + '|' + fz + '|' + g] || []).push(
+          r.collaboratore,
+        );
+        (perGruppoMeseFz[gk + '|' + fz] = perGruppoMeseFz[gk + '|' + fz] || new Set()).add(r.collaboratore);
+        perGruppoGiornoTot[gk + '|' + g] = (perGruppoGiornoTot[gk + '|' + g] || 0) + 1;
+      }
       // blocca_tipo_turno + richiede_campo + accompagnamento: controlli per cella
       for (const rg of _pianoRegoleGruppoDi(gr)) {
         const tipoR = (rg.tipo_regola || '').toLowerCase();
@@ -1022,7 +1026,7 @@ function _pianoViolazioniGruppi(righe, ctx) {
               if (parseInt(r.data.split('-')[2]) !== g) return;
               if (!_pianoCopreQui(r)) return;
               const t = _pianoTurnoInfo(r.codice);
-              if (!t || (t.gruppo || '').toUpperCase() !== gr) return;
+              if (!t || (gr !== '*' && (t.gruppo || '').toUpperCase() !== gr)) return;
               if (tipoF && (t.tipo || '').toUpperCase() !== tipoF) return;
               if ((((_pianoCollabInfo(r.collaboratore) || {}).funzione || '') + '').toUpperCase() === fu) conta++;
             });
@@ -1032,7 +1036,11 @@ function _pianoViolazioniGruppi(righe, ctx) {
               if (parseInt(r.data.split('-')[2]) !== g) return;
               if (!_pianoCopreQui(r)) return;
               const t = _pianoTurnoInfo(r.codice);
-              if (t && (t.gruppo || '').toUpperCase() === gr && (!tipoF || (t.tipo || '').toUpperCase() === tipoF))
+              if (
+                t &&
+                (gr === '*' || (t.gruppo || '').toUpperCase() === gr) &&
+                (!tipoF || (t.tipo || '').toUpperCase() === tipoF)
+              )
                 turniQuelGiorno++;
             });
             if (turniQuelGiorno && conta < nVal)
@@ -1983,14 +1991,29 @@ async function generaBozzaPiano(usaCoperture) {
   const contaGiornoFz = {}; // gruppo|FZ|g -> n assegnati
   const contaGiornoTot = {}; // gruppo|g -> n assegnati (per accompagnamento)
   const collabMeseFz = {}; // gruppo|FZ -> Set(nomi)
+  // un turno assegnato o tolto aggiorna i contatori del suo gruppo e di "*" (le regole
+  // con gruppo "tutti" contano ogni gruppo del settore)
   const registraAssegnazione = (nomeC, codiceT, giorno) => {
     const tt = _pianoTurnoInfo(codiceT);
     if (!tt) return;
-    const gr = (tt.gruppo || '').toUpperCase();
     const fzC = (((_pianoCollabInfo(nomeC) || {}).funzione || '') + '').toUpperCase();
-    contaGiornoFz[gr + '|' + fzC + '|' + giorno] = (contaGiornoFz[gr + '|' + fzC + '|' + giorno] || 0) + 1;
-    contaGiornoTot[gr + '|' + giorno] = (contaGiornoTot[gr + '|' + giorno] || 0) + 1;
-    (collabMeseFz[gr + '|' + fzC] = collabMeseFz[gr + '|' + fzC] || new Set()).add(nomeC);
+    for (const gr of [(tt.gruppo || '').toUpperCase(), '*']) {
+      contaGiornoFz[gr + '|' + fzC + '|' + giorno] = (contaGiornoFz[gr + '|' + fzC + '|' + giorno] || 0) + 1;
+      contaGiornoTot[gr + '|' + giorno] = (contaGiornoTot[gr + '|' + giorno] || 0) + 1;
+      (collabMeseFz[gr + '|' + fzC] = collabMeseFz[gr + '|' + fzC] || new Set()).add(nomeC);
+    }
+  };
+  const togliAssegnazione = (nomeC, codiceT, giorno) => {
+    const tt = _pianoTurnoInfo(codiceT);
+    if (!tt) return;
+    const fzC = (((_pianoCollabInfo(nomeC) || {}).funzione || '') + '').toUpperCase();
+    for (const gr of [(tt.gruppo || '').toUpperCase(), '*']) {
+      contaGiornoFz[gr + '|' + fzC + '|' + giorno] = Math.max(
+        0,
+        (contaGiornoFz[gr + '|' + fzC + '|' + giorno] || 0) - 1,
+      );
+      contaGiornoTot[gr + '|' + giorno] = Math.max(0, (contaGiornoTot[gr + '|' + giorno] || 0) - 1);
+    }
   };
   Object.keys(cella).forEach((k) => {
     if (altroSettore[k]) return; // non copre i posti di questo settore
@@ -2192,19 +2215,20 @@ async function generaBozzaPiano(usaCoperture) {
     // fonte di verità; la storia vale solo se i settori non sono configurati
     const gruppoT = (t.gruppo || '').toUpperCase();
     const fzU = (fz || '').toUpperCase();
-    for (const rg of _pianoRegoleGruppoDi(gruppoT)) {
+    for (const rg of _pianoRegoleGruppoDi(gruppoT).concat(_pianoRegoleGruppoDi('*'))) {
       const tipoR = (rg.tipo_regola || '').toLowerCase();
+      const grK = (rg.gruppo || '').toUpperCase() === '*' ? '*' : gruppoT;
       if (tipoR === 'limite_funzione_giorno') {
         const [fu, nMax] = rg.valore.split(':');
         if (
           fzU === (fu || '').toUpperCase() &&
-          (contaGiornoFz[gruppoT + '|' + fzU + '|' + g] || 0) >= (parseInt(nMax) || 99)
+          (contaGiornoFz[grK + '|' + fzU + '|' + g] || 0) >= (parseInt(nMax) || 99)
         )
           return false;
       } else if (tipoR === 'limite_funzione_mese') {
         const [fu, nMax] = rg.valore.split(':');
         if (fzU === (fu || '').toUpperCase()) {
-          const set = collabMeseFz[gruppoT + '|' + fzU];
+          const set = collabMeseFz[grK + '|' + fzU];
           if (set && set.size >= (parseInt(nMax) || 99) && !set.has(n)) return false;
         }
       }
@@ -2305,8 +2329,9 @@ async function generaBozzaPiano(usaCoperture) {
               }
               // minimo_funzione_giorno non ancora soddisfatto: privilegia la funzione richiesta
               const grT = (t.gruppo || '').toUpperCase();
-              for (const rg of _pianoRegoleGruppoDi(grT)) {
+              for (const rg of _pianoRegoleGruppoDi(grT).concat(_pianoRegoleGruppoDi('*'))) {
                 if ((rg.tipo_regola || '').toLowerCase() !== 'minimo_funzione_giorno') continue;
+                const grK = (rg.gruppo || '').toUpperCase() === '*' ? '*' : grT;
                 const parti = rg.valore.split(':');
                 const fu = (parti[0] || '').toUpperCase();
                 const nMin = parseInt(parti[1]) || 1;
@@ -2317,7 +2342,7 @@ async function generaBozzaPiano(usaCoperture) {
                 if (dows && !dows.includes(dowPy)) continue;
                 if (
                   ((infoP.funzione || '') + '').toUpperCase() === fu &&
-                  (contaGiornoFz[grT + '|' + fu + '|' + g] || 0) < nMin
+                  (contaGiornoFz[grK + '|' + fu + '|' + g] || 0) < nMin
                 )
                   p -= 2;
               }
@@ -2413,13 +2438,7 @@ async function generaBozzaPiano(usaCoperture) {
           const sw = rigaDi[kA] && sostituzioniWd.find((x) => x.id === rigaDi[kA].id);
           if (sw) sw.codice = sc.codice;
         }
-        const grA = (tA.gruppo || '').toUpperCase();
-        const fzA = (((_pianoCollabInfo(a) || {}).funzione || '') + '').toUpperCase();
-        contaGiornoFz[grA + '|' + fzA + '|' + sc.g] = Math.max(
-          0,
-          (contaGiornoFz[grA + '|' + fzA + '|' + sc.g] || 0) - 1,
-        );
-        contaGiornoTot[grA + '|' + sc.g] = Math.max(0, (contaGiornoTot[grA + '|' + sc.g] || 0) - 1);
+        togliAssegnazione(a, codA, sc.g);
         registraAssegnazione(a, sc.codice, sc.g);
         oreMese[a] = (oreMese[a] || 0) - durA + (parseFloat(sc.t.durata_ore) || 0);
         // B: prende il turno lasciato da A
@@ -2514,10 +2533,7 @@ async function generaBozzaPiano(usaCoperture) {
             assegnatiRun.delete(kN);
             const iN = nuove.findIndex((x) => x.collaboratore === n && x.data === dstrG && x.codice === cod);
             if (iN >= 0) nuove.splice(iN, 1);
-            const grT = (t.gruppo || '').toUpperCase();
-            const fzN = (((_pianoCollabInfo(n) || {}).funzione || '') + '').toUpperCase();
-            contaGiornoFz[grT + '|' + fzN + '|' + g] = Math.max(0, (contaGiornoFz[grT + '|' + fzN + '|' + g] || 0) - 1);
-            contaGiornoTot[grT + '|' + g] = Math.max(0, (contaGiornoTot[grT + '|' + g] || 0) - 1);
+            togliAssegnazione(n, cod, g);
             oreMese[n] = (oreMese[n] || 0) - dur;
             // b: prende il turno
             cella[b + '|' + g] = cod;

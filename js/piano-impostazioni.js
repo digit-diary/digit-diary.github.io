@@ -715,6 +715,381 @@ const _REGOLE_GRUPPO_ETICHETTE = {
   livello_turni: 'Turni per livello di Formazione',
   minimo_livello_giorno: 'Minimo di un livello al giorno',
 };
+// MODULO GUIDATO DELLE REGOLE DI GRUPPO (v415, richiesta del titolare 08/10/2026): per
+// ogni tipo i campi giusti (funzione, livello, numero, tipo di turno, giorni con le
+// caselle) e la frase che dice cosa fa la regola. Il valore salvato resta quello di
+// sempre (es. SUP:1:NOTTURNO:4,5): bozza, Valida e pacchetto IT non cambiano.
+const _RG_GIORNI = ['lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom']; // 0 = lunedi, come nelle regole
+const _RG_SCHEMI = {
+  richiede_funzione: {
+    campi: ['fzs'],
+    componi: (c) => c.fzs.join(','),
+    leggi: (v) => ({ fzs: v.split(',').filter(Boolean) }),
+  },
+  blocca_tipo_turno: {
+    campi: ['tipi'],
+    componi: (c) => c.tipi.join(','),
+    leggi: (v) => ({ tipi: v.split(',').filter(Boolean) }),
+  },
+  richiede_campo: {
+    campi: ['campo', 'op', 'val'],
+    componi: (c) => (c.campo && c.val !== '' ? c.campo + c.op + c.val : ''),
+    leggi: (v) => {
+      const m = v.match(/^([A-Z_][A-Z0-9_]*)\s*(>=|<=|!=|>|<|=)\s*(.+)$/i) || [];
+      return { campo: m[1] || '', op: m[2] || '>', val: m[3] || '' };
+    },
+  },
+  limite_funzione_giorno: { campi: ['fz', 'n'] },
+  limite_funzione_mese: { campi: ['fz', 'n'] },
+  minimo_funzione_mese: { campi: ['fz', 'n'] },
+  minimo_funzione_giorno: { campi: ['fz', 'n', 'tipo', 'gg'] },
+  minimo_livello_giorno: { campi: ['lv', 'n', 'tipo', 'gg'] },
+  turni_solo_funzioni: {
+    campi: ['turni', 'fzs'],
+    componi: (c) => (c.turni && c.fzs.length ? c.turni + ':' + c.fzs.join(',') : ''),
+    leggi: (v) => {
+      const p = v.split(':');
+      return { turni: p[0] || '', fzs: (p[1] || '').split(',').filter(Boolean) };
+    },
+  },
+  funzione_turni_giorni: {
+    campi: ['fz', 'turni', 'gg'],
+    componi: (c) => (c.fz && c.turni ? c.fz + ':' + c.turni + (c.gg.length ? ':' + c.gg.join(',') : '') : ''),
+    leggi: (v) => {
+      const p = v.split(':');
+      return { fz: p[0] || '', turni: p[1] || '', gg: (p[2] || '').split(',').filter((x) => x !== '') };
+    },
+  },
+  livello_turni: {
+    campi: ['turni', 'lv', 'lvmax'],
+    componi: (c) => (c.turni && c.lv ? c.turni + ':' + c.lv + (c.lvmax ? '-' + c.lvmax : '') : ''),
+    leggi: (v) => {
+      const p = v.split(':');
+      const [a, b] = String(p[1] || '').split('-');
+      return { turni: p[0] || '', lv: a || 'L1', lvmax: b || '' };
+    },
+  },
+};
+// formato comune "PRIMO:NUMERO[:TIPO[:giorni]]" (funzione o livello)
+function _rgComponiBase(tipo, c) {
+  const primo = tipo === 'minimo_livello_giorno' ? c.lv : c.fz;
+  if (!primo || !(parseInt(c.n) >= 0)) return '';
+  let v = primo + ':' + parseInt(c.n);
+  if (_RG_SCHEMI[tipo].campi.includes('tipo') && (c.tipo || c.gg.length)) v += ':' + (c.tipo || '');
+  if (_RG_SCHEMI[tipo].campi.includes('gg') && c.gg.length) v += ':' + c.gg.join(',');
+  return v;
+}
+function _rgLeggiBase(tipo, v) {
+  const p = v.split(':');
+  const c = { n: p[1] || '1', tipo: p[2] || '', gg: (p[3] || '').split(',').filter((x) => x !== '') };
+  if (tipo === 'minimo_livello_giorno') c.lv = p[0] || 'L1';
+  else c.fz = p[0] || '';
+  return c;
+}
+function _rgComponi(tipo, c) {
+  const s = _RG_SCHEMI[tipo];
+  return s && s.componi ? s.componi(c) : _rgComponiBase(tipo, c);
+}
+function _rgLeggi(tipo, v) {
+  const s = _RG_SCHEMI[tipo];
+  v = String(v || '').toUpperCase();
+  const base = {
+    fz: '',
+    fzs: [],
+    n: '1',
+    tipo: '',
+    tipi: [],
+    gg: [],
+    lv: 'L1',
+    lvmax: '',
+    turni: '',
+    campo: '',
+    op: '>',
+    val: '',
+  };
+  return Object.assign(base, s && s.leggi ? s.leggi(v) : _rgLeggiBase(tipo, v));
+}
+// la regola detta a parole, per la tabella
+function _rgFrase(r) {
+  const tipo = String(r.tipo_regola || '').toLowerCase();
+  const c = _rgLeggi(tipo, r.valore);
+  const gr = r.gruppo === '*' ? 'in tutti i gruppi' : 'nel gruppo ' + r.gruppo;
+  const tipoTxt = c.tipo ? ' sui turni ' + (c.tipo === 'NOTTURNO' ? 'notturni' : 'diurni') : '';
+  const giorniTxt = c.gg.length
+    ? ', ' +
+      c.gg
+        .map((x) => _RG_GIORNI[parseInt(x)])
+        .filter(Boolean)
+        .join(', ')
+    : ', ogni giorno';
+  switch (tipo) {
+    case 'richiede_funzione':
+      return (
+        (r.gruppo === '*' ? 'In tutti i gruppi' : 'Nel gruppo ' + r.gruppo) +
+        ' possono lavorare ' +
+        c.fzs.join(', ') +
+        ' anche senza la formazione del gruppo'
+      );
+    case 'blocca_tipo_turno':
+      return 'Niente turni ' + c.tipi.map((x) => (x === 'NOTTURNO' ? 'notturni' : 'diurni')).join(' e ') + ' ' + gr;
+    case 'richiede_campo':
+      return 'Lavora ' + gr + ' solo chi ha ' + c.campo.toLowerCase() + ' ' + c.op + ' ' + c.val + ' nella scheda';
+    case 'limite_funzione_giorno':
+      return 'Al massimo ' + c.n + ' ' + c.fz + ' al giorno ' + gr;
+    case 'limite_funzione_mese':
+      return (
+        'Al massimo ' +
+        c.n +
+        (c.n === '1' ? ' persona' : ' persone diverse') +
+        ' con funzione ' +
+        c.fz +
+        ' nel mese ' +
+        gr
+      );
+    case 'minimo_funzione_mese':
+      return (
+        'Almeno ' + c.n + (c.n === '1' ? ' persona' : ' persone diverse') + ' con funzione ' + c.fz + ' nel mese ' + gr
+      );
+    case 'minimo_funzione_giorno':
+      return 'Almeno ' + c.n + ' ' + c.fz + tipoTxt + ' ' + gr + giorniTxt;
+    case 'minimo_livello_giorno':
+      return 'Almeno ' + c.n + ' persone di livello ' + c.lv + ' o piu' + tipoTxt + ' ' + gr + giorniTxt;
+    case 'turni_solo_funzioni':
+      return 'I turni ' + c.turni + ' li fanno solo ' + c.fzs.join(', ');
+    case 'funzione_turni_giorni':
+      return c.fz + ' fa solo i turni ' + c.turni + (c.gg.length ? giorniTxt : ', sempre');
+    case 'livello_turni':
+      return 'I turni ' + c.turni + ' solo da ' + (c.lvmax ? c.lv + ' a ' + c.lvmax : c.lv + ' in su');
+  }
+  return r.valore;
+}
+// campi del modulo per un tipo (c = valori di partenza, per modificare una regola)
+function _rgCampiHtml(tipo, c) {
+  const s = _RG_SCHEMI[tipo];
+  if (!s) return '';
+  c = c || _rgLeggi(tipo, '');
+  const ctx = _pianoContestoSettore(_pianoReparto());
+  const funzioni = [
+    ...new Set(
+      (Array.isArray(window._pianoFunzioni) ? window._pianoFunzioni : [])
+        .map((f) => String(f).toUpperCase())
+        .concat([...ctx.funzioni]),
+    ),
+  ].sort();
+  const maxLv = typeof _lvMaxReparto === 'function' ? _lvMaxReparto(_pianoReparto()) || 1 : 3;
+  const livelli = Array.from({ length: maxLv }, (_, i) => 'L' + (i + 1));
+  const stileSel = 'padding:6px 8px';
+  const campo = (lbl, html) => '<div class="field"><label>' + lbl + '</label>' + html + '</div>';
+  const spunte = (nome, voci, scelti) =>
+    '<div style="display:flex;gap:4px 12px;flex-wrap:wrap;padding:4px 0">' +
+    voci
+      .map(
+        (v) =>
+          '<label style="display:inline-flex;align-items:center;gap:4px;font-size:var(--fs-md,.875rem);white-space:nowrap"><input type="checkbox" name="' +
+          nome +
+          '" value="' +
+          escP(v.v) +
+          '"' +
+          (scelti.includes(String(v.v)) ? ' checked' : '') +
+          '>' +
+          escP(v.l) +
+          '</label>',
+      )
+      .join('') +
+    '</div>';
+  const out = [];
+  s.campi.forEach((k) => {
+    if (k === 'fz')
+      out.push(
+        campo(
+          'Funzione',
+          '<select id="rgc-fz" style="' +
+            stileSel +
+            '">' +
+            funzioni.map((f) => '<option' + (f === c.fz ? ' selected' : '') + '>' + escP(f) + '</option>').join('') +
+            '</select>',
+        ),
+      );
+    if (k === 'fzs')
+      out.push(
+        campo(
+          'Funzioni',
+          spunte(
+            'rgc-fzs',
+            funzioni.map((f) => ({ v: f, l: f })),
+            c.fzs,
+          ),
+        ),
+      );
+    if (k === 'n')
+      out.push(
+        campo(
+          tipo.indexOf('limite') === 0 ? 'Al massimo' : 'Almeno',
+          '<input type="number" id="rgc-n" min="0" max="99" value="' +
+            escP(String(c.n)) +
+            '" style="width:70px;padding:6px">',
+        ),
+      );
+    if (k === 'tipo')
+      out.push(
+        campo(
+          'Sui turni',
+          '<select id="rgc-tipo" style="' +
+            stileSel +
+            '">' +
+            [
+              ['', 'tutti'],
+              ['DIURNO', 'diurni'],
+              ['NOTTURNO', 'notturni'],
+            ]
+              .map(
+                (o) => '<option value="' + o[0] + '"' + (o[0] === c.tipo ? ' selected' : '') + '>' + o[1] + '</option>',
+              )
+              .join('') +
+            '</select>',
+        ),
+      );
+    if (k === 'tipi')
+      out.push(
+        campo(
+          'Turni vietati',
+          spunte(
+            'rgc-tipi',
+            [
+              { v: 'DIURNO', l: 'diurni' },
+              { v: 'NOTTURNO', l: 'notturni' },
+            ],
+            c.tipi,
+          ),
+        ),
+      );
+    if (k === 'gg')
+      out.push(
+        campo(
+          'Giorni (nessuno = tutti)',
+          spunte(
+            'rgc-gg',
+            _RG_GIORNI.map((g, i) => ({ v: String(i), l: g })),
+            c.gg,
+          ),
+        ),
+      );
+    if (k === 'lv' || k === 'lvmax')
+      out.push(
+        campo(
+          k === 'lv' ? (tipo === 'livello_turni' ? 'Dal livello' : 'Livello minimo') : 'Fino al livello (facoltativo)',
+          '<select id="rgc-' +
+            k +
+            '" style="' +
+            stileSel +
+            '">' +
+            (k === 'lvmax' ? '<option value="">nessun limite</option>' : '') +
+            livelli
+              .map((l) => '<option' + (l === (k === 'lv' ? c.lv : c.lvmax) ? ' selected' : '') + '>' + l + '</option>')
+              .join('') +
+            '</select>',
+        ),
+      );
+    if (k === 'turni')
+      out.push(
+        campo(
+          'Turni',
+          '<input type="text" id="rgc-turni" value="' +
+            escP(c.turni) +
+            '" placeholder="es. L1,9 oppure Z*" title="Sigle separate da virgola; Z* = tutte le sigle che iniziano con Z" style="width:170px;padding:6px">',
+        ),
+      );
+    if (k === 'campo')
+      out.push(
+        campo(
+          'Campo della scheda',
+          '<input type="text" id="rgc-campo" value="' +
+            escP(c.campo) +
+            '" placeholder="es. ACCOGLIENZA" style="width:140px;padding:6px">',
+        ),
+      );
+    if (k === 'op')
+      out.push(
+        campo(
+          'Confronto',
+          '<select id="rgc-op" style="' +
+            stileSel +
+            '">' +
+            ['>', '>=', '=', '!=', '<', '<=']
+              .map((o) => '<option' + (o === c.op ? ' selected' : '') + '>' + escP(o) + '</option>')
+              .join('') +
+            '</select>',
+        ),
+      );
+    if (k === 'val')
+      out.push(
+        campo(
+          'Valore',
+          '<input type="text" id="rgc-val" value="' +
+            escP(c.val) +
+            '" placeholder="es. 0" style="width:90px;padding:6px">',
+        ),
+      );
+  });
+  return out.join('');
+}
+function _rgLeggiCampi() {
+  const val = (id) => ((document.getElementById(id) || {}).value || '').trim().toUpperCase();
+  const spunte = (nome) => [...document.querySelectorAll('input[name="' + nome + '"]:checked')].map((x) => x.value);
+  return {
+    fz: val('rgc-fz'),
+    fzs: spunte('rgc-fzs'),
+    n: val('rgc-n'),
+    tipo: val('rgc-tipo'),
+    tipi: spunte('rgc-tipi'),
+    gg: spunte('rgc-gg'),
+    lv: val('rgc-lv'),
+    lvmax: val('rgc-lvmax'),
+    turni: val('rgc-turni').replace(/\s+/g, ''),
+    campo: val('rgc-campo'),
+    op: (document.getElementById('rgc-op') || {}).value || '>',
+    val: val('rgc-val'),
+  };
+}
+// anteprima: la frase della regola mentre la si compone
+function rgAggiornaAnteprima() {
+  const tipo = (document.getElementById('rg-tipo') || {}).value;
+  const gruppo = (document.getElementById('rg-gruppo') || {}).value;
+  const v = _rgComponi(tipo, _rgLeggiCampi());
+  const el = document.getElementById('rg-anteprima');
+  if (el) el.textContent = v ? _rgFrase({ tipo_regola: tipo, valore: v, gruppo: gruppo }) + '  (' + v + ')' : '';
+}
+function rgTipoCambiato(c) {
+  const tipo = (document.getElementById('rg-tipo') || {}).value;
+  const box = document.getElementById('rg-campi');
+  if (box) box.innerHTML = _rgCampiHtml(tipo, c);
+  const aiuto = document.getElementById('rg-aiuto');
+  if (aiuto) aiuto.textContent = _REGOLE_GRUPPO_TIPI[tipo] || '';
+  rgAggiornaAnteprima();
+}
+function pianoModificaRegolaGruppo(id) {
+  const r = pianoRegoleGruppoCache.find((x) => x.id === id);
+  if (!r) return;
+  window._rgModifica = id;
+  const gSel = document.getElementById('rg-gruppo');
+  const tSel = document.getElementById('rg-tipo');
+  if (gSel) gSel.value = r.gruppo;
+  if (tSel) tSel.value = r.tipo_regola;
+  rgTipoCambiato(_rgLeggi(r.tipo_regola, r.valore));
+  const b = document.getElementById('rg-salva');
+  if (b) b.textContent = 'Salva modifiche';
+  const a = document.getElementById('rg-annulla-mod');
+  if (a) a.hidden = false;
+  const box = document.getElementById('rg-modulo');
+  if (box)
+    try {
+      box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } catch (e) {}
+}
+function pianoAnnullaModificaRegola() {
+  window._rgModifica = null;
+  renderPiano();
+}
 // TAB GUIDA · manuale rapido della sezione Piano (come la Guida di Turnivo)
 // ================================================================
 // TAB FORMULARI · moduli stampabili standard (come i formulari vuoti di
@@ -1064,7 +1439,7 @@ function _renderPianoRegoleGruppoCard() {
   h +=
     '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:6px">Regole di idoneità per settore/gruppo: chi può lavorare in un gruppo, limiti e minimi per funzione. Applicate dalla bozza automatica e dal validatore.</p>';
   h +=
-    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:680px;font-size:var(--fs-md,.875rem)"><thead><tr><th>Gruppo</th><th style="text-align:left">Regola</th><th style="text-align:left">Valore</th><th>Attiva</th><th></th></tr></thead><tbody>';
+    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:680px;font-size:var(--fs-md,.875rem)"><thead><tr><th>Gruppo</th><th style="text-align:left">Regola</th><th style="text-align:left">Valore salvato</th><th>Attiva</th><th></th></tr></thead><tbody>';
   pianoRegoleGruppoCache
     .filter((r) => (r.reparto_dip || 'slots') === _pianoReparto())
     .sort((a, b) => (a.gruppo || '').localeCompare(b.gruppo || '') || a.id - b.id)
@@ -1076,19 +1451,19 @@ function _renderPianoRegoleGruppoCard() {
         escP(_REGOLE_GRUPPO_TIPI[r.tipo_regola] || '') +
         '"><b>' +
         escP(_REGOLE_GRUPPO_ETICHETTE[r.tipo_regola] || r.tipo_regola) +
-        '</b><br><span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
-        escP(r.tipo_regola) +
-        '</span></td><td style="text-align:left"><input type="text" value="' +
+        '</b><br><span style="font-size:var(--fs-md,.875rem)">' +
+        escP(_rgFrase(r)) +
+        '</span></td><td style="text-align:left"><code style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
         escP(r.valore || '') +
-        '" onchange="salvaRegolaGruppo(' +
-        r.id +
-        ',\'valore\',this.value)" style="width:170px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)">' +
+        '</code>' +
         _pianoRegolaLivelloChi(r) +
         '</td><td><input type="checkbox"' +
         (r.attivo !== false ? ' checked' : '') +
         ' onchange="salvaRegolaGruppo(' +
         r.id +
-        ',\'attivo\',this.checked)"></td><td><button class="btn-del-tipo" onclick="eliminaRegolaGruppo(' +
+        ',\'attivo\',this.checked)"></td><td style="white-space:nowrap"><button class="btn-act" onclick="pianoModificaRegolaGruppo(' +
+        r.id +
+        ')">Modifica</button> <button class="btn-del-tipo" onclick="eliminaRegolaGruppo(' +
         r.id +
         ')">Elimina</button></td></tr>';
     });
@@ -1097,24 +1472,29 @@ function _renderPianoRegoleGruppoCard() {
     '<details style="margin:10px 0;background:var(--paper2);border:1px solid var(--line);border-radius:3px;padding:8px 12px"><summary style="cursor:pointer;font-weight:700;font-size:var(--fs-md,.875rem)">Come si crea una regola di gruppo (esempi)</summary>' +
     '<ol style="font-size:var(--fs-md,.875rem);margin:8px 0 4px 18px;line-height:1.5">' +
     '<li>Scegli il <b>gruppo</b> di turni a cui la regola si riferisce (quello scritto nella scheda Turni, colonna Gruppo). "tutti" vale per ogni gruppo del settore.</li>' +
-    '<li>Scegli il <b>tipo</b>: sotto compare la spiegazione con un esempio del valore.</li>' +
-    '<li>Scrivi il <b>valore</b> nel formato dell esempio e premi Aggiungi. Il programma controlla che gruppo, funzioni e sigle esistano in questo settore: se qualcosa non torna te lo dice.</li>' +
+    '<li>Scegli il <b>tipo</b>: compaiono i campi giusti (funzione o livello, numero, tipo di turno, giorni con le caselle).</li>' +
+    '<li>Compila i campi: sotto, <b>Regola</b> dice a parole cosa fara. Premi Aggiungi. Il programma controlla che gruppo, funzioni e sigle esistano in questo settore: se qualcosa non torna te lo dice. Per cambiarla dopo, <b>Modifica</b> nella tabella.</li>' +
     '<li>Esempi: <b>Turni riservati</b> con valore <code>L1,9:BO,SUP</code> = i turni L1 e 9 li fanno solo Back Office e Supervisor. <b>Una funzione fa solo certi turni</b> con <code>SUP:Z*,L1,9:0,1,2,3</code> = da lunedi a giovedi i Supervisor fanno solo turni che iniziano con Z (oppure L1 e 9); con <code>SUP:Z*,S*,L1,9:4,5</code> venerdi e sabato anche i turni S. <b>Massimo al giorno</b> con <code>SUP:1</code> nel gruppo BO = al massimo un Supervisor al giorno in Back Office.</li>' +
     '<li><b>Livelli di Formazione</b> (il livello di ognuno e quello di Formazione: L2 = tutte le competenze fino a L2 certificate). <b>Turni per livello</b> con <code>10,10C,9:L2</code> = quei turni dal livello L2 in su; <code>1,21:L1-L2</code> = solo L1 e L2 (es. turni da principianti). Chi deve fare un turno anche senza il livello lo trova in Preferenze collaboratori, <b>Turni consentiti</b>. <b>Minimo di un livello al giorno</b> con <code>L3:2:NOTTURNO:4,5</code> = venerdi e sabato almeno 2 persone di livello L3 o piu sui turni notturni. Quando un collaboratore sale di livello in Formazione, i turni si aprono da soli. Sotto il valore si vede quante persone soddisfano la regola.</li>' +
     '<li>Le regole valgono per il <b>settore aperto</b>: ogni settore ha le sue, con le sue sigle e le sue funzioni. Agiscono nel validatore, nella bozza, nei cambi turno e nella scrittura manuale (avviso).</li>' +
     '</ol></details>' +
-    '<div class="add-tipo-row" style="margin-top:8px"><div class="field"><label>Gruppo</label><select id="rg-gruppo" style="padding:8px">' +
+    '<div id="rg-modulo" style="margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:3px;background:var(--paper2)">' +
+    '<div class="add-tipo-row" onchange="rgAggiornaAnteprima()" oninput="rgAggiornaAnteprima()"><div class="field"><label>Gruppo</label><select id="rg-gruppo" style="padding:8px">' +
     gruppi.map((g) => '<option>' + escP(g) + '</option>').join('') +
     '<option value="*">tutti</option>' +
-    '</select></div><div class="field"><label>Regola</label><select id="rg-tipo" style="padding:8px" onchange="document.getElementById(\'rg-aiuto\').textContent=_REGOLE_GRUPPO_TIPI[this.value]||\'\'" >' +
+    '</select></div><div class="field"><label>Regola</label><select id="rg-tipo" style="padding:8px" onchange="rgTipoCambiato()">' +
     Object.keys(_REGOLE_GRUPPO_TIPI)
       .map((t) => '<option value="' + t + '">' + escP(_REGOLE_GRUPPO_ETICHETTE[t] || t) + '</option>')
       .join('') +
-    '</select></div><div class="field"><label>Valore</label><input type="text" id="rg-valore" placeholder="SUP:1" style="width:150px"></div>' +
-    '<button class="btn-add-tipo" onclick="aggiungiRegolaGruppo()">+ Aggiungi regola</button></div>' +
-    '<p id="rg-aiuto" style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:4px">' +
-    _REGOLE_GRUPPO_TIPI.richiede_funzione +
-    '</p>';
+    '</select></div><div id="rg-campi" style="display:contents">' +
+    _rgCampiHtml('richiede_funzione') +
+    '</div></div>' +
+    '<p id="rg-aiuto" style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:6px 0 2px">' +
+    escP(_REGOLE_GRUPPO_TIPI.richiede_funzione) +
+    '</p><p style="font-size:var(--fs-md,.875rem);margin:4px 0 8px"><b>Regola:</b> <span id="rg-anteprima" style="color:var(--ink)"></span></p>' +
+    '<button class="btn-add-tipo" id="rg-salva" onclick="aggiungiRegolaGruppo()">+ Aggiungi regola</button> ' +
+    '<button class="btn-act" id="rg-annulla-mod" hidden onclick="pianoAnnullaModificaRegola()">Annulla modifica</button>' +
+    '</div>';
   h += '</div></div>';
   return h;
 }
@@ -1322,14 +1702,30 @@ async function aggiungiRegolaGruppo() {
   if (!isAdmin()) return;
   const gruppo = (document.getElementById('rg-gruppo') || {}).value;
   const tipo = (document.getElementById('rg-tipo') || {}).value;
-  const valore = ((document.getElementById('rg-valore') || {}).value || '').trim().toUpperCase();
+  const valore = _rgComponi(tipo, _rgLeggiCampi()).trim().toUpperCase();
   if (!gruppo || !tipo || !valore) {
-    toast('Compila gruppo, regola e valore');
+    toast('Compila i campi della regola');
     return;
   }
   const errore = _pianoValidaRegolaGruppo(gruppo, tipo, valore, _pianoReparto());
   if (errore) {
     toastErrore(errore, 9000);
+    return;
+  }
+  // MODIFICA di una regola esistente (pulsante Modifica nella tabella)
+  const idMod = window._rgModifica;
+  if (idMod) {
+    try {
+      await secPatch('piano_regole_gruppo', 'id=eq.' + idMod, { gruppo: gruppo, tipo_regola: tipo, valore: valore });
+      const r = pianoRegoleGruppoCache.find((x) => x.id === idMod);
+      if (r) Object.assign(r, { gruppo: gruppo, tipo_regola: tipo, valore: valore });
+      logAzione('Regola gruppo modificata', gruppo + ' ' + tipo + ' ' + valore);
+      toast('Regola aggiornata');
+      window._rgModifica = null;
+      renderPiano();
+    } catch (e) {
+      toastErrore('Regola non salvata: ' + ((e && e.message) || e));
+    }
     return;
   }
   try {
