@@ -2655,8 +2655,13 @@ async function _applicaVacanzeMese(interattivo) {
     60: cAttorno ? parseInt(_pianoRegolaVal('c_dopo_60')) || 3 : 0,
     40: cAttorno ? parseInt(_pianoRegolaVal('c_dopo_40')) || 4 : 0,
   };
+  // jolly: C dopo le vacanze fisse (decisione del titolare 08/10/2026: una prima e una dopo)
+  const cDopoJolly = cAttorno ? parseInt(_pianoRegolaVal('c_dopo_jolly')) || 1 : 0;
   const wdPrima = parseInt(_pianoRegolaVal('wd_prima_vacanza'));
   const nWd = !cAttorno ? 0 : isNaN(wdPrima) ? 4 : wdPrima;
+  // giorni di lavoro obbligatori anche DOPO le C del rientro (turni prima e dopo le C)
+  const wdDopoR = parseInt(_pianoRegolaVal('wd_dopo_vacanza'));
+  const nWdDopo = !cAttorno ? 0 : isNaN(wdDopoR) ? 1 : wdDopoR;
   // SETTIMANE A CAVALLO D ANNO: la settimana 53 del 2026 (28.12-03.01) e la
   // settimana 1 del 2026 (dal 29.12.2025) portano giorni nel mese di un altro
   // anno. Si leggono anche le vacanze dell anno prima e dopo e ogni settimana
@@ -2664,8 +2669,12 @@ async function _applicaVacanzeMese(interattivo) {
   // gennaio le V di fine dicembre mancavano e venivano tolte come "orfane".
   const vacanze =
     (await secGet('piano_vacanze?anno=in.(' + (anno - 1) + ',' + anno + ',' + (anno + 1) + ')&limit=6000')) || [];
+  // solo chi ha QUESTO come settore principale: le vacanze di chi lavora in due settori
+  // le applica il suo settore (la cella e una sola e si vede in entrambi). Prima il
+  // settore extra le riapplicava e sovrascriveva i turni dell altro settore con WD e
+  // ne cambiava il settore (prova 08/10: Balliu, R22 C23 C0 delle Slot -> WD dal Valet)
   const nomiRep = collaboratoriCache
-    .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
+    .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto())
     .map((c) => c.nome);
   // settimane -> giorni del mese corrente
   const vacGiorni = {}; // nome -> Set(giorno)   solo vacanze (V)
@@ -2702,7 +2711,10 @@ async function _applicaVacanzeMese(interattivo) {
   // successivi si aggiornano senza toccare le stesse sigle inserite a mano
   const COMMENTO_ALTRE = 'Piano vacanze: ';
   const COMMENTO_V = COMMENTO_ALTRE + 'Vacanza';
-  const daVacanze = (r) => String(r.commento || '').startsWith(COMMENTO_ALTRE);
+  // le V scritte da qui non portano piu il commento (decisione del titolare 08/10/2026:
+  // non serve vederlo): il segno e "protetta e generata dal programma", invisibile
+  const daVacanze = (r) =>
+    String(r.commento || '').startsWith(COMMENTO_ALTRE) || (r.codice === 'V' && r.protetto && r.generato);
   // V ORFANE: se una vacanza e' stata spostata o tolta dalla scheda Vacanze,
   // le V scritte da qui rimaste senza settimana corrispondente vengono rimosse.
   // Le V scritte a mano (o importate) senza vacanza nel file NON si toccano: si
@@ -2918,13 +2930,19 @@ async function _applicaVacanzeMese(interattivo) {
       if (r && r.protetto) {
         // una V gia presente sul giorno di una vacanza del file prende il segno delle
         // vacanze: se la vacanza si sposta, si toglie con le altre
-        if (r.codice === 'V' && !daVacanze(r) && !r.commento && g >= primoAperto) {
-          await secPatch('piano', 'id=eq.' + r.id, { commento: COMMENTO_V, updated_at: new Date().toISOString() });
-          r.commento = COMMENTO_V;
+        // (e le V con il vecchio commento lo perdono: resta solo il segno invisibile)
+        if (r.codice === 'V' && g >= primoAperto && (r.commento === COMMENTO_V || (!r.commento && !r.generato))) {
+          await secPatch('piano', 'id=eq.' + r.id, {
+            commento: null,
+            generato: true,
+            updated_at: new Date().toISOString(),
+          });
+          r.commento = null;
+          r.generato = true;
         }
         continue;
       }
-      if (await scrivi(nome, g, 'V', true, false, COMMENTO_V)) nV++;
+      if (await scrivi(nome, g, 'V', true, true, null)) nV++;
     }
     // blocchi contigui; una vacanza che arriva dal mese prima e continua il giorno 1
     // inizia "prima" del mese (giorno 0): niente C prima, le C dopo si mettono qui
@@ -2944,7 +2962,15 @@ async function _applicaVacanzeMese(interattivo) {
     } else if (codaPrec[nome]) blocchi.push([0, 0]); // vacanza finita l ultimo giorno del mese prima
     const pct = info.percentuale != null ? info.percentuale : 1.0;
     const nCPrima = info.is_jolly ? cPrimaJolly : cPrimaFissi;
-    const nCDopo = pct >= 1.0 ? cDopo[100] : pct >= 0.8 ? cDopo[80] : pct >= 0.6 ? cDopo[60] : cDopo[40];
+    const nCDopo = info.is_jolly
+      ? cDopoJolly
+      : pct >= 1.0
+        ? cDopo[100]
+        : pct >= 0.8
+          ? cDopo[80]
+          : pct >= 0.6
+            ? cDopo[60]
+            : cDopo[40];
     const cGiorni = new Set();
     const cMesePrec = []; // giorni del mese precedente
     const dPrec = new Date(anno, mese - 2, 15);
@@ -2967,13 +2993,21 @@ async function _applicaVacanzeMese(interattivo) {
       if (await scrivi(nome, g, 'C', true, true)) nC++;
     }
     // WD: diurni forzati prima dei C pre-vacanza (non protetti)
-    if (nWd > 0) {
+    if (nWd > 0 || nWdDopo > 0) {
       const wdSet = new Set();
-      for (const [bstart] of blocchi) {
-        if (bstart < 1) continue; // vacanza iniziata il mese prima
-        const primoC = bstart - nCPrima;
-        for (let off = 1; off <= nWd; off++) {
-          const g = primoC - off;
+      for (const [bstart, bend] of blocchi) {
+        if (bstart >= 1) {
+          // vacanza iniziata in questo mese: giorni di lavoro prima delle C
+          const primoC = bstart - nCPrima;
+          for (let off = 1; off <= nWd; off++) {
+            const g = primoC - off;
+            if (g >= 1 && g <= nGiorni && !setVac.has(g) && !cGiorni.has(g)) wdSet.add(g);
+          }
+        }
+        // e dopo le C del rientro
+        const ultimoC = bend + nCDopo;
+        for (let off = 1; off <= nWdDopo; off++) {
+          const g = ultimoC + off;
           if (g >= 1 && g <= nGiorni && !setVac.has(g) && !cGiorni.has(g)) wdSet.add(g);
         }
       }

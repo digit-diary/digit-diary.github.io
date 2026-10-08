@@ -1965,6 +1965,8 @@ async function _renderPianoCore() {
     const da = ym + '-01';
     const a = ym + '-' + String(nGiorni).padStart(2, '0');
     _pianoRighe = await _pianoCaricaMeseSettore(da, a, _pianoReparto());
+    // domeniche libere dei mesi prima (conto annuale per Valida, bozza e Migliora)
+    if (typeof _pianoCaricaDomAnno === 'function') await _pianoCaricaDomAnno(ym, _pianoReparto()).catch(() => {});
     const mappa = {}; // 'nome|data' -> riga
     _pianoRighe.forEach((r) => (mappa[r.collaboratore + '|' + r.data] = r));
     const malattie = _pianoMalattieMese(ym);
@@ -2105,6 +2107,12 @@ async function _renderPianoCore() {
                 'Controlla tutto il mese contro le regole del settore e mostra le violazioni',
               )
             : '') +
+            pbtn(
+              'Perche scoperto',
+              'pianoPercheScoperti()',
+              '',
+              'Per ogni posto del fabbisogno rimasto scoperto: chi c era, perche nessuno l ha preso e cosa manca (personale, formazione, impostazioni, regole)',
+            ) +
             pbtn(
               'Copertura malattia',
               'apriCoperturaMalattia()',
@@ -2648,6 +2656,7 @@ async function _renderPianoCore() {
             else if (dow === 0) cls = 'piano-domenica';
             else if (_pianoGiorniWeekend().includes(dow)) cls = 'piano-weekend';
             if (g === 1) cls += ' piano-sep-left';
+            if (dstr === oggiLocale()) cls += ' piano-oggi'; // la colonna di oggi scende fino in fondo
             t +=
               '<th class="' +
               cls +
@@ -2702,8 +2711,8 @@ async function _renderPianoCore() {
             for (let g = 1; g <= nGiorni; g++) {
               const req = (fabbMap[cod] || {})[g] || 0;
               const ass = (assMap[cod] || {})[g] || 0;
-              const cls = g === 1 ? 'piano-sep-left' : '';
               const dstr = ym + '-' + String(g).padStart(2, '0');
+              const cls = (g === 1 ? 'piano-sep-left' : '') + (dstr === oggiLocale() ? ' piano-oggi' : '');
               // colori della PIANIFICAZIONE Excel: celle gialle, weekend verdi;
               // la carenza resta segnalata dal numero rosso
               const dow = new Date(dstr + 'T12:00:00').getDay();
@@ -2750,7 +2759,7 @@ async function _renderPianoCore() {
         const clsCella = (g) => {
           const dstr = ym + '-' + String(g).padStart(2, '0');
           const dow = new Date(dstr + 'T12:00:00').getDay();
-          const sep = g === 1 ? ' piano-sep-left' : '';
+          const sep = (g === 1 ? ' piano-sep-left' : '') + (dstr === oggiLocale() ? ' piano-oggi' : '');
           if (dow === 0) return 'piano-cel-dom' + sep;
           if (_pianoGiorniWeekend().includes(dow)) return 'piano-cel-we' + sep;
           return sep.trim();

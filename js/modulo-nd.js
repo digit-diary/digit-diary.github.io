@@ -322,3 +322,140 @@ async function ndApriModulo(id) {
     toastErrore('Modulo non leggibile');
   }
 }
+
+// NOTIFICA D ASSENZA, modulo 827 di Human Resources (richiesta del titolare 08/10/2026):
+// stessa intestazione dell originale, ma con piu righe (i collaboratori la usano per
+// mettere giu le settimane di vacanza), il motivo per riga con caselle vere (nell
+// originale erano simboli "£" dovuti al carattere) e l autorizzazione riga per riga.
+async function pdfNotificaAssenza() {
+  if (!window.jspdf) await caricaJsPDF();
+  if (!window.jspdf) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const punti = (x1, x2, y) => {
+    doc.setLineDashPattern([0.25, 0.6], 0);
+    doc.setLineWidth(0.2);
+    doc.line(x1, y, x2, y);
+    doc.setLineDashPattern([], 0);
+  };
+  const casella = (x, y) => {
+    doc.setLineWidth(0.25);
+    doc.rect(x, y - 2.7, 3, 3);
+  };
+  doc.setTextColor(0);
+  const logo = await _ndLogoRitagliato();
+  if (logo) doc.addImage(logo.url, 'PNG', 18, 5, 30, 30 * logo.ratio);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text('4 - Human Resources', 13, 25.5);
+  doc.setFontSize(8.5);
+  doc.text('827 - NOTIFICA DI ASSENZA', 20.5, 31);
+  doc.setFontSize(7);
+  doc.text('Data :14/03/2012', 140, 20);
+  doc.setFontSize(5);
+  doc.text('Red.', 140, 23.2);
+  doc.text('Appr.', 140, 29.3);
+  doc.setFontSize(7);
+  doc.text('O. Sampietro', 144, 24.5);
+  doc.text('AD CEO', 146, 29.6);
+  doc.setFontSize(16);
+  doc.text("NOTIFICA D'ASSENZA", 105, 45, { align: 'center' });
+  doc.setFontSize(8.5);
+  doc.text('- da trasmettere tempestivamente al Responsabile di settore -', 105, 50.5, { align: 'center' });
+  doc.setFontSize(10);
+  doc.text('Nome e Cognome:', 15, 62);
+  punti(48, 195, 62.5);
+  doc.text('Settore:', 15, 71);
+  punti(48, 195, 71.5);
+  // tabella dei periodi
+  const x0 = 15;
+  const col = [
+    { t: 'N.', w: 8 },
+    { t: 'Settimana', w: 20 },
+    { t: 'Dal', w: 26 },
+    { t: 'Al', w: 26 },
+    { t: 'Giorni', w: 15 },
+    { t: 'Vacanze', w: 18 },
+    { t: 'Recupero', w: 18 },
+    { t: 'Servizio\nmilitare', w: 18 },
+    { t: 'Altro', w: 16 },
+    { t: 'Autor.\nSI / NO', w: 15 },
+  ];
+  const wTot = col.reduce((s, c) => s + c.w, 0);
+  let y = 80;
+  const hTesta = 10;
+  const hRiga = 9;
+  const nRighe = 8;
+  doc.setFillColor(242, 242, 242);
+  doc.rect(x0, y, wTot, hTesta, 'F');
+  doc.setLineWidth(0.25);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  let x = x0;
+  col.forEach((c) => {
+    doc.rect(x, y, c.w, hTesta);
+    const righe = c.t.split('\n');
+    righe.forEach((tx, i) =>
+      doc.text(tx, x + c.w / 2, y + (righe.length === 1 ? 6 : 4.2 + i * 3.6), { align: 'center' }),
+    );
+    x += c.w;
+  });
+  doc.setFont('helvetica', 'normal');
+  y += hTesta;
+  for (let r = 1; r <= nRighe; r++) {
+    x = x0;
+    col.forEach((c, i) => {
+      doc.rect(x, y, c.w, hRiga);
+      if (i === 0) doc.text(String(r), x + c.w / 2, y + 5.8, { align: 'center' });
+      if (i >= 5 && i <= 8) casella(x + c.w / 2 - 1.5, y + 6);
+      if (i === 9) {
+        casella(x + 2.5, y + 6);
+        casella(x + c.w - 5.5, y + 6);
+      }
+      x += c.w;
+    });
+    y += hRiga;
+  }
+  y += 7;
+  doc.setFontSize(9);
+  doc.text('Altro / note:', 15, y);
+  punti(38, 195, y + 0.5);
+  y += 8;
+  punti(15, 195, y + 0.5);
+  y += 13;
+  doc.setFontSize(10);
+  doc.text('Luogo e data:', 15, y);
+  punti(40, 95, y + 0.5);
+  doc.text('Firma:', 105, y);
+  punti(118, 195, y + 0.5);
+  // parte del responsabile
+  y += 12;
+  doc.setLineWidth(0.6);
+  doc.line(15, y, 195, y);
+  y += 10;
+  doc.setFontSize(10);
+  doc.text('AUTORIZZAZIONE CONCESSA:', 15, y);
+  casella(75, y);
+  doc.text('SI, tutte le righe', 80, y);
+  casella(118, y);
+  doc.text('SI, salvo le righe:', 123, y);
+  punti(155, 195, y + 0.5);
+  y += 8;
+  casella(75, y);
+  doc.text('NO', 80, y);
+  y += 11;
+  doc.text('VISTO RESP. SETTORE:', 15, y);
+  punti(62, 195, y + 0.5);
+  y += 9;
+  doc.text('DATA:', 15, y);
+  punti(62, 120, y + 0.5);
+  y += 11;
+  doc.text('In caso di mancata autorizzazione, motivazione:', 15, y);
+  y += 8;
+  punti(15, 195, y + 0.5);
+  y += 8;
+  punti(15, 195, y + 0.5);
+  if (typeof mostraPdfPreview === 'function')
+    mostraPdfPreview(doc, 'Notifica_assenza_827.pdf', "Notifica d'assenza (827)");
+  else doc.save('Notifica_assenza_827.pdf');
+}

@@ -313,6 +313,12 @@ const PIANO_REGOLE_GUIDA = {
     t: 'numero',
     d: 'Applica vacanze e bozza',
   },
+  c_dopo_jolly: {
+    g: 'Vacanze',
+    n: 'Giorni di congedo C dopo la vacanza (ausiliari)',
+    t: 'numero',
+    d: 'Applica vacanze e bozza',
+  },
   c_dopo_100: {
     g: 'Vacanze',
     n: 'Giorni di congedo C dopo la vacanza (100%)',
@@ -340,6 +346,12 @@ const PIANO_REGOLE_GUIDA = {
   wd_prima_vacanza: {
     g: 'Vacanze',
     n: 'Giorni di lavoro diurno forzato (WD) prima dei congedi pre vacanza',
+    t: 'numero',
+    d: 'Applica vacanze e bozza',
+  },
+  wd_dopo_vacanza: {
+    g: 'Vacanze',
+    n: 'Giorni di lavoro (WD) dopo i congedi del rientro',
     t: 'numero',
     d: 'Applica vacanze e bozza',
   },
@@ -417,6 +429,8 @@ const PIANO_REGOLE_LIMITI = {
   saldo_ore_max: [0, 200],
   saldo_ore_min: [-200, 0],
   jolly_percentuale_piano: [0.1, 1],
+  c_dopo_jolly: [0, 7],
+  wd_dopo_vacanza: [0, 7],
   jolly_ore_max: [1, 250],
   jolly_ore_min: [0, 250],
   jolly_indennita_vacanze_4sett: [0, 30],
@@ -482,7 +496,7 @@ function _pianoValidaRegolaSettore(nome, valore, settore) {
     ': ' +
     cosa +
     '. Qui non avrebbe alcun effetto: lasciala su No o non crearla.';
-  if (/^jolly_|^c_prima_jolly$/.test(nome) && settore && !ctx.jolly)
+  if (/^jolly_|^c_prima_jolly$|^c_dopo_jolly$/.test(nome) && settore && !ctx.jolly)
     return manca('non ci sono ausiliari (jolly) in questo settore');
   return null;
 }

@@ -245,6 +245,14 @@ body {
   min-width: 340px;
   max-width: 420px;
 }
+/* finestra larga per i rapporti con tabelle (Perche scoperto): torna normale alla chiusura */
+.pwd-modal-box.pwd-largo {
+  width: 96vw;
+  max-width: 1180px;
+  max-height: 90vh;
+  overflow: auto;
+  padding: 24px 28px;
+}
 .pwd-modal-box h3 {
   font-family: 'Playfair Display', serif;
   font-size: var(--fs-xl);

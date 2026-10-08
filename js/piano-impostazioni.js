@@ -1303,6 +1303,11 @@ async function _renderPianoFormulariTab() {
     'pdfCambioVacanza()',
   );
   h += riga(
+    "Notifica d'assenza (modulo 827)",
+    'Il collaboratore indica le settimane di vacanza o le altre assenze (fino a 8 righe: settimana, dal, al, giorni, motivo); il responsabile autorizza riga per riga.',
+    'pdfNotificaAssenza()',
+  );
+  h += riga(
     'Lista di non disponibilità (Jolly)',
     'Modulo ufficiale HR 1187: i jolly indicano i giorni del mese in cui non sono disponibili (da consegnare entro il ' +
       _pianoGiornoNd() +

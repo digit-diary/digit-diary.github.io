@@ -25,6 +25,16 @@ const RICERCA_PESI = { legge: 60000, regola: 20000, oreSotto: 200, scoperto: 300
 // turni, giorni consecutivi, riposo singolo dopo 4 giorni, ore della settimana,
 // riposo attorno alla domenica). Con lo stesso peso la preferenza "giorni a
 // settimana": Migliora non la scambia con un'altra regola per coprire un posto
+// ORDINE DI IMPORTANZA fra le regole di legge (decisione del titolare 08/10/2026): prima
+// le domeniche libere dell anno, poi il riposo di 11 ore, poi le 36 ore della settimana,
+// poi le altre. Se Migliora deve scegliere, sacrifica per ultima la piu importante.
+function _ricercaPesoOrdine(msg) {
+  const m = String(msg || '');
+  if (/domenica libera:/.test(m)) return 2;
+  if (/di riposo dopo/.test(m)) return 1.5;
+  if (/domenica .*lavorata|riposo di .* ore/.test(m)) return 1.2;
+  return 1;
+}
 function _ricercaRegolaDiLegge(msg) {
   return /di riposo dopo|giorni lavorativi consecutivi|riposo singolo dopo|lavorate nella settimana|domenica .*lavorata|domenica libera:|riposo di .* ore|preferenza: massimo \d+ a settimana/.test(
     String(msg || ''),
@@ -50,6 +60,7 @@ async function _ricercaPrepara(opz) {
   opz = opz || {};
   const ym = _pianoMeseSel;
   const rep = _pianoReparto();
+  await _pianoCaricaDomAnno(ym, rep).catch(() => {}); // domeniche libere nell anno (Valida)
   const nGiorni = _pianoUltimoGiorno(ym);
   const da = ym + '-01';
   const a = ym + '-' + String(nGiorni).padStart(2, '0');
@@ -232,7 +243,7 @@ async function _ricercaPrepara(opz) {
         (costo += / SOTTO il minimo /.test(v.msg)
           ? RICERCA_PESI.oreSotto
           : _ricercaRegolaDiLegge(v.msg)
-            ? RICERCA_PESI.legge
+            ? RICERCA_PESI.legge * _ricercaPesoOrdine(v.msg)
             : RICERCA_PESI.regola),
     );
     if (obiettivo[n] != null) {

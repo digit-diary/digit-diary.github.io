@@ -3731,3 +3731,530 @@ async function _pianoAvvisiConteggioHome(rep) {
   const max = _pianoOreSettimanaMax();
   return _pianoSettimaneOltre(righe, max).filter((s) => s.giorni.some((d) => d.startsWith(ym))).length;
 }
+// ================================================================
+// PERCHE SCOPERTO (v418, richiesta del titolare 08/10/2026): per ogni posto del
+// fabbisogno rimasto scoperto, chi c era quel giorno e perche nessuno l ha preso
+// (al lavoro, assente, riposo gia fissato, non formato, fermato da una regola, libero),
+// e in fondo cosa manca: personale nei giorni senza nessuno libero, persone da formare
+// nei gruppi dove c era gente libera ma non formata, regole che fermano piu spesso.
+// Stessi controlli di bozza e proposte (idoneita, assenze, ore, regole di Valida).
+// ================================================================
+async function _pianoAnalisiScoperti(ym) {
+  const rep = _pianoReparto();
+  const nG = _pianoUltimoGiorno(ym);
+  const da = ym + '-01';
+  const a = ym + '-' + String(nG).padStart(2, '0');
+  const fabb =
+    (await secGet('piano_fabbisogni?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + rep + '&limit=5000')) ||
+    [];
+  const vuole = {};
+  fabb.forEach((f) => {
+    const k = String(f.data).substring(0, 10) + '|' + String(f.turno_codice).toUpperCase();
+    vuole[k] = (vuole[k] || 0) + (parseInt(f.quantita) || 0);
+  });
+  const righe = (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&limit=8000')) || [];
+  const ha = {};
+  righe.forEach((r) => {
+    if (!_pianoCopreQui(r) || !_pianoTurnoInfo(r.codice)) return;
+    const k = String(r.data).substring(0, 10) + '|' + String(r.codice).toUpperCase();
+    ha[k] = (ha[k] || 0) + 1;
+  });
+  const scoperti = [];
+  Object.keys(vuole)
+    .sort()
+    .forEach((k) => {
+      const m = vuole[k] - (ha[k] || 0);
+      if (m > 0) scoperti.push({ data: k.split('|')[0], codice: k.split('|')[1], quanti: m });
+    });
+  const totPosti = Object.values(vuole).reduce((s, x) => s + x, 0);
+  if (!scoperti.length) return { totPosti, scoperti, analisi: [] };
+  await _pianoCaricaStoriaGruppi(rep).catch(() => {});
+  await _pianoAggiornaYtd([]).catch(() => {});
+  // stato di tutti (anche gli altri settori) con 14 giorni prima e dopo, come Migliora ore
+  const cella = {};
+  const rigaDi = {};
+  righe.forEach((r) => {
+    const k = r.collaboratore + '|' + parseInt(String(r.data).substring(8, 10));
+    if (!cella[k] || _pianoTurnoInfo(r.codice)) {
+      cella[k] = r.codice;
+      rigaDi[k] = r;
+    }
+  });
+  try {
+    const primo = new Date(da + 'T12:00:00');
+    const bDa = new Date(primo);
+    bDa.setDate(bDa.getDate() - 14);
+    const bAl = new Date(primo);
+    bAl.setDate(bAl.getDate() + nG + 13);
+    const bordo = [
+      ...((await secGet('piano?data=gte.' + dataLocaleISO(bDa) + '&data=lt.' + da + '&limit=8000')) || []),
+      ...((await secGet('piano?data=gt.' + a + '&data=lte.' + dataLocaleISO(bAl) + '&limit=8000')) || []),
+    ];
+    bordo.forEach((r) => {
+      const idx = Math.round((new Date(String(r.data).substring(0, 10) + 'T12:00:00') - primo) / 86400000) + 1;
+      if (_pianoTurnoInfo(r.codice) || !cella[r.collaboratore + '|' + idx])
+        cella[r.collaboratore + '|' + idx] = r.codice;
+    });
+  } catch (e) {}
+  const persone = collaboratoriCache.filter(
+    (c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && !c.turni_solo_a_mano,
+  );
+  const ctx = _pianoCtxViolazioni(ym);
+  const assente = _pianoAssenzeLettore();
+  const mal = Object.assign({}, _pianoMalattieMese(ym), _pianoCnpMese(ym), _pianoFineMese(ym));
+  const ore = {};
+  righe.forEach((r) => {
+    const info = _pianoCollabInfo(r.collaboratore);
+    if (!info) return;
+    ore[r.collaboratore] = (ore[r.collaboratore] || 0) + (_pianoOreDiRiga(r, parseFloat(info.percentuale) || 1) || 0);
+  });
+  const viol = (n) =>
+    _pianoChiaviViolazioni(
+      n,
+      ym,
+      (k) => cella[n + '|' + k],
+      (k) => rigaDi[n + '|' + k],
+      ctx,
+    );
+  // la regola in parole; riposo = 11 ore o 36 ore: le sole per cui si propone
+  // un eccezione (decisione del titolare: solo se si e al limite, mai in automatico)
+  const inParole = (k) => {
+    const m = String(k).replace(/^[^|]*\|/, '');
+    if (/di riposo dopo/.test(m)) return { testo: 'riposo minimo di 11 ore', riposo: true };
+    if (/domenica .*lavorata|riposo di # ore/.test(m))
+      return { testo: 'riposo di 36 ore nella settimana', riposo: true };
+    if (/lavorate nella settimana/.test(m)) return { testo: 'troppe ore nella settimana' };
+    if (/consecutivi/.test(m)) return { testo: 'troppi giorni di fila' };
+    if (/riposo singolo/.test(m)) return { testo: 'riposo singolo dopo 4 giorni (4+1+1)' };
+    if (/domenica libera|non conteggiabile/.test(m)) return { testo: 'domeniche libere nell anno' };
+    if (/a settimana/.test(m)) return { testo: 'giorni a settimana (Preferenze)', config: true };
+    if (/preferenza/.test(m)) return { testo: m.replace(/#/g, '').trim(), config: true };
+    return {
+      testo: m
+        .replace(/\s*\(.*$/, '')
+        .replace(/#/g, 'N')
+        .trim(),
+    };
+  };
+  // ore di riposo prima e dopo il turno (per dire di quanto si accorcia)
+  const riposoOre = (n, g, t) => {
+    const out = [];
+    const fineAbs = (tt) => {
+      const f = _pianoOra(tt.ora_fine);
+      return f <= _pianoOra(tt.ora_inizio) ? 24 + f : f;
+    };
+    const prev = _pianoTurnoInfo(cella[n + '|' + (g - 1)] || '');
+    if (prev && prev.ora_fine && t.ora_inizio)
+      out.push({ ore: 24 + _pianoOra(t.ora_inizio) - fineAbs(prev), dopo: prev.codice });
+    const next = _pianoTurnoInfo(cella[n + '|' + (g + 1)] || '');
+    if (next && next.ora_inizio && t.ora_fine)
+      out.push({ ore: 24 + _pianoOra(next.ora_inizio) - fineAbs(t), prima: next.codice });
+    return out;
+  };
+  const minRip = parseFloat(_pianoRegolaVal('min_riposo_ore')) || 11;
+  const analisi = scoperti.map((s) => {
+    const g = parseInt(s.data.substring(8, 10));
+    const t = _pianoTurnoInfo(s.codice);
+    const gruppo = String((t && t.gruppo) || '').toUpperCase();
+    const out = Object.assign({}, s, {
+      gruppo,
+      lavoro: [],
+      assenti: [],
+      riposi: [],
+      giorniNo: [],
+      nonFormati: [],
+      config: [],
+      gruppoRegole: [],
+      regole: [],
+      liberi: [],
+    });
+    persone.forEach((c) => {
+      const n = c.nome;
+      const cod = String(cella[n + '|' + g] || '');
+      const riga = rigaDi[n + '|' + g];
+      if (cod && _pianoTurnoInfo(cod)) return out.lavoro.push(n);
+      if (mal[n + '|' + s.data] || assente(n, s.data)) return out.assenti.push(n + (cod ? ' (' + cod + ')' : ''));
+      if (cod && cod !== 'C' && cod !== 'WD') return out.assenti.push(n + ' (' + cod + ')');
+      if (cod === 'C' && riga && (riga.protetto || !riga.generato || _pianoCellaRiservata(riga)))
+        return out.riposi.push(n);
+      if (cod === 'WD' && t && String(t.tipo).toUpperCase() === 'NOTTURNO') return out.riposi.push(n + ' (WD)');
+      if (c.giorni_lavoro && !PianoRegole.lavoraNelGiorno(c, new Date(s.data + 'T12:00:00').getDay()))
+        return out.config.push({ nome: n, motivo: 'non lavora quel giorno (Preferenze, Giorni di lavoro)' });
+      if (!t || !_pianoIdoneoPerTurno(n, t, s.data)) {
+        // CONFIGURAZIONE della persona (da controllare se e un errore) o FORMAZIONE vera
+        const tipoT = String((t && t.tipo) || '').toUpperCase();
+        const bloccati = String(c.turni_bloccati || '')
+          .toUpperCase()
+          .split(',')
+          .map((x) => x.trim());
+        if (bloccati.includes(s.codice))
+          return out.config.push({ nome: n, motivo: 'turno ' + s.codice + ' bloccato (Preferenze, Turni bloccati)' });
+        if (c.solo_diurni && tipoT === 'NOTTURNO')
+          return out.config.push({ nome: n, motivo: 'solo diurni (Preferenze)' });
+        if (c.solo_notti && tipoT !== 'NOTTURNO')
+          return out.config.push({ nome: n, motivo: 'solo notturni (Preferenze)' });
+        const fz = t ? _pianoViolazioneFunzioneTurno(n, t, new Date(s.data + 'T12:00:00').getDay(), true) : null;
+        if (fz) return out.gruppoRegole.push({ nome: n, regola: String(fz.msg || fz).substring(0, 90) });
+        return out.nonFormati.push(n);
+      }
+      const lim = _pianoLimitiOre(n, nG);
+      if (lim.max != null && (ore[n] || 0) + (parseFloat(t.durata_ore) || 0) > lim.max)
+        return out.regole.push({ nome: n, regola: 'ore del mese al massimo' });
+      const prima = viol(n);
+      const vecchia = cella[n + '|' + g];
+      cella[n + '|' + g] = s.codice;
+      const nuove = _pianoViolazioniNuove(prima, viol(n));
+      if (vecchia === undefined) delete cella[n + '|' + g];
+      else cella[n + '|' + g] = vecchia;
+      if (nuove.length) {
+        const parole = nuove.map(inParole);
+        if (parole.every((q) => q.config))
+          return out.config.push({ nome: n, motivo: parole.map((q) => q.testo).join(', ') });
+        const testo = [...new Set(parole.map((q) => q.testo))].join(', ');
+        // eccezione proponibile solo se manca SOLO un po di riposo (11 o 36 ore)
+        let dettaglio = '';
+        if (parole.every((q) => q.riposo)) {
+          // al massimo UNA eccezione a settimana per persona (lunedi-domenica)
+          const dowG = (new Date(s.data + 'T12:00:00').getDay() + 6) % 7;
+          let giaUsata = false;
+          for (let k = g - dowG; k <= g - dowG + 6; k++) {
+            const rr = rigaDi[n + '|' + k];
+            if (rr && /^Eccezione:/i.test(rr.commento || '')) giaUsata = true;
+          }
+          if (giaUsata) return out.regole.push({ nome: n, regola: testo + ' (eccezione gia usata questa settimana)' });
+          const corti = riposoOre(n, g, t).filter((x) => x.ore < minRip);
+          // mai sotto le 8 ore di riposo (il minimo assoluto): niente eccezione da proporre
+          if (corti.some((x) => x.ore < 8))
+            return out.regole.push({
+              nome: n,
+              regola:
+                testo +
+                ' (' +
+                corti.map((x) => Math.round(x.ore * 10) / 10 + ' h').join(', ') +
+                ', sotto le 8 ore: nessuna eccezione)',
+            });
+          dettaglio = corti
+            .map((x) =>
+              x.dopo
+                ? Math.round(x.ore * 10) / 10 + ' h di riposo dopo ' + x.dopo
+                : Math.round(x.ore * 10) / 10 + ' h di riposo prima di ' + x.prima,
+            )
+            .join(', ');
+          return out.regole.push({
+            nome: n,
+            regola: testo + (dettaglio ? ' (' + dettaglio + ')' : ''),
+            eccezione: true,
+          });
+        }
+        return out.regole.push({ nome: n, regola: testo });
+      }
+      out.liberi.push(n);
+    });
+    return out;
+  });
+  return { totPosti, scoperti, analisi };
+}
+function _pianoDataBreve(d) {
+  const dt = new Date(d + 'T12:00:00');
+  return (
+    ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'][dt.getDay()] +
+    ' ' +
+    String(dt.getDate()).padStart(2, '0') +
+    '.' +
+    String(dt.getMonth() + 1).padStart(2, '0')
+  );
+}
+async function pianoPercheScoperti() {
+  const ym = _pianoMeseSel;
+  const b = document.getElementById('pwd-modal-content');
+  // finestra larga solo per questo rapporto: alla chiusura torna alla misura normale
+  b.classList.add('pwd-largo');
+  if (!window._pwdLargoObs) {
+    const modale = document.getElementById('pwd-modal');
+    window._pwdLargoObs = new MutationObserver(() => {
+      if (modale.classList.contains('hidden')) b.classList.remove('pwd-largo');
+    });
+    window._pwdLargoObs.observe(modale, { attributes: true, attributeFilter: ['class'] });
+  }
+  b.innerHTML = '<h3>Perche scoperto · ' + escP(ym) + '</h3><p>Analisi in corso...</p>';
+  document.getElementById('pwd-modal').classList.remove('hidden');
+  let r;
+  try {
+    r = await _pianoAnalisiScoperti(ym);
+  } catch (e) {
+    b.innerHTML = '<h3>Perche scoperto</h3><p>Analisi non riuscita: ' + escP((e && e.message) || String(e)) + '</p>';
+    return;
+  }
+  const chiudi =
+    '<div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
+  const settore = typeof repartoLabel === 'function' ? repartoLabel(_pianoReparto()) : _pianoReparto();
+  if (!r.totPosti) {
+    b.innerHTML = '<h3>Perche scoperto</h3><p>Il mese non ha fabbisogno in ' + escP(settore) + '.</p>' + chiudi;
+    return;
+  }
+  const nScop = r.scoperti.reduce((s, x) => s + x.quanti, 0);
+  const perc = Math.round(((r.totPosti - nScop) / r.totPosti) * 1000) / 10;
+  let h =
+    '<h3>Perche scoperto · ' +
+    escP(settore) +
+    ' · ' +
+    escP(ym) +
+    '</h3><p style="font-size:var(--fs-md,.875rem)">Fabbisogno coperto al <b>' +
+    perc +
+    '%</b>: ' +
+    (r.totPosti - nScop) +
+    ' posti su ' +
+    r.totPosti +
+    (nScop ? ', <b>' + nScop + ' scoperti</b>.' : '. Nessun posto scoperto.') +
+    '</p>';
+  if (!nScop) {
+    b.innerHTML = h + chiudi;
+    return;
+  }
+  // COSA MANCA: riepilogo
+  const conta = (lista) => {
+    const m = {};
+    lista.forEach((x) => (m[x] = (m[x] || 0) + 1));
+    return Object.entries(m).sort((a, c) => c[1] - a[1]);
+  };
+  const senzaNessuno = r.analisi.filter(
+    (x) => !x.liberi.length && !x.nonFormati.length && !x.regole.length && !x.config.length && !x.gruppoRegole.length,
+  );
+  const conGruppo = r.analisi.filter((x) => x.gruppoRegole.length && !x.liberi.length);
+  const conEccezione = r.analisi.filter((x) => x.regole.some((q) => q.eccezione) && !x.liberi.length);
+  const conConfig = r.analisi.filter((x) => x.config.length && !x.liberi.length);
+  const conNonFormati = r.analisi.filter((x) => x.nonFormati.length && !x.liberi.length);
+  const conRegole = r.analisi.filter((x) => x.regole.length && !x.liberi.length);
+  const conLiberi = r.analisi.filter((x) => x.liberi.length);
+  const voci = [];
+  if (senzaNessuno.length)
+    voci.push(
+      '<b>Manca personale</b> in ' +
+        senzaNessuno.length +
+        (senzaNessuno.length === 1 ? ' posto' : ' posti') +
+        ': quel giorno nessuno era libero (tutti al lavoro, assenti o con il riposo gia fissato). Giorni: ' +
+        escP([...new Set(senzaNessuno.map((x) => _pianoDataBreve(x.data)))].join(', ')) +
+        '. In vacanza o assenti in quei giorni: fino a ' +
+        Math.max(...senzaNessuno.map((x) => x.assenti.length)) +
+        ' persone. Servono una o piu persone in piu (o un jolly) in quei giorni, oppure vacanze meno concentrate.',
+    );
+  if (conNonFormati.length) {
+    const perGruppo = {};
+    conNonFormati.forEach((x) => (perGruppo[x.gruppo] = (perGruppo[x.gruppo] || []).concat(x.nonFormati)));
+    Object.keys(perGruppo).forEach((gr) => {
+      const nPosti = conNonFormati.filter((x) => x.gruppo === gr).length;
+      const chi = conta(perGruppo[gr]).slice(0, 6);
+      voci.push(
+        '<b>Formazione ' +
+          escP(gr) +
+          '</b>: ' +
+          nPosti +
+          (nPosti === 1 ? ' posto' : ' posti') +
+          ' si potevano coprire con persone libere quel giorno ma non formate per ' +
+          escP(gr) +
+          '. Le piu spesso libere: ' +
+          chi.map(([n, k]) => escP(n) + ' (' + k + ')').join(', ') +
+          '.',
+      );
+    });
+  }
+  if (conConfig.length) {
+    const perPersona = {};
+    conConfig.forEach((x) =>
+      x.config.forEach((q) => {
+        const k = q.nome + '|' + q.motivo;
+        perPersona[k] = (perPersona[k] || 0) + 1;
+      }),
+    );
+    voci.push(
+      '<b>Configurazione da controllare</b>: in ' +
+        conConfig.length +
+        (conConfig.length === 1 ? ' posto' : ' posti') +
+        ' c era qualcuno libero fermato dalle sue impostazioni. Se non e voluto, correggi in Piano, Impostazioni, Preferenze collaboratori: ' +
+        Object.entries(perPersona)
+          .sort((a, c) => c[1] - a[1])
+          .slice(0, 8)
+          .map(
+            ([k, n]) =>
+              escP(k.split('|')[0]) + ' · ' + escP(k.split('|')[1]) + ' (' + n + (n === 1 ? ' volta' : ' volte') + ')',
+          )
+          .join('; ') +
+        '.',
+    );
+  }
+  if (conGruppo.length) {
+    const perRegola = {};
+    conGruppo.forEach((x) =>
+      x.gruppoRegole.forEach((q) => {
+        const k = q.regola.replace(/\s*\(funzione:.*$/, '');
+        perRegola[k] = perRegola[k] || { posti: new Set(), persone: new Set() };
+        perRegola[k].posti.add(x.data + x.codice);
+        perRegola[k].persone.add(q.nome);
+      }),
+    );
+    Object.entries(perRegola).forEach(([k, v]) =>
+      voci.push(
+        '<b>Regola di gruppo</b> "' +
+          escP(k) +
+          '": in ' +
+          v.posti.size +
+          (v.posti.size === 1 ? ' posto' : ' posti') +
+          ' ha escluso ' +
+          v.persone.size +
+          (v.persone.size === 1 ? ' persona libera.' : ' persone libere.') +
+          ' Se la regola e giusta, quel giorno mancano persone delle funzioni previste; altrimenti si cambia in Regole di gruppo.',
+      ),
+    );
+  }
+  if (conEccezione.length)
+    voci.push(
+      '<b>Possibile con eccezione</b>: ' +
+        conEccezione.length +
+        (conEccezione.length === 1 ? ' posto' : ' posti') +
+        ' si coprirebbero accettando un riposo piu corto. Ordine delle regole: prima le domeniche libere (12 all anno, mai eccezioni), poi le 11 ore, poi le 36 ore; per questo sono proposte prima le eccezioni sulle 36 ore. Solo se si e al limite: nella tabella, <b>Assegna comunque</b> (conferma, nota "Eccezione" sulla cella, Valida la segnala; poi si puo far finire prima).',
+    );
+  if (conRegole.length) {
+    const tutte = [];
+    conRegole.forEach((x) => x.regole.forEach((q) => tutte.push(q.regola)));
+    voci.push(
+      '<b>Regole</b>: in ' +
+        conRegole.length +
+        (conRegole.length === 1 ? ' posto' : ' posti') +
+        ' c era qualcuno libero e formato, ma una regola lo fermava: ' +
+        conta(tutte)
+          .slice(0, 4)
+          .map(([q, k]) => escP(q) + ' (' + k + ')')
+          .join(', ') +
+        '.',
+    );
+  }
+  if (conLiberi.length)
+    voci.push(
+      '<b>Da coprire</b>: ' +
+        conLiberi.length +
+        (conLiberi.length === 1 ? ' posto ha' : ' posti hanno') +
+        ' qualcuno libero, formato e senza regole violate: prova <b>Migliora la bozza</b> o scrivilo a mano (' +
+        escP(
+          conLiberi
+            .map((x) => _pianoDataBreve(x.data) + ' ' + x.codice + ': ' + x.liberi.slice(0, 2).join(', '))
+            .join(' · '),
+        ) +
+        ').',
+    );
+  h +=
+    '<div style="background:var(--paper2);border:1px solid var(--line);border-radius:3px;padding:8px 12px;margin-bottom:10px"><b>Cosa manca</b><ul style="margin:6px 0 0 18px;font-size:var(--fs-md,.875rem);line-height:1.5">' +
+    voci.map((v) => '<li>' + v + '</li>').join('') +
+    '</ul></div>';
+  // DETTAGLIO per posto
+  const cellaLista = (arr, max) =>
+    arr.length
+      ? '<b>' +
+        arr.length +
+        '</b>' +
+        (max
+          ? '<div style="font-size:var(--fs-xs,.75rem);color:var(--muted)">' +
+            escP(arr.slice(0, max).join(', ')) +
+            (arr.length > max ? '…' : '') +
+            '</div>'
+          : '')
+      : '-';
+  h +=
+    '<div style="overflow:auto;max-height:50vh"><table class="piano-table" style="font-size:var(--fs-sm,.8125rem);min-width:760px"><thead><tr><th>Giorno</th><th>Turno</th><th>Al lavoro</th><th>Assenti</th><th>Riposo fissato</th><th>Non formati</th><th>Impostazioni e regole di gruppo</th><th>Fermati da regole</th><th>Possibile con eccezione</th><th>Liberi</th></tr></thead><tbody>' +
+    r.analisi
+      .map(
+        (x) =>
+          '<tr><td style="white-space:nowrap">' +
+          escP(_pianoDataBreve(x.data)) +
+          '</td><td><b>' +
+          escP(x.codice) +
+          '</b>' +
+          (x.quanti > 1 ? ' ×' + x.quanti : '') +
+          '<div style="font-size:var(--fs-xs,.75rem);color:var(--muted)">' +
+          escP(x.gruppo) +
+          '</div></td><td>' +
+          cellaLista(x.lavoro, 0) +
+          '</td><td>' +
+          cellaLista(x.assenti, 3) +
+          '</td><td>' +
+          cellaLista(x.riposi, 3) +
+          '</td><td>' +
+          cellaLista(x.nonFormati, 4) +
+          '</td><td>' +
+          cellaLista(
+            x.config.map((q) => q.nome + ': ' + q.motivo).concat(x.gruppoRegole.map((q) => q.nome + ': ' + q.regola)),
+            3,
+          ) +
+          '</td><td>' +
+          cellaLista(
+            x.regole.filter((q) => !q.eccezione).map((q) => q.nome + ': ' + q.regola),
+            3,
+          ) +
+          '</td><td>' +
+          (x.regole.filter((q) => q.eccezione).length
+            ? x.regole
+                .filter((q) => q.eccezione)
+                // prima le eccezioni sulla regola meno importante (36 ore), poi 11 ore
+                .sort((a, c) => (/11 ore/.test(a.regola) ? 1 : 0) - (/11 ore/.test(c.regola) ? 1 : 0))
+                .slice(0, 3)
+                .map(
+                  (q) =>
+                    '<div style="margin-bottom:4px"><b>' +
+                    escP(q.nome) +
+                    '</b><div style="font-size:var(--fs-xs,.75rem);color:var(--muted)">' +
+                    escP(q.regola) +
+                    '</div><button class="btn-act" style="font-size:var(--fs-xs,.75rem);padding:1px 8px" onclick="pianoAssegnaEccezione(\'' +
+                    _jsArg(q.nome) +
+                    "','" +
+                    x.data +
+                    "','" +
+                    _jsArg(x.codice) +
+                    "','" +
+                    _jsArg(q.regola) +
+                    '\')">Assegna comunque</button></div>',
+                )
+                .join('')
+            : '-') +
+          '</td><td>' +
+          cellaLista(x.liberi, 4) +
+          '</td></tr>',
+      )
+      .join('') +
+    '</tbody></table></div>';
+  b.innerHTML = h + chiudi;
+}
+// ECCEZIONE DECISA DA CHI PIANIFICA (dal rapporto Perche scoperto): un turno a chi ha un
+// riposo un po piu corto (36 ore, poi 11 ore), solo quando si e al limite. Conferma
+// esplicita, nota "Eccezione" sulla cella (Valida continua a segnalarla), registro.
+async function pianoAssegnaEccezione(nome, dstr, codice, regola) {
+  if (!puoGestirePiano()) return;
+  if (
+    !(await chiediConferma(
+      nome +
+        ' su ' +
+        codice +
+        ' il ' +
+        _pianoDataBreve(dstr) +
+        ' copre un posto scoperto, ma non rispetta: ' +
+        regola +
+        '.\n\nDa usare solo se si e al limite. La cella avra la nota "Eccezione" e Valida continuera a segnalarla (si puo far finire prima per rientrare nel riposo). Assegno?',
+      { titolo: 'Eccezione alla regola', ok: 'Assegna comunque', annulla: 'No' },
+    ))
+  )
+    return;
+  document.getElementById('pwd-modal').classList.add('hidden');
+  const ok = await _pianoSalvaCellaBase(nome, dstr, codice);
+  if (ok === false) return;
+  try {
+    const r = (
+      (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=eq.' + dstr + '&limit=5')) || []
+    ).find((x) => String(x.codice).toUpperCase() === String(codice).toUpperCase());
+    if (r)
+      await secPatch('piano', 'id=eq.' + r.id, {
+        commento: ('Eccezione: ' + regola + ' - ' + getOperatore()).substring(0, 400),
+        generato: false,
+      });
+  } catch (e) {}
+  logAzione('Piano: eccezione alla regola', nome + ' ' + codice + ' ' + dstr + ' · ' + regola);
+  await renderPiano();
+  await pianoPercheScoperti();
+}
