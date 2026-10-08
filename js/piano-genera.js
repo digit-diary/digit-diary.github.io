@@ -1876,6 +1876,9 @@ function _pianoIdoneoStatico(n, t, dowG, idoneita) {
       .includes(t.codice)
   )
     return false;
+  // scelto per nome per questo turno (Turni riservati a collaboratori): idoneo, anche se
+  // la sua funzione da sola non lo permetterebbe (es. un Supervisor che fa l accoglienza)
+  if (infoC && PianoRegole.sceltoPerTurno(infoC, t, _pianoRegoleTurnoFunzione())) return true;
   // regole "chi fa cosa" del settore (turni riservati, funzione-turni-giorni)
   if (_pianoViolazioneFunzioneTurno(n, t, dowG, true)) return false;
   const fz = infoC && infoC.funzione;

@@ -585,6 +585,43 @@ eq(
   'idoneita: AX idoneo a chi e scelto',
 );
 
+// scelto per nome: idoneo anche se la funzione da sola non lo permetterebbe (SUP che fa accoglienza)
+const RC2 = RC.concat([{ tipo_regola: 'funzione_turni_giorni', valore: 'SUP:Z*,L1,9:0,1,2,3' }]);
+const tS31 = { codice: 'S31', gruppo: 'ACCOGLIENZA' };
+const RC3 = RC2.concat([{ tipo_regola: 'turni_solo_collaboratori', valore: 'S31:SAPIO MATTIA' }]);
+eq(
+  R.violazioneFunzioneTurno({ nome: 'Sapio Mattia', funzione: 'SUP' }, tS31, 2, RC3),
+  null,
+  'SUP scelto per S31 il martedi: ok',
+);
+eq(
+  R.violazioneFunzioneTurno({ nome: 'Altro Sup', funzione: 'SUP' }, tS1, 2, RC3) !== null,
+  true,
+  'altro SUP il martedi su S1: regola funzione vale',
+);
+eq(
+  R.idoneoPerTurno(
+    { nome: 'Sapio Mattia', funzione: 'SUP' },
+    tS31,
+    Object.assign(ctxSt([]), {
+      settoriDi: () => [],
+      mappFunzione: () => [{ tipo: 'PRINCIPALE', turno_codice: 'Z0' }],
+      regoleTurnoFunzione: () => RC3,
+    }),
+  ),
+  true,
+  'scelto per nome: idoneo anche fuori dalla mappatura della funzione',
+);
+eq(
+  R.idoneoPerTurno(
+    { nome: 'Sapio Mattia', funzione: 'SUP', turni_bloccati: 'S31' },
+    tS31,
+    Object.assign(ctxSt([]), { settoriDi: () => [], regoleTurnoFunzione: () => RC3 }),
+  ),
+  false,
+  'scelto per nome ma turno bloccato nelle preferenze: resta bloccato',
+);
+
 console.log('\n=======================================');
 console.log('  ' + passati + ' passati, ' + falliti + ' falliti');
 console.log('=======================================\n');

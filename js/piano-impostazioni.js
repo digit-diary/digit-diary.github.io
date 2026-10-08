@@ -1922,6 +1922,31 @@ function _pianoValidaRegolaGruppo(gruppo, tipo, valore, settore) {
     if (!turni.length) return 'Scegli almeno un turno';
     const ign = sigleIgnote(turni);
     if (ign.length) return 'Sigle di turno che in ' + ctx.label + ' non esistono: ' + ign.join(', ');
+    // con un gruppo scelto i turni devono essere di quel gruppo (per turni di gruppi
+    // diversi si sceglie "tutti")
+    if (gr !== '*') {
+      const delGruppo = pianoTurniCache
+        .filter(
+          (x) =>
+            x.attivo !== false &&
+            (x.reparto_dip || 'slots') === String(settore || '').toLowerCase() &&
+            String(x.gruppo || '').toUpperCase() === gr,
+        )
+        .map((x) => String(x.codice).toUpperCase());
+      const fuori = turni.filter((m) =>
+        m.endsWith('*') ? !delGruppo.some((c) => c.startsWith(m.slice(0, -1))) : !delGruppo.includes(m),
+      );
+      if (fuori.length)
+        return (
+          'I turni ' +
+          fuori.join(', ') +
+          ' non sono del gruppo ' +
+          gr +
+          ': scegli i turni di ' +
+          gr +
+          ' oppure il gruppo "tutti"'
+        );
+    }
     const nomi = v
       .substring(i + 1)
       .split(';')
@@ -1997,10 +2022,9 @@ async function aggiungiRegolaGruppo() {
   if (!isAdmin()) return;
   const tipo = (document.getElementById('rg-tipo') || {}).value;
   // i coordinatori valgono per il settore intero
-  const gruppo =
-    tipo === 'coordinatori' || tipo === 'turni_solo_collaboratori'
-      ? '*'
-      : (document.getElementById('rg-gruppo') || {}).value;
+  // i coordinatori valgono per il settore intero; i turni riservati tengono il gruppo scelto
+  // (prima diventava "tutti" anche scegliendo ACCOGLIENZA, segnalazione del titolare)
+  const gruppo = tipo === 'coordinatori' ? '*' : (document.getElementById('rg-gruppo') || {}).value;
   const valore = _rgComponi(tipo, _rgLeggiCampi()).trim().toUpperCase();
   if (
     tipo === 'coordinatori' &&

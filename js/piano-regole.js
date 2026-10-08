@@ -143,8 +143,38 @@
   //                         maiuscolo, confronto senza maiuscole/minuscole
   // dow: giorno JS (0=dom) oppure null quando il giorno non e' noto (in quel
   // caso le regole a giorni non si applicano). Ritorna il motivo o null.
+  // SCELTO PER NOME per questo turno (regola turni_solo_collaboratori): la scelta fatta per
+  // nome vale piu delle regole generali sulla funzione (decisione del titolare 08/10/2026:
+  // Sapio e Supervisor ma fa anche l accoglienza). Le preferenze personali restano.
+  function sceltoPerTurno(info, turno, regole) {
+    if (!turno || !turno.codice || !Array.isArray(regole)) return false;
+    const cod = String(turno.codice).toUpperCase();
+    const nome = String((info && info.nome) || '').toLowerCase();
+    if (!nome) return false;
+    return regole.some((rg) => {
+      if (rg.attivo === false || String(rg.tipo_regola || '').toLowerCase() !== 'turni_solo_collaboratori')
+        return false;
+      const v = String(rg.valore || '');
+      const i = v.indexOf(':');
+      if (i < 0) return false;
+      const turni = v
+        .substring(0, i)
+        .split(',')
+        .map((x) => x.trim().toUpperCase())
+        .filter(Boolean);
+      const ok = turni.some((m) => (m.endsWith('*') ? cod.startsWith(m.slice(0, -1)) : cod === m));
+      return (
+        ok &&
+        v
+          .substring(i + 1)
+          .split(';')
+          .some((x) => x.trim().toLowerCase() === nome)
+      );
+    });
+  }
   function violazioneFunzioneTurno(info, turno, dow, regole) {
     if (!turno || !turno.codice || !Array.isArray(regole) || !regole.length) return null;
+    if (sceltoPerTurno(info, turno, regole)) return null; // scelto per nome: le regole sulla funzione non lo fermano
     const cod = String(turno.codice).toUpperCase();
     const fz = String((info && info.funzione) || '').toUpperCase();
     const settori = Array.isArray(info && info._settori) ? info._settori : [];
@@ -249,6 +279,9 @@
         .includes(turno.codice)
     )
       return false;
+    // scelto per nome per questo turno (Turni riservati a collaboratori): idoneo
+    if (typeof ctx.regoleTurnoFunzione === 'function' && sceltoPerTurno(info, turno, ctx.regoleTurnoFunzione()))
+      return true;
     const gruppoT = (turno.gruppo || '').toUpperCase();
     const fzU = ((info.funzione || '') + '').toUpperCase();
     // FUNZIONI CHE FANNO TUTTO (regola funzioni_fanno_tutto, es. SUP e RESP):
@@ -667,6 +700,7 @@
     idoneoPerTurno,
     lavoraNelGiorno,
     violazioneFunzioneTurno,
+    sceltoPerTurno,
     indiceBenessere,
     giorniVacanzaSpettanti,
     pasqua,
