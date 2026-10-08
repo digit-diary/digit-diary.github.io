@@ -13,8 +13,29 @@ function _renderPianoMappatureCard() {
     '<div class="main-card" style="margin-top:16px"><div class="card-header">Turni per funzione · ' +
     escP(repartoLabel(_pianoReparto())) +
     ' (admin)</div><div style="padding:10px 14px">';
+  // SPIEGAZIONE CHIARA (v428, richiesta del titolare: "non e chiaro"): su chi agisce ogni
+  // mappatura e cosa fa davvero; un solo PRINCIPALE o AMMESSO limita TUTTA la funzione
+  const pill = (col, t) => '<span class="mini-badge" style="background:' + col + ';cursor:default">' + t + '</span>';
   h +=
-    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:6px">Valgono per il settore aperto: ogni settore ha le sue sigle. PRINCIPALE = turni normali della funzione. AMMESSO = permessi quando serve. PREFERITO = la bozza li privilegia. Chi ha una funzione con mappature riceve SOLO i turni elencati; chi non ne ha segue i settori abilitati e le regole di gruppo.</p>';
+    '<div style="font-size:var(--fs-md,.875rem);line-height:1.55;margin-bottom:8px">Valgono per la <b>funzione</b> scritta nella scheda del collaboratore (SUP, HOST, BO...), per il settore aperto. Non servono per singole persone (per quelle: Regole di gruppo, <i>Turni riservati a collaboratori scelti</i>) ne per forti e deboli (livelli di Formazione).' +
+    '<div style="display:flex;flex-direction:column;gap:4px;margin-top:6px">' +
+    '<div>' +
+    pill('#2c6e49', 'PRINCIPALE') +
+    ' i turni normali della funzione: la bozza li da per primi.</div>' +
+    '<div>' +
+    pill('#b39b00', 'AMMESSO') +
+    ' permessi ma non abituali: la bozza li usa solo quando serve.</div>' +
+    '<div>' +
+    pill('#1a4a7a', 'PREFERITO') +
+    ' solo una preferenza: non limita niente.</div></div>' +
+    '<p style="margin-top:6px;color:var(--c-rosso,#c0392b)"><b>Attenzione:</b> basta un turno PRINCIPALE o AMMESSO e <b>tutti</b> quelli con quella funzione fanno <b>solo</b> i turni elencati.</p></div>';
+  const personeFz = (fz) =>
+    collaboratoriCache.filter(
+      (c) =>
+        c.attivo !== false &&
+        (c.reparto_dip || 'slots') === _pianoReparto() &&
+        String(c.funzione || '').toUpperCase() === String(fz).toUpperCase(),
+    ).length;
   const ordine = { PRINCIPALE: 1, AMMESSO: 2, PREFERITO: 3 };
   const perFz = {};
   pianoMappatureCache
@@ -23,10 +44,22 @@ function _renderPianoMappatureCard() {
   Object.keys(perFz)
     .sort()
     .forEach((fz) => {
+      const n = personeFz(fz);
+      const limita = perFz[fz].some((m) => m.tipo === 'PRINCIPALE' || m.tipo === 'AMMESSO');
+      const effetto = !n
+        ? 'nessun collaboratore del settore ha questa funzione: non agisce'
+        : limita
+          ? (n === 1 ? 'questa persona fa' : 'fanno') + ' SOLO i turni qui sotto'
+          : 'solo preferenza: non limita';
       h +=
-        '<p style="font-size:var(--fs-md,.875rem);font-weight:700;margin:8px 0 4px">' +
+        '<p style="font-size:var(--fs-md,.875rem);margin:10px 0 4px"><b>' +
         escP(fz) +
-        '</p><div style="display:flex;gap:6px;flex-wrap:wrap">';
+        '</b> <span style="color:var(--muted)">· ' +
+        n +
+        (n === 1 ? ' collaboratore' : ' collaboratori') +
+        ' · ' +
+        effetto +
+        '</span></p><div style="display:flex;gap:6px;flex-wrap:wrap">';
       perFz[fz]
         .sort((a, b) => (ordine[a.tipo] || 9) - (ordine[b.tipo] || 9) || a.turno_codice.localeCompare(b.turno_codice))
         .forEach((m) => {
@@ -90,6 +123,37 @@ async function aggiungiPianoMappatura() {
     toastErrore('Mappatura gia presente: ' + fz + ' → ' + turno);
     return;
   }
+  // il primo PRINCIPALE o AMMESSO limita tutta la funzione: lo si dice prima di salvare
+  const nPers = collaboratoriCache.filter(
+    (c) =>
+      c.attivo !== false &&
+      (c.reparto_dip || 'slots') === _pianoReparto() &&
+      String(c.funzione || '').toUpperCase() === String(fz).toUpperCase(),
+  ).length;
+  const limitavaGia = pianoMappatureCache.some(
+    (m) =>
+      m.funzione === fz &&
+      (m.reparto_dip || 'slots') === _pianoReparto() &&
+      (m.tipo === 'PRINCIPALE' || m.tipo === 'AMMESSO'),
+  );
+  if ((tipo === 'PRINCIPALE' || tipo === 'AMMESSO') && !limitavaGia) {
+    const testo = nPers
+      ? 'Da ora ' +
+        (nPers === 1 ? 'la persona' : 'le ' + nPers + ' persone') +
+        ' con funzione ' +
+        fz +
+        ' in ' +
+        repartoLabel(_pianoReparto()) +
+        ' potranno fare SOLO ' +
+        turno +
+        ' (e gli altri turni che aggiungerai come PRINCIPALE o AMMESSO).\n\nPer singole persone si usa invece Regole di gruppo, "Turni riservati a collaboratori scelti".\n\nConfermi?'
+      : 'Nessun collaboratore di ' +
+        repartoLabel(_pianoReparto()) +
+        ' ha la funzione ' +
+        fz +
+        ': la mappatura non avra effetto finche qualcuno non ha questa funzione.\n\nAggiungerla comunque?';
+    if (!(await chiediConferma(testo, { titolo: 'Turni per funzione' }))) return;
+  }
   try {
     const r = await secPost('piano_mappature', {
       funzione: fz,
@@ -120,7 +184,26 @@ async function rimuoviPianoMappatura(id) {
     await secDel('piano_mappature', 'id=eq.' + id);
     pianoMappatureCache = pianoMappatureCache.filter((x) => x.id !== id);
     logAzione('Piano: mappatura rimossa', m.funzione + ' ' + m.turno_codice);
-    toast('Mappatura rimossa');
+    const limitaAncora = pianoMappatureCache.some(
+      (x) =>
+        x.funzione === m.funzione &&
+        (x.reparto_dip || 'slots') === (m.reparto_dip || 'slots') &&
+        (x.tipo === 'PRINCIPALE' || x.tipo === 'AMMESSO'),
+    );
+    const conFz = collaboratoriCache.some(
+      (c) =>
+        c.attivo !== false &&
+        (c.reparto_dip || 'slots') === (m.reparto_dip || 'slots') &&
+        String(c.funzione || '').toUpperCase() === String(m.funzione).toUpperCase(),
+    );
+    if ((m.tipo === 'PRINCIPALE' || m.tipo === 'AMMESSO') && !limitaAncora && conFz)
+      toast(
+        'Mappatura rimossa: chi ha la funzione ' +
+          m.funzione +
+          ' non e piu limitato (segue settori, Formazione e Regole di gruppo)',
+        7000,
+      );
+    else toast('Mappatura rimossa');
     renderPiano();
   } catch (e) {
     toast('Errore rimozione');
