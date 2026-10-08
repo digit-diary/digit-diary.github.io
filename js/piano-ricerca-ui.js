@@ -68,7 +68,7 @@ async function _ricercaPrepara(opz) {
   });
   // chi partecipa: i collaboratori del settore (chi copre da un altro settore resta com e)
   const nomi = collaboratoriCache
-    .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && !_pianoCoperturaCfg(c))
+    .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && !_pianoCoperturaCfg(c) && !c.turni_solo_a_mano)
     .map((c) => c.nome);
   // GIORNI CHE SI POSSONO CAMBIARE: solo da domani in poi (controllo 05.10: Migliora
   // cambiava 23 celle di oggi, turni gia finiti o in corso, e i giorni passati quando un

@@ -1219,6 +1219,7 @@ function _pianoIdoneoPerTurno(nome, turno, dstr) {
   // funzioni che "fanno tutto" (SUP, RESP) lo fanno a mano (_pianoIdoneoAMano), non nelle
   // proposte automatiche. La logica vive nel motore puro PianoRegole.
   const info = _pianoCollabInfo(nome) || {};
+  if (info.turni_solo_a_mano) return false; // fuori rotazione (es. ufficio): mai proposto
   return PianoRegole.idoneoPerTurno(info, turno, {
     dow: dstr ? new Date(String(dstr).substring(0, 10) + 'T12:00:00').getDay() : null,
     storiaDi: () => _pianoStoriaGruppiDi(nome, dstr),

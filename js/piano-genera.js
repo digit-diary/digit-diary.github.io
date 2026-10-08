@@ -1719,6 +1719,7 @@ async function completaConCoperture() {
 // e la ricerca sul piano: stesso criterio. idoneita = { nome: Set(gruppi fatti) }.
 function _pianoIdoneoStatico(n, t, dowG, idoneita) {
   const infoC = _pianoCollabInfo(n);
+  if (infoC && infoC.turni_solo_a_mano) return false; // fuori rotazione (es. ufficio): solo a mano
   if (infoC && infoC.solo_diurni && t.tipo === 'NOTTURNO') return false;
   if (infoC && infoC.solo_notti && t.tipo !== 'NOTTURNO') return false;
   if (infoC && dowG != null && !PianoRegole.lavoraNelGiorno(infoC, dowG)) return false;
@@ -2589,6 +2590,7 @@ async function generaBozzaPiano(usaCoperture) {
   nomi.forEach((n) => {
     const infoN = _pianoCollabInfo(n) || {};
     if (String(infoN.reparti_extra || '').trim()) return; // multi-reparto: niente C automatiche
+    if (infoN.turni_solo_a_mano) return; // turni solo a mano (es. ufficio): i giorni li scrive chi pianifica
     for (let g = 1; g <= nGiorni; g++) {
       if (giorniChiusi.has(g)) continue;
       if (cella[n + '|' + g]) continue;
