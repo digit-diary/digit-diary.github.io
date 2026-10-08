@@ -236,9 +236,13 @@ async function _ricercaPrepara(opz) {
             : RICERCA_PESI.regola),
     );
     if (obiettivo[n] != null) {
-      const pct = parseFloat((_pianoCollabInfo(n) || {}).percentuale) || 1;
+      const infoO = _pianoCollabInfo(n) || {};
+      const pct = parseFloat(infoO.percentuale) || 1;
       const ore = mese.reduce((t, r) => t + (_pianoOreDiRiga(r, pct) || 0), 0);
-      costo += RICERCA_PESI.oraObiettivo * Math.abs(ore - obiettivo[n]);
+      const scarto = ore - obiettivo[n];
+      // i fissi devono raggiungere le ore (sotto pesa il doppio); i jolly coprono i
+      // buchi: costa solo andare oltre l 80% (decisione del titolare 08/10/2026)
+      costo += RICERCA_PESI.oraObiettivo * (infoO.is_jolly ? Math.max(0, scarto) : scarto < 0 ? -2 * scarto : scarto);
     }
     return costo;
   };

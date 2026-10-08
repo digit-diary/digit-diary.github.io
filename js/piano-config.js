@@ -158,9 +158,9 @@ const PIANO_REGOLE_GUIDA = {
   },
   jolly_percentuale_piano: {
     g: 'Ausiliari (jolly)',
-    n: 'Percentuale di riferimento degli ausiliari solo per generare (0.8 = 80%)',
+    n: 'Percentuale massima degli ausiliari (0.8 = 80%): oltre, con la tolleranza, solo se serve; nessun minimo',
     t: 'numero',
-    d: 'Bozza',
+    d: 'Bozza, Migliora, Valida',
   },
   jolly_ore_max: {
     g: 'Ausiliari (jolly)',

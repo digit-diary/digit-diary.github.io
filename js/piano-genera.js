@@ -344,9 +344,12 @@ function _pianoGgMm(d) {
   return String(d).substring(8, 10) + '.' + String(d).substring(5, 7);
 }
 // Limiti ORE MENSILI personalizzabili (pannello Regole):
-// - fissi e jolly CON percentuale: obiettivo = giorni/7 × ore sett × %;
+// - fissi: obiettivo = giorni/7 × ore sett × %;
 //   max = obiettivo + tolleranza_ore_sopra, min = obiettivo − tolleranza_ore_sotto
 //   (se sopra/sotto sono spente vale la tolleranza_ore simmetrica ±);
+// - jolly (con jolly_percentuale_piano): obiettivo = tempo pieno (meno i giorni di
+//   vacanza) × 80% (o la loro % se piu bassa), max = obiettivo + tolleranza (solo se
+//   serve), nessun minimo;
 // - jolly SENZA percentuale: range assoluto jolly_ore_min / jolly_ore_max.
 // min/max null = nessun limite su quel lato (regole spente).
 // OBIETTIVO ORE DEL MESE CON IL SALDO (riporto + mesi passati): chi e in piu
@@ -354,9 +357,11 @@ function _pianoGgMm(d) {
 // (tolleranza_ore_sopra/sotto). Il saldo si recupera un po per mese invece di
 // creare mesi fuori regola. base = ore dovute del mese.
 function _pianoObiettivoConSaldo(nome, base, nGiorni) {
+  const lim = _pianoLimitiOre(nome, nGiorni);
+  // jolly: niente ore dovute ne saldo, il bersaglio e la percentuale di riferimento
+  if (lim.jolly) return lim.obiettivo;
   const ytd = _pianoYtdMap[nome] || 0;
   let ob = base - ytd;
-  const lim = _pianoLimitiOre(nome, nGiorni);
   if (lim.obiettivo == null) return ob; // jolly puri: range assoluto, come prima
   if (lim.min != null) ob = Math.max(ob, lim.min);
   if (lim.max != null) ob = Math.min(ob, lim.max);
@@ -381,13 +386,43 @@ function _pianoLimitiOre(nome, nGiorni) {
     const jMax = parseFloat(_pianoRegolaVal('jolly_ore_max'));
     return { obiettivo: null, min: isNaN(jMin) ? null : jMin, max: isNaN(jMax) ? null : jMax };
   }
-  const pct = info.is_jolly && !(pctJ > 0 && pctJ < 1) ? pctJollyPiano : parseFloat(info.percentuale) || 1;
-  const obiettivo = (_pianoGgDovuti(nome, _pianoMeseSel) / 7) * _pianoOreSett * pct;
+  const pieno = (_pianoGgDovuti(nome, _pianoMeseSel) / 7) * _pianoOreSett; // tempo pieno del mese
   const sim = parseFloat(_pianoRegolaVal('tolleranza_ore'));
   const sopra = parseFloat(_pianoRegolaVal('tolleranza_ore_sopra'));
   const sotto = parseFloat(_pianoRegolaVal('tolleranza_ore_sotto'));
   const su = !isNaN(sopra) ? sopra : !isNaN(sim) ? sim : NaN;
   const giu = !isNaN(sotto) ? sotto : !isNaN(sim) ? sim : NaN;
+  if (info.is_jolly) {
+    // AUSILIARI (decisione del titolare 08/10/2026): sostituiscono i fissi quando serve.
+    // Lavorano FINO alla percentuale di riferimento (80%, o la loro se piu bassa), oltre
+    // (con la tolleranza) solo se serve davvero; nessun minimo: possono lavorare anche
+    // molto meno. Bozza e Migliora li usano dopo i fissi e li distribuiscono in modo equo.
+    const pctRif = pctJ > 0 && pctJ < 1 ? Math.min(pctJ, pctJollyPiano || 1) : pctJollyPiano;
+    // le vacanze dei jolly valgono zero ore (gia pagate nel salario): i giorni di vacanza
+    // del mese tolgono la loro parte di obiettivo, come le ore dovute dei fissi
+    const pagati = typeof _pianoCodiciGiaNellaPagaJolly === 'function' ? _pianoCodiciGiaNellaPagaJolly() : [];
+    const ym = String(_pianoMeseSel || '');
+    const giorniPagati = new Set(
+      (typeof _pianoRighe !== 'undefined' ? _pianoRighe : [])
+        .filter(
+          (r) =>
+            r.collaboratore === nome &&
+            String(r.data).startsWith(ym) &&
+            pagati.includes(String(r.codice || '').toUpperCase()),
+        )
+        .map((r) => String(r.data).substring(0, 10)),
+    ).size;
+    const gg = _pianoGgDovuti(nome, _pianoMeseSel);
+    const pienoJ = gg > 0 ? (pieno * Math.max(0, gg - giorniPagati)) / gg : pieno;
+    const obiettivo = pienoJ * pctRif;
+    return {
+      obiettivo: obiettivo,
+      min: null,
+      max: isNaN(su) ? obiettivo : obiettivo + su,
+      jolly: true,
+    };
+  }
+  const obiettivo = pieno * (parseFloat(info.percentuale) || 1);
   return {
     obiettivo: obiettivo,
     min: isNaN(giu) ? null : obiettivo - giu,
@@ -1847,8 +1882,8 @@ async function generaBozzaPiano(usaCoperture) {
   const nomiCella = [...nomiCellaSet];
   // OBIETTIVO ORE mensile (come la tolleranza ore del solver Turnivo):
   // giorni/7 × ore settimanali × percentuale, corretto col saldo cumulato
-  // dei mesi precedenti. La bozza dà i turni a chi è più LONTANO dal
-  // proprio obiettivo: prima i fissi al 100%, i jolly coprono il resto.
+  // dei mesi precedenti (jolly: l 80%, senza saldo). Prima i fissi fino al loro
+  // obiettivo, poi i jolly fino all 80%; fra pari, chi e piu LONTANO dall obiettivo.
   await _pianoAggiornaYtd(nomi);
   await _pianoCaricaOreMese(_pianoMeseSel);
   const obiettivo = {};
@@ -2183,7 +2218,7 @@ async function generaBozzaPiano(usaCoperture) {
         // per chi ha obiettivo il max segue anche il saldo cumulato (YTD)
         // con il saldo, ma mai oltre il massimo del mese ne sotto il minimo
         const maxEff =
-          limN.obiettivo != null
+          limN.obiettivo != null && !limN.jolly
             ? Math.min(limN.max, Math.max(limN.max - (_pianoYtdMap[n] || 0), limN.min != null ? limN.min : 0))
             : limN.max;
         if ((oreMese[n] || 0) + (oreDelta || 0) + (parseFloat(t.durata_ore) || 0) > maxEff) return false;
@@ -2297,6 +2332,12 @@ async function generaBozzaPiano(usaCoperture) {
             };
             const jx = (_pianoCollabInfo(x) || {}).is_jolly ? 1 : 0;
             const jy = (_pianoCollabInfo(y) || {}).is_jolly ? 1 : 0;
+            // PRECEDENZA (decisione del titolare 08/10/2026): i fissi devono raggiungere
+            // le loro ore, i jolly coprono i buchi. Prima i fissi sotto il loro obiettivo,
+            // poi i jolly sotto l 80%, poi i fissi gia arrivati (fino al loro massimo),
+            // per ultimi i jolly oltre l 80% (solo se serve). WD = deve lavorare: prima.
+            const quota = (n) => (obiettivo[n] > 0 ? (oreMese[n] || 0) / obiettivo[n] : 9);
+            const classe = (n, j) => (cella[n + '|' + g] === 'WD' ? -1 : gapOre(n) > 0 ? (j ? 1 : 0) : j ? 3 : 2);
             // chi COPRE da un altro settore va usato solo se il settore non ha
             // nessun altro disponibile: cosi' l'ordine di generazione dei piani
             // non toglie una persona al suo reparto d'origine
@@ -2304,6 +2345,9 @@ async function generaBozzaPiano(usaCoperture) {
             const cy = _pianoCoperturaCfg(_pianoCollabInfo(y)) ? 1 : 0;
             return (
               cx - cy ||
+              classe(x, jx) - classe(y, jy) ||
+              // fra jolly: EQUITA, prima chi ha la quota piu bassa del proprio obiettivo
+              (jx && jy ? quota(x) - quota(y) : 0) ||
               pattern(x) - pattern(y) ||
               bonus(mx) - bonus(my) ||
               gapOre(y) - gapOre(x) || // chi è più lontano dal proprio obiettivo ore viene prima

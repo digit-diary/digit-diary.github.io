@@ -2130,6 +2130,13 @@ async function miglioraOrePiano() {
   };
   // malattie e giorni dopo la fine del rapporto: chi e li non riceve turni
   const malattie = Object.assign(_pianoMalattieMese(ym), _pianoFineMese(ym));
+  // ordine dei donatori: prima i jolly (coprono i buchi dei fissi), fra loro chi ha la
+  // quota piu alta del proprio obiettivo (equita); poi i fissi piu sopra le ore
+  const quotaJ = (n) => {
+    const lim = _pianoLimitiOre(n, nGiorni);
+    return lim.obiettivo > 0 ? (ore[n] || 0) / lim.obiettivo : 0;
+  };
+  const peso = (n) => (infoDi[n].is_jolly ? 10000 + quotaJ(n) : saldo[n] || 0);
   // donatori: turni GENERATI non protetti di chi è sopra (fissi sopra o jolly)
   // solo giorni che devono ancora arrivare e aperti: il passato e un documento,
   // e oggi si sta gia lavorando (prima si spostavano anche i turni passati)
@@ -2145,11 +2152,7 @@ async function miglioraOrePiano() {
         nomi.includes(r.collaboratore) &&
         (infoDi[r.collaboratore].is_jolly || (saldo[r.collaboratore] || 0) > 1),
     )
-    .sort(
-      (x, y) =>
-        (saldo[y.collaboratore] === undefined ? 999 : saldo[y.collaboratore]) -
-        (saldo[x.collaboratore] === undefined ? 999 : saldo[x.collaboratore]),
-    );
+    .sort((x, y) => peso(y.collaboratore) - peso(x.collaboratore));
   // STESSE REGOLE DI VALIDA per chi da e chi riceve: uno spostamento non deve creare
   // nessuna violazione nuova (riposo singolo dopo 4 giorni, riposo attorno alla
   // domenica, ore della settimana, giorni a settimana, chi fa cosa...). Prima si
