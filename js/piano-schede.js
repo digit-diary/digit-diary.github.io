@@ -1065,14 +1065,9 @@ async function _renderPianoVacanzeTab() {
   const filtro = window._pianoVacFiltro || '';
   const vac = filtro ? _pianoVacCache.filter((v) => v.collaboratore === filtro) : _pianoVacCache;
   // ordine come nel piano (ordine salvato, poi SUP/BO/altri)
-  const ordSalv = (window._pianoOrdineCollab || {})[_pianoReparto()] || [];
-  const pos = {};
-  ordSalv.forEach((n, i) => (pos[n] = i));
   const perCollab = {};
   vac.forEach((v) => (perCollab[v.collaboratore] = (perCollab[v.collaboratore] || []).concat(v)));
-  const gruppi = Object.keys(perCollab).sort(
-    (x, y) => (pos[x] != null ? pos[x] : 9999) - (pos[y] != null ? pos[y] : 9999) || x.localeCompare(y),
-  );
+  const gruppi = ordineCollabPiano(Object.keys(perCollab), _pianoReparto());
   const MESI_L = MESI_FULL || [];
   const meseLbl = (MESI_L[parseInt(_pianoMeseSel.split('-')[1]) - 1] || '') + ' ' + _pianoMeseSel.split('-')[0];
 
@@ -1425,13 +1420,10 @@ function _renderPianoSaldoAnnoCard() {
     return h;
   }
   const banda = _pianoSaldoBanda();
-  const ordSalv = (window._pianoOrdineCollab || {})[_pianoReparto()] || [];
-  const pos = {};
-  ordSalv.forEach((n, i) => (pos[n] = i));
-  const nomi = collaboratoriCache
-    .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
-    .map((c) => c.nome)
-    .sort((x, y) => (pos[x] != null ? pos[x] : 9999) - (pos[y] != null ? pos[y] : 9999) || x.localeCompare(y));
+  const nomi = ordineCollabPiano(
+    collaboratoriCache.filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c)).map((c) => c.nome),
+    _pianoReparto(),
+  );
   h +=
     '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Saldo del mese = ore fatte meno ore dovute, con dentro gli scostamenti del Recupero ore. Il totale e il riporto piu i mesi. E in ordine (verde) se resta fra ' +
     banda.min +
@@ -1552,13 +1544,10 @@ async function _renderPianoSaldoTab() {
   const label = (MESI_L[parseInt(ym.split('-')[1]) - 1] || ym) + ' ' + ym.split('-')[0];
   const perNome = {};
   _pianoRighe.forEach((r) => (perNome[r.collaboratore] = (perNome[r.collaboratore] || []).concat(r)));
-  const ordSalv = (window._pianoOrdineCollab || {})[_pianoReparto()] || [];
-  const pos = {};
-  ordSalv.forEach((n, i) => (pos[n] = i));
-  const nomi = collaboratoriCache
-    .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
-    .map((c) => c.nome)
-    .sort((x, y) => (pos[x] != null ? pos[x] : 9999) - (pos[y] != null ? pos[y] : 9999) || x.localeCompare(y));
+  const nomi = ordineCollabPiano(
+    collaboratoriCache.filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c)).map((c) => c.nome),
+    _pianoReparto(),
+  );
   await _pianoAggiornaYtd(nomi);
   await _pianoCaricaOreMese(_pianoMeseSel);
   // come Turnivo: ore LAVORATE = timbrate del mese se presenti, altrimenti piano

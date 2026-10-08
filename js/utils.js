@@ -682,6 +682,9 @@ function inArchivioProtetto(dataRecord) {
 // ORDINE UNICO dei collaboratori in tutto il programma = ordine della lista
 // del piano (supervisori in alto, poi back office, fissi, jolly). Per chi non
 // e' nell'ordine salvato: gruppo per funzione e poi alfabetico.
+// Il RESPONSABILE di settore (RESP) e sempre il primo, anche sopra l ordine trascinato
+// a mano (richiesta del titolare 08/10/2026). Prima ogni vista del piano aveva la sua
+// copia di questa regola, con piccole differenze; ora la usano tutte.
 function ordineCollabPiano(nomi, reparto) {
   const rep =
     reparto ||
@@ -696,14 +699,18 @@ function ordineCollabPiano(nomi, reparto) {
   (typeof collaboratoriCache !== 'undefined' ? collaboratoriCache : []).forEach((c) => (info[c.nome] = c));
   const rank = (n) => {
     const c = info[n] || {};
+    const f = String(c.funzione || '').toUpperCase();
+    if (f === 'RESP') return -1; // sempre in cima
     if (c.is_jolly || c.impiego === 'jolly') return 4;
-    const f = c.funzione || '';
-    if (f === 'RESP' || f === 'SOSTRESP') return 0;
+    if (f === 'SOSTRESP' || f === 'VICERESP') return 0;
     if (f === 'SUP') return 1;
     if (f === 'BO') return 2;
     return 3;
   };
   return nomi.slice().sort((a, b) => {
+    const ra = rank(a) === -1;
+    const rb = rank(b) === -1;
+    if (ra !== rb) return ra ? -1 : 1;
     const pa = pos[a] != null ? pos[a] : 9999;
     const pb = pos[b] != null ? pos[b] : 9999;
     if (pa !== pb) return pa - pb;

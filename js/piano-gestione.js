@@ -65,13 +65,10 @@ function _renderPianoDomenicheBody() {
     (domMese[mm] = domMese[mm] || []).push(dstr);
     d.setDate(d.getDate() + 7);
   }
-  const ordSalv = (window._pianoOrdineCollab || {})[_pianoReparto()] || [];
-  const pos = {};
-  ordSalv.forEach((n, i) => (pos[n] = i));
-  const nomi = collaboratoriCache
-    .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
-    .map((c) => c.nome)
-    .sort((x, y) => (pos[x] != null ? pos[x] : 9999) - (pos[y] != null ? pos[y] : 9999) || x.localeCompare(y));
+  const nomi = ordineCollabPiano(
+    collaboratoriCache.filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c)).map((c) => c.nome),
+    _pianoReparto(),
+  );
   // domeniche future ancora disponibili (nei mesi con o senza piano): serve a
   // capire se le restanti si POSSONO ancora dare
   let domFuture = 0;

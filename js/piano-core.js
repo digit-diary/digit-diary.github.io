@@ -1872,17 +1872,9 @@ async function _renderPianoCore() {
     const festiviSet = {};
     pianoFestiviCache.forEach((f) => (festiviSet[f.data] = f.descrizione));
 
-    // righe: collaboratori attivi del settore + eventuali nomi presenti solo nel piano
-    // ordine predefinito: prima i SUP, poi i BO, poi gli altri (alfabetico);
-    // se l'operatore ha riordinato a mano (drag della riga) vale quell'ordine
-    const rangoFn = (n) => {
-      const info = _pianoCollabInfo(n) || {};
-      if (info.is_jolly) return 3; // i jolly in fondo, come nel foglio Excel
-      const f = ((info.funzione || '') + '').toUpperCase();
-      if (f === 'RESP' || f === 'VICERESP') return 0;
-      return f === 'SUP' ? 0 : f === 'BO' ? 1 : 2;
-    };
-    const ordinePred = (x, y) => rangoFn(x) - rangoFn(y) || x.localeCompare(y);
+    // righe: collaboratori attivi del settore + eventuali nomi presenti solo nel piano (in
+    // fondo). Ordine unico del programma (ordineCollabPiano): il RESP in cima, poi l ordine
+    // trascinato a mano, poi SUP, BO, gli altri, jolly in fondo.
     const collabs = collaboratoriCache
       .filter(
         (c) =>
@@ -1890,20 +1882,9 @@ async function _renderPianoCore() {
           _pianoAppartieneAlReparto(c) &&
           (_pianoOperativoNelMese(c, ym) || _pianoRighe.some((r) => r.collaboratore === c.nome)),
       )
-      .map((c) => c.nome)
-      .sort(ordinePred);
-    const extra = [...new Set(_pianoRighe.map((r) => r.collaboratore))]
-      .filter((n) => !collabs.includes(n))
-      .sort(ordinePred);
-    let nomi = collabs.concat(extra);
-    const ordineSalvato = (window._pianoOrdineCollab || {})[_pianoReparto()];
-    if (Array.isArray(ordineSalvato) && ordineSalvato.length) {
-      const pos = {};
-      ordineSalvato.forEach((n, i) => (pos[n] = i));
-      nomi = nomi
-        .slice()
-        .sort((x, y) => (pos[x] != null ? pos[x] : 9999) - (pos[y] != null ? pos[y] : 9999) || ordinePred(x, y));
-    }
+      .map((c) => c.nome);
+    const extra = [...new Set(_pianoRighe.map((r) => r.collaboratore))].filter((n) => !collabs.includes(n));
+    const nomi = ordineCollabPiano(collabs, _pianoReparto()).concat(ordineCollabPiano(extra, _pianoReparto()));
     const puoMod = puoGestirePiano();
     const GG = ['D', 'L', 'M', 'M', 'G', 'V', 'S'];
     const GG3 = ['DOM', 'LUN', 'MAR', 'MER', 'GIO', 'VEN', 'SAB']; // come Turnivo (GIORNI_SETT)
