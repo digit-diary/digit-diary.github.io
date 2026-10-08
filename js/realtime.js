@@ -378,8 +378,8 @@ window.addEventListener('beforeunload', () => {
   setTimeout(() => (_paginaInChiusura = false), 5000);
 });
 window.addEventListener('pageshow', () => (_paginaInChiusura = false));
-// UN SOLO RINNOVO ALLA VOLTA. Il server cancella il token vecchio quando ne rilascia
-// uno nuovo: con piu letture in parallelo fallite insieme (token scaduto dopo 24 ore,
+// UN SOLO RINNOVO ALLA VOLTA. Il server chiude il token vecchio quando ne rilascia
+// uno nuovo (dalla 20260903 dopo 2 minuti, per le richieste ancora in viaggio): con piu letture in parallelo fallite insieme (token scaduto dopo 24 ore,
 // rete che cade un attimo) ognuna chiedeva il rinnovo con lo stesso token vecchio, la
 // prima riusciva e le altre ricevevano "Sessione non valida" e mostravano "Sessione
 // scaduta" anche se la sessione era appena stata rinnovata. Ora chi arriva mentre un
@@ -393,6 +393,29 @@ function _renewToken(tkUsato) {
       _rinnovoInCorso = null;
     });
   return _rinnovoInCorso;
+}
+// CHIAMATA PROTETTA CON UN SECONDO TENTATIVO. Rete caduta un attimo: si riprova con
+// lo STESSO token (la sessione e buona, non serve rinnovarla; prima si rinnovava e il
+// rinnovo chiudeva il token mentre altre scritture erano ancora in viaggio: venivano
+// rifiutate con un falso "Permesso mancante" e Migliora la bozza non scriveva niente).
+// Sessione davvero scaduta: rinnovo (uno solo alla volta) e nuovo tentativo.
+async function _conSessione(chiama, tk) {
+  try {
+    return await chiama(tk);
+  } catch (e) {
+    let err = e;
+    if (!err.sessione && /Failed to fetch|NetworkError/i.test(err.message || '')) {
+      await new Promise((x) => setTimeout(x, 800));
+      try {
+        return await chiama(getOpToken() || tk);
+      } catch (e2) {
+        err = e2;
+      }
+    }
+    if ((err.sessione || /Failed to fetch|NetworkError/i.test(err.message || '')) && (await _renewToken(tk)))
+      return await chiama(getOpToken());
+    throw err;
+  }
 }
 async function _renewTokenUnaVolta() {
   const op = getOperatore();
@@ -662,21 +685,10 @@ async function secGet(path) {
   if (tk) {
     const p = _parseRestFilter(path); // un filtro non valido e' un errore del programma: si vede subito
     const leggi = (t) => _secLeggiTutto(t, p);
-    try {
-      return (await leggi(tk)) || [];
-    } catch (e) {
-      // Token scaduto o sessione chiusa: rinnova e riprova UNA volta. Ogni
-      // altro errore resta visibile: il vecchio ripiego anonimo tornava []
-      // (la RLS blocca tutto) e l'app mostrava liste vuote come se fosse
-      // normale, azzerando anche le cache.
-      if (e.sessione || /Failed to fetch|NetworkError/i.test(e.message || '')) {
-        if (await _renewToken(tk)) {
-          tk = getOpToken();
-          return (await leggi(tk)) || [];
-        }
-      }
-      throw e;
-    }
+    // Token scaduto o rete caduta: un nuovo tentativo (_conSessione). Ogni altro
+    // errore resta visibile: il vecchio ripiego anonimo tornava [] (la RLS blocca
+    // tutto) e l'app mostrava liste vuote come se fosse normale, azzerando le cache.
+    return (await _conSessione(leggi, tk)) || [];
   }
   return sbGet(path);
 }
@@ -698,14 +710,7 @@ async function _secPostRaw(table, data) {
   // rinnovava qui (le registrazioni nuove fallivano con "Errore salvataggio") e un
   // errore di rete ripiegava sulla scrittura anonima, bloccata in silenzio dalle regole.
   const scrivi = (t) => _rpcSicura('secure_insert', { p_token: t, p_table: table, p_data: data });
-  let r;
-  try {
-    r = await scrivi(tk);
-  } catch (e) {
-    if ((e.sessione || /Failed to fetch|NetworkError/i.test(e.message || '')) && (await _renewToken(tk)))
-      r = await scrivi(getOpToken());
-    else throw e;
-  }
+  const r = await _conSessione(scrivi, tk);
   return r ? [r] : [];
 }
 // Converte un filtro REST (id=eq.123&nome=eq.X) nel filtro SQL per le RPC secure_*
@@ -729,18 +734,10 @@ async function _secPatchRaw(table, filter, data) {
     const sql = _filtroSqlDaRest(filter);
     if (!sql) throw new Error('secPatch senza filtro su ' + table);
     const scrivi = (t) => _rpcSicura('secure_update', { p_token: t, p_table: table, p_filter: sql, p_data: data });
-    try {
-      await scrivi(tk);
-    } catch (e) {
-      // Token scaduto? Rinnova e riprova UNA volta. Ogni altro errore e' VISIBILE:
-      // il vecchio fallback anonimo veniva bloccato in silenzio dalla RLS (0 righe
-      // toccate ma nessun errore) e l'app credeva di aver salvato · dati "fantasma".
-      if ((e.sessione || /Failed to fetch|NetworkError/i.test(e.message || '')) && (await _renewToken(tk))) {
-        await scrivi(getOpToken());
-      } else {
-        throw e;
-      }
-    }
+    // Token scaduto o rete caduta: un nuovo tentativo. Ogni altro errore e' VISIBILE:
+    // il vecchio fallback anonimo veniva bloccato in silenzio dalla RLS (0 righe
+    // toccate ma nessun errore) e l'app credeva di aver salvato · dati "fantasma".
+    await _conSessione(scrivi, tk);
   } else {
     await sbPatch(table, filter, data);
   }
@@ -752,17 +749,9 @@ async function _secDelRaw(table, filter) {
     const sql = _filtroSqlDaRest(filter);
     if (!sql) throw new Error('secDel senza filtro su ' + table);
     const cancella = (t) => _rpcSicura('secure_delete', { p_token: t, p_table: table, p_filter: sql });
-    try {
-      await cancella(tk);
-    } catch (e) {
-      // Come secPatch: rinnova il token e riprova; mai fallback anonimo silenzioso
-      // (la RLS rispondeva OK senza cancellare nulla → le righe "riapparivano")
-      if ((e.sessione || /Failed to fetch|NetworkError/i.test(e.message || '')) && (await _renewToken(tk))) {
-        await cancella(getOpToken());
-      } else {
-        throw e;
-      }
-    }
+    // Come secPatch; mai fallback anonimo silenzioso (la RLS rispondeva OK senza
+    // cancellare nulla → le righe "riapparivano")
+    await _conSessione(cancella, tk);
   } else {
     await sbDel(table, filter);
   }
@@ -785,15 +774,7 @@ async function _setImpRaw(k, v) {
     // Un'impostazione non salvata e' un errore da vedere (prima si tentavano
     // tre strade in silenzio e l'ultima poteva fallire senza dirlo).
     const salva = (t) => _rpcSicura('upsert_impostazione', { p_token: t, p_chiave: k, p_valore: v });
-    try {
-      await salva(tk);
-    } catch (e) {
-      if ((e.sessione || /Failed to fetch|NetworkError/i.test(e.message || '')) && (await _renewToken(tk))) {
-        await salva(getOpToken());
-      } else {
-        throw e;
-      }
-    }
+    await _conSessione(salva, tk);
     return;
   }
   await secPatch('impostazioni', 'chiave=eq.' + k, { valore: v });

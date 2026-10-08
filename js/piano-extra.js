@@ -2165,6 +2165,28 @@ async function miglioraOrePiano() {
       ctxV,
     );
   const nuoveViolazioni = (n, prima) => _pianoViolazioniNuove(prima, violPersona(n)).length > 0;
+  // REGOLE DI GRUPPO (limiti e minimi per funzione nel giorno e nel mese, SUP di notte,
+  // livello minimo...): le stesse di Valida, sulle righe del settore con lo stato
+  // simulato. Prima non si guardavano: uno spostamento poteva mettere due SUP nello
+  // stesso giorno o un SUP in piu nel mese, e lo diceva Valida dopo.
+  const repMO = _pianoReparto();
+  const conGruppiMO = (pianoRegoleGruppoCache || []).some(
+    (r) => r.attivo !== false && (r.reparto_dip || 'slots') === repMO,
+  );
+  const righeSim = righe.map((r) => Object.assign({}, r));
+  const simDi = {};
+  righeSim.forEach((r) => (simDi[r.collaboratore + '|' + parseInt(r.data.split('-')[2])] = r));
+  const chiaviGruppi = (g) =>
+    new Set(
+      _pianoViolazioniGruppi(righeSim, ctxV)
+        .filter((v) => v.giorno === g || v.giorno === 0)
+        .map((v) => v.nome + '|' + v.giorno + '|' + v.msg),
+    );
+  // ore del MESE come le conta Valida (minimo e massimo delle regole di tolleranza)
+  const sottoMin = (n, oreN) => {
+    const lim = _pianoLimitiOre(n, nGiorni);
+    return lim.min != null && Math.round(oreN * 10) / 10 < lim.min;
+  };
   const scambi = [];
   const mediaPrima = fissi.reduce((acc, n) => acc + Math.abs(saldo[n] || 0), 0) / (fissi.length || 1);
   for (const rT of donatrici) {
@@ -2174,6 +2196,8 @@ async function miglioraOrePiano() {
     const donatore = rT.collaboratore;
     const sD = infoDi[donatore].is_jolly ? 999 : saldo[donatore] || 0;
     if (sD !== 999 && sD - oT < -1) continue; // il donatore andrebbe troppo sotto
+    // e non scende sotto il minimo del mese (regole di tolleranza, anche per i jolly)
+    if (!sottoMin(donatore, ore[donatore] || 0) && sottoMin(donatore, (ore[donatore] || 0) - oT)) continue;
     // riceventi: fissi sotto le ore, ordinati dal più sotto
     const cand = fissi
       .filter((n) => n !== donatore && (saldo[n] || 0) < -1)
@@ -2208,12 +2232,30 @@ async function miglioraOrePiano() {
       // simulazione: nessuna violazione nuova per nessuno dei due
       const primaD = violPersona(donatore);
       const primaR = violPersona(ric);
+      const primaG = conGruppiMO ? chiaviGruppi(g) : null;
       cella[donatore + '|' + g] = 'C';
       cella[kR] = rT.codice;
-      if (nuoveViolazioni(donatore, primaD) || nuoveViolazioni(ric, primaR)) {
+      const simD = simDi[donatore + '|' + g];
+      let simR = simDi[kR];
+      const simRNuova = !simR;
+      if (simRNuova) {
+        simR = { collaboratore: ric, data: rT.data, codice: '', reparto_dip: rT.reparto_dip || repMO };
+        righeSim.push(simR);
+        simDi[kR] = simR;
+      }
+      const celSimR = simR.codice;
+      if (simD) simD.codice = 'C';
+      simR.codice = rT.codice;
+      const gruppoPeggiora = conGruppiMO && _pianoViolazioniNuove(primaG, chiaviGruppi(g)).length > 0;
+      if (gruppoPeggiora || nuoveViolazioni(donatore, primaD) || nuoveViolazioni(ric, primaR)) {
         cella[donatore + '|' + g] = rT.codice;
         if (celR) cella[kR] = celR;
         else delete cella[kR];
+        if (simD) simD.codice = rT.codice;
+        if (simRNuova) {
+          righeSim.splice(righeSim.indexOf(simR), 1);
+          delete simDi[kR];
+        } else simR.codice = celSimR;
         continue;
       }
       scambi.push({ rT: rT, rigaR: rigaR, ric: ric, g: g, cod: rT.codice });

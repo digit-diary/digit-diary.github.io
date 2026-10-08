@@ -1,4 +1,4 @@
-const CACHE_NAME = 'diario-cl-v410';
+const CACHE_NAME = 'diario-cl-v411';
 const SHELL_URLS = ['/', '/manifest.json', '/logo_casino.png', '/icon-192.png', '/icon-512.png',
   '/css/style.css',
   '/js/config.js', '/js/finestre.js', '/js/crypto.js', '/js/chat-core.js', '/js/annulla.js', '/js/realtime.js',
@@ -11,7 +11,9 @@ const SHELL_URLS = ['/', '/manifest.json', '/logo_casino.png', '/icon-192.png', 
   '/js/guida.js',
   '/libs/supabase.min.js', '/libs/chart.umd.min.js', '/libs/flatpickr.min.css', '/libs/flatpickr.min.js',
   '/libs/flatpickr.it.js', '/libs/qrcode.min.js', '/libs/xlsx.full.min.js', '/libs/jspdf.umd.min.js',
-  '/libs/jspdf.plugin.autotable.min.js', '/libs/mammoth.browser.min.js', '/libs/pdf.min.js', '/libs/pdf.worker.min.js'
+  '/libs/jspdf.plugin.autotable.min.js', '/libs/mammoth.browser.min.js', '/libs/pdf.min.js', '/libs/pdf.worker.min.js',
+  '/libs/fonts.css', '/libs/fonts/PlayfairDisplay-latin.woff2', '/libs/fonts/PlayfairDisplay-latin-ext.woff2',
+  '/libs/fonts/SourceSans3-latin.woff2', '/libs/fonts/SourceSans3-latin-ext.woff2'
 ];
 
 self.addEventListener('install', e => {
