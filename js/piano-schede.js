@@ -2691,6 +2691,46 @@ async function _applicaVacanzeMese(interattivo) {
       else (altreGiorni[v.collaboratore] = altreGiorni[v.collaboratore] || {})[parseInt(p[2])] = sigla;
     });
   });
+  // LA MALATTIA PREVALE (decisione del titolare 08/10/2026): nei giorni di malattia
+  // (registrata nel Diario o M/I nel piano) niente V, C, WD ne altre assenze. Il giorno
+  // di vacanza diventa M protetta con la nota "Ex V", come quando la malattia si registra
+  // sopra una V gia scritta: le ore restano quelle della vacanza e, tolta la malattia, la
+  // V torna (sincronizzaMalattiaPiano). Prima una malattia del Diario sui giorni senza
+  // cella (la M si vede in automatico) veniva coperta: prova 08/10, Bonavetti malata
+  // 2-21.11 con vacanza 9-15.11 -> V 9-15, C 8 e 16, WD 7 e 17, C 4-6
+  const malato = {}; // 'nome minuscolo|giorno' -> true
+  Object.keys(_pianoMalattieMese(ym)).forEach((k) => {
+    const i = k.lastIndexOf('|');
+    malato[k.substring(0, i).toLowerCase() + '|' + parseInt(k.substring(i + 1).split('-')[2])] = true;
+  });
+  (
+    (await secGet(
+      'piano?data=gte.' +
+        ym +
+        '-01&data=lte.' +
+        ym +
+        '-' +
+        String(nGiorni).padStart(2, '0') +
+        '&codice=in.(M,M1,I,I1)&select=collaboratore,data&limit=5000',
+    )) || []
+  ).forEach((r) => (malato[String(r.collaboratore).toLowerCase() + '|' + parseInt(r.data.split('-')[2])] = true));
+  const eMalato = (nome, g) => !!malato[String(nome).toLowerCase() + '|' + g];
+  const vacInMalattia = []; // { nome, g }: giorni di vacanza da segnare M "Ex V"
+  Object.keys(vacGiorni).forEach((nome) => {
+    [...vacGiorni[nome]].forEach((g) => {
+      if (eMalato(nome, g)) {
+        vacGiorni[nome].delete(g);
+        vacInMalattia.push({ nome: nome, g: g });
+      }
+    });
+    if (!vacGiorni[nome].size) delete vacGiorni[nome];
+  });
+  Object.keys(altreGiorni).forEach((nome) => {
+    Object.keys(altreGiorni[nome]).forEach((g) => {
+      if (eMalato(nome, parseInt(g))) delete altreGiorni[nome][g];
+    });
+    if (!Object.keys(altreGiorni[nome]).length) delete altreGiorni[nome];
+  });
   // GIORNI CHIUSI: il piano dei giorni passati e un documento. Si lavora solo
   // dal primo giorno aperto; nei giorni chiusi non si cancella e non si scrive
   // niente, e le differenze che restano si elencano (niente di nascosto).
@@ -2730,6 +2770,7 @@ async function _applicaVacanzeMese(interattivo) {
     const senza = righeV.filter((r) => {
       if (!nomiRep.includes(r.collaboratore)) return false;
       const g = parseInt(r.data.split('-')[2]);
+      if (vacInMalattia.some((x) => x.nome === r.collaboratore && x.g === g)) return false; // diventa M sotto
       return !(vacGiorni[r.collaboratore] && vacGiorni[r.collaboratore].has(g));
     });
     // nella generazione automatica non si cancella niente di protetto: anche le V delle
@@ -2778,6 +2819,51 @@ async function _applicaVacanzeMese(interattivo) {
       _pianoReparto() +
       '&protetto=eq.true&generato=eq.true&codice=eq.C',
   );
+  // VACANZA IN MALATTIA: M protetta con la nota "Ex V" (stessa forma della malattia
+  // registrata sopra una V: ore della vacanza nei primi 14 giorni, V di ritorno se la
+  // malattia si toglie). Le M/I gia presenti restano; nella generazione automatica le
+  // celle scritte a mano diverse dalla V non si toccano (vanno nel resoconto)
+  let nRestituiti = 0;
+  if (vacInMalattia.length) {
+    const righeMal =
+      (await secGet(
+        'piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&limit=5000',
+      )) || [];
+    const perCellaMal = {};
+    righeMal.forEach((r) => (perCellaMal[r.collaboratore + '|' + parseInt(r.data.split('-')[2])] = r));
+    const opM = getOperatore();
+    for (const x of vacInMalattia) {
+      if (x.g < primoAperto) continue; // giorno chiuso: non si tocca
+      const dstrM = ym + '-' + String(x.g).padStart(2, '0');
+      const r = perCellaMal[x.nome + '|' + x.g];
+      if (r && ['M', 'M1', 'I', 'I1'].includes(r.codice)) continue;
+      if (r && r.codice !== 'V' && (r.protetto || (window._pianoAutoInCorso && !r.generato))) {
+        if (window._pianoAutoInCorso)
+          (window._pianoAutoInCorso.aManoNonToccate = window._pianoAutoInCorso.aManoNonToccate || []).push({
+            nome: x.nome,
+            data: dstrM,
+            voluto: 'M',
+            attuale: r.codice,
+          });
+        continue;
+      }
+      const datiM = {
+        codice: 'M',
+        protetto: true,
+        generato: false,
+        commento: ('Ex V - ' + opM).substring(0, 400),
+        operatore: opM,
+      };
+      if (r) await secPatch('piano', 'id=eq.' + r.id, Object.assign({ updated_at: new Date().toISOString() }, datiM));
+      else
+        await _pianoInserisciCella(
+          Object.assign({ collaboratore: x.nome, data: dstrM, reparto_dip: _pianoReparto() }, datiM),
+        );
+      nRestituiti++;
+    }
+    if (nRestituiti)
+      logAzione('Vacanze: giorni in malattia', ym + ' · ' + nRestituiti + ' giorni di vacanza segnati M (Ex V)');
+  }
   // ALTRE ASSENZE (PC, MT...): scritte con il commento COMMENTO_ALTRE
   let nAltre = 0;
   {
@@ -2847,7 +2933,7 @@ async function _applicaVacanzeMese(interattivo) {
           ? nOrfane + ' V rimosse (vacanze spostate); nessuna vacanza cade in ' + ym
           : 'Nessuna vacanza cade in ' + ym + ' per questo settore',
       );
-    return { v: 0, c: 0, wd: 0, orfane: nOrfane, altre: nAltre, vSenzaFile: vSenzaFile };
+    return { v: 0, c: 0, wd: 0, orfane: nOrfane, altre: nAltre, vSenzaFile: vSenzaFile, restituiti: nRestituiti };
   }
   const righe =
     (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&limit=5000')) ||
@@ -2863,6 +2949,8 @@ async function _applicaVacanzeMese(interattivo) {
     const r = perCella[nome + '|' + g];
     // prima dell assunzione o dopo la fine del rapporto non si scrive niente (C, WD)
     if (!_pianoOperativoIl(nome, dstrDi(g))) return false;
+    // in malattia niente C o WD attorno alle vacanze: il giorno resta malattia
+    if (eMalato(nome, g)) return false;
     if (g < primoAperto) {
       // giorno chiuso: niente scrittura, ma se la cella e diversa si segnala
       if (!r || (r.codice !== codice && !r.protetto))
@@ -3096,6 +3184,7 @@ async function _applicaVacanzeMese(interattivo) {
     primoAperto: primoAperto,
     vSenzaFile: vSenzaFile,
     cNonMesse: cNonMesse,
+    restituiti: nRestituiti,
   };
 }
 // "Rossi Mario 03.11-09.11, Bianchi Anna 21.11": giorni di fila raccolti per persona
@@ -3151,7 +3240,8 @@ async function applicaVacanzePiano() {
         r.wd +
         ' WD' +
         (r.altre ? ', ' + r.altre + ' altre assenze' : '') +
-        (r.orfane ? ' · rimosse ' + r.orfane + ' V di vacanze spostate' : ''),
+        (r.orfane ? ' · rimosse ' + r.orfane + ' V di vacanze spostate' : '') +
+        (r.restituiti ? ' · ' + r.restituiti + ' giorni di vacanza in malattia: segnati M (Ex V)' : ''),
     );
   if (r && r.cNonMesse && r.cNonMesse.length)
     await mostraAvviso(
