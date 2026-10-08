@@ -276,6 +276,106 @@ function _pianoFunzioniFannoTutto() {
 // LIVELLO DI FORMAZIONE nel settore del piano (come in Formazione: L(n) = tutte le
 // competenze di livello <= n certificate; Extra fuori dalla scala). null = il settore
 // non ha competenze a livelli: le regole di livello non si applicano.
+// COORDINATORI (regola di gruppo "coordinatori", v417, richiesta del titolare 08/10/2026):
+// ogni giorno UN coordinatore di giorno (fra chi ha un turno di apertura, es. X1) e UNO di
+// notte (fra chi ha un turno di chiusura, es. X3 o X4: vale quello che finisce piu tardi,
+// quindi X4 venerdi e sabato, X3 negli altri giorni). Prima i collaboratori scelti nella
+// regola, nel loro ordine; se quel giorno non ce n e nessuno, un altro di chi fa il turno
+// (proposto, e Valida lo dice). Il coordinatore esce in rosso nel piano e nel briefing
+// senza scrivere colori nelle celle: se le persone cambiano, il rosso le segue. Una cella
+// di apertura o chiusura colorata a mano decide lei per quel giorno.
+// Valore salvato: "X1|X3,X4|NOME COGNOME;NOME COGNOME" (giorno | notte | coordinatori).
+function _pianoRegolaCoordinatori(rep) {
+  rep = rep || _pianoReparto();
+  const r = (pianoRegoleGruppoCache || []).find(
+    (x) =>
+      x.attivo !== false &&
+      String(x.tipo_regola || '').toLowerCase() === 'coordinatori' &&
+      (x.reparto_dip || 'slots') === rep,
+  );
+  if (!r) return null;
+  const [g, n, c] = String(r.valore || '').split('|');
+  const lista = (s) =>
+    String(s || '')
+      .split(/[,;]/)
+      .map((x) => x.trim().toUpperCase())
+      .filter(Boolean);
+  return {
+    giorno: lista(g),
+    notte: lista(n),
+    nomi: String(c || '')
+      .split(';')
+      .map((x) => x.trim().toLowerCase())
+      .filter(Boolean),
+  };
+}
+// colore del coordinatore: quello delle Evidenziazioni del briefing con "coord" nel
+// significato (cosi sul foglio diventa il colore scelto li), altrimenti rosso
+function _pianoColoreCoordinatore(rep) {
+  try {
+    const ev = typeof _briefEvidenziazioni === 'function' ? _briefEvidenziazioni(rep) : [];
+    const x = (ev || []).find((e) => /coord/i.test(e.label || '') && e.da);
+    if (x) return x.da;
+  } catch (e) {}
+  return '#FF6B6B';
+}
+// righe di un periodo -> { mappa: {'nome|data': 'giorno'|'notte'}, note: [{data, fascia, nome, sostituto}] }
+function _pianoCoordinatoriDa(righe, rep) {
+  rep = rep || _pianoReparto();
+  const regola = _pianoRegolaCoordinatori(rep);
+  const out = { mappa: {}, note: [] };
+  if (!regola || (!regola.giorno.length && !regola.notte.length)) return out;
+  const fineAbs = (cod) => {
+    const t = _pianoTurnoInfo(cod);
+    if (!t || !t.ora_fine) return 0;
+    const f = _pianoOra(t.ora_fine);
+    return f <= _pianoOra(t.ora_inizio) ? 24 + f : f;
+  };
+  const perData = {};
+  (righe || []).forEach((r) => {
+    if (!r || !r.codice) return;
+    const d = String(r.data).substring(0, 10);
+    (perData[d] = perData[d] || []).push(r);
+  });
+  const posto = (n) => {
+    const i = regola.nomi.indexOf(String(n).toLowerCase());
+    return i < 0 ? 999 : i;
+  };
+  Object.keys(perData)
+    .sort()
+    .forEach((d) => {
+      [
+        ['giorno', regola.giorno],
+        ['notte', regola.notte],
+      ].forEach(([fascia, codici]) => {
+        if (!codici.length) return;
+        let cand = perData[d].filter((r) => codici.includes(String(r.codice).toUpperCase()));
+        if (!cand.length) return;
+        // di notte vale solo il turno che finisce piu tardi quel giorno (X4 ven-sab, X3 gli altri)
+        if (fascia === 'notte') {
+          const max = Math.max(...cand.map((r) => fineAbs(r.codice)));
+          cand = cand.filter((r) => fineAbs(r.codice) === max);
+        }
+        const aMano = cand.find((r) => r.colore);
+        let scelto = aMano;
+        if (!scelto) {
+          const ordinati = cand.slice().sort((a, b) => posto(a.collaboratore) - posto(b.collaboratore));
+          scelto = ordinati[0];
+        }
+        if (!aMano) out.mappa[scelto.collaboratore + '|' + d] = fascia;
+        if (posto(scelto.collaboratore) === 999 && !aMano)
+          out.note.push({ data: d, fascia: fascia, nome: scelto.collaboratore, sostituto: true });
+      });
+    });
+  return out;
+}
+// colore con cui disegnare una cella: il suo, oppure quello del coordinatore
+function _pianoColoreCella(r, mappaCoord) {
+  if (!r) return '';
+  if (r.colore) return r.colore;
+  const m = mappaCoord || window._pianoCoordMappa || {};
+  return m[r.collaboratore + '|' + String(r.data).substring(0, 10)] ? _pianoColoreCoordinatore(r.reparto_dip) : '';
+}
 // STORIA DEI GRUPPI per l idoneita delle PROPOSTE (cerca cambio, copertura malattia e
 // ND, Migliora ore, copertura dal Diario). Per chi non ha settori ne competenze la
 // bozza ammette solo i gruppi gia fatti (prima del mese e nel mese stesso); le proposte
@@ -1885,6 +1985,11 @@ async function _renderPianoCore() {
       .map((c) => c.nome);
     const extra = [...new Set(_pianoRighe.map((r) => r.collaboratore))].filter((n) => !collabs.includes(n));
     const nomi = ordineCollabPiano(collabs, _pianoReparto()).concat(ordineCollabPiano(extra, _pianoReparto()));
+    // coordinatori del mese (regola di gruppo "coordinatori"): il rosso si calcola qui
+    window._pianoCoordMappa = _pianoCoordinatoriDa(
+      _pianoRighe.filter((r) => String(r.data).startsWith(ym) && _pianoCopreQui(r)),
+      _pianoReparto(),
+    ).mappa;
     const puoMod = puoGestirePiano();
     const GG = ['D', 'L', 'M', 'M', 'G', 'V', 'S'];
     const GG3 = ['DOM', 'LUN', 'MAR', 'MER', 'GIO', 'VEN', 'SAB']; // come Turnivo (GIORNI_SETT)
@@ -2291,8 +2396,9 @@ async function _renderPianoCore() {
             titolo += (titolo ? ' · ' : '') + 'Attenzione: ' + violMsg.join(' | ');
           }
           // stile personalizzato della cella: colore (vince sul turno) + formato
-          if (r && r.colore) {
-            const stC = _stileCella(r.colore);
+          const colEff = _pianoColoreCella(r);
+          if (r && colEff) {
+            const stC = _stileCella(colEff);
             if (stC.c) stile += (stile ? ';' : '') + 'background:' + stC.c;
             if (stC.b) stile += ';font-weight:700';
             if (stC.i) stile += ';font-style:italic';

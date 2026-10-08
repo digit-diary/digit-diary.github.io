@@ -702,6 +702,8 @@ const _REGOLE_GRUPPO_TIPI = {
     'Questi turni solo da un livello di Formazione in su (es: 10,10C,9:L2 · L1-L2 = solo L1 e L2 · eccezioni per persona in Preferenze, Turni consentiti)',
   minimo_livello_giorno:
     'Almeno N persone di un livello di Formazione al giorno, con filtri (es: L3:2:NOTTURNO:4,5 = 2 di livello L3 o piu sui turni notturni, venerdi e sabato · 0=lun ... 6=dom)',
+  coordinatori:
+    'Ogni giorno un coordinatore di giorno (turni di apertura) e uno di notte (turni di chiusura: vale quello che finisce piu tardi), scelti fra i collaboratori indicati; se mancano, ne propone un altro. Escono in rosso nel piano e nel briefing',
 };
 // Etichette in italiano per la scheda (la lingua di chi la usa)
 const _REGOLE_GRUPPO_ETICHETTE = {
@@ -716,6 +718,7 @@ const _REGOLE_GRUPPO_ETICHETTE = {
   funzione_turni_giorni: 'Una funzione fa solo certi turni (per giorno)',
   livello_turni: 'Turni per livello di Formazione',
   minimo_livello_giorno: 'Minimo di un livello al giorno',
+  coordinatori: 'Coordinatori (apertura e chiusura)',
 };
 // MODULO GUIDATO DELLE REGOLE DI GRUPPO (v415, richiesta del titolare 08/10/2026): per
 // ogni tipo i campi giusti (funzione, livello, numero, tipo di turno, giorni con le
@@ -762,6 +765,22 @@ const _RG_SCHEMI = {
       return { fz: p[0] || '', turni: p[1] || '', gg: (p[2] || '').split(',').filter((x) => x !== '') };
     },
   },
+  coordinatori: {
+    campi: ['turniG', 'turniN', 'coord'],
+    componi: (c) =>
+      c.coord.length && (c.turniG || c.turniN) ? c.turniG + '|' + c.turniN + '|' + c.coord.join(';') : '',
+    leggi: (v) => {
+      const p = v.split('|');
+      return {
+        turniG: p[0] || '',
+        turniN: p[1] || '',
+        coord: (p[2] || '')
+          .split(';')
+          .map((x) => x.trim())
+          .filter(Boolean),
+      };
+    },
+  },
   livello_turni: {
     campi: ['turni', 'lv', 'lvmax'],
     componi: (c) => (c.turni && c.lv ? c.turni + ':' + c.lv + (c.lvmax ? '-' + c.lvmax : '') : ''),
@@ -805,6 +824,9 @@ function _rgLeggi(tipo, v) {
     lv: 'L1',
     lvmax: '',
     turni: '',
+    turniG: '',
+    turniN: '',
+    coord: [],
     campo: '',
     op: '>',
     val: '',
@@ -873,6 +895,21 @@ function _rgFrase(r) {
       return c.fz + ' fa solo i turni ' + c.turni + (c.gg.length ? giorniTxt : ', sempre');
     case 'livello_turni':
       return 'I turni ' + c.turni + ' solo da ' + (c.lvmax ? c.lv + ' a ' + c.lvmax : c.lv + ' in su');
+    case 'coordinatori': {
+      const nomeVero = (x) => {
+        const cc = collaboratoriCache.find((k) => k.nome.toLowerCase() === x.toLowerCase());
+        return cc ? cc.nome : x;
+      };
+      return (
+        'Ogni giorno un coordinatore' +
+        (c.turniG ? ' di giorno (' + c.turniG + ')' : '') +
+        (c.turniG && c.turniN ? ' e uno' : '') +
+        (c.turniN ? ' di notte (' + c.turniN + ', quello che finisce piu tardi)' : '') +
+        ', fra: ' +
+        c.coord.map(nomeVero).join(', ') +
+        '; se mancano, il programma ne propone un altro'
+      );
+    }
   }
   return r.valore;
 }
@@ -920,6 +957,60 @@ function _rgEsempiSettore() {
     });
   }
   return es.filter((e) => !_pianoValidaRegolaGruppo(e.gruppo, e.tipo_regola, e.valore, _pianoReparto()));
+}
+// le POSIZIONI del settore: sigle dei suoi turni, divise per gruppo, da spuntare; in piu i
+// modelli (Z* = tutte le sigle che iniziano con Z)
+function _rgTurniHtml(id, etichetta, valore) {
+  const scelti = String(valore || '')
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean);
+  const perGruppo = {};
+  _pianoTurniReparto()
+    .filter((t) => t.attivo !== false)
+    .forEach((t) =>
+      (perGruppo[(t.gruppo || '-').toUpperCase()] = perGruppo[(t.gruppo || '-').toUpperCase()] || []).push(
+        String(t.codice).toUpperCase(),
+      ),
+    );
+  const codici = new Set([].concat(...Object.values(perGruppo)));
+  const modelli = scelti.filter((x) => !codici.has(x));
+  return (
+    '<div class="field" style="flex-basis:100%"><label>' +
+    escP(etichetta) +
+    ' · posizioni di ' +
+    escP(typeof repartoLabel === 'function' ? repartoLabel(_pianoReparto()) : _pianoReparto()) +
+    '</label><div style="display:flex;flex-direction:column;gap:2px;max-height:180px;overflow:auto;padding:4px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper)">' +
+    Object.keys(perGruppo)
+      .sort()
+      .map(
+        (g) =>
+          '<div style="display:flex;gap:2px 10px;flex-wrap:wrap;align-items:center"><b style="font-size:var(--fs-sm,.8125rem);min-width:90px">' +
+          escP(g) +
+          '</b>' +
+          perGruppo[g]
+            .map(
+              (cd) =>
+                '<label style="display:inline-flex;align-items:center;gap:3px;font-size:var(--fs-sm,.8125rem)"><input type="checkbox" name="' +
+                id +
+                '" value="' +
+                escP(cd) +
+                '"' +
+                (scelti.includes(cd) ? ' checked' : '') +
+                '>' +
+                escP(cd) +
+                '</label>',
+            )
+            .join('') +
+          '</div>',
+      )
+      .join('') +
+    '</div><input type="text" id="' +
+    id +
+    '-modelli" value="' +
+    escP(modelli.join(',')) +
+    '" placeholder="Altri modelli, es. Z* = tutte le sigle che iniziano con Z" style="margin-top:4px;width:100%;max-width:360px;padding:6px"></div>'
+  );
 }
 // campi del modulo per un tipo (c = valori di partenza, per modificare una regola)
 function _rgCampiHtml(tipo, c) {
@@ -1048,52 +1139,23 @@ function _rgCampiHtml(tipo, c) {
             '</select>',
         ),
       );
-    if (k === 'turni') {
-      // le POSIZIONI del settore: sigle dei suoi turni, divise per gruppo, da spuntare;
-      // in piu i modelli (Z* = tutte le sigle che iniziano con Z)
-      const scelti = String(c.turni || '')
-        .split(',')
-        .map((x) => x.trim())
-        .filter(Boolean);
-      const perGruppo = {};
-      _pianoTurniReparto()
-        .filter((t) => t.attivo !== false)
-        .forEach((t) =>
-          (perGruppo[(t.gruppo || '-').toUpperCase()] = perGruppo[(t.gruppo || '-').toUpperCase()] || []).push(
-            String(t.codice).toUpperCase(),
-          ),
-        );
-      const codici = new Set([].concat(...Object.values(perGruppo)));
-      const modelli = scelti.filter((x) => !codici.has(x));
+    if (k === 'turni') out.push(_rgTurniHtml('rgc-turni', 'Turni', c.turni));
+    if (k === 'turniG') out.push(_rgTurniHtml('rgc-turniG', 'Turni di apertura (coordinatore di giorno)', c.turniG));
+    if (k === 'turniN') out.push(_rgTurniHtml('rgc-turniN', 'Turni di chiusura (coordinatore di notte)', c.turniN));
+    if (k === 'coord') {
+      const persone = ordineCollabPiano(
+        collaboratoriCache.filter((x) => x.attivo !== false && _pianoAppartieneAlReparto(x)).map((x) => x.nome),
+        _pianoReparto(),
+      );
+      const scelti = c.coord.map((x) => x.toLowerCase());
       out.push(
-        '<div class="field" style="flex-basis:100%"><label>Turni (posizioni di ' +
-          escP(typeof repartoLabel === 'function' ? repartoLabel(_pianoReparto()) : _pianoReparto()) +
-          ')</label><div style="display:flex;flex-direction:column;gap:2px;max-height:180px;overflow:auto;padding:4px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper)">' +
-          Object.keys(perGruppo)
-            .sort()
-            .map(
-              (g) =>
-                '<div style="display:flex;gap:2px 10px;flex-wrap:wrap;align-items:center"><b style="font-size:var(--fs-sm,.8125rem);min-width:90px">' +
-                escP(g) +
-                '</b>' +
-                perGruppo[g]
-                  .map(
-                    (cd) =>
-                      '<label style="display:inline-flex;align-items:center;gap:3px;font-size:var(--fs-sm,.8125rem)"><input type="checkbox" name="rgc-turni" value="' +
-                      escP(cd) +
-                      '"' +
-                      (scelti.includes(cd) ? ' checked' : '') +
-                      '>' +
-                      escP(cd) +
-                      '</label>',
-                  )
-                  .join('') +
-                '</div>',
-            )
-            .join('') +
-          '</div><input type="text" id="rgc-modelli" value="' +
-          escP(modelli.join(',')) +
-          '" placeholder="Altri modelli, es. Z* = tutte le sigle che iniziano con Z" style="margin-top:4px;width:100%;max-width:360px;padding:6px"></div>',
+        '<div class="field" style="flex-basis:100%"><label>Coordinatori scelti (in ordine di preferenza: il primo disponibile)</label>' +
+          spunte(
+            'rgc-coord',
+            persone.map((n) => ({ v: n, l: n })),
+            persone.filter((n) => scelti.includes(n.toLowerCase())),
+          ) +
+          '</div>',
       );
     }
     if (k === 'campo')
@@ -1133,6 +1195,15 @@ function _rgCampiHtml(tipo, c) {
 function _rgLeggiCampi() {
   const val = (id) => ((document.getElementById(id) || {}).value || '').trim().toUpperCase();
   const spunte = (nome) => [...document.querySelectorAll('input[name="' + nome + '"]:checked')].map((x) => x.value);
+  const turniDi = (id) =>
+    spunte(id)
+      .concat(
+        val(id + '-modelli')
+          .split(',')
+          .map((x) => x.replace(/\s+/g, ''))
+          .filter(Boolean),
+      )
+      .join(',');
   return {
     fz: val('rgc-fz'),
     fzs: spunte('rgc-fzs'),
@@ -1142,14 +1213,10 @@ function _rgLeggiCampi() {
     gg: spunte('rgc-gg'),
     lv: val('rgc-lv'),
     lvmax: val('rgc-lvmax'),
-    turni: spunte('rgc-turni')
-      .concat(
-        val('rgc-modelli')
-          .split(',')
-          .map((x) => x.replace(/\s+/g, ''))
-          .filter(Boolean),
-      )
-      .join(','),
+    turni: turniDi('rgc-turni'),
+    turniG: turniDi('rgc-turniG'),
+    turniN: turniDi('rgc-turniN'),
+    coord: [...document.querySelectorAll('input[name="rgc-coord"]:checked')].map((x) => x.value),
     campo: val('rgc-campo'),
     op: (document.getElementById('rgc-op') || {}).value || '>',
     val: val('rgc-val'),
@@ -1797,6 +1864,30 @@ function _pianoValidaRegolaGruppo(gruppo, tipo, valore, settore) {
     }
     return null;
   }
+  if (t === 'coordinatori') {
+    const p = v.split('|');
+    if (p.length !== 3) return 'Scegli i turni di apertura o di chiusura e almeno un coordinatore';
+    const turni = (p[0] + ',' + p[1])
+      .split(',')
+      .map((x) => x.trim())
+      .filter(Boolean);
+    if (!turni.length) return 'Scegli almeno un turno di apertura o di chiusura';
+    const ign = sigleIgnote(turni);
+    if (ign.length) return 'Sigle di turno che in ' + ctx.label + ' non esistono: ' + ign.join(', ');
+    const nomi = p[2]
+      .split(';')
+      .map((x) => x.trim())
+      .filter(Boolean);
+    if (!nomi.length) return 'Scegli almeno un coordinatore';
+    const ignoti = nomi.filter(
+      (n) =>
+        !collaboratoriCache.some(
+          (c) => c.attivo !== false && c.nome.toLowerCase() === n.toLowerCase() && _pianoAppartieneAlReparto(c),
+        ),
+    );
+    if (ignoti.length) return 'Collaboratori che non risultano attivi in ' + ctx.label + ': ' + ignoti.join(', ');
+    return null;
+  }
   if (t === 'minimo_funzione_giorno') {
     const m = v.match(/^([A-Z0-9_]+):(\d+)(?::(DIURNO|NOTTURNO)?)?(?::([0-6](,[0-6])*))?$/);
     if (!m)
@@ -1831,9 +1922,22 @@ async function salvaRegolaGruppo(id, campo, valore) {
 }
 async function aggiungiRegolaGruppo() {
   if (!isAdmin()) return;
-  const gruppo = (document.getElementById('rg-gruppo') || {}).value;
   const tipo = (document.getElementById('rg-tipo') || {}).value;
+  // i coordinatori valgono per il settore intero
+  const gruppo = tipo === 'coordinatori' ? '*' : (document.getElementById('rg-gruppo') || {}).value;
   const valore = _rgComponi(tipo, _rgLeggiCampi()).trim().toUpperCase();
+  if (
+    tipo === 'coordinatori' &&
+    pianoRegoleGruppoCache.some(
+      (r) =>
+        String(r.tipo_regola).toLowerCase() === 'coordinatori' &&
+        (r.reparto_dip || 'slots') === _pianoReparto() &&
+        r.id !== window._rgModifica,
+    )
+  ) {
+    toastErrore('Il settore ha gia una regola Coordinatori: usa Modifica per cambiarla');
+    return;
+  }
   if (!gruppo || !tipo || !valore) {
     toast('Compila i campi della regola');
     return;

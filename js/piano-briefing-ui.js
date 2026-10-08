@@ -74,6 +74,14 @@ function _briefEtichettaColore(coloreBriefing) {
 }
 function _briefComponi(pianoRighe) {
   const righe = [];
+  // coordinatori del giorno (regola di gruppo "coordinatori"): rossi anche sul foglio
+  const mappaCoord =
+    typeof _pianoCoordinatoriDa === 'function'
+      ? _pianoCoordinatoriDa(
+          (pianoRighe || []).filter((r) => _pianoCopreQui(r)),
+          _pianoReparto(),
+        ).mappa
+      : {};
   (pianoRighe || []).forEach((r) => {
     // regola multi-reparto: si finisce nel briefing del REPARTO DEL TURNO,
     // non del reparto d'origine (Balliu con X1 valet → solo briefing valet,
@@ -117,7 +125,10 @@ function _briefComponi(pianoRighe) {
       // "evidenziazioni" configurate (Briefing → Evidenziazioni dal piano) un
       // colore del piano puo' diventarne un altro sul briefing: es. valet,
       // coordinatore segnato in rosso nel piano che sul foglio si vede verde.
-      col: (r.colore && _briefColoreDaPiano(_stileCella(r.colore).c)) || undefined,
+      col: (() => {
+        const c = typeof _pianoColoreCella === 'function' ? _pianoColoreCella(r, mappaCoord) : r.colore;
+        return (c && _briefColoreDaPiano(_stileCella(c).c)) || undefined;
+      })(),
     });
   });
   // cognomi uguali di persone diverse (es. BIANCHI Milena e BIANCHI Chiara):

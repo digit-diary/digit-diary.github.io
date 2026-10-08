@@ -1498,6 +1498,25 @@ async function _rinominaCollaboratoreTutto(vecchio, nuovo) {
   } catch (_) {
     nonRiuscite.push('briefing futuri');
   }
+  // regole COORDINATORI del piano: i nomi scelti sono nel valore della regola
+  try {
+    for (const r of (typeof pianoRegoleGruppoCache !== 'undefined' ? pianoRegoleGruppoCache : []).filter(
+      (x) => String(x.tipo_regola || '').toLowerCase() === 'coordinatori',
+    )) {
+      const p = String(r.valore || '').split('|');
+      if (p.length !== 3) continue;
+      const nomi = p[2]
+        .split(';')
+        .map((n) => (n.trim().toLowerCase() === vecchio.toLowerCase() ? nuovo.toUpperCase() : n));
+      const v2 = p[0] + '|' + p[1] + '|' + nomi.join(';');
+      if (v2 !== r.valore) {
+        await secPatch('piano_regole_gruppo', 'id=eq.' + r.id, { valore: v2 });
+        r.valore = v2;
+      }
+    }
+  } catch (_) {
+    nonRiuscite.push('regole coordinatori');
+  }
   // memoria
   const ci = collaboratoriCache.findIndex((c) => c.nome === vecchio);
   if (ci !== -1) collaboratoriCache[ci].nome = nuovo;

@@ -1108,6 +1108,19 @@ function _pianoViolazioniGruppi(righe, ctx) {
       }
     }
   }
+  // COORDINATORI (regola di gruppo "coordinatori"): giorni in cui in apertura o in
+  // chiusura non c e nessuno dei coordinatori scelti (il programma ne propone un altro)
+  if (typeof _pianoCoordinatoriDa === 'function')
+    _pianoCoordinatoriDa(
+      _pianoRighe.filter((r) => String(r.data).startsWith(ym) && _pianoCopreQui(r)),
+      _pianoReparto(),
+    ).note.forEach((x) =>
+      aggiungi(
+        x.nome,
+        parseInt(x.data.substring(8, 10)),
+        'coordinatore di ' + x.fascia + ' non fra quelli scelti: proposto ' + x.nome + ' (regola Coordinatori)',
+      ),
+    );
   return out;
 }
 function _pianoCalcolaViolazioni() {
@@ -1992,6 +2005,9 @@ async function generaBozzaPiano(usaCoperture) {
   const contaGiornoFz = {}; // gruppo|FZ|g -> n assegnati
   const contaGiornoTot = {}; // gruppo|g -> n assegnati (per accompagnamento)
   const collabMeseFz = {}; // gruppo|FZ -> Set(nomi)
+  // regola COORDINATORI del settore (se c e): chi preferire in apertura e chiusura
+  const regCoord = typeof _pianoRegolaCoordinatori === 'function' ? _pianoRegolaCoordinatori(_pianoReparto()) : null;
+  const coordSet = new Set(regCoord ? regCoord.nomi : []);
   // un turno assegnato o tolto aggiorna i contatori del suo gruppo e di "*" (le regole
   // con gruppo "tutti" contano ogni gruppo del settore)
   const registraAssegnazione = (nomeC, codiceT, giorno) => {
@@ -2262,9 +2278,42 @@ async function generaBozzaPiano(usaCoperture) {
   };
   for (let g = 1; g <= nGiorni; g++) {
     if (giorniChiusi.has(g)) continue; // giorno chiuso: resta com'e'
-    (fabbG[g] || []).forEach((f) => {
+    // COORDINATORI: turno di chiusura del giorno = quello di notte che finisce piu tardi
+    const fineAbsC = (cod) => {
+      const tc = _pianoTurnoInfo(cod);
+      if (!tc || !tc.ora_fine) return 0;
+      const fc = _pianoOra(tc.ora_fine);
+      return fc <= _pianoOra(tc.ora_inizio) ? 24 + fc : fc;
+    };
+    const chiusuraG = regCoord
+      ? (fabbG[g] || [])
+          .map((f) => String(f.turno_codice).toUpperCase())
+          .filter((c) => regCoord.notte.includes(c))
+          .sort((a, b) => fineAbsC(b) - fineAbsC(a))[0]
+      : null;
+    // prima i turni di apertura e chiusura: i coordinatori scelti vanno li prima di
+    // essere usati in altri turni dello stesso giorno (ordine stabile per gli altri)
+    const postiG = (fabbG[g] || []).slice();
+    if (regCoord) {
+      const primo = (f) => {
+        const c = String(f.turno_codice).toUpperCase();
+        return regCoord.giorno.includes(c) || c === chiusuraG ? 1 : 0;
+      };
+      postiG.sort((a, b) => primo(b) - primo(a));
+    }
+    postiG.forEach((f) => {
       const t = _pianoTurnoInfo(f.turno_codice);
       if (!t) return;
+      const codU = String(f.turno_codice).toUpperCase();
+      const fasciaC = !regCoord ? '' : regCoord.giorno.includes(codU) ? 'giorno' : codU === chiusuraG ? 'notte' : '';
+      const codiciFascia = fasciaC === 'giorno' ? regCoord.giorno : fasciaC === 'notte' ? [chiusuraG] : [];
+      // il giorno ha gia il suo coordinatore in questa fascia?
+      const coordGia =
+        fasciaC &&
+        nomiCella.some(
+          (n) => coordSet.has(n.toLowerCase()) && codiciFascia.includes(String(cella[n + '|' + g] || '').toUpperCase()),
+        );
+      const coordPref = (n) => (fasciaC && !coordGia && coordSet.has(n.toLowerCase()) ? 0 : 1);
       const dstr = ym + '-' + String(g).padStart(2, '0');
       // contano anche le persone di altri settori che fanno un turno di questo
       // (es. Papa del Valet su R22): hanno la cella, ma non sono tra i nomi del settore
@@ -2371,6 +2420,7 @@ async function generaBozzaPiano(usaCoperture) {
             const cy = _pianoCoperturaCfg(_pianoCollabInfo(y)) ? 1 : 0;
             return (
               cx - cy ||
+              coordPref(x) - coordPref(y) || // un coordinatore scelto in apertura/chiusura, se manca
               classe(x, jx) - classe(y, jy) ||
               // fra jolly: EQUITA, prima chi ha la quota piu bassa del proprio obiettivo
               (jx && jy ? quota(x) - quota(y) : 0) ||
