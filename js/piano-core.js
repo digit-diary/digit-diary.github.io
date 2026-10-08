@@ -688,9 +688,46 @@ async function _pianoCaricaCfg() {
   try {
     window._pianoFunzioni = funzioni ? JSON.parse(funzioni) : null;
   } catch (e) {}
-  if (!Array.isArray(window._pianoFunzioni) || !window._pianoFunzioni.length)
-    window._pianoFunzioni = ['RESP', 'SUP', 'BO', 'HOST'];
+  // elenco (formato di prima, vale per le Slot) oppure oggetto per settore
+  const fzCfg = window._pianoFunzioni;
+  const fzOggetto = fzCfg && typeof fzCfg === 'object' && !Array.isArray(fzCfg);
+  if (!fzOggetto && (!Array.isArray(fzCfg) || !fzCfg.length)) window._pianoFunzioni = ['RESP', 'SUP', 'BO', 'HOST'];
   _pianoCfgCaricata = true;
+}
+// FUNZIONI DISPONIBILI PER SETTORE (v427, segnalazione del titolare: nei Tavoli i menu
+// mostravano le funzioni delle Slot e non CR, DI). L impostazione piano_funzioni e un
+// oggetto { slots: [...], tavoli: [...] }; il formato di prima (un elenco) vale per le
+// Slot. A ogni settore si aggiungono le funzioni che i suoi collaboratori hanno gia,
+// cosi nessun menu perde la funzione di qualcuno.
+function _pianoFunzioniConfig(rep) {
+  const cfg = window._pianoFunzioni;
+  let lista = [];
+  if (Array.isArray(cfg)) lista = rep === 'slots' ? cfg : [];
+  else if (cfg && typeof cfg === 'object') lista = Array.isArray(cfg[rep]) ? cfg[rep] : [];
+  return lista.map((f) => String(f).toUpperCase()).filter(Boolean);
+}
+function _pianoFunzioniDi(rep) {
+  rep = rep || (typeof _pianoReparto === 'function' ? _pianoReparto() : 'slots');
+  const out = _pianoFunzioniConfig(rep);
+  (typeof collaboratoriCache !== 'undefined' ? collaboratoriCache : [])
+    .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === rep && c.funzione)
+    .forEach((c) => {
+      const f = String(c.funzione).toUpperCase();
+      if (!out.includes(f)) out.push(f);
+    });
+  return out;
+}
+// tutte le funzioni di tutti i settori (controlli che valgono per l intero programma)
+function _pianoFunzioniTutte() {
+  const out = new Set();
+  const cfg = window._pianoFunzioni;
+  if (Array.isArray(cfg)) cfg.forEach((f) => out.add(String(f).toUpperCase()));
+  else if (cfg && typeof cfg === 'object')
+    Object.values(cfg).forEach((l) => (Array.isArray(l) ? l : []).forEach((f) => out.add(String(f).toUpperCase())));
+  (typeof collaboratoriCache !== 'undefined' ? collaboratoriCache : []).forEach(
+    (c) => c.funzione && out.add(String(c.funzione).toUpperCase()),
+  );
+  return [...out];
 }
 // mappature del SETTORE aperto: ogni settore ha le sue sigle
 function _pianoMappFunzione(funzione, rep) {

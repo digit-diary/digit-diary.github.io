@@ -529,9 +529,7 @@ function _pianoValidaRegola(nome, valore, settore) {
     return null;
   }
   if (nome === 'funzioni_fanno_tutto') {
-    const note = new Set(
-      (Array.isArray(window._pianoFunzioni) ? window._pianoFunzioni : []).map((f) => String(f).toUpperCase()),
-    );
+    const note = new Set(_pianoFunzioniTutte());
     collaboratoriCache.forEach((c) => c.funzione && note.add(String(c.funzione).toUpperCase()));
     const ignote = v
       .split(',')
@@ -2014,7 +2012,7 @@ async function _importaPianoDaWb(wb, ym, opz) {
         const fz = String(colInfo(1) || '')
           .trim()
           .toUpperCase();
-        const funzioni = window._pianoFunzioni || ['RESP', 'SOSTRESP', 'SUP', 'BO', 'HOST'];
+        const funzioni = _pianoFunzioniDi(_pianoReparto());
         let pct = parseFloat(String(colInfo(2) == null ? '' : colInfo(2)).replace(',', '.'));
         if (pct > 1 && pct <= 100) pct = pct / 100;
         const pctLetta = !isNaN(pct) && pct > 0 && pct <= 1;
@@ -2022,7 +2020,8 @@ async function _importaPianoDaWb(wb, ym, opz) {
           nome: titolo(raw),
           celle: celle,
           stato: 'nuovo',
-          funzione: funzioni.includes(fz) ? fz : 'HOST',
+          // funzione non riconosciuta: HOST nelle Slot (come prima), vuota negli altri settori
+          funzione: funzioni.includes(fz) ? fz : _pianoReparto() === 'slots' ? 'HOST' : '',
           percentuale: pctLetta ? pct : 1,
           // jolly = nel foglio del piano la colonna della percentuale e vuota (come nel file
           // HR); nel formato semplice non si sa: fisso al 100%, da controllare nella scheda

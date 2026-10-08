@@ -1152,6 +1152,14 @@ async function cambiaDataCollaboratore(id, campo, valore) {
 async function renderCollaboratoriUI() {
   const section = document.getElementById('collab-section');
   if (!section) return;
+  // funzioni disponibili per settore: se il Piano non e ancora stato aperto non sono
+  // caricate e il menu mostrerebbe solo quelle gia assegnate
+  if (window._pianoFunzioni === undefined && typeof getImp === 'function') {
+    try {
+      const v = await getImp('piano_funzioni');
+      window._pianoFunzioni = v ? JSON.parse(v) : null;
+    } catch (e) {}
+  }
   // Admin: gestione completa. Operatore con permesso 'gestione_categorie' (es. HR):
   // vede la lista e può assegnare solo impiego e categoria.
   const adminFull = isAdmin();
@@ -1234,7 +1242,12 @@ async function renderCollaboratoriUI() {
           '"><option value=""' +
           (!c.funzione ? ' selected' : '') +
           '>Funzione...</option>' +
-          (window._pianoFunzioni || ['RESP', 'SUP', 'BO', 'HOST'])
+          // le funzioni del SETTORE del collaboratore (prima sempre quelle delle Slot:
+          // un croupier CR aveva il menu vuoto)
+          (typeof _pianoFunzioniDi === 'function'
+            ? _pianoFunzioniDi(c.reparto_dip || 'slots')
+            : window._pianoFunzioni || ['RESP', 'SUP', 'BO', 'HOST']
+          )
             .map((f) => '<option value="' + f + '"' + (c.funzione === f ? ' selected' : '') + '>' + f + '</option>')
             .join('') +
           '</select><select onchange="cambiaPercentualeCollaboratore(' +

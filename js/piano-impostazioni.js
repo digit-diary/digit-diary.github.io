@@ -46,7 +46,9 @@ function _renderPianoMappatureCard() {
     });
   h +=
     '<div class="add-tipo-row" style="margin-top:10px"><div class="field"><label>Funzione</label><select id="mp-funzione" style="padding:8px">' +
-    (window._pianoFunzioni || ['RESP', 'SUP', 'BO', 'HOST']).map((f) => '<option>' + escP(f) + '</option>').join('') +
+    _pianoFunzioniDi(_pianoReparto())
+      .map((f) => '<option>' + escP(f) + '</option>')
+      .join('') +
     '</select></div><div class="field"><label>Turno</label><select id="mp-turno" style="padding:8px">' +
     _pianoTurniReparto()
       .slice()
@@ -133,8 +135,10 @@ function _renderPianoImpostazioniCard() {
     '<div class="add-tipo-row"><div class="field"><label>Ore settimanali contratto (per il saldo ore)</label><input type="number" step="0.5" id="pi-ore-sett" value="' +
     _pianoOreSett +
     '" style="width:90px" onchange="salvaOreSettimanali(this.value)"></div>' +
-    '<div class="field" style="flex:1;min-width:220px"><label>Funzioni disponibili (separate da virgola)</label><input type="text" id="pi-funzioni" value="' +
-    escP((window._pianoFunzioni || []).join(', ')) +
+    '<div class="field" style="flex:1;min-width:220px"><label>Funzioni disponibili · ' +
+    escP(repartoLabel(_pianoReparto())) +
+    ' (separate da virgola)</label><input type="text" id="pi-funzioni" value="' +
+    escP(_pianoFunzioniDi(_pianoReparto()).join(', ')) +
     '" onchange="salvaPianoFunzioni(this.value)"></div>' +
     '<div class="field"><label title="0 = illimitati">Max cambi turno al mese</label><input type="number" min="0" max="99" value="' +
     _pianoMaxCambi() +
@@ -394,10 +398,15 @@ async function salvaOreSettimanali(v) {
 }
 async function salvaPianoFunzioni(v) {
   if (!isAdmin()) return;
-  const lista = String(v)
-    .split(',')
-    .map((x) => x.trim().toUpperCase())
-    .filter(Boolean);
+  const rep = _pianoReparto();
+  const lista = [
+    ...new Set(
+      String(v)
+        .split(',')
+        .map((x) => x.trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  ];
   if (!lista.length) {
     toastErrore('Inserisci almeno una funzione');
     return;
@@ -407,32 +416,34 @@ async function salvaPianoFunzioni(v) {
     toastErrore('Funzioni non valide (solo lettere, cifre e _, max 12): ' + nonValide.join(', '));
     return;
   }
-  // una funzione ancora assegnata a qualcuno non si toglie per sbaglio. Conta solo quelle
-  // che erano nell elenco e sono state cancellate: prima si confrontava con tutte le
-  // funzioni in uso e aggiungendo ACCOGLIENZA chiedeva di "togliere" CR, DI e CL dei
-  // Tavoli e del Cleaning, mai state nell elenco (segnalazione del titolare 08/10/2026)
+  // FUNZIONI PER SETTORE (v427): si salva solo l elenco del settore aperto. Le funzioni
+  // ancora assegnate a collaboratori del settore restano comunque nei menu: si dice quali
+  // (prima si chiedeva di "togliere" anche funzioni di altri settori)
   const inUso = [
     ...new Set(
-      collaboratoriCache.filter((c) => c.attivo !== false && c.funzione).map((c) => String(c.funzione).toUpperCase()),
+      collaboratoriCache
+        .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === rep && c.funzione)
+        .map((c) => String(c.funzione).toUpperCase()),
     ),
   ];
-  const prima = (window._pianoFunzioni || []).map((x) => String(x).toUpperCase());
-  const tolteInUso = inUso.filter((f) => prima.includes(f) && !lista.includes(f));
-  if (
-    tolteInUso.length &&
-    !(await chiediConferma(
-      'Queste funzioni sono assegnate a collaboratori attivi: ' +
-        tolteInUso.join(', ') +
-        '.\n\nToglierle dall elenco? (le schede le mantengono, ma non compariranno piu nei menu)',
-    ))
-  ) {
-    renderPiano();
-    return;
-  }
-  window._pianoFunzioni = lista;
-  if (!(await salvaImp('piano_funzioni', JSON.stringify(lista)))) return;
-  logAzione('Piano: funzioni', lista.join(','));
-  toast('Funzioni aggiornate');
+  const restano = inUso.filter((f) => !lista.includes(f));
+  const cfg = window._pianoFunzioni;
+  const tutte = Array.isArray(cfg) ? { slots: cfg.slice() } : Object.assign({}, cfg || {});
+  tutte[rep] = lista;
+  if (!(await salvaImp('piano_funzioni', JSON.stringify(tutte)))) return;
+  window._pianoFunzioni = tutte;
+  logAzione('Piano: funzioni', repartoLabel(rep) + ' · ' + lista.join(','));
+  if (restano.length)
+    await mostraAvviso(
+      'Funzioni salvate per ' +
+        repartoLabel(rep) +
+        '. Restano nei menu anche ' +
+        restano.join(', ') +
+        ', perche le hanno ancora dei collaboratori del settore: per toglierle, cambia prima la funzione nelle loro schede.',
+      { titolo: 'Funzioni disponibili' },
+    );
+  else toast('Funzioni di ' + repartoLabel(rep) + ' aggiornate');
+  renderPiano();
 }
 
 // Preferenze per collaboratore: solo diurni + turni bloccati
@@ -1146,13 +1157,7 @@ function _rgCampiHtml(tipo, c) {
   if (!s) return '';
   c = c || _rgLeggi(tipo, '');
   const ctx = _pianoContestoSettore(_pianoReparto());
-  const funzioni = [
-    ...new Set(
-      (Array.isArray(window._pianoFunzioni) ? window._pianoFunzioni : [])
-        .map((f) => String(f).toUpperCase())
-        .concat([...ctx.funzioni]),
-    ),
-  ].sort();
+  const funzioni = [...new Set(_pianoFunzioniDi(_pianoReparto()).concat([...ctx.funzioni]))].sort();
   const maxLv = _rgMaxLivello() || 1;
   const livelli = Array.from({ length: maxLv }, (_, i) => 'L' + (i + 1));
   const stileSel = 'padding:6px 8px';
@@ -1877,11 +1882,7 @@ function _pianoValidaRegolaGruppo(gruppo, tipo, valore, settore) {
     .toUpperCase();
   if (gr !== '*' && !ctx.gruppi.has(gr))
     return 'Il gruppo ' + gr + ' non esiste fra i turni di ' + ctx.label + ' (scheda Turni, colonna Gruppo)';
-  const funzioniNote = new Set(
-    (Array.isArray(window._pianoFunzioni) ? window._pianoFunzioni : [])
-      .map((f) => String(f).toUpperCase())
-      .concat([...ctx.funzioni]),
-  );
+  const funzioniNote = new Set(_pianoFunzioniDi(String(settore || '').toLowerCase()).concat([...ctx.funzioni]));
   const fzOk = (f) => funzioniNote.has(f);
   const t = String(tipo || '').toLowerCase();
   if (t === 'richiede_funzione') {
