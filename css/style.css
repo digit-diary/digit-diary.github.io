@@ -5946,27 +5946,203 @@ html {
   scroll-padding-top: 100px;
 }
 
-/* scheda del collaboratore: ultimi cambi turno con anteprima del foglio */
-.scheda-cambi {
-  margin-top: 8px;
+/* scheda del collaboratore: pagine (v410) */
+.scheda-tabs {
+  position: sticky;
+  top: -32px;
+  z-index: 3;
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 14px -32px 0;
+  padding: 0 32px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+}
+.scheda-tabs::-webkit-scrollbar {
+  display: none;
+}
+.scheda-tab {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px 9px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.scheda-tab:hover {
+  color: var(--ink);
+}
+.scheda-tab.attiva {
+  color: var(--ink);
+  border-bottom-color: var(--accent2);
+}
+.scheda-tab:focus-visible {
+  outline: 2px solid var(--accent2);
+  outline-offset: -2px;
+}
+.scheda-tab-n {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--paper2);
+  color: var(--muted);
   font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
-.scheda-cambi-tit {
+.scheda-tab.attiva .scheda-tab-n {
+  background: var(--accent2);
+  color: #fff;
+}
+.scheda-pannello {
+  padding-top: 4px;
+}
+.scheda-pannello > .scheda-section:first-child,
+.scheda-pannello > .scheda-kpi-grid:first-child {
+  margin-top: 14px;
+  border-top: 0;
+  padding-top: 0;
+}
+.scheda-h4-azioni {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 4px;
+  flex-wrap: wrap;
 }
-.scheda-cambio {
+.scheda-h4-azioni .btn-secondario {
+  margin-left: auto;
+  font-family: 'Source Sans 3', sans-serif;
+  font-size: var(--fs-sm);
+  padding: 3px 12px;
+}
+.scheda-conta {
+  font-family: 'Source Sans 3', sans-serif;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.scheda-punto {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+.scheda-gruppo {
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  margin-bottom: 6px;
+  background: var(--paper);
+}
+.scheda-gruppo > summary {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
-  padding: 3px 0 3px 10px;
-  border-left: 2px solid var(--line);
+  padding: 8px 12px;
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--fs-md);
 }
-.scheda-cambi .btn-secondario {
+.scheda-gruppo > summary::-webkit-details-marker {
+  display: none;
+}
+.scheda-gruppo > summary::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  transform: rotate(-45deg);
+  transition: transform 0.15s;
+  flex: 0 0 auto;
+}
+.scheda-gruppo[open] > summary::before {
+  transform: rotate(45deg);
+}
+.scheda-gruppo[open] > summary {
+  border-bottom: 1px solid var(--line);
+  background: var(--paper2);
+}
+.scheda-gruppo-tit {
+  flex: 1;
+  font-weight: 600;
+  color: var(--ink);
+}
+.scheda-gruppo-n {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.scheda-riga {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--fs-md);
+}
+.scheda-riga:last-child {
+  border-bottom: 0;
+}
+.scheda-riga-click {
+  cursor: pointer;
+}
+.scheda-riga-click:hover {
+  background: var(--paper2);
+}
+.scheda-riga-data {
+  flex: 0 0 84px;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+.scheda-riga-testo {
+  flex: 1;
+  min-width: 0;
+  color: var(--ink);
+}
+.scheda-riga-nota {
+  display: block;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.scheda-riga-op {
+  font-size: var(--fs-sm);
+  color: var(--accent2);
+  white-space: nowrap;
+}
+.scheda-riga .btn-secondario {
   font-size: var(--fs-sm);
   padding: 2px 10px;
+}
+@media (max-width: 700px) {
+  .scheda-tabs {
+    top: -20px;
+    margin: 12px -20px 0;
+    padding: 0 20px;
+  }
+  .scheda-riga {
+    flex-wrap: wrap;
+  }
+  .scheda-riga-data {
+    flex-basis: 100%;
+  }
 }
 
 /* ===== Piano > Avvisi ===== */

@@ -2328,8 +2328,6 @@ function apriSchedaCollaboratore(nome) {
         '\')">Registra congedo non pagato</button>';
   }
   html += '<div id="collab-crediti" style="font-size:var(--fs-sm,.8125rem);margin-top:6px"></div>';
-  if (typeof _schedaCambiTurnoRiga === 'function') html += _schedaCambiTurnoRiga(nome);
-  if (typeof _schedaNdRiga === 'function') html += _schedaNdRiga(nome);
   html += '</div></div>';
   html +=
     '<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn-export btn-export-pdf" onclick="stampaSchedaPDF(\'' +
@@ -2347,18 +2345,11 @@ function apriSchedaCollaboratore(nome) {
   const _lastEntry = entries.length ? entries.sort((a, b) => (b.data || '').localeCompare(a.data || ''))[0] : null;
   const _lastDateStr = _lastEntry ? new Date(_lastEntry.data).toLocaleDateString('it-IT') : '-';
   const _lastTipo = _lastEntry ? _lastEntry.tipo : '';
-  // MINI-INDICE: salta alle sezioni della scheda
-  const _chipStile =
-    'padding:4px 12px;border:1px solid var(--line);border-radius:14px;font-size:var(--fs-sm,.8125rem);cursor:pointer;background:var(--paper2);color:var(--muted);font-weight:600';
-  html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">';
-  const _hrChipFull = typeof puoVedereStoricoHr === 'function' && puoVedereStoricoHr();
-  const _chipForm = !_hrChipFull && typeof puoModificare === 'function' && puoModificare('gestione_formazioni');
-  ['Valutazione', 'Storico HR', 'Formazioni svolte', 'Cronologia'].forEach(function (sez) {
-    if (sez === 'Storico HR' && !_hrChipFull) return;
-    if (sez === 'Formazioni svolte' && !_chipForm) return;
-    html += '<span style="' + _chipStile + '" onclick="schedaVaiA(\'' + sez + '\')">' + sez + '</span>';
-  });
-  html += '</div>';
+  // SCHEDE (v410): la testata resta sempre visibile; sotto, il fascicolo e'
+  // diviso in pagine (Panoramica, Diario, Piano, Moduli, HR) invece di una
+  // colonna unica dove cambi turno e moduli ND si accodavano tutti di fila
+  const _hTestata = html;
+  html = '';
 
   // KPI CARDS · cliccabili: aprono l'anteprima delle voci nella cronologia
   const _kpiClick = function (source, tipo) {
@@ -2543,6 +2534,8 @@ function apriSchedaCollaboratore(nome) {
     html += '</div></div>';
   } // fine _hasChartData
 
+  let _pPan = html;
+  html = '';
   // DISCIPLINARY PATH · solo se c'è almeno 1 evento
   if (_hrVede && (totAmm || allineamenti || rdiCount)) {
     html += '<div class="scheda-section"><h4>Percorso disciplinare</h4>';
@@ -2634,6 +2627,8 @@ function apriSchedaCollaboratore(nome) {
     }
     html += '</div>';
   } // fine percorso disciplinare
+  const _pDisc = html;
+  html = '';
 
   // SICK DAY PATTERNS · analisi riservata (richiesta HR): percentuali per
   // giorno, avviso Lunedi/Venerdi e confronto col team li vede solo chi ha il
@@ -2696,12 +2691,16 @@ function apriSchedaCollaboratore(nome) {
     html += '</div>';
   }
 
+  _pPan += html;
+  html = '';
   // VALUTAZIONE ANNUALE (11 aree della scheda HR rev. 2026)
   if (typeof _renderValutazioneSezione === 'function') html += _renderValutazioneSezione(nome);
 
   // STORICO HR (riservato: admin + operatori con permesso storico_hr)
   if (typeof _renderStoricoHrSezione === 'function') html += _renderStoricoHrSezione(nome);
 
+  const _pHr = html;
+  html = '';
   // TIMELINE with date filter
   html +=
     '<div class="scheda-section"><h4>Cronologia completa' +
@@ -2723,6 +2722,47 @@ function apriSchedaCollaboratore(nome) {
     _renderSchedaTimeline(nome, entries, moduli, '', '') +
     '</div>';
   html += '</div>';
+
+  const _pDiario = html;
+  const _pPiano = _schedaPianoHtml(nome);
+  const _mod = _schedaModuliHtml(nome, moduli);
+  const _pMod = _pDisc + _mod.html;
+  const _schede = [
+    { id: 'pan', label: 'Panoramica', html: _pPan },
+    { id: 'diario', label: 'Diario', html: _pDiario, n: totReg + moduli.length },
+    { id: 'piano', label: 'Piano', html: _pPiano.html, n: _pPiano.n },
+    { id: 'moduli', label: 'Moduli', html: _pMod, n: _mod.n },
+    { id: 'hr', label: 'HR e formazione', html: _pHr },
+  ].filter((t) => t.html);
+  // si riapre sulla pagina usata per ultima, se questo collaboratore ce l'ha
+  const _tabAttiva = _schede.some((t) => t.id === window._schedaTab) ? window._schedaTab : 'pan';
+  html = _hTestata + '<div class="scheda-tabs" role="tablist">';
+  _schede.forEach((t) => {
+    html +=
+      '<button type="button" role="tab" class="scheda-tab' +
+      (t.id === _tabAttiva ? ' attiva' : '') +
+      '" data-tab="' +
+      t.id +
+      '" aria-selected="' +
+      (t.id === _tabAttiva) +
+      '" onclick="schedaMostraTab(\'' +
+      t.id +
+      '\')">' +
+      t.label +
+      (t.n ? '<span class="scheda-tab-n">' + t.n + '</span>' : '') +
+      '</button>';
+  });
+  html += '</div>';
+  _schede.forEach((t) => {
+    html +=
+      '<div class="scheda-pannello" role="tabpanel" data-pannello="' +
+      t.id +
+      '"' +
+      (t.id === _tabAttiva ? '' : ' hidden') +
+      '>' +
+      t.html +
+      '</div>';
+  });
 
   const box = document.getElementById('profilo-content');
   box.className = 'profilo-box scheda-wide';
@@ -2753,6 +2793,226 @@ function apriSchedaCollaboratore(nome) {
     // Radar valutazione
     if (typeof _initSchedaValutazione === 'function') _initSchedaValutazione(nome);
   }, 120);
+}
+
+// Gruppo richiudibile della scheda (mese o anno): il piu' recente resta aperto
+function _schedaGruppo(titolo, dettaglio, righe, aperto) {
+  return (
+    '<details class="scheda-gruppo"' +
+    (aperto ? ' open' : '') +
+    '><summary><span class="scheda-gruppo-tit">' +
+    escP(titolo) +
+    '</span><span class="scheda-gruppo-n">' +
+    escP(dettaglio) +
+    '</span></summary><div class="scheda-gruppo-righe">' +
+    righe +
+    '</div></details>'
+  );
+}
+function _schedaMeseAnno(ym) {
+  var m = parseInt(String(ym).substring(5, 7), 10);
+  return (MESI_FULL[m - 1] || ym) + ' ' + String(ym).substring(0, 4);
+}
+// Pagina Piano della scheda: tutti i cambi turno (per mese) e tutti i moduli di
+// non disponibilita' (per anno), ognuno con l'anteprima del foglio firmato
+function _schedaPianoHtml(nome) {
+  var cache = typeof moduliCache !== 'undefined' ? moduliCache : [];
+  var dataIt = function (d) {
+    return String(d || '')
+      .slice(0, 10)
+      .split('-')
+      .reverse()
+      .join('.');
+  };
+  var html = '';
+  var n = 0;
+  var fogli =
+    typeof _pianoVisOk === 'function' && !_pianoVisOk('ptab_cambi')
+      ? []
+      : cache
+          .filter(function (m) {
+            var d = m.dati || {};
+            return (
+              m.tipo === 'cambio_turno' &&
+              !m.eliminato &&
+              ((d.a && d.a.nome === nome) || (d.b && d.b.nome === nome) || m.collaboratore === nome)
+            );
+          })
+          .sort(function (a, b) {
+            return String(b.data_modulo || '').localeCompare(String(a.data_modulo || ''));
+          });
+  if (fogli.length) {
+    n += fogli.length;
+    var perMese = {};
+    fogli.forEach(function (m) {
+      var ym = String(m.data_modulo || '').substring(0, 7);
+      (perMese[ym] = perMese[ym] || []).push(m);
+    });
+    html +=
+      '<div class="scheda-section"><h4 class="scheda-h4-azioni">Cambi turno <span class="scheda-conta">' +
+      fogli.length +
+      '</span>' +
+      (typeof apriCambiTurnoDi === 'function'
+        ? '<button class="btn-secondario" onclick="apriCambiTurnoDi(\'' + _jsArg(nome) + '\')">Apri nel Piano</button>'
+        : '') +
+      '</h4>';
+    Object.keys(perMese).forEach(function (ym, i) {
+      var righe = perMese[ym]
+        .map(function (m) {
+          var d = m.dati || {};
+          var collega = d.a && d.a.nome === nome ? (d.b || {}).nome : (d.a || {}).nome;
+          return (
+            '<div class="scheda-riga"><span class="scheda-riga-data">' +
+            dataIt(m.data_modulo) +
+            '</span><span class="scheda-riga-testo">' +
+            (collega ? 'con <b>' + escP(collega) + '</b>' : 'cambio') +
+            (d.tipo === 'ESIGENZE' ? ' · esigenze operative' : '') +
+            (d.motivo ? '<span class="scheda-riga-nota">' + escP(d.motivo) + '</span>' : '') +
+            '</span><button class="btn-secondario" onclick="ristampaModuloPDF(' +
+            Number(m.id) +
+            ')">Anteprima</button></div>'
+          );
+        })
+        .join('');
+      var k = perMese[ym].length;
+      html += _schedaGruppo(_schedaMeseAnno(ym), k + (k === 1 ? ' cambio' : ' cambi'), righe, i === 0);
+    });
+    html += '</div>';
+  }
+  var nd = cache
+    .filter(function (m) {
+      return m.tipo === 'non_disponibilita' && !m.eliminato && m.collaboratore === nome;
+    })
+    .sort(function (a, b) {
+      return String(b.data_modulo || '').localeCompare(String(a.data_modulo || ''));
+    });
+  if (nd.length) {
+    n += nd.length;
+    var perAnno = {};
+    nd.forEach(function (m) {
+      var y = String(m.data_modulo || '').substring(0, 4);
+      (perAnno[y] = perAnno[y] || []).push(m);
+    });
+    html +=
+      '<div class="scheda-section"><h4 class="scheda-h4-azioni">Moduli di non disponibilit&agrave; <span class="scheda-conta">' +
+      nd.length +
+      '</span></h4>';
+    Object.keys(perAnno)
+      .sort()
+      .reverse()
+      .forEach(function (y, i) {
+        var gg = 0;
+        var righe = perAnno[y]
+          .map(function (m) {
+            var giorni = (m.dati && m.dati.giorni) || [];
+            gg += giorni.length;
+            return (
+              '<div class="scheda-riga"><span class="scheda-riga-data">' +
+              escP(_schedaMeseAnno(String(m.data_modulo || '').substring(0, 7)).split(' ')[0]) +
+              '</span><span class="scheda-riga-testo"><b>' +
+              giorni.length +
+              (giorni.length === 1 ? ' giorno' : ' giorni') +
+              '</b>' +
+              (giorni.length
+                ? '<span class="scheda-riga-nota">' +
+                  escP(
+                    giorni
+                      .map(function (x) {
+                        return x.g;
+                      })
+                      .join(', '),
+                  ) +
+                  '</span>'
+                : '') +
+              '</span><button class="btn-secondario" onclick="ndApriModulo(' +
+              Number(m.id) +
+              ')">Anteprima</button></div>'
+            );
+          })
+          .join('');
+        var k = perAnno[y].length;
+        html += _schedaGruppo(
+          y,
+          k + (k === 1 ? ' mese' : ' mesi') + ' · ' + gg + (gg === 1 ? ' giorno' : ' giorni'),
+          righe,
+          i === 0,
+        );
+      });
+    html += '</div>';
+  }
+  return { html: html, n: n };
+}
+// Pagina Moduli della scheda: RDI, allineamenti e apprezzamenti divisi per
+// tipo e per anno (prima stavano solo mescolati nella cronologia)
+function _schedaModuliHtml(nome, moduli) {
+  var TIPI = [
+    { k: 'rdi', label: 'RDI', col: '#c0392b' },
+    { k: 'allineamento', label: 'Allineamenti', col: '#1a4a7a' },
+    { k: 'apprezzamento', label: 'Apprezzamenti', col: '#b8860b' },
+  ];
+  var noti = TIPI.map(function (t) {
+    return t.k;
+  });
+  moduli.forEach(function (m) {
+    if (noti.indexOf(m.tipo) === -1) {
+      noti.push(m.tipo);
+      TIPI.push({ k: m.tipo, label: String(m.tipo || 'Altro'), col: 'var(--muted)' });
+    }
+  });
+  var quando = function (m) {
+    return String(m.created_at || m.data_modulo || '');
+  };
+  var html = '';
+  TIPI.forEach(function (t) {
+    var lista = moduli
+      .filter(function (m) {
+        return m.tipo === t.k;
+      })
+      .sort(function (a, b) {
+        return quando(b).localeCompare(quando(a));
+      });
+    if (!lista.length) return;
+    var perAnno = {};
+    lista.forEach(function (m) {
+      var y = quando(m).substring(0, 4);
+      (perAnno[y] = perAnno[y] || []).push(m);
+    });
+    html +=
+      '<div class="scheda-section"><h4 class="scheda-h4-azioni"><span class="scheda-punto" style="background:' +
+      t.col +
+      '"></span>' +
+      escP(t.label) +
+      ' <span class="scheda-conta">' +
+      lista.length +
+      '</span></h4>';
+    Object.keys(perAnno)
+      .sort()
+      .reverse()
+      .forEach(function (y, i) {
+        var righe = perAnno[y]
+          .map(function (m) {
+            var c = _moduloCampi(m);
+            var oggetto = c.non_conformita || c.descrizione || '';
+            return (
+              '<div class="scheda-riga scheda-riga-click" title="Clicca per l\'anteprima completa" onclick="apriVoceTimeline(\'mod\',' +
+              Number(m.id) +
+              ')"><span class="scheda-riga-data">' +
+              new Date(quando(m)).toLocaleDateString('it-IT') +
+              '</span><span class="scheda-riga-testo">' +
+              (oggetto ? escP(String(oggetto).substring(0, 140)) : 'Modulo ' + escP(t.label)) +
+              (m.resp_settore ? '<span class="scheda-riga-nota">Resp. ' + escP(m.resp_settore) + '</span>' : '') +
+              '</span>' +
+              (m.operatore ? '<span class="scheda-riga-op">' + escP(m.operatore) + '</span>' : '') +
+              '</div>'
+            );
+          })
+          .join('');
+        var k = perAnno[y].length;
+        html += _schedaGruppo(y, k + (k === 1 ? ' modulo' : ' moduli'), righe, i === 0);
+      });
+    html += '</div>';
+  });
+  return { html: html, n: moduli.length };
 }
 
 function _renderSchedaTimeline(nome, entries, moduli, dal, al) {
@@ -2878,6 +3138,8 @@ function _renderSchedaTimeline(nome, entries, moduli, dal, al) {
 
 // Click su una card KPI della scheda: mostra in anteprima solo quelle voci nella cronologia
 function schedaKpiFiltra(nome, source, tipo) {
+  // le voci stanno nella pagina Diario
+  schedaMostraTab('diario');
   window._schedaTlTipo = tipo ? { source: source, tipo: tipo } : null;
   _schedaFilterTimeline(nome);
   var chip = document.getElementById('scheda-tl-tipo-chip');
@@ -3303,11 +3565,35 @@ function apriPdfModuloDaScheda(id) {
   if (typeof ristampaModuloPDF === 'function') return ristampaModuloPDF(id);
 }
 
-// Mini-indice della scheda: scrolla alla sezione con quel titolo
+// Pagine della scheda: mostra quella scelta e la ricorda per la prossima apertura
+function schedaMostraTab(id) {
+  var box = document.getElementById('profilo-content');
+  if (!box || !box.querySelector('.scheda-pannello[data-pannello="' + id + '"]')) return;
+  window._schedaTab = id;
+  box.querySelectorAll('.scheda-tab').forEach(function (b) {
+    var on = b.getAttribute('data-tab') === id;
+    b.classList.toggle('attiva', on);
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  box.querySelectorAll('.scheda-pannello').forEach(function (p) {
+    p.hidden = p.getAttribute('data-pannello') !== id;
+  });
+  // i grafici disegnati mentre la pagina era nascosta hanno misura zero
+  Object.values(_schedaCharts).forEach(function (c) {
+    try {
+      c.resize();
+    } catch (e) {}
+  });
+  var tabs = box.querySelector('.scheda-tabs');
+  if (tabs && box.scrollTop > tabs.offsetTop) box.scrollTop = tabs.offsetTop;
+}
+// Porta alla sezione con quel titolo, aprendo prima la pagina che la contiene
 function schedaVaiA(sezione) {
   var h = [...document.querySelectorAll('#profilo-content .scheda-section h4')].find(function (x) {
     return x.textContent.indexOf(sezione) !== -1;
   });
+  var p = h && h.closest('.scheda-pannello');
+  if (p) schedaMostraTab(p.getAttribute('data-pannello'));
   if (h)
     try {
       h.scrollIntoView({ behavior: 'smooth', block: 'start' });

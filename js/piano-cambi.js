@@ -2617,54 +2617,6 @@ function _renderPianoCambiTab() {
   return h;
 }
 
-// Scheda del collaboratore: i suoi ultimi cambi turno, ognuno con l anteprima del foglio,
-// e il collegamento all elenco completo nel Piano
-function _schedaCambiTurnoRiga(nome) {
-  if (typeof _pianoVisOk === 'function' && !_pianoVisOk('ptab_cambi')) return '';
-  const fogli = moduliCache
-    .filter(
-      (m) =>
-        m.tipo === 'cambio_turno' &&
-        !m.eliminato &&
-        ((m.dati && m.dati.a && m.dati.a.nome === nome) ||
-          (m.dati && m.dati.b && m.dati.b.nome === nome) ||
-          m.collaboratore === nome),
-    )
-    .sort((a, b) => String(b.data_modulo || '').localeCompare(String(a.data_modulo || '')));
-  if (!fogli.length) return '';
-  const nomeJs = _jsArg(nome);
-  const righe = fogli
-    .slice(0, 3)
-    .map((m) => {
-      const d = m.dati || {};
-      const collega = d.a && d.a.nome === nome ? (d.b || {}).nome : (d.a || {}).nome;
-      return (
-        '<div class="scheda-cambio"><span>' +
-        String(m.data_modulo || '')
-          .slice(0, 10)
-          .split('-')
-          .reverse()
-          .join('.') +
-        (collega ? ' · con ' + escP(collega) : '') +
-        (d.tipo === 'ESIGENZE' ? ' · esigenze operative' : '') +
-        '</span><button class="btn-secondario" onclick="ristampaModuloPDF(' +
-        Number(m.id) +
-        ')">Anteprima</button></div>'
-      );
-    })
-    .join('');
-  return (
-    '<div class="scheda-cambi"><div class="scheda-cambi-tit">Cambi turno: <b>' +
-    fogli.length +
-    '</b>' +
-    (fogli.length > 3 ? ' (ultimi 3)' : '') +
-    ' <button class="btn-secondario" onclick="apriCambiTurnoDi(\'' +
-    nomeJs +
-    '\')">Tutti nel Piano</button></div>' +
-    righe +
-    '</div>'
-  );
-}
 // Apre Piano > Cambi turno filtrato su un nome; con l id porta in vista quel foglio
 // e lo evidenzia (usato dalla scheda del collaboratore e dalla ricerca globale)
 function apriCambiTurnoDi(nome, id) {
