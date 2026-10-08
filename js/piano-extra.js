@@ -463,6 +463,105 @@ async function pianoCancellaSelezione() {
     toast('Errore cancellazione');
   }
 }
+// SCRIVERE UNA SIGLA SU PIU CELLE (richiesta del titolare 08/10/2026, come Excel): si
+// selezionano le celle trascinando o con Maiusc+clic, si scrive la sigla (es. M) e Invio.
+// Ogni cella passa dalle stesse regole della cella singola (sigla esistente, giorni chiusi,
+// fuori rapporto, nota "Ex <sigla>" sotto la M, regole scritte nel commento), con UNA
+// conferma, UN passo di Annulla e, per la malattia, una registrazione nel Diario per
+// persona e periodo (non una domanda per giorno)
+async function pianoScriviSuSelezione(codice, celle) {
+  if (!puoGestirePiano()) return;
+  codice = String(codice || '')
+    .trim()
+    .toUpperCase();
+  if (!codice) return;
+  if (!_pianoTurnoInfo(codice) && !_pianoCodiceInfo(codice)) {
+    toastErrore(_pianoMessaggioSiglaSbagliata(codice));
+    return;
+  }
+  if (codice === 'ND') {
+    toastErrore('La ND si scrive una cella alla volta (chiede il tipo di non disponibilita)');
+    return;
+  }
+  const lista = [];
+  (celle || []).forEach((td) => {
+    const tr = td && td.closest ? td.closest('tr[data-nome]') : null;
+    const g = parseInt(td && td.dataset ? td.dataset.g : '');
+    if (!tr || !g || !td.hasAttribute('ondblclick')) return; // solo celle modificabili
+    const dstr = _pianoMeseSel + '-' + String(g).padStart(2, '0');
+    const r = _pianoRighe.find((x) => x.collaboratore === tr.dataset.nome && x.data === dstr);
+    if (r && r.codice === codice) return;
+    lista.push({ nome: tr.dataset.nome, dstr: dstr, r: r });
+  });
+  if (!lista.length) {
+    toast('Nelle celle selezionate c e gia ' + codice);
+    return;
+  }
+  const persone = [...new Set(lista.map((x) => x.nome))];
+  const prot = lista.filter((x) => x.r && x.r.protetto).length;
+  if (
+    !(await chiediConferma(
+      'Scrivere ' +
+        codice +
+        ' su ' +
+        lista.length +
+        (lista.length === 1 ? ' cella' : ' celle') +
+        ' (' +
+        persone.length +
+        (persone.length === 1 ? ' persona' : ' persone') +
+        ')?' +
+        (prot ? '\n\n' + prot + ' celle protette vengono sostituite.' : '') +
+        (_pianoTurnoInfo(codice)
+          ? '\n\nLe regole non rispettate (riposi, giorni di fila...) restano scritte nel commento delle celle e si elencano alla fine.'
+          : ''),
+    ))
+  )
+    return;
+  // giorni chiusi: lo sblocco con motivo si chiede una volta per giorno, prima di scrivere
+  for (const d of [...new Set(lista.map((x) => x.dstr))].sort()) if (!(await _pianoConsentiScrittura(d))) return;
+  _pianoUndoSnap(codice + ' su ' + lista.length + ' celle');
+  const blocco = { avvisi: [], malattie: {}, viaMalattia: {}, nonFormati: [], scritte: 0, fasce: null };
+  window._pianoScritturaBlocco = blocco;
+  const nonScritte = [];
+  try {
+    for (const x of lista) {
+      const ok = await pianoSalvaCella(x.nome, x.dstr, codice);
+      if (ok === false) nonScritte.push(x.nome + ' ' + x.dstr.split('-').reverse().join('.'));
+    }
+  } finally {
+    window._pianoScritturaBlocco = null;
+  }
+  logAzione('Piano: ' + codice + ' su piu celle', blocco.scritte + ' celle (' + _pianoMeseSel + ')');
+  // MALATTIA: Rapporto e Diario una volta per persona e per periodo di giorni di fila
+  for (const nome of Object.keys(blocco.malattie)) {
+    const giorni = blocco.malattie[nome].sort((a, b) => (a.data < b.data ? -1 : 1));
+    let ini = 0;
+    for (let i = 1; i <= giorni.length; i++) {
+      const fila =
+        i < giorni.length &&
+        new Date(giorni[i].data + 'T12:00:00') - new Date(giorni[i - 1].data + 'T12:00:00') === 86400000;
+      if (fila) continue;
+      const nDia = await _pianoMalattiaNelDiario(nome, giorni[ini].data, giorni[i - 1].data, true, giorni[ini].prima);
+      if (nDia) toast(nome + ': malattia registrata anche nel Rapporto e nel Diario (' + nDia + ' giorni)');
+      ini = i;
+    }
+  }
+  // M sostituite con altro: proposta di togliere quei giorni dal Diario (una per persona)
+  for (const nome of Object.keys(blocco.viaMalattia)) await _pianoMalattiaViaDiario(nome, blocco.viaMalattia[nome]);
+  renderPiano();
+  if (_pianoViolLista !== null) {
+    const rv = _pianoCalcolaViolazioni();
+    _pianoViolCelle = rv.celle;
+    _pianoViolLista = rv.lista.sort((a, b) => a.nome.localeCompare(b.nome) || a.giorno - b.giorno);
+    _pianoRenderViolazioni();
+  }
+  toast(codice + ' scritto su ' + blocco.scritte + (blocco.scritte === 1 ? ' cella' : ' celle'));
+  const righe = [];
+  if (nonScritte.length) righe.push('Non scritte (vedi avviso): ' + nonScritte.join(', '));
+  if (blocco.avvisi.length) righe.push('Regole da controllare:\n\u2022 ' + blocco.avvisi.join('\n\u2022 '));
+  if (blocco.nonFormati.length) righe.push('Non formati per il turno: ' + [...new Set(blocco.nonFormati)].join(', '));
+  if (righe.length) await mostraAvviso(righe.join('\n\n'), { titolo: codice + ' su piu celle' });
+}
 function pianoBloccoClick(tab, el) {
   const b = window._pianoBlocco;
   if (b && b.tab === tab && b.t1.closest('table') === el.closest('table')) {
@@ -859,6 +958,7 @@ function _pianoSelezionaCella(el, estendi) {
     ym: _pianoMeseSel,
     rep: _pianoReparto(),
   };
+  window._fabbCellaAttiva = null; // una sola cella attiva: si lavora nel calendario
   window._pianoCellaAttivaEl = el;
   _pianoBloccoEvidenzia();
   // niente focus rimasto in un campo: i tasti vanno alla griglia
@@ -946,7 +1046,14 @@ function _pianoTastiCalendario(e) {
   }
   if (e.key.length === 1 && /[0-9A-Za-z]/.test(e.key)) {
     e.preventDefault();
-    pianoCellaInline(tr.dataset.nome, dstr, attiva, { iniziale: e.key.toUpperCase() });
+    // piu celle selezionate: la sigla scritta va su tutte (pianoScriviSuSelezione)
+    const celleSel = _pianoBloccoCelle().flat();
+    pianoCellaInline(
+      tr.dataset.nome,
+      dstr,
+      attiva,
+      celleSel.length > 1 ? { iniziale: e.key.toUpperCase(), blocco: celleSel } : { iniziale: e.key.toUpperCase() },
+    );
     return true;
   }
   return false;
@@ -956,9 +1063,152 @@ function fabbCellaClick(codice, dstr, el) {
     pianoBloccoClick('fabb', el);
     return;
   }
-  _pianoBloccoPulisci();
-  window._pianoBlocco = { tab: 'fabb', t1: el, t2: el, completo: true };
+  if (el && el.querySelector('input')) return; // gia in modifica
+  _fabbSelezionaCella(el);
+}
+// FABBISOGNO CON LA TASTIERA, come il calendario (richiesta del titolare 08/10/2026):
+// la cella attiva si ricorda per turno e giorno, cosi sopravvive al ridisegno
+function _fabbRicordaCella(el) {
+  const tr = el && el.closest ? el.closest('tr[data-cod]') : null;
+  if (!tr) return;
+  window._fabbCellaAttiva = { cod: tr.dataset.cod, g: el.dataset.g, ym: _pianoMeseSel, rep: _pianoReparto() };
+  window._pianoCellaAttiva = null; // una sola cella attiva: si lavora nel fabbisogno
+}
+function _fabbSelezionaCella(el, estendi) {
+  if (!el) return;
+  if (estendi && window._pianoBlocco && window._pianoBlocco.tab === 'fabb') window._pianoBlocco.t2 = el;
+  else {
+    _pianoBloccoPulisci();
+    window._pianoBlocco = { tab: 'fabb', t1: el, t2: el, completo: true };
+  }
+  _fabbRicordaCella(el);
+  window._fabbCellaAttivaEl = el;
   _pianoBloccoEvidenzia();
+  el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+function _fabbCellaDi(cod, g) {
+  const tr = document.querySelector(
+    '#piano-content table[data-seltab="fabb"] tr[data-cod="' + CSS.escape(String(cod)) + '"]',
+  );
+  return tr ? tr.querySelector('td[data-g="' + g + '"]') : null;
+}
+function _fabbRipristinaCellaAttiva() {
+  const a = window._fabbCellaAttiva;
+  if (!a || _pianoTab !== 'calendario' || a.ym !== _pianoMeseSel || a.rep !== _pianoReparto()) return;
+  const el = _fabbCellaDi(a.cod, a.g);
+  if (!el) return;
+  window._pianoBlocco = { tab: 'fabb', t1: el, t2: el, completo: true };
+  window._fabbCellaAttivaEl = el;
+  _pianoBloccoEvidenzia();
+}
+// cella vicina nel fabbisogno: dx = giorni, dy = turni
+function _fabbCellaVicina(el, dx, dy) {
+  if (!el) return null;
+  const tr = el.closest('tr[data-cod]');
+  if (!tr) return null;
+  if (dx) {
+    let td = el;
+    do td = dx > 0 ? td.nextElementSibling : td.previousElementSibling;
+    while (td && !td.dataset.g);
+    return td;
+  }
+  let riga = tr;
+  do riga = dy > 0 ? riga.nextElementSibling : riga.previousElementSibling;
+  while (riga && !(riga.dataset && riga.dataset.cod));
+  return riga ? riga.querySelector('td[data-g="' + el.dataset.g + '"]') : null;
+}
+function _fabbTasti(e) {
+  if (_pianoTab !== 'calendario') return false;
+  const b = window._pianoBlocco;
+  if (!b || b.tab !== 'fabb' || !b.t1 || !document.body.contains(b.t1)) return false;
+  if (e.target && e.target.closest && e.target.closest('input,textarea,select,[contenteditable="true"]')) return false;
+  if (document.querySelector('.finestra-velo:not([hidden]), #pwd-modal:not(.hidden), #profilo-modal:not(.hidden)'))
+    return false;
+  if (e.ctrlKey || e.metaKey || e.altKey) return false;
+  const attiva =
+    window._fabbCellaAttivaEl && document.body.contains(window._fabbCellaAttivaEl) ? window._fabbCellaAttivaEl : b.t1;
+  const mosse = { ArrowRight: [1, 0], ArrowLeft: [-1, 0], ArrowDown: [0, 1], ArrowUp: [0, -1] };
+  if (mosse[e.key]) {
+    e.preventDefault();
+    const base = e.shiftKey ? b.t2 || attiva : attiva;
+    const dest = _fabbCellaVicina(base, mosse[e.key][0], mosse[e.key][1]);
+    if (!dest) return true;
+    if (e.shiftKey) {
+      window._pianoBlocco.t2 = dest;
+      _pianoBloccoEvidenzia();
+      dest.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    } else _fabbSelezionaCella(dest);
+    return true;
+  }
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    _fabbSelezionaCella(_fabbCellaVicina(attiva, e.shiftKey ? -1 : 1, 0) || attiva);
+    return true;
+  }
+  if (!attiva.hasAttribute('ondblclick')) return false; // senza il permesso: solo selezione
+  const tr = attiva.closest('tr[data-cod]');
+  const dstr = _pianoMeseSel + '-' + String(attiva.dataset.g).padStart(2, '0');
+  const celleSel = _pianoBloccoCelle().flat();
+  if (e.key === 'Enter' || e.key === 'F2') {
+    e.preventDefault();
+    fabbisognoInline(tr.dataset.cod, dstr, attiva);
+    return true;
+  }
+  if (/^[0-9]$/.test(e.key)) {
+    e.preventDefault();
+    fabbisognoInline(
+      tr.dataset.cod,
+      dstr,
+      attiva,
+      celleSel.length > 1 ? { iniziale: e.key, blocco: celleSel } : { iniziale: e.key },
+    );
+    return true;
+  }
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    e.preventDefault();
+    fabbScriviSuSelezione(0, celleSel.length ? celleSel : [attiva]);
+    return true;
+  }
+  return false;
+}
+// stesso numero su piu celle del fabbisogno (0 = svuota), una conferma, un ridisegno
+async function fabbScriviSuSelezione(q, celle) {
+  if (!puoGestirePiano() || !_pianoAzioneAutoConsentita('fabbisogno')) return;
+  const lista = [];
+  (celle || []).forEach((td) => {
+    const tr = td && td.closest ? td.closest('tr[data-cod]') : null;
+    if (!tr || !td.dataset.g || !td.hasAttribute('ondblclick')) return;
+    const dstr = _pianoMeseSel + '-' + String(td.dataset.g).padStart(2, '0');
+    const es = _pianoFabbCache.find(
+      (f) => f.turno_codice === tr.dataset.cod && f.data === dstr && (f.reparto_dip || 'slots') === _pianoReparto(),
+    );
+    if ((es ? es.quantita : 0) !== q) lista.push({ cod: tr.dataset.cod, dstr: dstr, es: es });
+  });
+  if (!lista.length) return;
+  if (
+    lista.length > 1 &&
+    !(await chiediConferma(
+      (q ? 'Mettere ' + q + ' persone' : 'Svuotare il fabbisogno') + ' su ' + lista.length + ' celle del fabbisogno?',
+    ))
+  )
+    return;
+  try {
+    for (const x of lista) {
+      if (x.es && q === 0) await secDel('piano_fabbisogni', 'id=eq.' + x.es.id);
+      else if (x.es) await secPatch('piano_fabbisogni', 'id=eq.' + x.es.id, { quantita: q });
+      else if (q > 0)
+        await secPost('piano_fabbisogni', {
+          data: x.dstr,
+          turno_codice: x.cod,
+          quantita: q,
+          reparto_dip: _pianoReparto(),
+        });
+    }
+    logAzione('Piano: fabbisogno', lista.length + ' celle → ' + q + ' (' + _pianoMeseSel + ')');
+  } catch (e) {
+    toastErrore('Fabbisogno non salvato: ' + ((e && e.message) || e));
+  }
+  renderPiano();
 }
 function _pianoBloccoCelle() {
   const b = window._pianoBlocco;
@@ -1067,6 +1317,7 @@ function _pianoDragBind() {
   });
   document.addEventListener('keydown', (e) => {
     if (_pianoTastiCalendario(e)) return;
+    if (_fabbTasti(e)) return;
     if (e.key === 'Escape' && window._pianoBlocco) _pianoBloccoPulisci();
     // CANC/Backspace: cancella le celle selezionate (con conferma)
     if (

@@ -2689,15 +2689,22 @@ async function _renderPianoCore() {
           '</colgroup>' +
           testataGiorni(false) +
           '<tbody>';
+        // ordine delle righe: quello del file Excel del fabbisogno (colonna ordine dei turni,
+        // salvata all import); i turni senza ordine dopo, raggruppati per gruppo
         const gruppoOrd = {};
         turniRep.forEach((t, i) => (gruppoOrd[t.codice] = (t.gruppo || '') + '|' + String(i).padStart(3, '0')));
+        const ordFile = (t) => (parseInt(t.ordine) > 0 && parseInt(t.ordine) < 999 ? parseInt(t.ordine) : 1e6);
         turniRep
           .slice()
-          .sort((x, y) => (gruppoOrd[x.codice] || '').localeCompare(gruppoOrd[y.codice] || ''))
+          .sort(
+            (x, y) => ordFile(x) - ordFile(y) || (gruppoOrd[x.codice] || '').localeCompare(gruppoOrd[y.codice] || ''),
+          )
           .forEach((t) => {
             const cod = t.codice;
             hFabb +=
-              '<tr><td class="piano-nome" title="' +
+              '<tr data-cod="' +
+              escP(cod) +
+              '"><td class="piano-nome" title="' +
               escP(
                 (t.gruppo || '') +
                   ' ' +
@@ -2732,9 +2739,12 @@ async function _renderPianoCore() {
                 stile +
                 (puoFabb ? 'cursor:pointer' : '') +
                 '"' +
-                (puoFabb
-                  ? ' onclick="fabbisognoInline(\'' + escP(cod) + "','" + dstr + '\',this)"'
-                  : ' onclick="fabbCellaClick(\'' + escP(cod) + "','" + dstr + '\',this)"') +
+                ' onclick="fabbCellaClick(\'' +
+                escP(cod) +
+                "','" +
+                dstr +
+                '\',this)"' +
+                (puoFabb ? ' ondblclick="fabbisognoInline(\'' + escP(cod) + "','" + dstr + '\',this)"' : '') +
                 ' oncontextmenu="fabbCtxMenu(event,\'' +
                 escP(cod) +
                 "','" +
@@ -2929,6 +2939,7 @@ async function _renderPianoCore() {
       _pianoApplicaNascosti();
       // la cella attiva resta selezionata anche dopo il ridisegno (salvataggio)
       if (typeof _pianoRipristinaCellaAttiva === 'function') _pianoRipristinaCellaAttiva();
+      if (typeof _fabbRipristinaCellaAttiva === 'function') _fabbRipristinaCellaAttiva();
       if (typeof _pianoApplicaEvidenzia === 'function') _pianoApplicaEvidenzia();
     }
     if (_pianoTab === 'recupero' && typeof _pianoRecuperoTotaliGenerali === 'function') {

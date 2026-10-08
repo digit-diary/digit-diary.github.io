@@ -1071,16 +1071,21 @@ async function _pianoSalvaCellaBase(nome, dstr, codice) {
   if (csOr && csOr.richiede_orario) {
     // una o piu fasce (es. 10:00-12:00 e 19:00-03:00)
     const prima = r && r.codice === codice ? _pianoFasceRiga(r) : [];
-    const fasce = await _pianoChiediFasce(
-      'Orario ' + codice,
-      'Orario del ' + codice + ' di ' + nome + ' il ' + dstr.split('-').reverse().join('.'),
-      prima.length ? prima : [{ da: '10:00', a: '18:00' }],
-    );
+    const blF = window._pianoScritturaBlocco;
+    const fasce =
+      blF && blF.fasce
+        ? blF.fasce
+        : await _pianoChiediFasce(
+            'Orario ' + codice,
+            'Orario del ' + codice + ' di ' + nome + ' il ' + dstr.split('-').reverse().join('.'),
+            prima.length ? prima : [{ da: '10:00', a: '18:00' }],
+          );
     if (fasce === null) return;
     if (!fasce.length) {
       toast('Scrivi almeno una fascia (dalle - alle)');
       return;
     }
+    if (blF) blF.fasce = fasce; // stesso orario per tutte le celle del blocco
     orarioJG = _pianoCampiFasce(fasce);
   }
   // REGOLE ANCHE A MANO: controllo prima di salvare (riposo minimo e
@@ -1096,7 +1101,15 @@ async function _pianoSalvaCellaBase(nome, dstr, codice) {
     if (_pianoTurnoInfo(codice))
       _pianoAccompagnamentoAvviso([{ nome: nome, data: dstr, codice: codice }]).forEach((a) => avvisi.push(a.testo));
     const protetta = !!(r && r.protetto && codice !== attuale);
-    if (avvisi.length || protetta) {
+    const blocco = window._pianoScritturaBlocco;
+    if (blocco && (avvisi.length || protetta)) {
+      // SCRITTURA SU PIU CELLE: la conferma e una sola, data prima (con le protette
+      // contate); le segnalazioni restano nel commento e si elencano alla fine
+      if (avvisi.length) {
+        commentoRegole = '\u26a0 ' + avvisi.join(' \u00b7 ');
+        blocco.avvisi.push(nome + ' ' + dstr.split('-').reverse().join('.') + ': ' + avvisi.join(' \u00b7 '));
+      }
+    } else if (avvisi.length || protetta) {
       const righe = avvisi.slice();
       if (protetta)
         righe.push(
@@ -1124,7 +1137,7 @@ async function _pianoSalvaCellaBase(nome, dstr, codice) {
   }
   // la fotografia per Annulla si prende solo ora, dopo le conferme: una rinuncia
   // non lascia piu un passo vuoto (che svuotava anche Ripristina)
-  _pianoUndoSnap('modifica cella ' + nome.split(' ')[0] + ' ' + dstr.substring(8));
+  if (!window._pianoScritturaBlocco) _pianoUndoSnap('modifica cella ' + nome.split(' ')[0] + ' ' + dstr.substring(8));
   try {
     if (!codice) {
       if (r) {
@@ -1191,6 +1204,19 @@ async function _pianoSalvaCellaBase(nome, dstr, codice) {
     // festivo con diritto al recupero che non si lavora piu (turno tolto): un CGF
     // anticipato nel mese non spetta piu, si propone di trasformarlo in C
     await _pianoFestiviPersiDopo(nome, [{ data: dstr, codice: attuale }], codice);
+    const bloccoFine = window._pianoScritturaBlocco;
+    if (bloccoFine) {
+      // scrittura su piu celle: Diario, ridisegno e formazione una volta sola alla fine
+      if (codice === 'M' || codice === 'M1') {
+        if (attuale === 'CGF' && typeof _pianoRimettiCgf === 'function') await _pianoRimettiCgf(nome, dstr);
+        (bloccoFine.malattie[nome] = bloccoFine.malattie[nome] || []).push({ data: dstr, prima: attuale });
+      } else if (attuale === 'M' || attuale === 'M1')
+        (bloccoFine.viaMalattia[nome] = bloccoFine.viaMalattia[nome] || []).push(dstr);
+      const gNFb = _pianoGruppoNonFormato(nome, codice, '');
+      if (gNFb) bloccoFine.nonFormati.push(nome + ' (' + gNFb + ')');
+      bloccoFine.scritte++;
+      return;
+    }
     // M scritta a mano nel piano: proposta di registrarla nel Rapporto e nel Diario,
     // cosi' piano, Rapporto, Diario e scheda collaboratore restano allineati
     if (codice === 'M' || codice === 'M1') {
@@ -1410,7 +1436,9 @@ function pianoCellaInline(nome, dstr, el, opz) {
       return;
     }
   }
-  if (typeof _pianoSelezionaCella === 'function') _pianoSelezionaCella(el);
+  // piu celle selezionate (opz.blocco): la selezione resta evidenziata mentre si scrive
+  if (opz.blocco) {
+  } else if (typeof _pianoSelezionaCella === 'function') _pianoSelezionaCella(el);
   else {
     _pianoBloccoPulisci();
     window._pianoBlocco = { tab: 'piano', t1: el, t2: el, completo: true };
@@ -1435,6 +1463,12 @@ function pianoCellaInline(nome, dstr, el, opz) {
     if (chiuso) return;
     chiuso = true;
     const v = inp.value.trim().toUpperCase();
+    // SELEZIONE DI PIU CELLE (come Excel): la sigla va su tutte le celle selezionate
+    if (opz.blocco) {
+      el.innerHTML = vecchio;
+      if (v) await pianoScriviSuSelezione(v, opz.blocco);
+      return;
+    }
     // la cella attiva passa subito alla destinazione: dopo il salvataggio il
     // ridisegno la ritrova (persona + giorno)
     if (dopo) {

@@ -2294,6 +2294,8 @@ async function generaBozzaPiano(usaCoperture) {
   const riposoDomAttivo =
     !!parseFloat(_pianoRegolaVal('riposo_domenica_libera_ore')) ||
     !!parseFloat(_pianoRegolaVal('riposo_domenica_lavorata_ore'));
+  // passata finale (vedi sotto): il massimo del mese non si riduce per il saldo dell anno
+  let passataFinale = false;
   const candidatoOk = (n, f, t, g, dstr, dowG, ignoraOccupato, oreDelta) => {
     const esistente = cella[n + '|' + g];
     if (altroSettore[n + '|' + g]) return false; // quel giorno lavora in un altro settore
@@ -2421,7 +2423,7 @@ async function generaBozzaPiano(usaCoperture) {
         // per chi ha obiettivo il max segue anche il saldo cumulato (YTD)
         // con il saldo, ma mai oltre il massimo del mese ne sotto il minimo
         const maxEff =
-          limN.obiettivo != null && !limN.jolly
+          limN.obiettivo != null && !limN.jolly && !passataFinale
             ? Math.min(limN.max, Math.max(limN.max - (_pianoYtdMap[n] || 0), limN.min != null ? limN.min : 0))
             : limN.max;
         if ((oreMese[n] || 0) + (oreDelta || 0) + (parseFloat(t.durata_ore) || 0) > maxEff) return false;
@@ -2640,6 +2642,7 @@ async function generaBozzaPiano(usaCoperture) {
   // valgono per entrambi. Niente catene piu' lunghe: restano scoperti.
   let riparati = 0;
   const scopertiRestanti = [];
+  const scopertiFinali = []; // gli stessi come oggetti, per la passata finale
   scopertiObj.forEach((sc) => {
     let fatto = false;
     for (const a of nomi) {
@@ -2683,7 +2686,10 @@ async function generaBozzaPiano(usaCoperture) {
         break;
       }
     }
-    if (!fatto) scopertiRestanti.push(sc.codice + ' giorno ' + sc.g);
+    if (!fatto) {
+      scopertiRestanti.push(sc.codice + ' giorno ' + sc.g);
+      scopertiFinali.push(sc);
+    }
   });
   scoperti.length = 0;
   scopertiRestanti.forEach((x) => scoperti.push(x));
@@ -2784,6 +2790,9 @@ async function generaBozzaPiano(usaCoperture) {
       }
     });
   }
+  // i WD sono giorni di lavoro obbligatori: come nella passata finale, il saldo dell anno
+  // non riduce il massimo del mese (resta il massimo con la tolleranza)
+  passataFinale = true;
   // ===== WD RIMASTI (decisione del titolare: le WD vanno sempre sistemate) =====
   // Se il fabbisogno del giorno e gia pieno, chi ha WD prende il turno diurno di chi non e
   // obbligato a lavorare quel giorno (prima i jolly con la quota piu alta, poi i fissi
@@ -2791,6 +2800,7 @@ async function generaBozzaPiano(usaCoperture) {
   const wdRestano = [];
   const wdExtra = []; // turni presto dati oltre il fabbisogno accanto alle C delle vacanze
   let wdRiposo = 0; // WD senza posto diventati riposo
+  const wdDiventatiC = new Set(); // 'nome|g': WD diventati C (liberi per la passata finale)
   nomi.forEach((n) => {
     for (let g = 1; g <= nGiorni; g++) {
       if (giorniChiusi.has(g) || cella[n + '|' + g] !== 'WD') continue;
@@ -2878,9 +2888,79 @@ async function generaBozzaPiano(usaCoperture) {
       // gli altri WD del blocco: senza posto diventano riposo, non restano WD nel piano
       cella[n + '|' + g] = 'C';
       if (rigaDi[n + '|' + g]) sostituzioniWd.push({ id: rigaDi[n + '|' + g].id, codice: 'C' });
+      wdDiventatiC.add(n + '|' + g);
       wdRiposo++;
     }
   });
+
+  // ===== PASSATA FINALE: POSTI ANCORA SCOPERTI (controllo del 08/10/2026) =====
+  // La riparazione, i riposi attorno alla domenica e i WD tolgono o spostano turni: chi
+  // durante il giro principale era "pieno" (ore della settimana, giorni di fila...) a
+  // fine bozza puo coprire. Prima nessuno riprovava: nella prova di novembre Zanotti
+  // (fisso sotto le sue ore) restava libero la domenica 22 con C0, C23 e C4 scoperti.
+  // Si riprova ogni posto scoperto con TUTTE le regole (candidatoOk) e lo stesso ordine
+  // del giro principale: chi deve lavorare (WD), fissi sotto il loro obiettivo, jolly
+  // sotto la quota (prima la quota piu bassa), fissi, jolly. Solo qui il massimo del
+  // mese non si riduce per il saldo dell anno (coprire il fabbisogno viene prima del
+  // pareggio del saldo; mai oltre il massimo con la tolleranza).
+  let tappatiFine = 0;
+  if (scopertiFinali.length) {
+    passataFinale = true;
+    const liberoFine = (n, g) => {
+      const c = cella[n + '|' + g];
+      return !c || c === 'WD' || (c === 'C' && wdDiventatiC.has(n + '|' + g));
+    };
+    const classeFine = (n, g) => {
+      if (cella[n + '|' + g] === 'WD') return -1;
+      const j = (_pianoCollabInfo(n) || {}).is_jolly ? 1 : 0;
+      return gapOre(n) > 0 ? j : 2 + j;
+    };
+    const quotaFine = (n) => (obiettivo[n] > 0 ? (oreMese[n] || 0) / obiettivo[n] : 9);
+    for (const sc of scopertiFinali.slice()) {
+      const cand = nomi
+        .filter(
+          (n) =>
+            liberoFine(n, sc.g) &&
+            candidatoOk(n, { turno_codice: sc.codice }, sc.t, sc.g, sc.dstr, sc.dowG, liberoFine(n, sc.g), 0),
+        )
+        .sort((x, y) => {
+          const cx = _pianoCoperturaCfg(_pianoCollabInfo(x)) ? 1 : 0;
+          const cy = _pianoCoperturaCfg(_pianoCollabInfo(y)) ? 1 : 0;
+          return (
+            cx - cy || classeFine(x, sc.g) - classeFine(y, sc.g) || quotaFine(x) - quotaFine(y) || gapOre(y) - gapOre(x)
+          );
+        });
+      if (!cand.length) continue;
+      const n = cand[0];
+      const k = n + '|' + sc.g;
+      const prima = cella[k];
+      cella[k] = sc.codice;
+      assegnatiRun.add(k);
+      registraAssegnazione(n, sc.codice, sc.g);
+      oreMese[n] = (oreMese[n] || 0) + (parseFloat(sc.t.durata_ore) || 0);
+      const sw = rigaDi[k] && sostituzioniWd.find((x) => x.id === rigaDi[k].id);
+      if (sw) sw.codice = sc.codice;
+      else if (prima === 'WD' && rigaDi[k]) sostituzioniWd.push({ id: rigaDi[k].id, codice: sc.codice });
+      else
+        nuove.push({
+          collaboratore: n,
+          data: sc.dstr,
+          codice: sc.codice,
+          protetto: false,
+          generato: true,
+          reparto_dip: _pianoReparto(),
+        });
+      if (prima === 'C' && wdDiventatiC.has(k)) {
+        wdDiventatiC.delete(k);
+        wdRiposo--;
+      }
+      const iS = scoperti.indexOf(sc.codice + ' giorno ' + sc.g);
+      if (iS >= 0) scoperti.splice(iS, 1);
+      scopertiFinali.splice(scopertiFinali.indexOf(sc), 1);
+      tappatiFine++;
+    }
+  }
+  passataFinale = false;
 
   // ===== CGF DEI FESTIVI LAVORATI IN QUESTO MESE =====
   // Chi ha appena ricevuto un turno in un festivo con diritto matura un
@@ -2964,6 +3044,7 @@ async function generaBozzaPiano(usaCoperture) {
         scoperti.length +
         ' posti senza candidato idoneo' +
         (riparati ? ' (altri ' + riparati + ' risolti spostando un turno)' : '') +
+        (tappatiFine ? '\n• ' + tappatiFine + ' posti coperti nella passata finale (dopo riposi e WD)' : '') +
         (riposiSistemati
           ? '\n• ' + riposiSistemati + ' riposi attorno alla domenica sistemati spostando un turno a un collega'
           : '') +

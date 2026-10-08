@@ -997,13 +997,18 @@ async function setPianoFabbisogno(codice, dstr, qDiretta) {
 }
 
 // Modifica INLINE del fabbisogno: click sulla cella = scrivi il numero lì
-function fabbisognoInline(codice, dstr, el) {
-  if (window.event && window.event.shiftKey) {
+// MODIFICA DI UNA CELLA DEL FABBISOGNO, con la tastiera come nel calendario (richiesta del
+// titolare 08/10/2026): Invio = conferma e scende (Maiusc+Invio sale), Tab = destra
+// (Maiusc+Tab sinistra), frecce = conferma e si sposta, Esc = annulla. Con piu celle
+// selezionate (opz.blocco) il numero va su tutte.
+function fabbisognoInline(codice, dstr, el, opz) {
+  opz = opz || {};
+  if (window.event && window.event.shiftKey && window.event.type !== 'keydown') {
     pianoBloccoClick('fabb', el);
     return;
   }
   if (!puoGestirePiano() || !el || el.querySelector('input')) return;
-  _pianoBloccoPulisci();
+  if (!opz.blocco) _fabbSelezionaCella(el);
   const esistente = _pianoFabbCache.find(
     (f) => f.turno_codice === codice && f.data === dstr && (f.reparto_dip || 'slots') === _pianoReparto(),
   );
@@ -1015,28 +1020,54 @@ function fabbisognoInline(codice, dstr, el) {
     '" size="1" maxlength="2" style="width:100%;min-width:0;box-sizing:border-box;border:1px solid #1a4a7a;border-radius:0;padding:0;margin:0;font:inherit;font-weight:700;text-align:center;background:transparent;color:inherit">';
   const inp = el.querySelector('input');
   inp.focus();
-  inp.select();
+  if (opz.iniziale) {
+    inp.value = opz.iniziale;
+    inp.setSelectionRange(inp.value.length, inp.value.length);
+  } else inp.select();
   let chiuso = false;
+  let dopo = null; // cella su cui spostarsi dopo la conferma
   const conferma = async () => {
     if (chiuso) return;
     chiuso = true;
     const v = inp.value.trim();
     const q = v === '' ? 0 : parseInt(v);
-    if (q === attuale || (v !== '' && isNaN(q))) {
+    // la cella attiva passa subito alla destinazione: il ridisegno la ritrova
+    if (dopo) _fabbRicordaCella(dopo);
+    if (v !== '' && (isNaN(q) || q < 0 || q > 99)) {
       el.innerHTML = vecchio;
-      if (v !== '' && isNaN(q)) toast('Inserisci un numero tra 0 e 99');
+      toast('Inserisci un numero tra 0 e 99');
+      if (dopo) _fabbSelezionaCella(dopo);
+      return;
+    }
+    if (opz.blocco) {
+      el.innerHTML = vecchio;
+      await fabbScriviSuSelezione(q, opz.blocco);
+      return;
+    }
+    if (q === attuale) {
+      el.innerHTML = vecchio;
+      _fabbSelezionaCella(dopo || el);
       return;
     }
     await setPianoFabbisogno(codice, dstr, q);
   };
   inp.addEventListener('keydown', (e) => {
     e.stopPropagation();
-    if (e.key === 'Enter') {
+    let mossa = null;
+    if (e.key === 'Enter') mossa = [0, e.shiftKey ? -1 : 1];
+    else if (e.key === 'Tab') mossa = [e.shiftKey ? -1 : 1, 0];
+    else if (e.key === 'ArrowDown') mossa = [0, 1];
+    else if (e.key === 'ArrowUp') mossa = [0, -1];
+    else if (e.key === 'ArrowRight') mossa = [1, 0];
+    else if (e.key === 'ArrowLeft') mossa = [-1, 0];
+    if (mossa) {
       e.preventDefault();
+      dopo = _fabbCellaVicina(el, mossa[0], mossa[1]) || el;
       conferma();
     } else if (e.key === 'Escape') {
       chiuso = true;
       el.innerHTML = vecchio;
+      _fabbSelezionaCella(el);
     }
   });
   inp.addEventListener('click', (e) => e.stopPropagation());
@@ -1503,6 +1534,7 @@ function _xlsFabbisognoDaFile(wb, ym, nGiorni, codiciValidi) {
   const foglioMese = _xlsFoglioMese(wb, ym);
   if (!foglioMese) return null;
   const nuovi = [];
+  const ordine = []; // turni nell ordine delle righe del file
   const dati = XLSX.utils.sheet_to_json(wb.Sheets[foglioMese], { header: 1, defval: '', raw: true });
   let rPian = -1;
   for (let r = 0; r < dati.length; r++) {
@@ -1537,6 +1569,7 @@ function _xlsFabbisognoDaFile(wb, ym, nGiorni, codiciValidi) {
       continue;
     }
     vuoteConsecutive = 0;
+    if (!ordine.includes(cod)) ordine.push(cod);
     for (let g = 1; g <= nGiorni; g++) {
       const q = parseInt(riga[mappa[g]]);
       if (!isNaN(q) && q > 0)
@@ -1548,7 +1581,31 @@ function _xlsFabbisognoDaFile(wb, ym, nGiorni, codiciValidi) {
         });
     }
   }
-  return { nuovi: nuovi, fonte: 'foglio "' + foglioMese + '" (sezione PIANIFICAZIONE)' };
+  return { nuovi: nuovi, ordine: ordine, fonte: 'foglio "' + foglioMese + '" (sezione PIANIFICAZIONE)' };
+}
+// ORDINE DEI TURNI COME NEL FILE (richiesta del titolare 08/10/2026): le righe del
+// fabbisogno seguono l ordine della sezione PIANIFICAZIONE del file Excel. Si salva nella
+// colonna ordine dei turni del settore (10, 20, 30...); i turni che il file non ha restano
+// dopo, raggruppati come prima. Senza il permesso di modificare i turni resta com era.
+async function _pianoOrdineTurniDalFile(codici) {
+  if (!codici || !codici.length) return;
+  const cambi = [];
+  _pianoTurniReparto().forEach((t) => {
+    const i = codici.indexOf(String(t.codice).toUpperCase());
+    if (i < 0) return;
+    const voluto = (i + 1) * 10;
+    if (parseInt(t.ordine) !== voluto) cambi.push({ t: t, ordine: voluto });
+  });
+  if (!cambi.length) return;
+  try {
+    for (const c of cambi) {
+      await secPatch('piano_turni', 'id=eq.' + c.t.id, { ordine: c.ordine });
+      c.t.ordine = c.ordine;
+    }
+    logAzione('Piano: ordine dei turni dal file', _pianoReparto() + ' · ' + cambi.length + ' turni');
+  } catch (e) {
+    console.warn('ordine dei turni non salvato', e);
+  }
 }
 // FABBISOGNO DEL MESE DOPO L IMPORT DEL PIANO: dal file (sezione PIANIFICAZIONE) o, se il
 // file non l ha, dai turni del piano importato (quante persone per turno ogni giorno).
@@ -1560,6 +1617,7 @@ async function _pianoFabbisognoDopoImport(wb, ym) {
   const rep = _pianoReparto();
   const codiciRep = new Set(_pianoTurniReparto().map((t) => t.codice.toUpperCase()));
   const dalFile = _xlsFabbisognoDaFile(wb, ym, nGiorni, codiciRep);
+  if (dalFile) await _pianoOrdineTurniDalFile(dalFile.ordine);
   let nuovi = dalFile ? dalFile.nuovi : [];
   let fonte = dalFile ? dalFile.fonte : '';
   const fine = ym + '-' + String(nGiorni).padStart(2, '0');
@@ -1655,8 +1713,10 @@ async function importaFabbisognoExcel(input) {
     const foglioMese = _xlsFoglioMese(wb, ym);
     const dalFile = _xlsFabbisognoDaFile(wb, ym, nGiorni, codiciValidi);
     let smartOk = !!dalFile;
+    const ordineFile = [];
     if (dalFile) {
       dalFile.nuovi.forEach((x) => nuovi.push(x));
+      dalFile.ordine.forEach((x) => ordineFile.push(x));
       fonte = dalFile.fonte;
     }
     // 2) ripiego: formato semplice (prima colonna = turno, colonne = giorni 1..N)
@@ -1674,6 +1734,7 @@ async function importaFabbisognoExcel(input) {
           errori++;
           continue;
         }
+        if (!ordineFile.includes(cod)) ordineFile.push(cod);
         for (let g = 1; g <= nGiorni; g++) {
           const q = parseInt(riga[g]);
           if (!isNaN(q) && q > 0)
@@ -1686,6 +1747,11 @@ async function importaFabbisognoExcel(input) {
         }
       }
       fonte = 'formato semplice (turno + giorni)';
+    }
+    // l ordine delle righe del file vale anche se le quantita non si leggono
+    if (ordineFile.length) {
+      await _pianoOrdineTurniDalFile(ordineFile);
+      renderPiano();
     }
     if (!nuovi.length) {
       toast(

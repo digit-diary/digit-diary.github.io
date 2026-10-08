@@ -2638,7 +2638,7 @@ function _pianoCongediAttornoVacanze() {
   const v = _pianoRegolaVal('c_prima_dopo_vacanza');
   return v == null ? true : String(v).toUpperCase() !== 'FALSE';
 }
-async function _applicaVacanzeMese(interattivo) {
+async function _applicaVacanzeMese(interattivo, opz) {
   if (!puoGestirePiano() && !window._pianoAutoInCorso) return null; // anche dentro la generazione automatica
   const ym = _pianoMeseSel;
   const anno = parseInt(ym.split('-')[0]);
@@ -2731,6 +2731,170 @@ async function _applicaVacanzeMese(interattivo) {
     });
     if (!Object.keys(altreGiorni[nome]).length) delete altreGiorni[nome];
   });
+  // VACANZA DA SPOSTARE DOPO LA MALATTIA (proposta, richiesta del titolare 08/10/2026):
+  // i giorni di vacanza caduti nella malattia si possono rimettere subito dopo, con la C
+  // prima: malattia fino al 21, C il 22, vacanza dal 23 (stessi giorni), poi le C del
+  // rientro con le regole solite. Si chiede per persona; con il si si corregge la scheda
+  // Vacanze (i giorni in malattia tolti dalla settimana di prima, il periodo nuovo
+  // aggiunto con la nota) e il mese si riapplica. Con il no restano M "Ex V" (giorni
+  // restituiti nei Crediti). Mai nella generazione automatica (non fa domande).
+  if (vacInMalattia.length && !window._pianoAutoInCorso && !(opz && opz.senzaSpostamento)) {
+    let spostate = 0;
+    const perNome = {};
+    vacInMalattia.forEach((x) => (perNome[x.nome] = perNome[x.nome] || []).push(x.g));
+    const dIso = (d) =>
+      d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const piu = (dstr, n) => {
+      const d = new Date(dstr + 'T12:00:00');
+      d.setDate(d.getDate() + n);
+      return dIso(d);
+    };
+    const it = (dstr) => dstr.split('-').reverse().join('.');
+    for (const nome of Object.keys(perNome)) {
+      const giorniVac = perNome[nome].sort((x, y) => x - y).map((g) => ym + '-' + String(g).padStart(2, '0'));
+      const malTutti = new Set(_pianoGiorniMalattiaDi(nome));
+      giorniVac.forEach((d) => malTutti.add(d));
+      // ultimo giorno della malattia che contiene la vacanza
+      let fineMal = giorniVac[giorniVac.length - 1];
+      while (malTutti.has(piu(fineMal, 1))) fineMal = piu(fineMal, 1);
+      let inizioMal = giorniVac[0];
+      while (malTutti.has(piu(inizioMal, -1))) inizioMal = piu(inizioMal, -1);
+      const info = _pianoCollabInfo(nome) || {};
+      const nC = info.is_jolly ? cPrimaJolly : cPrimaFissi;
+      // giorni gia in vacanza (altre settimane del file): il periodo nuovo non li copre
+      const giaVac = new Set();
+      vacanze.forEach((v) => {
+        if (v.collaboratore === nome && v.confermata) _vacGiorni(v, anno).forEach((d) => giaVac.add(d));
+      });
+      let ini = piu(fineMal, 1 + nC);
+      const nuovi = [];
+      for (let d = ini; nuovi.length < giorniVac.length; d = piu(d, 1)) {
+        if (malTutti.has(d) || (giaVac.has(d) && !giorniVac.includes(d))) {
+          if (!nuovi.length) ini = piu(d, 1);
+          else break; // il periodo nuovo resta di fila
+        } else nuovi.push(d);
+      }
+      if (nuovi.length < giorniVac.length) continue; // niente spazio di fila: resta M "Ex V"
+      const fineNuova = nuovi[nuovi.length - 1];
+      const ok = await chiediConferma(
+        nome +
+          ': ' +
+          giorniVac.length +
+          (giorniVac.length === 1 ? ' giorno' : ' giorni') +
+          ' di vacanza (' +
+          it(giorniVac[0]) +
+          (giorniVac.length > 1 ? '-' + it(giorniVac[giorniVac.length - 1]) : '') +
+          ') cadono nella malattia (' +
+          it(inizioMal) +
+          '-' +
+          it(fineMal) +
+          ').\n\nSpostare la vacanza dopo la malattia?\n\n• ' +
+          (nC ? it(piu(fineMal, 1)) + (nC > 1 ? '-' + it(piu(fineMal, nC)) : '') + ': C\n• ' : '') +
+          it(nuovi[0]) +
+          '-' +
+          it(fineNuova) +
+          ': vacanza\n• poi le C del rientro come sempre\n\nLa scheda Vacanze viene aggiornata. Con No i giorni restano malattia (M) e sono restituiti nei Crediti.',
+        { titolo: 'Vacanza in malattia', ok: 'Sposta la vacanza' },
+      );
+      if (!ok) continue;
+      // 1) togli i giorni in malattia dalle settimane del file (una settimana puo restare
+      //    a pezzi: il primo pezzo resta sulla riga, gli altri diventano righe nuove)
+      const togliere = new Set(giorniVac);
+      for (const v of vacanze) {
+        if (v.collaboratore !== nome || !v.confermata || !_vacEVacanza(v)) continue;
+        const gg = _vacGiorni(v, anno);
+        if (!gg.some((d) => togliere.has(d))) continue;
+        const resto = gg.filter((d) => !togliere.has(d));
+        const pezzi = [];
+        resto.forEach((d) => {
+          const ult = pezzi[pezzi.length - 1];
+          if (ult && piu(ult[ult.length - 1], 1) === d) ult.push(d);
+          else pezzi.push([d]);
+        });
+        const tutta = _pianoGiorniSettimana(parseInt(v.anno) || anno, v.settimana);
+        const dalAl = (pz) =>
+          pz.length === 7 && pz[0] === tutta[0] ? { dal: null, al: null } : { dal: pz[0], al: pz[pz.length - 1] };
+        if (!pezzi.length) await secDel('piano_vacanze', 'id=eq.' + v.id);
+        else {
+          await secPatch('piano_vacanze', 'id=eq.' + v.id, dalAl(pezzi[0]));
+          for (const pz of pezzi.slice(1))
+            await secPost(
+              'piano_vacanze',
+              Object.assign(
+                {
+                  collaboratore: nome,
+                  anno: v.anno,
+                  settimana: v.settimana,
+                  confermata: true,
+                  codice: v.codice || null,
+                  operatore: getOperatore(),
+                  nota: v.nota || null,
+                },
+                dalAl(pz),
+              ),
+            );
+        }
+      }
+      // 2) il periodo nuovo, una riga per settimana (dal/al se la settimana e parziale)
+      const perSett = {};
+      nuovi.forEach((d) => {
+        const w = _vacSettimanaDi(d);
+        (perSett[w.anno + '|' + w.settimana] = perSett[w.anno + '|' + w.settimana] || []).push(d);
+      });
+      for (const k of Object.keys(perSett)) {
+        const [aW, sW] = k.split('|').map((x) => parseInt(x));
+        const gg = perSett[k];
+        const tutta = _pianoGiorniSettimana(aW, sW);
+        const intera = gg.length === 7 && gg[0] === tutta[0];
+        await secPost('piano_vacanze', {
+          collaboratore: nome,
+          anno: aW,
+          settimana: sW,
+          confermata: true,
+          operatore: getOperatore(),
+          dal: intera ? null : gg[0],
+          al: intera ? null : gg[gg.length - 1],
+          nota: (
+            'Spostata per malattia (era ' +
+            it(giorniVac[0]) +
+            '-' +
+            it(giorniVac[giorniVac.length - 1]) +
+            ')'
+          ).substring(0, 200),
+        });
+      }
+      // 3) le M di quei giorni non sono piu vacanza: via la nota "Ex V" (altrimenti i
+      //    Crediti li conterebbero restituiti e la vacanza nuova due volte)
+      const righeEx =
+        (await secGet(
+          'piano?collaboratore=eq.' +
+            encodeURIComponent(nome) +
+            '&data=gte.' +
+            giorniVac[0] +
+            '&data=lte.' +
+            giorniVac[giorniVac.length - 1] +
+            '&codice=eq.M',
+        )) || [];
+      for (const r of righeEx)
+        if (/^Ex V\b/.test(r.commento || ''))
+          await secPatch('piano', 'id=eq.' + r.id, { commento: null, updated_at: new Date().toISOString() });
+      logAzione(
+        'Vacanza spostata per malattia',
+        nome +
+          ' · ' +
+          it(giorniVac[0]) +
+          '-' +
+          it(giorniVac[giorniVac.length - 1]) +
+          ' -> ' +
+          it(nuovi[0]) +
+          '-' +
+          it(fineNuova),
+      );
+      spostate++;
+    }
+    // scheda Vacanze cambiata: il mese si riapplica da capo con il file nuovo
+    if (spostate) return _applicaVacanzeMese(interattivo, { senzaSpostamento: true });
+  }
   // GIORNI CHIUSI: il piano dei giorni passati e un documento. Si lavora solo
   // dal primo giorno aperto; nei giorni chiusi non si cancella e non si scrive
   // niente, e le differenze che restano si elencano (niente di nascosto).
