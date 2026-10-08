@@ -2040,6 +2040,7 @@ async function fabbIncollaDaClipboard() {
 async function miglioraOrePiano() {
   if (!_pianoAzioneAutoConsentita('genera')) return; // azione automatica: permesso apposito
   if (!puoGestirePiano()) return;
+  await _pianoCaricaStoriaGruppi(_pianoReparto()).catch(() => {}); // idoneita come la bozza
   const ym = _pianoMeseSel;
   const nGiorni = _pianoUltimoGiorno(ym);
   const da = ym + '-01';

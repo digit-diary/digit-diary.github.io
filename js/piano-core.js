@@ -276,6 +276,50 @@ function _pianoFunzioniFannoTutto() {
 // LIVELLO DI FORMAZIONE nel settore del piano (come in Formazione: L(n) = tutte le
 // competenze di livello <= n certificate; Extra fuori dalla scala). null = il settore
 // non ha competenze a livelli: le regole di livello non si applicano.
+// STORIA DEI GRUPPI per l idoneita delle PROPOSTE (cerca cambio, copertura malattia e
+// ND, Migliora ore, copertura dal Diario). Per chi non ha settori ne competenze la
+// bozza ammette solo i gruppi gia fatti (prima del mese e nel mese stesso); le proposte
+// invece lo davano idoneo a tutto (es. un HOST nuovo proposto in cassa senza formazione).
+// Ora la stessa regola: per settore, il primo giorno in cui ognuno ha fatto ogni gruppo.
+const _pianoStoriaGruppiCache = {}; // reparto -> { quando, primo: { nome: { GRUPPO: 'YYYY-MM-DD' } } }
+async function _pianoCaricaStoriaGruppi(rep) {
+  rep = rep || _pianoReparto();
+  const c = _pianoStoriaGruppiCache[rep];
+  if (c && Date.now() - c.quando < 10 * 60000) return c.primo;
+  const righe =
+    (await secGet(
+      'piano?reparto_dip=eq.' +
+        encodeURIComponent(rep) +
+        '&order=data.desc&limit=30000&select=collaboratore,codice,data',
+    )) || [];
+  const primo = {};
+  righe.forEach((r) => {
+    const t = _pianoTurnoInfo(r.codice);
+    if (!t || !t.gruppo) return;
+    const g = String(t.gruppo).toUpperCase();
+    const d = String(r.data).substring(0, 10);
+    const per = (primo[r.collaboratore] = primo[r.collaboratore] || {});
+    if (!per[g] || d < per[g]) per[g] = d;
+  });
+  _pianoStoriaGruppiCache[rep] = { quando: Date.now(), primo: primo };
+  return primo;
+}
+// gruppi fatti da una persona fino alla fine del mese di dstr; null = storia non letta
+// (allora vale la regola di prima: idoneo se non ha settori)
+function _pianoStoriaGruppiDi(nome, dstr) {
+  const reps = Object.keys(_pianoStoriaGruppiCache);
+  if (!reps.length) return null;
+  const ym = String(dstr || _pianoMeseSel || '').substring(0, 7);
+  const fine = ym ? ym + '-31' : '9999-12-31';
+  const out = new Set();
+  reps.forEach((rep) => {
+    const per = _pianoStoriaGruppiCache[rep].primo[nome] || {};
+    Object.keys(per).forEach((g) => {
+      if (per[g] <= fine) out.add(g);
+    });
+  });
+  return out;
+}
 function _pianoLivelloNelSettore(info, rep) {
   if (!info || typeof getCompetenzeConfigAll !== 'function') return null;
   const comps = (getCompetenzeConfigAll()[rep || _pianoReparto()] || []).filter((k) => parseInt(k.livello) >= 1);

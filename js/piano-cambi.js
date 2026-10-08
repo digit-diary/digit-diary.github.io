@@ -355,6 +355,7 @@ async function apriCercaCambioLibero() {
     return;
   }
   toast("Cerco con chi puo' cambiare...");
+  await _pianoCaricaStoriaGruppi(_pianoReparto()).catch(() => {}); // idoneita come la bozza
   const ym = _pianoMeseSel;
   const anno = parseInt(ym.split('-')[0]);
   const mese = parseInt(ym.split('-')[1]);
@@ -1212,13 +1213,15 @@ function _pianoGiornoDiIndice(g) {
 // dstr (facoltativo): il giorno del turno, per la preferenza dei giorni di lavoro
 function _pianoIdoneoPerTurno(nome, turno, dstr) {
   // idoneita' per le PROPOSTE del programma (cerca cambio, copertura malattia e ND,
-  // Migliora ore, finestra copertura del Diario): stesse regole della bozza, compresi i
+  // Migliora ore, finestra copertura del Diario): stesse regole della bozza (anche la
+  // storia dei gruppi per chi non ha settori: _pianoCaricaStoriaGruppi), compresi i
   // giorni (giorni di lavoro, funzione per giorno: SUP solo Z* da lunedi a giovedi). Le
   // funzioni che "fanno tutto" (SUP, RESP) lo fanno a mano (_pianoIdoneoAMano), non nelle
   // proposte automatiche. La logica vive nel motore puro PianoRegole.
   const info = _pianoCollabInfo(nome) || {};
   return PianoRegole.idoneoPerTurno(info, turno, {
     dow: dstr ? new Date(String(dstr).substring(0, 10) + 'T12:00:00').getDay() : null,
+    storiaDi: () => _pianoStoriaGruppiDi(nome, dstr),
     settoriDi: (i) => _pianoSettoriEffettivi(i),
     regoleGruppoDi: (gr) => _pianoRegoleGruppoDi(gr),
     campoOk: (i, v) => _pianoCampoOk(i, v),
@@ -1301,6 +1304,7 @@ async function cercaSostitutiMalattia() {
     return;
   }
   out.innerHTML = '<p style="color:var(--muted)">Ricerca in corso...</p>';
+  await _pianoCaricaStoriaGruppi(_pianoReparto()).catch(() => {}); // idoneita come la bozza
   const ym = _pianoMeseSel;
   const nomi = collaboratoriCache.filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c)).map((c) => c.nome);
   const cella = {}; // nome|g -> codice (con overrides progressivi)

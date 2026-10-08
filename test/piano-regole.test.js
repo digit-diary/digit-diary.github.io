@@ -531,6 +531,28 @@ eq(
   'ma la preferenza personale solo diurni resta',
 );
 
+console.log('\n== storia dei gruppi (proposte come la bozza) ==');
+const ctxSt = (storia, mapp) =>
+  Object.assign({}, ctxBase, {
+    settoriDi: () => null,
+    storiaDi: () => (storia ? new Set(storia) : null),
+    mappFunzione: () => mapp || null,
+  });
+const CASSA = { codice: 'C23', gruppo: 'CASSA', tipo: 'DIURNO' };
+eq(R.idoneoPerTurno({ funzione: 'HOST' }, CASSA, ctxSt(['SALA'])), false, 'senza settori: gruppo mai fatto = non idoneo');
+eq(R.idoneoPerTurno({ funzione: 'HOST' }, CASSA, ctxSt(['SALA', 'CASSA'])), true, 'gruppo gia fatto = idoneo');
+eq(R.idoneoPerTurno({ funzione: 'HOST' }, CASSA, ctxSt(null)), true, 'storia non letta = regola di prima');
+eq(
+  R.idoneoPerTurno({ funzione: 'BO' }, CASSA, ctxSt([], [{ tipo: 'PRINCIPALE', turno_codice: 'C23' }])),
+  true,
+  'mappatura con turni principali decide da sola (come la bozza)',
+);
+eq(
+  R.idoneoPerTurno({ funzione: 'HOST' }, CASSA, Object.assign(ctxSt([]), { settoriDi: () => ['CASSA'] })),
+  true,
+  'con i settori la storia non conta',
+);
+
 console.log('\n=======================================');
 console.log('  ' + passati + ' passati, ' + falliti + ' falliti');
 console.log('=======================================\n');

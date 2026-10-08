@@ -240,7 +240,10 @@
     // ha i suoi controlli e continua a rispettare le regole del settore.
     if (typeof ctx.fannoTutto === 'function' && fzU && ctx.fannoTutto(fzU)) return true;
     const settoriC = ctx.settoriDi(info);
-    const haSettore = settoriC ? settoriC.includes(gruppoT) : true;
+    // senza settori: i gruppi gia fatti (storia, come la bozza) se il programma li passa;
+    // senza storia letta resta la regola di prima (idoneo)
+    const storia = !settoriC && typeof ctx.storiaDi === 'function' ? ctx.storiaDi(info) : null;
+    const haSettore = settoriC ? settoriC.includes(gruppoT) : storia ? storia.has(gruppoT) : true;
     let campoGrant = false;
     for (const rg of ctx.regoleGruppoDi(gruppoT)) {
       const tipoR = (rg.tipo_regola || '').toLowerCase();
@@ -265,12 +268,15 @@
         campoGrant = true;
       }
     }
-    if (settoriC && !haSettore && !campoGrant) return false;
     const mapp = ctx.mappFunzione(info.funzione);
-    if (mapp) {
-      const voci = mapp.filter((m) => m.tipo === 'PRINCIPALE' || m.tipo === 'AMMESSO').map((m) => m.turno_codice);
-      if (voci.length && !voci.includes(turno.codice)) return false;
-    }
+    const voci = mapp
+      ? mapp.filter((m) => m.tipo === 'PRINCIPALE' || m.tipo === 'AMMESSO').map((m) => m.turno_codice)
+      : [];
+    if (settoriC && !haSettore && !campoGrant) return false;
+    // con la sola storia, come la bozza: una mappatura con turni principali o ammessi
+    // decide da sola; altrimenti serve il gruppo gia fatto (o un lasciapassare)
+    if (storia && !haSettore && !campoGrant && !voci.length) return false;
+    if (voci.length && !voci.includes(turno.codice)) return false;
     // regole "chi fa cosa" del settore (senza giorno: solo turni_solo_funzioni)
     if (typeof ctx.regoleTurnoFunzione === 'function') {
       const infoS = Object.assign({}, info, {

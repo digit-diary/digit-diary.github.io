@@ -2998,6 +2998,11 @@ async function _copCaricaPianoDelGiorno() {
   if (!ctx || !ctx.dataRif) return;
   try {
     const righe = (await secGet('piano?data=eq.' + ctx.dataRif + '&limit=2000')) || [];
+    // storia dei gruppi del settore dell assente: chi non ha settori e "formato" solo per
+    // i gruppi gia fatti, come nella bozza
+    const infoA = typeof _pianoCollabInfo === 'function' ? _pianoCollabInfo(ctx.assente) : null;
+    if (typeof _pianoCaricaStoriaGruppi === 'function')
+      await _pianoCaricaStoriaGruppi((infoA && infoA.reparto_dip) || 'slots').catch(() => {});
     const perNome = {};
     righe.forEach((r) => (perNome[r.collaboratore] = r.codice));
     ctx.piano = perNome;
