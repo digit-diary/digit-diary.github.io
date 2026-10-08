@@ -1004,42 +1004,141 @@ function _rgTurniHtml(id, etichetta, valore) {
     );
   const codici = new Set([].concat(...Object.values(perGruppo)));
   const modelli = scelti.filter((x) => !codici.has(x));
+  // prima i turni del gruppo scelto nel modulo; gli altri gruppi si aprono a richiesta
+  // (restano aperti se fra loro c e un turno gia scelto, es. modificando una regola)
+  const grSel = String((document.getElementById('rg-gruppo') || {}).value || '*').toUpperCase();
+  const tuttiG = Object.keys(perGruppo).sort();
+  const primi = grSel !== '*' && perGruppo[grSel] ? [grSel] : tuttiG;
+  const altri = tuttiG.filter((g) => !primi.includes(g));
+  const rigaGruppo = (g) =>
+    '<div style="display:flex;gap:2px 10px;flex-wrap:wrap;align-items:center"><b style="font-size:var(--fs-sm,.8125rem);min-width:90px">' +
+    escP(g) +
+    '</b>' +
+    perGruppo[g]
+      .map(
+        (cd) =>
+          '<label style="display:inline-flex;align-items:center;gap:3px;font-size:var(--fs-sm,.8125rem)"><input type="checkbox" name="' +
+          id +
+          '" value="' +
+          escP(cd) +
+          '"' +
+          (scelti.includes(cd) ? ' checked' : '') +
+          '>' +
+          escP(cd) +
+          '</label>',
+      )
+      .join('') +
+    '</div>';
+  const altriAperti = altri.some((g) => perGruppo[g].some((cd) => scelti.includes(cd)));
   return (
     '<div class="field" style="flex-basis:100%"><label>' +
     escP(etichetta) +
-    ' · posizioni di ' +
-    escP(typeof repartoLabel === 'function' ? repartoLabel(_pianoReparto()) : _pianoReparto()) +
-    '</label><div style="display:flex;flex-direction:column;gap:2px;max-height:180px;overflow:auto;padding:4px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper)">' +
-    Object.keys(perGruppo)
-      .sort()
-      .map(
-        (g) =>
-          '<div style="display:flex;gap:2px 10px;flex-wrap:wrap;align-items:center"><b style="font-size:var(--fs-sm,.8125rem);min-width:90px">' +
-          escP(g) +
-          '</b>' +
-          perGruppo[g]
-            .map(
-              (cd) =>
-                '<label style="display:inline-flex;align-items:center;gap:3px;font-size:var(--fs-sm,.8125rem)"><input type="checkbox" name="' +
-                id +
-                '" value="' +
-                escP(cd) +
-                '"' +
-                (scelti.includes(cd) ? ' checked' : '') +
-                '>' +
-                escP(cd) +
-                '</label>',
-            )
-            .join('') +
-          '</div>',
-      )
-      .join('') +
-    '</div><input type="text" id="' +
+    (grSel !== '*' && perGruppo[grSel] ? ' · gruppo ' + escP(grSel) : '') +
+    '</label><div style="display:flex;flex-direction:column;gap:2px;padding:4px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);box-sizing:border-box;max-width:100%">' +
+    primi.map(rigaGruppo).join('') +
+    // altri gruppi e modelli (Z* = tutte le sigle che iniziano con Z): servono di rado
+    '<details' +
+    (altriAperti || modelli.length ? ' open' : '') +
+    ' style="margin-top:2px"><summary style="cursor:pointer;font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
+    (altri.length ? 'Turni degli altri gruppi e modelli' : 'Modelli di sigle') +
+    '</summary>' +
+    altri.map(rigaGruppo).join('') +
+    '<input type="text" id="' +
     id +
     '-modelli" value="' +
     escP(modelli.join(',')) +
-    '" placeholder="Altri modelli, es. Z* = tutte le sigle che iniziano con Z" style="margin-top:4px;width:100%;max-width:360px;padding:6px"></div>'
+    '" placeholder="Modelli, es. Z* = tutte le sigle che iniziano con Z" style="margin-top:4px;width:100%;max-width:360px;padding:6px"></details>' +
+    '</div></div>'
   );
+}
+// SCELTA DEI COLLABORATORI (v426, richiesta del titolare: la lista di tutti i nomi da
+// spuntare non era professionale): casella di ricerca con i nomi del settore e, sotto,
+// le persone scelte come etichette con la x, nell ordine di scelta (per i Coordinatori
+// conta la preferenza). Ogni etichetta porta la casella nascosta name=id: la lettura
+// (_rgLeggiCampi) e il valore salvato restano quelli di prima.
+function _rgPersoneHtml(id, etichetta, scelti) {
+  const persone = ordineCollabPiano(
+    collaboratoriCache.filter((x) => x.attivo !== false && _pianoAppartieneAlReparto(x)).map((x) => x.nome),
+    _pianoReparto(),
+  );
+  const nomeVero = (n) => persone.find((p) => p.toLowerCase() === String(n).toLowerCase()) || n;
+  return (
+    '<div class="field rg-persone" style="flex-basis:100%"><label>' +
+    escP(etichetta) +
+    '</label><input type="text" id="' +
+    id +
+    '-cerca" list="' +
+    id +
+    '-lista" autocomplete="off" placeholder="Scrivi un nome e sceglilo dall elenco" style="width:100%;max-width:360px;padding:6px;box-sizing:border-box" onchange="_rgAggiungiPersona(\'' +
+    id +
+    "')\" onkeydown=\"if(event.key==='Enter'){event.preventDefault();_rgAggiungiPersona('" +
+    id +
+    '\')}"><datalist id="' +
+    id +
+    '-lista">' +
+    persone.map((n) => '<option value="' + escP(n) + '">').join('') +
+    '</datalist><div class="rg-chips" id="' +
+    id +
+    '-chips">' +
+    scelti.map((n) => _rgChipHtml(id, nomeVero(n))).join('') +
+    '</div><div class="rg-chips-conta" id="' +
+    id +
+    '-conta">' +
+    _rgContaTesto(scelti.length) +
+    '</div></div>'
+  );
+}
+function _rgChipHtml(id, nome) {
+  return (
+    '<span class="rg-chip">' +
+    escP(nome) +
+    '<button type="button" title="Togli" aria-label="Togli ' +
+    escP(nome) +
+    '" onclick="this.parentNode.remove();_rgAggiornaConta(\'' +
+    id +
+    '\');rgAggiornaAnteprima()">\u00d7</button><input type="checkbox" name="' +
+    id +
+    '" value="' +
+    escP(nome) +
+    '" checked hidden></span>'
+  );
+}
+function _rgContaTesto(n) {
+  return n ? n + (n === 1 ? ' collaboratore scelto' : ' collaboratori scelti') : 'Nessun collaboratore scelto';
+}
+function _rgAggiornaConta(id) {
+  const n = document.querySelectorAll('#' + id + '-chips input[name="' + id + '"]').length;
+  const el = document.getElementById(id + '-conta');
+  if (el) el.textContent = _rgContaTesto(n);
+}
+function _rgAggiungiPersona(id) {
+  const inp = document.getElementById(id + '-cerca');
+  const box = document.getElementById(id + '-chips');
+  if (!inp || !box) return;
+  const v = inp.value.trim().toLowerCase();
+  if (!v) return;
+  const opzioni = [...document.querySelectorAll('#' + id + '-lista option')].map((o) => o.value);
+  // nome esatto, altrimenti l unico che contiene il testo scritto
+  let nome = opzioni.find((n) => n.toLowerCase() === v);
+  if (!nome) {
+    const simili = opzioni.filter((n) => n.toLowerCase().includes(v));
+    if (simili.length === 1) nome = simili[0];
+  }
+  if (!nome) {
+    toast('Scegli il nome dall elenco dei suggerimenti');
+    return;
+  }
+  const gia = [...box.querySelectorAll('input[name="' + id + '"]')].some((x) => x.value === nome);
+  if (!gia) box.insertAdjacentHTML('beforeend', _rgChipHtml(id, nome));
+  inp.value = '';
+  _rgAggiornaConta(id);
+  rgAggiornaAnteprima();
+}
+// cambio del gruppo nel modulo: i turni si ridisegnano (prima quelli del gruppo) tenendo
+// tutto quello che e gia stato scelto
+function rgGruppoCambiato() {
+  const tipo = (document.getElementById('rg-tipo') || {}).value;
+  if (tipo) rgTipoCambiato(_rgLeggiCampi());
 }
 // campi del modulo per un tipo (c = valori di partenza, per modificare una regola)
 function _rgCampiHtml(tipo, c) {
@@ -1171,38 +1270,14 @@ function _rgCampiHtml(tipo, c) {
     if (k === 'turni') out.push(_rgTurniHtml('rgc-turni', 'Turni', c.turni));
     if (k === 'turniG') out.push(_rgTurniHtml('rgc-turniG', 'Turni di apertura (coordinatore di giorno)', c.turniG));
     if (k === 'turniN') out.push(_rgTurniHtml('rgc-turniN', 'Turni di chiusura (coordinatore di notte)', c.turniN));
-    if (k === 'coord') {
-      const persone = ordineCollabPiano(
-        collaboratoriCache.filter((x) => x.attivo !== false && _pianoAppartieneAlReparto(x)).map((x) => x.nome),
-        _pianoReparto(),
-      );
-      const scelti = c.coord.map((x) => x.toLowerCase());
+    if (k === 'coord')
       out.push(
-        '<div class="field" style="flex-basis:100%"><label>Coordinatori scelti (in ordine di preferenza: il primo disponibile)</label>' +
-          spunte(
-            'rgc-coord',
-            persone.map((n) => ({ v: n, l: n })),
-            persone.filter((n) => scelti.includes(n.toLowerCase())),
-          ) +
-          '</div>',
+        _rgPersoneHtml('rgc-coord', 'Coordinatori scelti (in ordine di preferenza: il primo disponibile)', c.coord),
       );
-    }
-    if (k === 'collab') {
-      const persone = ordineCollabPiano(
-        collaboratoriCache.filter((x) => x.attivo !== false && _pianoAppartieneAlReparto(x)).map((x) => x.nome),
-        _pianoReparto(),
-      );
-      const scelti = c.collab.map((x) => x.toLowerCase());
+    if (k === 'collab')
       out.push(
-        '<div class="field" style="flex-basis:100%"><label>Collaboratori che possono fare questi turni (tutti gli altri no)</label>' +
-          spunte(
-            'rgc-collab',
-            persone.map((n) => ({ v: n, l: n })),
-            persone.filter((n) => scelti.includes(n.toLowerCase())),
-          ) +
-          '</div>',
+        _rgPersoneHtml('rgc-collab', 'Collaboratori che possono fare questi turni (tutti gli altri no)', c.collab),
       );
-    }
     if (k === 'campo')
       out.push(
         campo(
@@ -1274,7 +1349,8 @@ function rgAggiornaAnteprima() {
   const gruppo = (document.getElementById('rg-gruppo') || {}).value;
   const v = _rgComponi(tipo, _rgLeggiCampi());
   const el = document.getElementById('rg-anteprima');
-  if (el) el.textContent = v ? _rgFrase({ tipo_regola: tipo, valore: v, gruppo: gruppo }) + '  (' + v + ')' : '';
+  // solo la frase: il valore tecnico resta nella tabella delle regole
+  if (el) el.textContent = v ? _rgFrase({ tipo_regola: tipo, valore: v, gruppo: gruppo }) : '';
 }
 // suggerimento sotto il modulo: l esempio del settore aperto per quel tipo (prima: sempre
 // quello delle Slot)
@@ -1728,7 +1804,7 @@ function _renderPianoRegoleGruppoCard() {
     '<li>Le regole valgono per il <b>settore aperto</b>: ogni settore ha le sue, con le sue sigle e le sue funzioni. Agiscono nel validatore, nella bozza, nei cambi turno e nella scrittura manuale (avviso).</li>' +
     '</ol></details>' +
     '<div id="rg-modulo" style="margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:3px;background:var(--paper2)">' +
-    '<div class="add-tipo-row" onchange="rgAggiornaAnteprima()" oninput="rgAggiornaAnteprima()"><div class="field"><label>Gruppo</label><select id="rg-gruppo" style="padding:8px">' +
+    '<div class="add-tipo-row" onchange="rgAggiornaAnteprima()" oninput="rgAggiornaAnteprima()"><div class="field"><label>Gruppo</label><select id="rg-gruppo" style="padding:8px" onchange="rgGruppoCambiato()">' +
     gruppi.map((g) => '<option>' + escP(g) + '</option>').join('') +
     '<option value="*">tutti</option>' +
     '</select></div><div class="field"><label>Regola</label><select id="rg-tipo" style="padding:8px" onchange="rgTipoCambiato()">' +
