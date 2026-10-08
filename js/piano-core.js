@@ -1193,8 +1193,10 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
     // La malattia prevale (regola del casino): il giorno di vacanza viene
     // restituito, il CGF resta a credito, il turno perso diventa malattia.
     // La sigla coperta resta scritta nel commento ("Ex V - operatore") cosi, se la
-    // malattia viene tolta dal Diario, torna al suo posto. Senza cella, basta
-    // la M automatica dal Diario.
+    // malattia viene tolta dal Diario, torna al suo posto. Senza cella si scrive la M
+    // (decisione del titolare 08/10/2026: la malattia conta come M, anche nei giorni
+    // senza turno; prima restava la M solo disegnata e valeva 0 ore). Togliendo la
+    // malattia dal Diario la M senza nota si cancella (sopra).
     // festivi con diritto al recupero che si perdono per la malattia (c era un turno)
     const festiviPersi = [];
     const cgfPersi = []; // giorni di CGF caduti in malattia: il recupero va rimesso
@@ -1213,6 +1215,17 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
           commento: ('Ex ' + r.codice + ' - ' + getOperatore()).substring(0, 400),
           operatore: getOperatore(),
           updated_at: new Date().toISOString(),
+        });
+        messe++;
+      } else if (!r && (typeof _pianoOperativoIl !== 'function' || _pianoOperativoIl(nome, d))) {
+        await _pianoInserisciCella({
+          collaboratore: info ? info.nome : nome,
+          data: d,
+          codice: 'M',
+          protetto: true,
+          generato: false,
+          reparto_dip: rep,
+          operatore: getOperatore(),
         });
         messe++;
       }

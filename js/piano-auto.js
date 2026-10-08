@@ -281,6 +281,29 @@ async function _pianoAutoEsegui(rep, ym, minuti) {
           if (fin.legge || fin.scoperti)
             righe.push('Da controllare in Piano > Calendario con "Valida regole" prima di pubblicarlo.');
         } else if (b.scoperti) righe.push('• ' + b.scoperti + ' posti senza candidato idoneo');
+        // COPERTURE DA ALTRI SETTORI e MIGLIORA ORE (richiesta del titolare 08/10/2026: la
+        // generazione automatica fa la stessa sequenza che si fa a mano). Le coperture
+        // solo quando il piano del settore di provenienza di chi copre c e gia (cosi non
+        // si toglie nessuno al suo settore); generando quel settore si rifanno anche qui.
+        await _pianoAutoCoperture(rep, ym, righe);
+        for (const altro of _pianoAutoSettoriCheCopronoDa(rep))
+          if (altro !== rep) await _pianoAutoCoperture(altro, ym, righe);
+        _pianoMeseSel = ym;
+        _pianoRepartoSel = rep;
+        _pianoAutoFase('Bilancio le ore (Migliora ore)...');
+        auto.miglioraOre = null;
+        await miglioraOrePiano();
+        const mo = auto.miglioraOre;
+        if (mo && mo.scambi)
+          righe.push(
+            '• Migliora ore: ' +
+              mo.scambi +
+              ' turni spostati da chi e sopra a chi e sotto le ore (scarto medio ' +
+              mo.prima +
+              ' → ' +
+              mo.dopo +
+              ' ore)',
+          );
         if (b.riposiDaSistemare && b.riposiDaSistemare.length)
           righe.push('• Riposo attorno alla domenica da sistemare a mano: ' + b.riposiDaSistemare.join(', '));
         righe.push('Si cancella con "Cancella piano" (solo le celle generate) se non va.');
@@ -327,6 +350,73 @@ async function _pianoAutoEsegui(rep, ym, minuti) {
     if ((localStorage.getItem('pagina_corrente') || '') === 'piano') renderPiano();
   } catch (e) {}
   return { stato: stato, esito: esito };
+}
+
+// settori che possono prendere persone da rep (chi ha rep come settore e l altro fra i
+// settori in cui copre)
+function _pianoAutoSettoriCheCopronoDa(rep) {
+  const out = new Set();
+  collaboratoriCache
+    .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === rep)
+    .forEach((c) =>
+      String(c.reparti_extra || '')
+        .split(',')
+        .map((x) => x.trim().toLowerCase())
+        .filter((x) => x && x !== rep)
+        .forEach((x) => out.add(x)),
+    );
+  return [...out];
+}
+// COMPLETA CON COPERTURE nella generazione automatica, per il settore repT
+async function _pianoAutoCoperture(repT, ym, righe) {
+  const auto = window._pianoAutoInCorso;
+  const nG = _pianoUltimoGiorno(ym);
+  const da = ym + '-01';
+  const a = ym + '-' + String(nG).padStart(2, '0');
+  const repL = typeof repartoLabel === 'function' ? repartoLabel(repT) : repT;
+  const chi = collaboratoriCache.filter(
+    (c) => c.attivo !== false && _pianoAppartieneAlReparto(c, repT) && _pianoCoperturaCfg(c, repT),
+  );
+  if (!chi.length) return;
+  const haPiano = async (r) =>
+    ((await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + r + '&limit=400')) || []).some(
+      (x) => _pianoTurnoInfo(x.codice) || x.generato,
+    );
+  // il piano del settore da coprire c e? (per gli altri settori: solo se gia generato)
+  if (!(await haPiano(repT))) return;
+  const mancano = [];
+  for (const casa of [...new Set(chi.map((c) => c.reparto_dip || 'slots'))])
+    if (!(await haPiano(casa))) mancano.push(typeof repartoLabel === 'function' ? repartoLabel(casa) : casa);
+  const nomi = chi.map((c) => c.nome).join(', ');
+  if (mancano.length) {
+    righe.push(
+      '• Coperture ' +
+        repL +
+        ' (' +
+        nomi +
+        '): rimandate, il piano di ' +
+        mancano.join(', ') +
+        ' non c e ancora. Si fanno quando viene generato (anche a mano: "Completa con coperture").',
+    );
+    return;
+  }
+  _pianoAutoFase('Coperture da altri settori (' + repL + ')...');
+  _pianoMeseSel = ym;
+  _pianoRepartoSel = repT;
+  _pianoRighe = await _pianoCaricaMeseSettore(da, a, repT);
+  if (auto) auto.bozza = null;
+  await generaBozzaPiano(true);
+  const bc = (auto && auto.bozza) || {};
+  righe.push(
+    '• Coperture ' +
+      repL +
+      ' (' +
+      nomi +
+      '): ' +
+      (bc.celle || 0) +
+      ' celle scritte (turni e congedi)' +
+      (bc.scoperti != null ? ', posti ancora scoperti ' + bc.scoperti : ''),
+  );
 }
 
 // ============================================================ IMPOSTAZIONI

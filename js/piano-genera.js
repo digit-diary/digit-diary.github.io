@@ -2005,6 +2005,12 @@ async function generaBozzaPiano(usaCoperture) {
   });
   // malattie, congedi non pagati e giorni dopo la fine del rapporto: non assegnabili
   const malattie = Object.assign(_pianoMalattieMese(ym), _pianoCnpMese(ym), _pianoFineMese(ym));
+  // solo le malattie del Diario (nome minuscolo|data): nei giorni vuoti diventano M
+  const malDiario = {};
+  Object.keys(_pianoMalattieMese(ym)).forEach((k) => {
+    const i = k.lastIndexOf('|');
+    if (!_pianoFineMese(ym)[k]) malDiario[k.substring(0, i).toLowerCase() + '|' + k.substring(i + 1)] = true;
+  });
   // VACANZE di chi viene da un altro settore (coperture): le scrive il suo settore, ma qui
   // valgono anche se il suo piano non e ancora generato (mai coperture in vacanza)
   try {
@@ -2996,6 +3002,21 @@ async function generaBozzaPiano(usaCoperture) {
       if (giorniChiusi.has(g)) continue;
       if (cella[n + '|' + g]) continue;
       const dstrG = ym + '-' + String(g).padStart(2, '0');
+      // MALATTIA DEL DIARIO su un giorno vuoto: diventa una M vera, come scritta a mano
+      // (conta le ore della M; decisione del titolare 08/10/2026). Congedi non pagati e
+      // giorni fuori contratto restano vuoti.
+      if (malDiario[n.toLowerCase() + '|' + dstrG]) {
+        cella[n + '|' + g] = 'M';
+        nuove.push({
+          collaboratore: n,
+          data: dstrG,
+          codice: 'M',
+          protetto: true,
+          generato: false,
+          reparto_dip: _pianoReparto(),
+        });
+        continue;
+      }
       if (malattie[n + '|' + dstrG]) continue;
       cella[n + '|' + g] = 'C';
       // COMPLEANNO: il congedo di quel giorno porta la nota, cosi' si vede

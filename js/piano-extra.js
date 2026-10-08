@@ -562,6 +562,31 @@ async function pianoScriviSuSelezione(codice, celle) {
   if (blocco.nonFormati.length) righe.push('Non formati per il turno: ' + [...new Set(blocco.nonFormati)].join(', '));
   if (righe.length) await mostraAvviso(righe.join('\n\n'), { titolo: codice + ' su piu celle' });
 }
+async function _pianoIncollaSuSelezione(tab, testo) {
+  const celle = _pianoBloccoCelle();
+  if (!celle.length) return;
+  const grid = _pianoParseTsv(testo).filter((r) => r.some((x) => x !== ''));
+  const singolo = grid.length === 1 && grid[0].length === 1;
+  const tutte = celle.flat();
+  const primo = celle[0][0];
+  const g0 = String(primo.dataset.g).padStart(2, '0');
+  if (tab === 'piano') {
+    if (singolo && tutte.length > 1) return pianoScriviSuSelezione(grid[0][0], tutte);
+    const tr = primo.closest('tr[data-nome]');
+    if (tr) return pianoIncollaDaClipboard({ nome: tr.dataset.nome, data: _pianoMeseSel + '-' + g0 }, testo);
+    return;
+  }
+  if (singolo && tutte.length > 1) {
+    const q = parseInt(grid[0][0]);
+    if (isNaN(q) || q < 0 || q > 99) {
+      toast('Nel fabbisogno si incollano numeri tra 0 e 99');
+      return;
+    }
+    return fabbScriviSuSelezione(q, tutte);
+  }
+  const tr = primo.closest('tr[data-cod]');
+  if (tr) return fabbIncollaDaClipboard({ codice: tr.dataset.cod, dstr: _pianoMeseSel + '-' + g0 }, testo);
+}
 function pianoBloccoClick(tab, el) {
   const b = window._pianoBlocco;
   if (b && b.tab === tab && b.t1.closest('table') === el.closest('table')) {
@@ -1330,7 +1355,7 @@ function _pianoDragBind() {
       e.preventDefault();
       pianoCancellaSelezione();
     }
-    // Ctrl/Cmd+C copia il blocco marcato (solo le celle, mai i nomi)
+    // Ctrl/Cmd+C copia il blocco marcato (solo le celle, mai i nomi); Ctrl/Cmd+V: evento paste sotto
     if (
       (e.ctrlKey || e.metaKey) &&
       (e.key === 'c' || e.key === 'C') &&
@@ -1342,6 +1367,19 @@ function _pianoDragBind() {
       e.preventDefault();
       pianoCopiaBlocco();
     }
+  });
+  // CTRL/CMD+V sulla selezione, nel calendario e nel fabbisogno (come Excel): un solo
+  // valore copiato va su tutte le celle selezionate; un blocco si incolla dalla prima
+  document.addEventListener('paste', (e) => {
+    if (typeof _pianoTab === 'undefined' || _pianoTab !== 'calendario') return;
+    const b = window._pianoBlocco;
+    if (!b || !b.completo || !b.t1 || !document.body.contains(b.t1)) return;
+    if (b.tab !== 'piano' && b.tab !== 'fabb') return;
+    if (e.target && e.target.closest && e.target.closest('input,textarea,select,[contenteditable="true"]')) return;
+    const testo = (e.clipboardData && e.clipboardData.getData('text/plain')) || '';
+    if (!testo.trim()) return;
+    e.preventDefault();
+    _pianoIncollaSuSelezione(b.tab, testo);
   });
   const estendi = (td) => {
     if (!drag || !td || td.closest('table') !== drag.table) return;
@@ -1957,9 +1995,9 @@ function _pianoParseTsv(testo) {
 }
 // incolla nel PIANO a partire dalla cella target (righe = collaboratori in
 // ordine visivo, colonne = giorni)
-async function pianoIncollaDaClipboard(target) {
+async function pianoIncollaDaClipboard(target, testoDato) {
   if (!puoGestirePiano()) return;
-  const testo = await _pianoTestoAppunti();
+  const testo = testoDato != null ? testoDato : await _pianoTestoAppunti();
   if (!testo.trim()) return;
   const grid = _pianoParseTsv(testo);
   const nomiVis = [...document.querySelectorAll('#piano-content .piano-table tbody tr[data-nome]')].map(
@@ -2200,21 +2238,19 @@ function fabbCtxMenu(e, codice, dstr) {
   menu.style.left = Math.min(e.clientX, window.innerWidth - 230) + 'px';
   menu.style.top = Math.min(e.clientY, window.innerHeight - 120) + 'px';
 }
-async function fabbIncollaDaClipboard() {
+async function fabbIncollaDaClipboard(targetDato, testoDato) {
   // il fabbisogno si modifica solo con il permesso Modificare il fabbisogno (v359)
   if (!_pianoAzioneAutoConsentita('fabbisogno')) return;
-  if (!puoGestirePiano() || !window._fabbCtxSel) return;
-  const target = window._fabbCtxSel;
-  const testo = await _pianoTestoAppunti();
+  const target = targetDato || window._fabbCtxSel;
+  if (!puoGestirePiano() || !target) return;
+  const testo = testoDato != null ? testoDato : await _pianoTestoAppunti();
   if (!testo.trim()) return;
   const grid = _pianoParseTsv(testo);
-  // ordine dei turni come mostrati nella tabella fabbisogno
-  const tabelle = [...document.querySelectorAll('#piano-content .piano-table')];
-  const tavFabb = tabelle.find((t) => t.querySelector('td[onclick*="fabbisognoInline"]'));
+  // ordine dei turni come mostrati nella tabella fabbisogno (righe con data-cod: prima
+  // si cercava la tabella dal clic delle celle, che dalla v421 apre con il doppio clic)
+  const tavFabb = document.querySelector('#piano-content table[data-seltab="fabb"]');
   if (!tavFabb) return;
-  const codiciVis = [...tavFabb.querySelectorAll('tbody tr')].map((tr) =>
-    (tr.querySelector('.piano-nome') || {}).textContent ? tr.querySelector('.piano-nome').textContent.trim() : '',
-  );
+  const codiciVis = [...tavFabb.querySelectorAll('tbody tr[data-cod]')].map((tr) => tr.dataset.cod);
   const start = codiciVis.indexOf(target.codice);
   if (start < 0) return;
   const ym = _pianoMeseSel;
@@ -2528,7 +2564,11 @@ async function miglioraOrePiano() {
     return;
   }
   const mediaDopo = fissi.reduce((acc, n) => acc + Math.abs(saldo[n] || 0), 0) / (fissi.length || 1);
+  // generazione automatica: niente domanda, il resoconto lo scrive piano-auto.js
+  const autoMO = window._pianoAutoInCorso;
+  if (autoMO) autoMO.miglioraOre = { scambi: scambi.length, prima: mediaPrima.toFixed(1), dopo: mediaDopo.toFixed(1) };
   if (
+    !autoMO &&
     !(await chiediConferma(
       'Migliora ore (' +
         ym +
