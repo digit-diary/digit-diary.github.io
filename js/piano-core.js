@@ -2030,6 +2030,8 @@ async function _renderPianoCore() {
       const prima = _PIANO_TABS.map((x) => x[0]).find((k) => pianoTabVisibile(k));
       _pianoTab = prima || 'calendario';
     }
+    // freccia Indietro: pagina e scheda del Piano nella cronologia (navigazione.js)
+    if (typeof navRegistra === 'function') navRegistra();
     const ym = _pianoMeseSel;
     // FESTIVITA' PRIMA DI TUTTO: da queste dipende quali giorni chiudono tardi,
     // e quindi la durata dei turni che si prolungano. Se il dato non c'e', le

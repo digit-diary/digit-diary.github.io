@@ -2068,8 +2068,8 @@ function _pianoIdoneoStatico(n, t, dowG, idoneita) {
     infoC.turni_bloccati &&
     infoC.turni_bloccati
       .split(',')
-      .map((x) => x.trim())
-      .includes(t.codice)
+      .map((x) => x.trim().toUpperCase())
+      .includes(String(t.codice).toUpperCase())
   )
     return false;
   // scelto per nome per questo turno (Turni riservati a collaboratori): idoneo, anche se
@@ -2083,7 +2083,10 @@ function _pianoIdoneoStatico(n, t, dowG, idoneita) {
   // REGOLE DI GRUPPO (port di eligibility.py Turnivo): i settori assegnati al
   // collaboratore sono la fonte di verita; la storia vale solo se non ci sono
   const settoriC = _pianoSettoriEffettivi(infoC);
-  const haStoria = settoriC ? settoriC.includes(gruppoT) : !!(idoneita && idoneita[n] && idoneita[n].has(t.gruppo));
+  // storia: gruppi come salvati o in maiuscolo (un turno vecchio "Sala" vale come SALA)
+  const haStoria = settoriC
+    ? settoriC.includes(gruppoT)
+    : !!(idoneita && idoneita[n] && (idoneita[n].has(t.gruppo) || idoneita[n].has(gruppoT)));
   let campoGrant = false;
   for (const rg of _pianoRegoleGruppoDi(gruppoT)) {
     const tipoR = (rg.tipo_regola || '').toLowerCase();

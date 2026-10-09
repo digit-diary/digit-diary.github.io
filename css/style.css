@@ -6799,3 +6799,200 @@ body.dark-theme .pcfc-no {
   background: #3c241f;
   color: #ef8b72;
 }
+/* v433: legenda, filtri, aree, riepilogo del turno, telefono */
+.pcfc-intro,
+.pcfc-legenda {
+  font-size: var(--fs-md, 0.875rem);
+  color: var(--muted);
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+.pcfc-legenda .pcfc-chip {
+  margin-right: 2px;
+}
+.pcfc-chi {
+  margin: 4px 0 8px;
+}
+.pcfc-filtri {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.pcfc-filtro {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 3px 12px;
+  font-size: var(--fs-sm, 0.8125rem);
+  cursor: pointer;
+}
+.pcfc-filtro.attivo {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+.pcfc-scroll {
+  overflow-x: auto;
+}
+.pcfc-tab tr.pcfc-area td {
+  background: var(--paper2);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding-top: 8px;
+}
+.pcfc-tab tr.pcfc-area span {
+  font-weight: 400;
+  color: var(--muted);
+  letter-spacing: 0;
+}
+.pcfc-sigle {
+  display: block;
+  font-weight: 400;
+  color: var(--muted);
+  font-size: var(--fs-sm, 0.8125rem);
+}
+.pcfc-allarme {
+  color: var(--c-rosso);
+}
+.pcfc-uguale,
+.pcfc-mano-perche {
+  color: var(--muted);
+  font-size: var(--fs-sm, 0.8125rem);
+}
+.pcfc-vai {
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+.pcfc-vuoto {
+  color: var(--muted);
+  padding: 8px 0;
+}
+.pcfc-decide {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  background: var(--paper2);
+  padding: 8px 12px;
+  margin: 4px 0 10px;
+  font-size: var(--fs-md, 0.875rem);
+}
+.pcfc-decide-tit {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.pcfc-decide ul {
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.6;
+}
+.pcfc-nota {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: var(--fs-sm, 0.8125rem);
+}
+@media (max-width: 640px) {
+  .pcfc-tab {
+    min-width: 0;
+  }
+  .pcfc-tab thead {
+    display: none;
+  }
+  .pcfc-tab tr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .pcfc-tab td {
+    border: 0;
+    padding: 2px 0;
+  }
+  .pcfc-tab tr.pcfc-area {
+    display: block;
+    padding: 0;
+  }
+  .pcfc-tab tr.pcfc-area td {
+    display: block;
+    padding: 6px 8px;
+  }
+  .pcfc-c-perche,
+  .pcfc-c-mano,
+  .pcfc-c-vai {
+    grid-column: 1 / -1;
+  }
+}
+/* rigo evidenziato dopo un "vai a" e barra per tornare (navigazione.js) */
+.nav-evidenza {
+  outline: 3px solid var(--accent) !important;
+  outline-offset: -2px;
+  animation: navPulsa 1.2s ease-in-out 2;
+}
+tr.nav-evidenza > td {
+  background: color-mix(in srgb, var(--accent) 12%, transparent) !important;
+}
+@keyframes navPulsa {
+  50% {
+    outline-color: transparent;
+  }
+}
+#nav-ritorno {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 9000;
+  width: min(760px, calc(100% - 32px));
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 10px 12px 10px 16px;
+  border-radius: 6px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+  font-size: var(--fs-md, 0.875rem);
+  line-height: 1.45;
+}
+.nav-ritorno-testo {
+  flex: 1;
+  min-width: 0;
+}
+.nav-ritorno-azioni {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-shrink: 0;
+}
+#nav-ritorno .nav-ritorno-torna {
+  background: var(--paper);
+  color: var(--ink);
+  border-color: var(--paper);
+  white-space: nowrap;
+}
+.nav-ritorno-chiudi {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  padding: 6px;
+  opacity: 0.8;
+}
+@media (max-width: 640px) {
+  #nav-ritorno {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .nav-ritorno-azioni {
+    justify-content: space-between;
+  }
+}
+.rg-tecnico {
+  margin-top: 4px;
+  font-size: var(--fs-sm, 0.8125rem);
+  color: var(--muted);
+}
+.rg-tecnico summary {
+  cursor: pointer;
+}

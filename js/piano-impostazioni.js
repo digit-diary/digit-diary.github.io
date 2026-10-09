@@ -24,7 +24,7 @@ function _renderPianoMappatureCard() {
     ' i turni normali della funzione: la bozza li da per primi.</div>' +
     '<div>' +
     pill('#b39b00', 'AMMESSO') +
-    ' permessi ma non abituali: la bozza li usa solo quando serve.</div>' +
+    ' permessi ma non abituali: la bozza li assegna, preferendo i principali.</div>' +
     '<div>' +
     pill('#1a4a7a', 'PREFERITO') +
     ' solo una preferenza: non limita niente.</div></div>' +
@@ -52,14 +52,18 @@ function _renderPianoMappatureCard() {
           ? (n === 1 ? 'questa persona fa' : 'fanno') + ' SOLO i turni qui sotto'
           : 'solo preferenza: non limita';
       h +=
-        '<p style="font-size:var(--fs-md,.875rem);margin:10px 0 4px"><b>' +
+        '<p data-mapp-fz="' +
+        escP(String(fz).toUpperCase()) +
+        '" style="font-size:var(--fs-md,.875rem);margin:10px 0 4px"><b>' +
         escP(fz) +
         '</b> <span style="color:var(--muted)">· ' +
         n +
         (n === 1 ? ' collaboratore' : ' collaboratori') +
         ' · ' +
         effetto +
-        '</span></p><div style="display:flex;gap:6px;flex-wrap:wrap">';
+        '</span></p><div data-mapp-fz="' +
+        escP(String(fz).toUpperCase()) +
+        '" style="display:flex;gap:6px;flex-wrap:wrap">';
       perFz[fz]
         .sort((a, b) => (ordine[a.tipo] || 9) - (ordine[b.tipo] || 9) || a.turno_codice.localeCompare(b.turno_codice))
         .forEach((m) => {
@@ -254,7 +258,7 @@ function _renderPianoImpostazioniCard() {
     '</div>';
   // competenze Formazione -> gruppi del piano
   h +=
-    '<p style="font-size:var(--fs-md,.875rem);font-weight:700;margin:12px 0 4px">Competenze Formazione → gruppi del piano</p>' +
+    '<p data-pcfc-comp-gruppi style="font-size:var(--fs-md,.875rem);font-weight:700;margin:12px 0 4px">Competenze Formazione → aree del piano</p>' +
     '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:6px">Per i gruppi collegati qui <b>decide la Formazione</b>: chi ha la competenza certificata e abilitato al gruppo, chi non ce l ha ne e escluso, anche se il gruppo era fra i suoi Settori (togliere una spunta in Formazione toglie la persona da quei turni). I gruppi senza collegamento seguono i Settori della persona. "-" = nessun collegamento.</p>';
   // solo i gruppi dei turni DI QUESTO settore (i turni sono divisi per settore)
   const gruppiDisp = [
@@ -294,7 +298,7 @@ function _renderPianoImpostazioniCard() {
     h += '</div>';
   }
   h +=
-    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:10px">Le funzioni compaiono nei menu di Gestione collaboratori e nelle mappature. Preferenze per collaboratore (solo diurni, turni bloccati, settori...) nella card qui sotto.</p>';
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:10px">Le funzioni compaiono nei menu di Gestione collaboratori e nelle mappature. Preferenze per collaboratore (solo diurni, turni bloccati, giorni di lavoro...) nella card Preferenze collaboratori di questa scheda.</p>';
   h += '</div></div>';
   // generazione automatica (js/piano-auto.js): scheda propria, si riempie da sola
   if (typeof _pianoAutoCardSegnaposto === 'function') h += _pianoAutoCardSegnaposto();
@@ -786,32 +790,32 @@ function _renderPianoImportExportCard() {
 
 const _REGOLE_GRUPPO_TIPI = {
   richiede_funzione:
-    'Funzioni ammesse anche senza il gruppo fra i settori (es: SUP oppure BO,SUP) · chi non le ha deve avere il gruppo fra i settori',
-  blocca_tipo_turno: 'Vieta un tipo di turno nel gruppo (es: NOTTURNO)',
-  richiede_campo: 'Richiede un campo del collaboratore (es: accoglienza>0)',
-  limite_funzione_giorno: 'Max N di una funzione al giorno (es: SUP:1)',
-  limite_funzione_mese: 'Max N persone di una funzione al mese (es: SUP:1)',
-  minimo_funzione_mese: 'Almeno N di una funzione al mese (es: SUP:1)',
-  minimo_funzione_giorno: 'Almeno N al giorno, con filtri (es: SUP:1:NOTTURNO:4,5 · 4,5=ven,sab)',
-  turni_solo_funzioni: 'Questi turni solo a queste funzioni (es: L1,9:BO,SUP · gruppo "tutti" = qualsiasi)',
+    'Le funzioni scelte entrano nell area anche senza esserne abilitate; gli altri devono essere abilitati (Formazione)',
+  blocca_tipo_turno: 'Nell area nessuno fa turni del tipo scelto (per esempio notturni)',
+  richiede_campo: 'Nell area lavora solo chi ha un valore sulla scheda (per esempio accoglienza maggiore di 0)',
+  limite_funzione_giorno: 'Al massimo quante persone di una funzione nello stesso giorno',
+  limite_funzione_mese: 'Al massimo quante persone diverse di una funzione nel mese',
+  minimo_funzione_mese: 'Almeno quante persone di una funzione nel mese',
+  minimo_funzione_giorno: 'Almeno quante persone di una funzione al giorno, anche solo certi giorni o certi turni',
+  turni_solo_funzioni:
+    'I turni scelti li fanno solo le funzioni scelte (per esempio L1 e 9 solo Back Office e Supervisor)',
   funzione_turni_giorni:
-    'In questi giorni la funzione fa SOLO questi turni (es: SUP:Z*,L1,9:0,1,2,3 · Z* = tutte le sigle che iniziano con Z · giorni 0=lun ... 6=dom, vuoto = sempre)',
+    'Nei giorni scelti la funzione fa solo i turni scelti (per esempio i Supervisor da lunedi a giovedi solo i turni che iniziano con Z, L1 e 9)',
   livello_turni:
-    'Questi turni solo da un livello di Formazione in su (es: 10,10C,9:L2 · L1-L2 = solo L1 e L2 · eccezioni per persona in Preferenze, Turni consentiti)',
-  minimo_livello_giorno:
-    'Almeno N persone di un livello di Formazione al giorno, con filtri (es: L3:2:NOTTURNO:4,5 = 2 di livello L3 o piu sui turni notturni, venerdi e sabato · 0=lun ... 6=dom)',
+    'I turni scelti solo da un livello di Formazione in su; eccezioni per persona in Preferenze, Turni consentiti',
+  minimo_livello_giorno: 'Almeno quante persone di un livello di Formazione al giorno, anche solo certi giorni o turni',
   minimo_competenza_giorno:
-    'Almeno N persone con una competenza di Formazione (anche una specialita Extra, es. Poker) al giorno, con filtri facoltativi: tipo di turno, giorni, fascia oraria',
+    'Almeno quante persone con una competenza di Formazione (anche una specialita Extra, per esempio Poker) al giorno, con giorni, tipo di turno e fascia oraria facoltativi',
   equilibrio_livelli:
-    'Forti e deboli distribuiti nelle fasce orarie: in ogni fascia almeno N persone dal livello scelto in su e livello medio vicino a quello del giorno. La bozza bilancia, Valida segnala',
+    'Forti e deboli distribuiti nelle fasce orarie: in ogni fascia almeno quanti forti e livello medio vicino a quello del giorno. La bozza bilancia, Valida segnala',
   turni_solo_collaboratori:
-    'Questi turni li fanno solo i collaboratori scelti (es: AX solo a tre persone): vale per bozza, Migliora, proposte e Valida',
+    'I turni scelti li fanno solo i collaboratori scelti (per esempio AX a tre persone): vale per bozza, Migliora, proposte e Valida',
   coordinatori:
     'Ogni giorno un coordinatore di giorno (turni di apertura) e uno di notte (turni di chiusura: vale quello che finisce piu tardi), scelti fra i collaboratori indicati; se mancano, ne propone un altro. Escono in rosso nel piano e nel briefing',
 };
 // Etichette in italiano per la scheda (la lingua di chi la usa)
 const _REGOLE_GRUPPO_ETICHETTE = {
-  richiede_funzione: 'Funzioni ammesse nel gruppo',
+  richiede_funzione: 'Funzioni che entrano nell area senza abilitazione',
   blocca_tipo_turno: 'Tipo di turno vietato nel gruppo',
   richiede_campo: 'Requisito sulla scheda del collaboratore',
   limite_funzione_giorno: 'Massimo di una funzione al giorno',
@@ -996,6 +1000,19 @@ function _rgLeggi(tipo, v) {
   return Object.assign(base, s && s.leggi ? s.leggi(v) : _rgLeggiBase(tipo, v));
 }
 // la regola detta a parole, per la tabella
+// "Z*,S*,L1,9" -> "i turni che iniziano con Z o S, e L1, 9" (niente simboli tecnici)
+function _rgSigleInParole(testo) {
+  const voci = String(testo || '')
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean);
+  const pref = voci.filter((x) => x.endsWith('*')).map((x) => x.slice(0, -1));
+  const esatte = voci.filter((x) => !x.endsWith('*'));
+  const parti = [];
+  if (pref.length) parti.push('i turni che iniziano con ' + pref.join(' o '));
+  if (esatte.length) parti.push((pref.length ? 'e ' : 'i turni ') + esatte.join(', '));
+  return parti.join(', ');
+}
 function _rgFrase(r) {
   const tipo = String(r.tipo_regola || '').toLowerCase();
   const c = _rgLeggi(tipo, r.valore);
@@ -1054,7 +1071,7 @@ function _rgFrase(r) {
     case 'turni_solo_funzioni':
       return 'I turni ' + c.turni + ' li fanno solo ' + c.fzs.join(', ');
     case 'funzione_turni_giorni':
-      return c.fz + ' fa solo i turni ' + c.turni + (c.gg.length ? giorniTxt : ', sempre');
+      return c.fz + ' fa solo ' + _rgSigleInParole(c.turni) + (c.gg.length ? giorniTxt : ', sempre');
     case 'livello_turni':
       return 'I turni ' + c.turni + ' solo da ' + (c.lvmax ? c.lv + ' a ' + c.lvmax : c.lv + ' in su');
     case 'minimo_competenza_giorno': {
@@ -1987,15 +2004,19 @@ function _renderPianoRegoleGruppoCard() {
   let h =
     '<div class="main-card" style="margin-top:16px"><div class="card-header">Regole di gruppo</div><div style="padding:10px 14px">';
   h +=
-    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:6px">Regole di idoneità per settore/gruppo: chi può lavorare in un gruppo, limiti e minimi per funzione. Applicate dalla bozza automatica e dal validatore.</p>';
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:6px">Chi puo fare quali turni in ogni area del settore aperto, quante persone servono al giorno e come distribuirle. Le rispettano bozza, Migliora e Valida. Per vedere l effetto su una persona o un turno: Chi puo fare cosa, qui sopra.</p>';
   h +=
-    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:680px;font-size:var(--fs-md,.875rem)"><thead><tr><th>Gruppo</th><th style="text-align:left">Regola</th><th style="text-align:left">Valore salvato</th><th>Attiva</th><th></th></tr></thead><tbody>';
+    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:680px;font-size:var(--fs-md,.875rem)"><thead><tr><th>Area</th><th style="text-align:left">Regola</th><th>Attiva</th><th></th></tr></thead><tbody>';
   pianoRegoleGruppoCache
     .filter((r) => (r.reparto_dip || 'slots') === _pianoReparto())
     .sort((a, b) => (a.gruppo || '').localeCompare(b.gruppo || '') || a.id - b.id)
     .forEach((r) => {
       h +=
-        '<tr><td style="font-weight:700">' +
+        '<tr data-rg-id="' +
+        r.id +
+        '" data-rg-gruppo="' +
+        escP(String(r.gruppo || '').toUpperCase()) +
+        '"><td style="font-weight:700">' +
         escP(r.gruppo === '*' ? 'tutti' : r.gruppo) +
         '</td><td style="text-align:left" title="' +
         escP(_REGOLE_GRUPPO_TIPI[r.tipo_regola] || '') +
@@ -2003,11 +2024,11 @@ function _renderPianoRegoleGruppoCard() {
         escP(_REGOLE_GRUPPO_ETICHETTE[r.tipo_regola] || r.tipo_regola) +
         '</b><br><span style="font-size:var(--fs-md,.875rem)">' +
         escP(_rgFrase(r)) +
-        '</span></td><td style="text-align:left"><code style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
-        escP(r.valore || '') +
-        '</code>' +
+        '</span>' +
         _pianoRegolaLivelloChi(r) +
-        '</td><td><input type="checkbox"' +
+        '<details class="rg-tecnico"><summary>Valore tecnico</summary><code>' +
+        escP(r.valore || '') +
+        '</code></details></td><td><input type="checkbox"' +
         (r.attivo !== false ? ' checked' : '') +
         ' onchange="salvaRegolaGruppo(' +
         r.id +
@@ -2049,7 +2070,7 @@ function _renderPianoRegoleGruppoCard() {
     '<li>Le regole valgono per il <b>settore aperto</b>: ogni settore ha le sue, con le sue sigle e le sue funzioni. Agiscono nel validatore, nella bozza, nei cambi turno e nella scrittura manuale (avviso).</li>' +
     '</ol></details>' +
     '<div id="rg-modulo" style="margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:3px;background:var(--paper2)">' +
-    '<div class="add-tipo-row" onchange="rgAggiornaAnteprima()" oninput="rgAggiornaAnteprima()"><div class="field"><label>Gruppo</label><select id="rg-gruppo" style="padding:8px" onchange="rgGruppoCambiato()">' +
+    '<div class="add-tipo-row" onchange="rgAggiornaAnteprima()" oninput="rgAggiornaAnteprima()"><div class="field"><label>Area</label><select id="rg-gruppo" style="padding:8px" onchange="rgGruppoCambiato()">' +
     gruppi.map((g) => '<option>' + escP(g) + '</option>').join('') +
     '<option value="*">tutti</option>' +
     '</select></div><div class="field"><label>Regola</label><select id="rg-tipo" style="padding:8px" onchange="rgTipoCambiato()">' +
@@ -2818,7 +2839,7 @@ function _renderPianoPreferenzeCard() {
     (soloSlots
       ? '<th title="La bozza le privilegia sui turni L1">Preferisce L1</th><th title="Livello accoglienza (0-2): serve per il gruppo ACCOGLIENZA">Accoglienza</th>'
       : '') +
-    '<th style="text-align:left" title="Gruppi dove NON può lavorare da solo (CSV, es: REC)">Accompagnamento</th><th style="text-align:left" title="Altri reparti in cui lavora (CSV, es: valet): appare anche nei loro piani e le ore si sommano">Reparti extra</th><th style="text-align:left" title="Derivati dalle competenze certificate in Formazione (sola lettura)">Settori</th></tr></thead><tbody>';
+    '<th style="text-align:left" title="Aree dove lavora affiancato: puo fare i turni ma mai da solo (es: REC)">Affiancato in</th><th style="text-align:left" title="Altri reparti in cui lavora (CSV, es: valet): appare anche nei loro piani e le ore si sommano">Reparti extra</th><th style="text-align:left" title="Derivate dalle competenze certificate in Formazione (sola lettura: si cambiano in Formazione)">Aree abilitate</th></tr></thead><tbody>';
   collabs.forEach((c) => {
     h +=
       '<tr data-pref-nome="' +

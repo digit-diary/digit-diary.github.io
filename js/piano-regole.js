@@ -230,8 +230,8 @@
         const min = parseInt(String(minT || '').replace(/^L/i, '')) || 0;
         const max = parseInt(String(maxT || '').replace(/^L/i, '')) || 0;
         if (lv < min)
-          return 'turno ' + cod + ' dal livello L' + min + ' in su (livello: ' + (lv ? 'L' + lv : 'nessuno') + ')';
-        if (max && lv > max) return 'turno ' + cod + ' solo fino al livello L' + max + ' (livello: L' + lv + ')';
+          return 'turno ' + cod + ' dal livello ' + min + ' in su (suo livello: ' + (lv ? lv : 'nessuno') + ')';
+        if (max && lv > max) return 'turno ' + cod + ' solo fino al livello ' + max + ' (suo livello: ' + lv + ')';
         continue;
       }
       if (tipo === 'funzione_turni_giorni') {
@@ -249,7 +249,12 @@
         if (giorni.length && !giorni.includes(dowPy)) continue;
         if (modelli.some(combacia)) continue;
         return (
-          fz + ' con turno ' + cod + (giorni.length ? ' in questo giorno' : '') + ': ammessi solo ' + modelli.join(', ')
+          fz +
+          ' con turno ' +
+          cod +
+          (giorni.length ? ' in questo giorno' : '') +
+          ': ammessi solo ' +
+          modelli.map((m) => (m.endsWith('*') ? 'i turni che iniziano con ' + m.slice(0, -1) : m)).join(', ')
         );
       }
     }
@@ -275,8 +280,8 @@
       info.turni_bloccati &&
       info.turni_bloccati
         .split(',')
-        .map((x) => x.trim())
-        .includes(turno.codice)
+        .map((x) => x.trim().toUpperCase())
+        .includes(String(turno.codice).toUpperCase())
     )
       return false;
     // scelto per nome per questo turno (Turni riservati a collaboratori): idoneo

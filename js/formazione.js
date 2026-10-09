@@ -979,7 +979,9 @@ function renderFormazione() {
       const on = (c.competenze || {})[k.key] === true;
       const cc2 = coloreComp(k.key);
       html +=
-        '<td class="num"' +
+        '<td class="num" data-comp="' +
+        escP(k.key) +
+        '"' +
         (cc2 ? ' style="background:' + cc2 + '40"' : '') +
         '><input type="checkbox" ' +
         (on ? 'checked ' : '') +

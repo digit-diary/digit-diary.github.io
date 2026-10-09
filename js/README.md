@@ -56,6 +56,7 @@ Ordine = ordine di caricamento in index.html. Il Piano di lavoro e diviso in die
 | 38 | piano-briefing-ui.js | 1773 | PIANO · scheda Briefing (compilazione, numeri cassa, formato, Annulla/Ripristina del giorno) e corsi |
 | 39 | piano-extra.js | 2278 | PIANO · copia/incolla a blocchi, annulla/ripristina, selezione sparsa, trova, migliora ore, formazione, scheda Crediti |
 | 40 | pause-controlli.js | 531 | PAUSE · controlli del foglio Slots in funzioni pure (test/pause-controlli.test.js): pause di ogni persona, regola delle ore, distanza, sala mai vuota, righe senza nessuno |
+| 41b | navigazione.js | 150 | Freccia Indietro (pagine e schede del Piano nella cronologia del browser), evidenza dell elemento di arrivo e barra Torna a |
 | 42 | posizione.js | 230 | La pagina resta ferma: avvolge le funzioni che ridisegnano (render/refresh/aggiorna) e rimette lo scorrimento di finestra e riquadri; ripristino dopo la ricarica del browser; caricato per ultimo |
 | 41 | pause-engine.js | 4563 | PAUSE del briefing: schemi Slots (porting Excel), completamento delle pause mancanti, bigliettino del mattino, pausa e cambio collegati, motore algoritmico Valet/altri, regole pause per settore, PDF |
 

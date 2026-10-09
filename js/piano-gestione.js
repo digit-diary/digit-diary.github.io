@@ -656,7 +656,7 @@ function _renderPianoTurniCard() {
     let hRO =
       '<div class="main-card" style="margin-top:16px"><div class="card-header">Turni · ' +
       escP(repartoLabel(_pianoReparto())) +
-      '</div><div style="padding:10px 14px"><div style="overflow-x:auto"><table class="piano-table" style="min-width:520px;font-size:var(--fs-md,.875rem)"><thead><tr><th>Codice</th><th>Gruppo</th><th>Inizio</th><th>Fine</th><th title="Durata in ore decimali e, accanto, in ore e minuti: 8.33 = 8h20, perche 20 minuti sono un terzo di ora">Ore</th><th>Tipo</th></tr></thead><tbody>';
+      '</div><div style="padding:10px 14px"><div style="overflow-x:auto"><table class="piano-table" style="min-width:520px;font-size:var(--fs-md,.875rem)"><thead><tr><th>Codice</th><th title="Area di lavoro del turno (SALA, CASSA, REC...)">Area</th><th>Inizio</th><th>Fine</th><th title="Durata in ore decimali e, accanto, in ore e minuti: 8.33 = 8h20, perche 20 minuti sono un terzo di ora">Ore</th><th>Tipo</th></tr></thead><tbody>';
     turniRO.forEach((t) => {
       hRO +=
         '<tr><td style="font-weight:700;background:' +
@@ -696,7 +696,7 @@ function _renderPianoTurniCard() {
     '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px" onclick="pianoVerificaDurateNotte()">Controlla le durate dei turni</button>' +
     '</div>';
   h +=
-    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:720px;font-size:var(--fs-md,.875rem)"><thead><tr><th>Codice</th><th>Gruppo</th><th>Inizio</th><th>Fine</th><th title="Ora di fine nei giorni in cui il casino chiude alle 5: venerdi, sabato, vigilie di festivita, 31 dicembre. Vuoto = il turno finisce sempre alla stessa ora">Fine (chiusura 5)</th><th title="Durata in ore decimali e, accanto, in ore e minuti: 8.33 = 8h20, perche 20 minuti sono un terzo di ora">Ore</th><th>Tipo</th><th>Colore</th><th>Oltre 23</th><th>Attivo</th><th></th></tr></thead><tbody>';
+    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:720px;font-size:var(--fs-md,.875rem)"><thead><tr><th>Codice</th><th title="Area di lavoro del turno (SALA, CASSA, REC...)">Area</th><th>Inizio</th><th>Fine</th><th title="Ora di fine nei giorni in cui il casino chiude alle 5: venerdi, sabato, vigilie di festivita, 31 dicembre. Vuoto = il turno finisce sempre alla stessa ora">Fine (chiusura 5)</th><th title="Durata in ore decimali e, accanto, in ore e minuti: 8.33 = 8h20, perche 20 minuti sono un terzo di ora">Ore</th><th>Tipo</th><th>Colore</th><th>Oltre 23</th><th>Attivo</th><th></th></tr></thead><tbody>';
   turni
     .slice()
     .sort((x, y) => (x.gruppo || '').localeCompare(y.gruppo || '') || x.codice.localeCompare(y.codice))
@@ -767,7 +767,7 @@ function _renderPianoTurniCard() {
   h += '</tbody></table></div>';
   h +=
     '<div class="add-tipo-row" style="margin-top:8px"><div class="field"><label>Codice</label><input type="text" id="pt-nuovo-codice" placeholder="S9" style="width:80px"></div>' +
-    '<div class="field"><label>Gruppo</label><input type="text" id="pt-nuovo-gruppo" placeholder="SALA" style="width:110px"></div>' +
+    '<div class="field"><label>Area</label><input type="text" id="pt-nuovo-gruppo" placeholder="SALA" style="width:110px"></div>' +
     '<div class="field"><label>Inizio</label><input type="time" id="pt-nuovo-inizio"></div>' +
     '<div class="field"><label>Fine</label><input type="time" id="pt-nuovo-fine"></div>' +
     '<div class="field"><label>Ore</label><input type="number" step="0.25" id="pt-nuovo-ore" value="8.25" style="width:70px"></div>' +
@@ -890,7 +890,8 @@ async function salvaPianoTurno(id, campo, valore) {
   if (
     tV &&
     ((campo === 'gruppo' && String(valore).trim().toUpperCase() !== String(tV.gruppo || '').toUpperCase()) ||
-      (campo === 'attivo' && !valore && tV.attivo !== false))
+      (campo === 'attivo' && !valore && tV.attivo !== false) ||
+      (campo === 'tipo' && String(valore || '').toUpperCase() !== String(tV.tipo || '').toUpperCase()))
   ) {
     const dip = await _pianoDipendenzeTurno(tV, campo, valore);
     if (
@@ -899,12 +900,14 @@ async function salvaPianoTurno(id, campo, valore) {
         (campo === 'gruppo'
           ? 'Spostare ' +
             tV.codice +
-            ' dal gruppo ' +
+            ' dall area ' +
             (tV.gruppo || '-') +
-            ' al gruppo ' +
+            ' all area ' +
             String(valore).trim().toUpperCase() +
             '?'
-          : 'Disattivare il turno ' + tV.codice + '?') +
+          : campo === 'tipo'
+            ? 'Cambiare ' + tV.codice + ' in ' + String(valore || '').toLowerCase() + '?'
+            : 'Disattivare il turno ' + tV.codice + '?') +
           '\n\nQueste impostazioni ne dipendono e potrebbero non valere piu come prima:\n\u2022 ' +
           dip.join('\n\u2022 ') +
           '\n\nConfermi?',
@@ -945,21 +948,23 @@ async function salvaPianoTurno(id, campo, valore) {
     toast('Errore salvataggio turno');
   }
 }
-// cosa dipende da un turno (per l avviso prima di cambiarne il gruppo o disattivarlo)
+// cosa dipende da un turno (per l avviso prima di cambiarne il gruppo, disattivarlo o eliminarlo)
 async function _pianoDipendenzeTurno(t, campo, valore) {
   const rep = t.reparto_dip || 'slots';
   const cod = String(t.codice).toUpperCase();
   const gr = String(t.gruppo || '').toUpperCase();
   const out = [];
+  const plur = (n, uno, molti) => n + ' ' + (n === 1 ? uno : molti);
   const nomiDi = (l) => (l.length > 6 ? l.slice(0, 6).join(', ') + ' e altri ' + (l.length - 6) : l.join(', '));
-  const persone = collaboratoriCache.filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === rep);
+  const persone = collaboratoriCache.filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c, rep));
   const lista = (v) =>
     String(v || '')
       .toUpperCase()
       .split(',')
       .map((x) => x.trim())
       .filter(Boolean);
-  // il gruppo resta senza turni attivi? (solo questo turno lo teneva in vita)
+  const frase = (r) => (typeof _rgFrase === 'function' ? _rgFrase(r) : r.valore);
+  // l area resta senza turni attivi? (solo se questo turno era attivo e l unico)
   const altriDelGruppo = pianoTurniCache.filter(
     (x) =>
       x.id !== t.id &&
@@ -967,56 +972,127 @@ async function _pianoDipendenzeTurno(t, campo, valore) {
       (x.reparto_dip || 'slots') === rep &&
       String(x.gruppo || '').toUpperCase() === gr,
   );
-  const gruppoSparisce = gr && !altriDelGruppo.length;
-  if (campo === 'gruppo' || gruppoSparisce) {
+  const gruppoSparisce = !!gr && t.attivo !== false && !altriDelGruppo.length;
+  if (gruppoSparisce) {
+    out.push('l area ' + gr + ' resta senza turni attivi');
     const regG = pianoRegoleGruppoCache.filter(
       (r) => r.attivo !== false && (r.reparto_dip || 'slots') === rep && String(r.gruppo || '').toUpperCase() === gr,
     );
-    if (gruppoSparisce) out.push('il gruppo ' + gr + ' resta senza turni attivi');
-    if (gruppoSparisce && regG.length) out.push(regG.length + ' regole di gruppo del gruppo ' + gr);
-    const comp = Object.entries(window._pianoCompGruppiCfg || {}).filter(
-      ([, g]) => String(g || '').toUpperCase() === gr,
-    );
-    if (gruppoSparisce && comp.length)
-      out.push('competenze di Formazione collegate al gruppo ' + gr + ': ' + comp.map(([k]) => k).join(', '));
-    const conSett = persone.filter((c) => lista(c.settori_piano).includes(gr)).map((c) => c.nome);
-    if (gruppoSparisce && conSett.length) out.push('Settori di ' + nomiDi(conSett));
-    const conAcc = persone.filter((c) => lista(c.accompagnamento_settori).includes(gr)).map((c) => c.nome);
-    if (gruppoSparisce && conAcc.length) out.push('Accompagnamento di ' + nomiDi(conAcc));
-    if (campo === 'gruppo') {
-      const nuovo = String(valore || '')
-        .trim()
-        .toUpperCase();
-      const nuovoEsiste = pianoTurniCache.some(
-        (x) =>
-          x.attivo !== false && (x.reparto_dip || 'slots') === rep && String(x.gruppo || '').toUpperCase() === nuovo,
+    if (regG.length)
+      out.push(
+        plur(regG.length, 'regola di gruppo', 'regole di gruppo') +
+          ' dell area ' +
+          gr +
+          ': ' +
+          regG.map(frase).join('; '),
       );
-      if (!nuovoEsiste)
-        out.push(
-          'il gruppo ' +
-            nuovo +
-            ' e nuovo: nessuno vi e abilitato finche non lo colleghi a una competenza, ai Settori delle persone o a "Turni riservati"',
-        );
-      else out.push('chi e abilitato al gruppo ' + gr + ' ma non al gruppo ' + nuovo + ' non potra piu fare ' + cod);
-    }
+    const comp = Object.entries(_pianoCompetenzeGruppiGrezze()).filter(([, g]) => String(g || '').toUpperCase() === gr);
+    if (comp.length)
+      out.push(
+        'competenze di Formazione collegate all area ' +
+          gr +
+          ': ' +
+          comp
+            .map(([k]) => (typeof _pcfcEtichettaCompetenza === 'function' ? _pcfcEtichettaCompetenza(k) : k))
+            .join(', '),
+      );
+    const conSett = persone.filter((c) => lista(c.settori_piano).includes(gr)).map((c) => c.nome);
+    if (conSett.length) out.push('aree abilitate di ' + nomiDi(conSett));
+    const conAcc = persone.filter((c) => _pianoAccompagnamentoDi(c).includes(gr)).map((c) => c.nome);
+    if (conAcc.length) out.push('affiancamento di ' + nomiDi(conAcc));
   }
-  // regole che citano la sigla (turni riservati, coordinatori, livelli...)
-  const citano = pianoRegoleGruppoCache.filter(
-    (r) =>
-      r.attivo !== false &&
-      (r.reparto_dip || 'slots') === rep &&
-      String(r.valore || '')
-        .toUpperCase()
-        .split(/[^A-Z0-9*]+/)
-        .includes(cod),
-  );
-  if (campo === 'attivo' && citano.length) out.push(citano.length + ' regole di gruppo citano ' + cod);
+  if (campo === 'tipo') {
+    const nuovoT = String(valore || '').toUpperCase();
+    const pref = persone.filter((c) =>
+      nuovoT === 'NOTTURNO' ? c.solo_diurni : String(t.tipo || '').toUpperCase() === 'NOTTURNO' && c.solo_notti,
+    );
+    if (pref.length)
+      out.push(
+        (nuovoT === 'NOTTURNO'
+          ? 'fanno solo turni diurni e non lo potranno piu fare: '
+          : 'fanno solo notturni e non lo potranno piu fare: ') + nomiDi(pref.map((c) => c.nome)),
+      );
+    const vieta = pianoRegoleGruppoCache.filter(
+      (r) =>
+        r.attivo !== false &&
+        (r.reparto_dip || 'slots') === rep &&
+        String(r.gruppo || '').toUpperCase() === gr &&
+        String(r.tipo_regola || '').toLowerCase() === 'blocca_tipo_turno' &&
+        lista(r.valore).includes(nuovoT),
+    );
+    if (vieta.length) out.push('nell area ' + gr + ' una regola vieta i turni ' + nuovoT.toLowerCase());
+    return out;
+  }
+  if (campo === 'gruppo') {
+    const nuovo = String(valore || '')
+      .trim()
+      .toUpperCase();
+    const nuovoEsiste = pianoTurniCache.some(
+      (x) => x.attivo !== false && (x.reparto_dip || 'slots') === rep && String(x.gruppo || '').toUpperCase() === nuovo,
+    );
+    if (!nuovoEsiste)
+      out.push(
+        'l area ' +
+          nuovo +
+          ' e nuova: nessuno vi e abilitato finche non la colleghi a una competenza di Formazione o a "Turni riservati"',
+      );
+    // chi perde o guadagna davvero il turno (stesso controllo della bozza, senza giorno)
+    try {
+      await _pianoCaricaStoriaGruppi(rep);
+    } catch (e) {}
+    const storia = (n) => {
+      const c = (_pianoStoriaGruppiCache[rep] || {}).primo || {};
+      return new Set(Object.keys(c[n] || {}));
+    };
+    const tNuovo = Object.assign({}, t, { gruppo: nuovo });
+    const perdono = [];
+    const guadagnano = [];
+    persone.forEach((c) => {
+      const id = {};
+      id[c.nome] = storia(c.nome);
+      const prima = _pianoIdoneoStatico(c.nome, t, null, id);
+      const dopo = _pianoIdoneoStatico(c.nome, tNuovo, null, id);
+      if (prima && !dopo) perdono.push(c.nome);
+      if (!prima && dopo) guadagnano.push(c.nome);
+    });
+    if (perdono.length) out.push('non potranno piu fare ' + cod + ' (per la bozza): ' + nomiDi(perdono));
+    if (guadagnano.length) out.push('potranno fare ' + cod + ' (per la bozza): ' + nomiDi(guadagnano));
+    const regNuovo = pianoRegoleGruppoCache.filter(
+      (r) => r.attivo !== false && (r.reparto_dip || 'slots') === rep && String(r.gruppo || '').toUpperCase() === nuovo,
+    );
+    if (regNuovo.length)
+      out.push(
+        'nell area ' +
+          nuovo +
+          ' valgono ' +
+          plur(regNuovo.length, 'regola', 'regole') +
+          ': ' +
+          regNuovo.map(frase).join('; '),
+      );
+  }
+  // regole e mappature che citano la sigla (secondo il tipo di regola; Z* comprende Z0)
+  const citano =
+    typeof _pcfcRegoleCheCitano === 'function'
+      ? _pcfcRegoleCheCitano(cod, rep)
+      : pianoRegoleGruppoCache.filter((r) =>
+          String(r.valore || '')
+            .toUpperCase()
+            .includes(cod),
+        );
+  if (campo !== 'gruppo' && citano.length)
+    out.push(
+      plur(citano.length, 'regola di gruppo cita', 'regole di gruppo citano') +
+        ' ' +
+        cod +
+        ': ' +
+        citano.map(frase).join('; '),
+    );
   const mapp = (typeof pianoMappatureCache !== 'undefined' ? pianoMappatureCache : []).filter(
     (m) => (m.reparto_dip || 'slots') === rep && String(m.turno_codice).toUpperCase() === cod,
   );
-  if (campo === 'attivo' && mapp.length)
-    out.push('Turni per funzione: ' + mapp.map((m) => m.funzione + ' ' + m.tipo).join(', '));
-  if (campo === 'attivo') {
+  if (campo !== 'gruppo' && mapp.length)
+    out.push('Turni per funzione: ' + mapp.map((m) => m.funzione + ' ' + String(m.tipo).toLowerCase()).join(', '));
+  if (campo !== 'gruppo') {
     const blocc = persone.filter(
       (c) => lista(c.turni_bloccati).includes(cod) || lista(c.turni_consentiti).includes(cod),
     );
@@ -1025,7 +1101,7 @@ async function _pianoDipendenzeTurno(t, campo, valore) {
       const oggi = typeof oggiLocale === 'function' ? oggiLocale() : new Date().toISOString().slice(0, 10);
       const f =
         (await secGet(
-          'piano_fabbisogni?turno_codice=eq.' +
+          'piano_fabbisogni?turno_codice=ilike.' +
             encodeURIComponent(t.codice) +
             '&reparto_dip=eq.' +
             rep +
@@ -1033,8 +1109,10 @@ async function _pianoDipendenzeTurno(t, campo, valore) {
             oggi +
             '&limit=500',
         )) || [];
-      if (f.length) out.push('fabbisogno da oggi in poi: ' + f.length + ' giorni con ' + cod);
-    } catch (e) {}
+      if (f.length) out.push('fabbisogno da oggi in poi: ' + plur(f.length, 'giorno', 'giorni') + ' con ' + cod);
+    } catch (e) {
+      out.push('fabbisogno futuro non verificato (collegamento assente)');
+    }
   }
   return out;
 }
@@ -1102,7 +1180,18 @@ async function eliminaPianoTurno(id) {
     toast('Il turno ' + t.codice + ' è usato nel piano: disattivalo invece di eliminarlo');
     return;
   }
-  if (!(await chiediConferma('Eliminare il turno ' + t.codice + '? (mai usato nel piano)'))) return;
+  const dip = await _pianoDipendenzeTurno(t, 'elimina', true);
+  if (
+    !(await chiediConferma(
+      'Eliminare il turno ' +
+        t.codice +
+        '? (mai usato nel piano)' +
+        (dip.length
+          ? '\n\nDipendono da questo turno:\n\u2022 ' + dip.join('\n\u2022 ') + '\n\nRestano da sistemare a mano.'
+          : ''),
+    ))
+  )
+    return;
   try {
     await secDel('piano_turni', 'id=eq.' + id);
     pianoTurniCache = pianoTurniCache.filter((x) => x.id !== id);

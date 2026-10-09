@@ -1750,7 +1750,7 @@ function _renderPianoCorsiCard() {
   // gestione della LISTA corsi (admin): aggiungi sigla, rinomina, rimuovi
   if (isAdmin()) {
     h +=
-      '<p style="font-size:var(--fs-sm,.8125rem);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Gestisci corsi (admin)</p>';
+      '<p style="font-size:var(--fs-sm,.8125rem);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Gestisci corsi</p>';
     corsi.forEach((c) => {
       h +=
         '<div class="tipo-item"><div class="tipo-item-name" style="min-width:90px;font-weight:700">' +

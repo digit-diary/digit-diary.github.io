@@ -22,6 +22,8 @@ function switchPage(name) {
   const tb = document.querySelector('.nav-tab[data-page="' + name + '"]');
   if (tb) tb.classList.add('active');
   localStorage.setItem('pagina_corrente', name);
+  // freccia Indietro: la pagina entra nella cronologia (il Piano la registra con la sua scheda)
+  if (name !== 'piano' && typeof navRegistra === 'function') navRegistra();
   if (typeof aggiornaMenuMobile === 'function') aggiornaMenuMobile();
   if (name === 'diario') {
     aggiornaNomi();
