@@ -2617,9 +2617,9 @@ function _invAggiornaTitoli() {
       comandi =
         '<span><button onclick="rinominaCategoriaBase(\'' +
         k +
-        '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:none;border:1px solid var(--paper);color:var(--paper);border-radius:2px;cursor:pointer">Rinomina</button> <button onclick="nascondiCategoriaBase(\'' +
+        '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:none;border:1px solid currentColor;color:var(--testata-testo);border-radius:2px;cursor:pointer">Rinomina</button> <button onclick="nascondiCategoriaBase(\'' +
         k +
-        '\',true)" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:none;border:1px solid var(--paper);color:var(--paper);border-radius:2px;cursor:pointer">Nascondi in questo settore</button></span>';
+        '\',true)" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:none;border:1px solid currentColor;color:var(--testata-testo);border-radius:2px;cursor:pointer">Nascondi in questo settore</button></span>';
     if (comandi) {
       el.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap';
       el.innerHTML = '<span>' + escP(testo) + '</span>' + comandi;
@@ -2811,7 +2811,7 @@ function renderInventarioCustom(cat) {
     (adm
       ? '<span><button onclick="rinominaCategoriaInventario(\'' +
         cat.key +
-        '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:none;border:1px solid var(--paper);color:var(--paper);border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif">Rinomina</button> <button onclick="rimuoviCategoriaInventario(\'' +
+        '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:none;border:1px solid currentColor;color:var(--testata-testo);border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif">Rinomina</button> <button onclick="rimuoviCategoriaInventario(\'' +
         cat.key +
         '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:none;border:1px solid #e74c3c;color:var(--c-rosso,#c0392b);border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif">Rimuovi categoria</button></span>'
       : '') +
@@ -3731,7 +3731,7 @@ function aggiornaMenuMobile() {
       },
       {
         page: 'note-collega',
-        icon: '<i class="icx icx-mail"></i>&#65039;',
+        icon: '<i class="icx icx-mail"></i>',
         label: 'Note Colleghi',
         vis: 'note_collega',
         badgeId: 'note-badge',

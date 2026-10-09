@@ -1553,7 +1553,7 @@ function _briefPauseBodyHtml() {
     const viol = typeof _peVerificaRegolePause === 'function' ? _peVerificaRegolePause(p.contenuto, _briefData) : [];
     if (viol.length)
       h +=
-        '<div style="margin:8px 0;padding:6px 10px;font-size:var(--fs-sm,.8125rem);background:#fff3c4;border-left:3px solid #d4b86a"><b>Regole pause non rispettate (' +
+        '<div style="margin:8px 0;padding:6px 10px;font-size:var(--fs-sm,.8125rem);background:var(--avviso-bg-forte);border-left:3px solid #d4b86a"><b>Regole pause non rispettate (' +
         viol.length +
         ')</b>: ' +
         escP(viol.slice(0, 8).join(' · ')) +

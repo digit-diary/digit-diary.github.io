@@ -1689,11 +1689,15 @@ function graficiColoriTema() {
   const griglia = cs.getPropertyValue('--line').trim() || '#e8dfd0';
   Chart.defaults.color = testo;
   Chart.defaults.borderColor = griglia;
+  // il carattere del programma (prima Arial) e numeri interi sugli assi dei conteggi
+  Chart.defaults.font.family = "'Source Sans 3', sans-serif";
+  if (Chart.defaults.scales && Chart.defaults.scales.linear) Chart.defaults.scales.linear.ticks.precision = 0;
   Object.values(Chart.instances || {}).forEach((ch) => {
     try {
       ch.options.color = testo;
       Object.values(ch.options.scales || {}).forEach((sc) => {
         if (sc.ticks) sc.ticks.color = testo;
+        if (sc.title) sc.title.color = testo; // titoli degli assi: prima scuri anche al buio
         if (sc.pointLabels) sc.pointLabels.color = testo;
         if (sc.grid) sc.grid.color = griglia;
       });

@@ -443,7 +443,9 @@ function renderChart(id, type, data, opts) {
     options: Object.assign(
       {
         responsive: true,
-        maintainAspectRatio: true,
+        // l altezza la decide il riquadro (.chart-wrap): il grafico usa tutta la larghezza
+        // (prima, con le proporzioni fisse, occupava meta riquadro)
+        maintainAspectRatio: false,
         animation: { duration: 600 },
       },
       opts || {},

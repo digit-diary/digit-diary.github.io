@@ -30,9 +30,17 @@
   --line: #e8dfd0;
   --accent: #c0392b;
   --accent2: #8b6914;
-  --muted: #6f6454; /* leggibile anche sul fondo sabbia (contrasto 3,6); era #8a7d6b */
+  --muted: #5f5446; /* leggibile anche sul fondo sabbia (contrasto 4,6); era #6f6454 */
   --shadow: rgba(26, 18, 8, 0.1);
   --sfondo-pagina: #d4c9b5; /* fondo della pagina (anche dietro al menu fisso) */
+  /* riquadri di avviso (giallo) ed errore (rosa) scritti nel programma: con il tema scuro
+     diventano scuri (prima restavano chiari con il testo chiaro: illeggibili) */
+  --avviso-bg: #fff8e1;
+  --avviso-bg-forte: #fff3c4;
+  --avviso-bordo: #b8860b;
+  --errore-bg: #fdecea;
+  /* testo dei comandi dentro le barre dei titoli (sempre scure) */
+  --testata-testo: #f3ede3;
 }
 body.dark-theme {
   --c-verde: #6cc594;
@@ -54,6 +62,10 @@ body.dark-theme {
   --muted: #9a9aaa;
   --shadow: rgba(0, 0, 0, 0.3);
   --sfondo-pagina: #0f0f1a;
+  --avviso-bg: #3a3020;
+  --avviso-bg-forte: #4a3c1c;
+  --avviso-bordo: #d4a017;
+  --errore-bg: #3a2220;
   background: #0f0f1a;
   background-image: repeating-linear-gradient(
     45deg,
@@ -93,6 +105,18 @@ html {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+}
+/* campi, menu e pulsanti con il carattere del programma (prima molti restavano in Arial,
+   il carattere di serie del browser) */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--c-verde);
 }
 body {
   font-family: 'Source Sans 3', sans-serif;
@@ -1035,7 +1059,8 @@ header h1 .casino {
 /* STATS BAR */
 .stats-bar {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  /* tanti riquadri quanti ce ne stanno, senza buco a destra (prima 5 colonne fisse) */
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 10px;
   margin-bottom: 24px;
 }
@@ -1512,6 +1537,7 @@ header h1 .casino {
 }
 .btn-act {
   background: none;
+  color: var(--ink);
   border: 1px solid;
   border-radius: 3px;
   cursor: pointer;
@@ -2097,7 +2123,18 @@ header h1 .casino {
 }
 .chart-wrap {
   position: relative;
+  height: 300px;
   max-height: 300px;
+}
+/* collaboratori con piu registrazioni: un nome per riga anche al telefono */
+.chart-wrap:has(#chart-collab) {
+  height: 360px;
+  max-height: none !important;
+}
+@media (max-width: 700px) {
+  .chart-wrap {
+    height: 260px;
+  }
 }
 .collab-table {
   width: 100%;
@@ -6995,4 +7032,38 @@ tr.nav-evidenza > td {
 }
 .rg-tecnico summary {
   cursor: pointer;
+}
+
+/* comandi dentro le barre dei titoli (v436): sempre chiari sulla barra scura, in entrambi i temi */
+.card-header .btn-testata {
+  color: var(--testata-testo);
+  border: 1px solid currentColor;
+  background: none;
+}
+
+/* ===== TELEFONO (v436, controllo grafico del 09/10/2026) ===== */
+/* righe di moduli a tre colonne (Maison, Consegna): una colonna sotto i 700px; prima lo
+   stile scritto nella pagina vinceva e il campo Data usciva dallo schermo */
+.form-row.cols-3 {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+.form-row.cols-3.ultima-stretta {
+  grid-template-columns: 1fr 1fr 80px;
+}
+@media (max-width: 700px) {
+  .form-row.cols-3,
+  .form-row.cols-3.ultima-stretta {
+    grid-template-columns: 1fr;
+  }
+  /* elenchi delle Impostazioni: nome sopra, comandi sotto (prima "Rimuovi" usciva dal riquadro) */
+  .tipo-item {
+    flex-wrap: wrap;
+  }
+  .tipo-item-name {
+    flex: 1 1 100%;
+  }
+  /* moduli in colonna: niente spazi vuoti fra un campo e l altro */
+  .add-tipo-row .field {
+    flex: 0 0 auto;
+  }
 }

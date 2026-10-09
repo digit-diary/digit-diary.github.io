@@ -502,7 +502,7 @@ async function caricaBenesserePiano() {
     const critici = calcolati.filter((x) => x.res.punteggio < 55);
     if (critici.length)
       h +=
-        '<p style="font-size:var(--fs-md,.875rem);margin-top:12px;padding:8px 10px;background:#fdecea;border-left:3px solid #c0392b;border-radius:2px"><b>Da guardare per primi:</b> ' +
+        '<p style="font-size:var(--fs-md,.875rem);margin-top:12px;padding:8px 10px;background:var(--errore-bg);border-left:3px solid #c0392b;border-radius:2px"><b>Da guardare per primi:</b> ' +
         escP(critici.map((x) => x.nome.split(' ')[0] + ' (' + x.res.punteggio + ')').join(', ')) +
         '</p>';
     el.innerHTML = h;
@@ -706,7 +706,7 @@ function _renderPianoTurniCard() {
         '<tr id="pt-riga-' +
         t.id +
         '"' +
-        (_mod.length ? ' style="background:#fff8e1"' : '') +
+        (_mod.length ? ' style="background:var(--avviso-bg)"' : '') +
         '><td style="font-weight:700;background:' +
         (t.colore || '#fff') +
         '">' +
@@ -805,7 +805,7 @@ function _pianoModificheHtml() {
   const lista = window._pianoModifiche || [];
   if (!lista.length) return '';
   return (
-    '<div style="background:#fff8e1;border-left:4px solid #b8860b;border-radius:3px;padding:10px 12px;margin:0 0 12px">' +
+    '<div style="background:var(--avviso-bg);border-left:4px solid var(--avviso-bordo);border-radius:3px;padding:10px 12px;margin:0 0 12px">' +
     '<b style="font-size:var(--fs-md,.875rem)">Modifiche fatte adesso (' +
     lista.length +
     ')</b>' +

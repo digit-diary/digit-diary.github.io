@@ -353,16 +353,20 @@ function _initSchedaValutazione(nome) {
       responsive: true,
       maintainAspectRatio: false,
       animation: false,
+      // margine attorno: le etichette lunghe non si tagliano piu ("ervizio al cliente")
+      layout: { padding: 24 },
       scales: {
         r: {
           min: 0,
           max: 100,
-          ticks: { stepSize: 20, font: { size: 12 } },
-          pointLabels: { font: { size: 12 } },
+          // i numeri 20...100 si sovrapponevano alle linee: nascosti (il valore c e nel suggerimento)
+          ticks: { stepSize: 20, display: false },
+          pointLabels: { font: { size: 11 } },
         },
       },
       plugins: {
-        legend: { position: 'bottom', labels: { font: { size: 12 } } },
+        // con un solo anno la legenda non serve
+        legend: { display: datasets.length > 1, position: 'bottom', labels: { font: { size: 12 } } },
       },
     },
   });

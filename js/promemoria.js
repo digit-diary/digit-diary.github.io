@@ -325,9 +325,22 @@ function renderPromemoria() {
         '">' +
         escP(p.titolo) +
         '</strong><span style="font-size:var(--fs-sm,.8125rem);padding:2px 8px;border-radius:2px;background:' +
-        (p.assegnato_a === 'tutti' ? 'var(--accent2)' : '#2980b9') +
-        ';color:white;font-weight:600">' +
-        escP(p.assegnato_a === 'tutti' ? 'Tutti' : p.assegnato_a) +
+        (p.assegnato_a === 'tutti' ? 'var(--accent2)' : 'var(--c-azzurro)') +
+        ';color:white;font-weight:600" title="' +
+        escP(String(p.assegnato_a || '').replace(/,\s*/g, ', ')) +
+        '">' +
+        escP(
+          p.assegnato_a === 'tutti'
+            ? 'Tutti'
+            : (() => {
+                // tanti destinatari: "7 persone" (elenco completo al passaggio del mouse)
+                const l = String(p.assegnato_a || '')
+                  .split(',')
+                  .map((x) => x.trim())
+                  .filter(Boolean);
+                return l.length > 3 ? l.length + ' persone' : l.join(', ');
+              })(),
+        ) +
         '</span>' +
         (scaduto
           ? '<span style="font-size:var(--fs-sm,.8125rem);color:var(--accent);font-weight:700">SCADUTO</span>'

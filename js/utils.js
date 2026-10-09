@@ -380,7 +380,7 @@ function _renderNdCal() {
     const fuori = ndGiornoFuoriTempo(ds);
     let style = 'padding:6px 0;border-radius:2px;cursor:pointer;font-size:var(--fs-md,.875rem);font-weight:600;';
     if (isSel) style += fuori ? 'background:#c0392b;color:white;' : 'background:var(--accent2);color:white;';
-    else if (fuori) style += 'background:#fdecea;color:var(--c-rosso,#c0392b);';
+    else if (fuori) style += 'background:var(--errore-bg);color:var(--c-rosso,#c0392b);';
     else if (isToday) style += 'background:var(--paper2);border:1px solid var(--accent2);';
     else style += 'background:var(--paper);';
     html +=

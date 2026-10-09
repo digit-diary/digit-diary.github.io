@@ -1033,7 +1033,7 @@ async function _pianoVacDirittoCard(anno) {
       .sort((p, q) => q.diff - p.diff);
     if (cambi.length)
       h +=
-        '<div style="margin-top:12px;padding:10px 12px;background:#fff8e1;border-left:4px solid #b8860b;border-radius:3px">' +
+        '<div style="margin-top:12px;padding:10px 12px;background:var(--avviso-bg);border-left:4px solid var(--avviso-bordo);border-radius:3px">' +
         '<b style="font-size:var(--fs-base,.9375rem)">Da tenere presente per il ' +
         (anno + 1) +
         '</b><p style="font-size:var(--fs-md,.875rem);margin:4px 0 0">Nel pianificare le vacanze del prossimo anno, ' +
@@ -1158,7 +1158,7 @@ async function _renderPianoVacanzeTab() {
         '<tr' +
         (v.confermata
           ? ''
-          : ' style="background:#fff3c4" title="Provvisoria: non va nel piano e non conta nel saldo"') +
+          : ' style="background:var(--avviso-bg-forte)" title="Provvisoria: non va nel piano e non conta nel saldo"') +
         '><td style="text-align:left"><strong>Settimana ' +
         v.settimana +
         '</strong> <span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">(' +

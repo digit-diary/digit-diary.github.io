@@ -917,10 +917,10 @@ function renderFormazione() {
     '<div class="main-card"><div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span>Matrice competenze · chi sa fare cosa</span>' +
     '<span style="display:flex;gap:6px;flex-wrap:wrap">' +
     (isAdmin() || (typeof puoModificare === 'function' && puoModificare('gestione_formazioni'))
-      ? '<button onclick="formLivelliDaTurni()" title="Chi fa turni di un settore per cui non risulta formato riceve il livello (con l avviso prima e l incentivo)" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:none;border:1px solid var(--paper);color:var(--paper);border-radius:2px;cursor:pointer">Livelli dai turni del piano</button>'
+      ? '<button onclick="formLivelliDaTurni()" title="Chi fa turni di un settore per cui non risulta formato riceve il livello (con l avviso prima e l incentivo)" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:none;border:1px solid currentColor;color:var(--testata-testo);border-radius:2px;cursor:pointer">Livelli dai turni del piano</button>'
       : '') +
     (isAdmin()
-      ? '<button onclick="apriRiordinoCompetenze()" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:none;border:1px solid var(--paper);color:var(--paper);border-radius:2px;cursor:pointer">Riordina competenze</button>'
+      ? '<button onclick="apriRiordinoCompetenze()" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:none;border:1px solid currentColor;color:var(--testata-testo);border-radius:2px;cursor:pointer">Riordina competenze</button>'
       : '') +
     '</span></div>';
   html +=
