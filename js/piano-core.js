@@ -551,18 +551,41 @@ function _pianoSettoriEffettivi(info) {
   return base.length || info.settori_piano != null ? base : null;
 }
 function _pianoCampoOk(info, valore) {
-  // 'campo>N' / 'campo>=N' -> true se il collaboratore PASSA il controllo
-  for (const op of ['>=', '>']) {
-    const i = valore.indexOf(op);
-    if (i > 0) {
-      const campo = valore.substring(0, i).trim();
-      const soglia = parseFloat(valore.substring(i + op.length));
-      if (isNaN(soglia)) return true;
-      const v = parseFloat((info || {})[campo]) || 0;
-      return op === '>=' ? v >= soglia : v > soglia;
-    }
+  // REQUISITO SULLA SCHEDA (regola richiede_campo): 'campo OPERATORE valore', per esempio
+  // accoglienza>0, categoria>=3, lingue=EN, impiego!=jolly. true = il collaboratore PASSA.
+  // Il nome del campo vale senza maiuscole/minuscole: il modulo salva la regola in
+  // maiuscolo (ACCOGLIENZA>0) e prima il campo non si trovava, valeva 0 e il gruppo si
+  // chiudeva a tutti. Tutti i confronti offerti dal modulo funzionano (prima solo > e >=:
+  // gli altri passavano sempre). Controllo del 09/10/2026.
+  const m = String(valore || '')
+    .trim()
+    .match(/^([A-Za-z_][A-Za-z0-9_]*)\s*(>=|<=|!=|>|<|=)\s*(.*)$/);
+  if (!m) return true;
+  const chiave = Object.keys(info || {}).find((k) => k.toLowerCase() === m[1].toLowerCase());
+  const grezzo = chiave ? info[chiave] : null;
+  const op = m[2];
+  const atteso = m[3].trim();
+  const nA = parseFloat(String(atteso).replace(',', '.'));
+  // confronto numerico quando il valore richiesto e un numero (campo vuoto = 0)
+  if (!isNaN(nA) && /^-?\d+([.,]\d+)?$/.test(atteso)) {
+    const v = parseFloat(String(grezzo == null ? '' : grezzo).replace(',', '.')) || 0;
+    if (op === '>=') return v >= nA;
+    if (op === '>') return v > nA;
+    if (op === '<=') return v <= nA;
+    if (op === '<') return v < nA;
+    if (op === '=') return v === nA;
+    return v !== nA;
   }
-  return true;
+  // testo: uguale o diverso, senza maiuscole; un campo con piu valori (lingue "IT, EN")
+  // e uguale se contiene il valore richiesto
+  const voci = String(grezzo == null ? '' : grezzo)
+    .split(/[,;/]/)
+    .map((x) => x.trim().toLowerCase())
+    .filter(Boolean);
+  const c = voci.includes(atteso.toLowerCase());
+  if (op === '=') return c;
+  if (op === '!=') return !c;
+  return true; // > e < su un testo non hanno senso: non si blocca nessuno
 }
 let _pianoOreSett = 41; // ore settimanali contratto (imp 'piano_ore_settimanali')
 async function _pianoCaricaCfg() {
