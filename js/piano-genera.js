@@ -208,6 +208,116 @@ function _pianoIntervalloLavoro(r) {
   const base = new Date(d + 'T00:00:00').getTime() / 3600000; // ore
   return { ini: base + i, fin: base + f, data: d };
 }
+// FASCE ORARIE delle regole (v430): "14:00-18:00" o "14-18". Una fascia che inizia prima
+// delle 08 e dopo la mezzanotte della stessa serata: 02-05 = 26-29 ore dal giorno del turno
+function _pianoFasciaDaTesto(t) {
+  const m = String(t || '')
+    .trim()
+    .match(/^(\d{1,2})(?:[:.](\d{2}))?\s*-\s*(\d{1,2})(?:[:.](\d{2}))?$/);
+  if (!m) return null;
+  let ini = parseInt(m[1]) + (parseInt(m[2]) || 0) / 60;
+  let fin = parseInt(m[3]) + (parseInt(m[4]) || 0) / 60;
+  if (ini > 24 || fin > 24) return null;
+  if (ini < 8) ini += 24;
+  while (fin <= ini) fin += 24;
+  if (fin - ini > 24) return null;
+  const hh = (x) =>
+    String(Math.floor(x % 24)).padStart(2, '0') + ':' + String(Math.round((x % 1) * 60)).padStart(2, '0');
+  return { ini: ini, fin: fin, etichetta: hh(ini) + '-' + hh(fin) };
+}
+function _pianoFasceDaTesto(v) {
+  return String(v || '')
+    .split(',')
+    .map(_pianoFasciaDaTesto)
+    .filter(Boolean);
+}
+// in servizio nella fascia: almeno meta della fascia (al massimo 2 ore richieste)
+function _pianoInFascia(r, f) {
+  const x = _pianoIntervalloLavoro(r);
+  if (!x || !f) return false;
+  const base = new Date(x.data + 'T00:00:00').getTime() / 3600000;
+  const ov = Math.min(x.fin - base, f.fin) - Math.max(x.ini - base, f.ini);
+  return ov >= Math.min(2, (f.fin - f.ini) / 2) - 1e-9;
+}
+function _pianoHaCompetenza(info, key) {
+  const c = (info && info.competenze) || {};
+  const k = String(key || '').toLowerCase();
+  return Object.keys(c).some((x) => x.toLowerCase() === k && c[x] === true);
+}
+function _pianoEtichettaCompetenza(key, rep) {
+  const l =
+    (typeof getCompetenzeConfigAll === 'function' ? getCompetenzeConfigAll()[rep || _pianoReparto()] : null) || [];
+  const c = l.find((x) => String(x.key).toLowerCase() === String(key || '').toLowerCase());
+  return c ? c.label : String(key || '').toLowerCase();
+}
+// BOZZA: precedenza per le regole di qualita (minimo con una competenza, equilibrio dei
+// livelli) per un posto (turno codice, giorno g). La situazione del giorno si calcola una
+// volta per posto; ritorna la correzione del punteggio di ogni candidato (negativo = prima)
+function _pianoPunteggioQualita(t, codice, g, dstr, dowG, nomiLv, cella, livelloDi) {
+  const regole = _pianoRegoleGruppoDi((t.gruppo || '').toUpperCase())
+    .concat(_pianoRegoleGruppoDi('*'))
+    .filter((rg) => /^(minimo_competenza_giorno|equilibrio_livelli)$/.test(String(rg.tipo_regola || '').toLowerCase()));
+  if (!regole.length) return () => 0;
+  const rT = { codice: codice, data: dstr };
+  const dowPy = (dowG + 6) % 7;
+  const inGruppo = (tx, grR) => tx && (grR === '*' || String(tx.gruppo || '').toUpperCase() === grR);
+  const media = (a) => (a.length ? a.reduce((x, v) => x + v, 0) / a.length : null);
+  const funzioni = [];
+  for (const rg of regole) {
+    const tr = String(rg.tipo_regola || '').toLowerCase();
+    const p = String(rg.valore || '').split('|');
+    const grR = String(rg.gruppo || '').toUpperCase();
+    if (tr === 'minimo_competenza_giorno') {
+      const comp = p[0] || '';
+      const nMin = parseInt(p[1]) || 1;
+      const tipoF = String(p[2] || '').toUpperCase();
+      const dows = p[3] ? p[3].split(',').map((x) => parseInt(x)) : null;
+      const fascia = p[4] ? _pianoFasciaDaTesto(p[4]) : null;
+      if (tipoF && String(t.tipo || '').toUpperCase() !== tipoF) continue;
+      if (dows && !dows.includes(dowPy)) continue;
+      if (fascia && !_pianoInFascia(rT, fascia)) continue;
+      let gia = 0;
+      for (const x of nomiLv) {
+        const cod = cella[x + '|' + g];
+        const tx = _pianoTurnoInfo(cod || '');
+        if (!inGruppo(tx, grR) || (tipoF && String(tx.tipo || '').toUpperCase() !== tipoF)) continue;
+        if (fascia && !_pianoInFascia({ codice: cod, data: dstr }, fascia)) continue;
+        if (_pianoHaCompetenza(_pianoCollabInfo(x), comp)) gia++;
+      }
+      if (gia < nMin) funzioni.push((n) => (_pianoHaCompetenza(_pianoCollabInfo(n), comp) ? -3 : 0));
+    } else {
+      const dows = p[4] ? p[4].split(',').map((x) => parseInt(x)) : null;
+      if (dows && !dows.includes(dowPy)) continue;
+      const fasce = _pianoFasceDaTesto(p[0]).filter((f) => _pianoInFascia(rT, f));
+      if (!fasce.length) continue;
+      const forte = _pianoLivelloDaTesto(p[1] || '') || 0;
+      const minF = parseInt(p[2]) || 0;
+      const lvGiorno = [];
+      const perFascia = fasce.map(() => []);
+      for (const x of nomiLv) {
+        const cod = cella[x + '|' + g];
+        if (!inGruppo(_pianoTurnoInfo(cod || ''), grR)) continue;
+        const lx = livelloDi(x);
+        if (lx == null) continue;
+        lvGiorno.push(lx);
+        fasce.forEach((f, i) => {
+          if (_pianoInFascia({ codice: cod, data: dstr }, f)) perFascia[i].push(lx);
+        });
+      }
+      const mGiorno = media(lvGiorno);
+      const mancaForte = forte && minF && perFascia.some((a) => a.filter((v) => v >= forte).length < minF);
+      const piuDebole = Math.min(...perFascia.map((a) => (a.length ? media(a) : 99)));
+      funzioni.push((n) => {
+        const lv = livelloDi(n);
+        if (lv == null) return 0;
+        if (mancaForte && lv >= forte) return -3;
+        if (mGiorno != null && piuDebole < mGiorno && lv > piuDebole) return -1;
+        return 0;
+      });
+    }
+  }
+  return (n) => funzioni.reduce((tot, fn) => tot + fn(n), 0);
+}
 function _pianoRiposiSettimanali(righe) {
   const minLib = parseFloat(_pianoRegolaVal('riposo_domenica_libera_ore')) || 0;
   const minLav = parseFloat(_pianoRegolaVal('riposo_domenica_lavorata_ore')) || 0;
@@ -1192,6 +1302,92 @@ function _pianoViolazioniGruppi(righe, ctx) {
                   conta +
                   ')',
               });
+          }
+        } else if (tipoR === 'minimo_competenza_giorno') {
+          // 'POKER|2|NOTTURNO|4,5|22:00-02:00' = almeno 2 persone con la competenza (anche
+          // una specialita Extra) sui turni del gruppo; tipo, giorni (0 = lunedi) e fascia
+          // oraria facoltativi (v430)
+          const pc = rg.valore.split('|');
+          const comp = pc[0] || '';
+          const nMin = parseInt(pc[1]) || 1;
+          const tipoF = (pc[2] || '').toUpperCase();
+          const dows = pc[3] ? pc[3].split(',').map((x) => parseInt(x)) : null;
+          const fascia = pc[4] ? _pianoFasciaDaTesto(pc[4]) : null;
+          const nome = _pianoEtichettaCompetenza(comp);
+          for (let g = 1; g <= nGiorni; g++) {
+            const dstr = ym + '-' + String(g).padStart(2, '0');
+            if (dows && !dows.includes((new Date(dstr + 'T12:00:00').getDay() + 6) % 7)) continue;
+            let conta = 0;
+            let turniQuelGiorno = 0;
+            _pianoRighe.forEach((r) => {
+              if (parseInt(r.data.split('-')[2]) !== g || !_pianoCopreQui(r)) return;
+              const t = _pianoTurnoInfo(r.codice);
+              if (!t || (gr !== '*' && (t.gruppo || '').toUpperCase() !== gr)) return;
+              if (tipoF && (t.tipo || '').toUpperCase() !== tipoF) return;
+              if (fascia && !_pianoInFascia(r, fascia)) return;
+              turniQuelGiorno++;
+              if (_pianoHaCompetenza(_pianoCollabInfo(r.collaboratore), comp)) conta++;
+            });
+            if (turniQuelGiorno && conta < nMin)
+              lista.push({
+                nome: '(' + (gr === '*' ? 'settore' : gr) + ')',
+                giorno: g,
+                msg:
+                  'giorno ' +
+                  g +
+                  ': servono ' +
+                  nMin +
+                  ' con ' +
+                  nome +
+                  (gr !== '*' ? ' nel gruppo ' + gr : '') +
+                  (tipoF ? ' sui turni ' + tipoF : '') +
+                  (fascia ? ' fra le ' + fascia.etichetta.replace('-', ' e le ') : '') +
+                  ' (trovati ' +
+                  conta +
+                  ')',
+              });
+          }
+        } else if (tipoR === 'equilibrio_livelli') {
+          // '14-18,18-22,22-02,02-05|L5|1|1|' = in ogni fascia almeno 1 di livello L5 o piu e
+          // livello medio non sotto quello del giorno di piu di 1; giorni facoltativi (v430)
+          const pe = rg.valore.split('|');
+          const fasce = _pianoFasceDaTesto(pe[0]);
+          const forte = _pianoLivelloDaTesto(pe[1] || '') || 0;
+          const minF = parseInt(pe[2]) || 0;
+          const scarto = parseFloat(String(pe[3] || '').replace(',', '.')) || 0;
+          const dows = pe[4] ? pe[4].split(',').map((x) => parseInt(x)) : null;
+          const fmt = (x) => String(Math.round(x * 10) / 10).replace('.', ',');
+          for (let g = 1; g <= nGiorni; g++) {
+            const dstr = ym + '-' + String(g).padStart(2, '0');
+            if (dows && !dows.includes((new Date(dstr + 'T12:00:00').getDay() + 6) % 7)) continue;
+            const delGiorno = _pianoRighe.filter((r) => {
+              if (parseInt(r.data.split('-')[2]) !== g || !_pianoCopreQui(r)) return false;
+              const t = _pianoTurnoInfo(r.codice);
+              return t && (gr === '*' || (t.gruppo || '').toUpperCase() === gr);
+            });
+            const lv = (r) => _pianoLivelloNelSettore(_pianoCollabInfo(r.collaboratore));
+            const tutti = delGiorno.map(lv).filter((x) => x != null);
+            if (!tutti.length) continue;
+            const mG = tutti.reduce((a, v) => a + v, 0) / tutti.length;
+            fasce.forEach((f) => {
+              const v = delGiorno
+                .filter((r) => _pianoInFascia(r, f))
+                .map(lv)
+                .filter((x) => x != null);
+              if (!v.length) return;
+              const m = v.reduce((a, x) => a + x, 0) / v.length;
+              const forti = forte ? v.filter((x) => x >= forte).length : 0;
+              const problemi = [];
+              if (forte && minF && forti < minF)
+                problemi.push(forti + ' di livello L' + forte + ' o piu (minimo ' + minF + ')');
+              if (scarto && m < mG - scarto) problemi.push('livello medio ' + fmt(m) + ' (giorno ' + fmt(mG) + ')');
+              if (problemi.length)
+                lista.push({
+                  nome: '(' + (gr === '*' ? 'settore' : gr) + ')',
+                  giorno: g,
+                  msg: 'giorno ' + g + ', ' + f.etichetta + ': ' + problemi.join(', '),
+                });
+            });
           }
         } else if (tipoR === 'minimo_livello_giorno') {
           // 'L3:2:NOTTURNO:4,5' = almeno 2 persone di livello L3 o piu (Formazione) sui
@@ -2494,6 +2690,9 @@ async function generaBozzaPiano(usaCoperture) {
       let have = nomiCella.filter((n) => cella[n + '|' + g] === f.turno_codice && !altroSettore[n + '|' + g]).length;
       while (have < f.quantita) {
         const dowG = new Date(dstr + 'T12:00:00').getDay();
+        // regole di qualita (minimo con una competenza, equilibrio dei livelli): situazione
+        // del giorno calcolata una volta per questo posto
+        const qualita = _pianoPunteggioQualita(t, f.turno_codice, g, dstr, dowG, nomiLv, cella, livelloDi);
         const candidati = nomi
           .filter((n) => candidatoOk(n, f, t, g, dstr, dowG, false, 0))
           .sort((x, y) => {
@@ -2535,6 +2734,7 @@ async function generaBozzaPiano(usaCoperture) {
               }
               // preferisce L1 (2 collaboratrici in produzione Turnivo)
               if (f.turno_codice === 'L1' && infoP.prefers_l1) p -= 1;
+              p += qualita(n);
               // minimo_livello_giorno non ancora soddisfatto: privilegia chi ha il livello
               for (const rg of _pianoRegoleGruppoDi((t.gruppo || '').toUpperCase()).concat(_pianoRegoleGruppoDi('*'))) {
                 if ((rg.tipo_regola || '').toLowerCase() !== 'minimo_livello_giorno') continue;
@@ -2971,6 +3171,114 @@ async function generaBozzaPiano(usaCoperture) {
   }
   passataFinale = false;
 
+  // ===== PASSATA DI EQUILIBRIO DEI LIVELLI (regola equilibrio_livelli, v430) =====
+  // Il giro principale assegna un posto alla volta: quando arrivano i turni della sera i
+  // forti liberi possono essere gia sul pomeriggio. Qui, per ogni giorno, finche una
+  // fascia non ha i forti richiesti (o ha il livello medio troppo basso), si cerca uno
+  // SCAMBIO di turno fra un forte di una fascia che ne ha in piu e uno piu debole della
+  // fascia scoperta. Solo fra turni messi da QUESTA bozza, con tutte le regole valide per
+  // entrambi (candidatoOk); la copertura non cambia.
+  let scambiEquilibrio = 0;
+  {
+    const regoleEq = _pianoRegoleGruppoDi('*')
+      .concat(
+        [...new Set(_pianoTurniReparto().map((t) => String(t.gruppo || '').toUpperCase()))].flatMap((gr) =>
+          _pianoRegoleGruppoDi(gr),
+        ),
+      )
+      .filter((rg) => String(rg.tipo_regola || '').toLowerCase() === 'equilibrio_livelli');
+    const media = (a) => (a.length ? a.reduce((x, v) => x + v, 0) / a.length : null);
+    for (const rg of regoleEq) {
+      const pe = String(rg.valore || '').split('|');
+      const fasce = _pianoFasceDaTesto(pe[0]);
+      const forte = _pianoLivelloDaTesto(pe[1] || '') || 0;
+      const minF = parseInt(pe[2]) || 0;
+      const scarto = parseFloat(String(pe[3] || '').replace(',', '.')) || 0;
+      const dows = pe[4] ? pe[4].split(',').map((x) => parseInt(x)) : null;
+      const grR = String(rg.gruppo || '').toUpperCase();
+      const inGruppo = (tx) => tx && (grR === '*' || String(tx.gruppo || '').toUpperCase() === grR);
+      if (!fasce.length) continue;
+      for (let g = 1; g <= nGiorni; g++) {
+        if (giorniChiusi.has(g)) continue;
+        const dstrE = ym + '-' + String(g).padStart(2, '0');
+        const dowE = new Date(dstrE + 'T12:00:00').getDay();
+        if (dows && !dows.includes((dowE + 6) % 7)) continue;
+        for (let giro = 0; giro < 6; giro++) {
+          // situazione del giorno: chi lavora, con quale turno e livello, in quali fasce
+          const pres = [];
+          nomiLv.forEach((x) => {
+            const cod = cella[x + '|' + g];
+            const tx = _pianoTurnoInfo(cod || '');
+            if (!inGruppo(tx)) return;
+            const lv = livelloDi(x);
+            if (lv == null) return;
+            const r = { codice: cod, data: dstrE };
+            pres.push({ n: x, cod: cod, t: tx, lv: lv, fasce: fasce.map((f) => _pianoInFascia(r, f)) });
+          });
+          if (!pres.length) break;
+          const mG = media(pres.map((q) => q.lv));
+          const stato = fasce.map((f, i) => {
+            const v = pres.filter((q) => q.fasce[i]);
+            return { v: v, forti: v.filter((q) => forte && q.lv >= forte).length, m: media(v.map((q) => q.lv)) };
+          });
+          const problema = (s) =>
+            s.v.length && ((forte && minF && s.forti < minF) || (scarto && s.m != null && s.m < mG - scarto));
+          const iDebole = stato.findIndex(problema);
+          if (iDebole < 0) break;
+          const serveForte = forte && minF && stato[iDebole].forti < minF;
+          // chi cede il posto: nella fascia debole, livello piu basso, turno messo dalla bozza
+          const deboli = stato[iDebole].v.filter((q) => assegnatiRun.has(q.n + '|' + g)).sort((x, y) => x.lv - y.lv);
+          // chi arriva: fuori dalla fascia debole, piu forte, e senza lasciare scoperta
+          // una sua fascia (resta il minimo di forti dove era)
+          const forti = pres
+            .filter(
+              (q) =>
+                !q.fasce[iDebole] &&
+                assegnatiRun.has(q.n + '|' + g) &&
+                (serveForte ? q.lv >= forte : q.lv > stato[iDebole].m) &&
+                q.fasce.every((dentro, i) => !dentro || !(forte && minF && q.lv >= forte) || stato[i].forti > minF),
+            )
+            .sort((x, y) => y.lv - x.lv);
+          let fatto = false;
+          for (const S of forti) {
+            for (const W of deboli) {
+              if (W.lv >= S.lv || W.cod === S.cod) continue;
+              const durS = parseFloat(S.t.durata_ore) || 0;
+              const durW = parseFloat(W.t.durata_ore) || 0;
+              if (!candidatoOk(S.n, { turno_codice: W.cod }, W.t, g, dstrE, dowE, true, -durS)) continue;
+              if (!candidatoOk(W.n, { turno_codice: S.cod }, S.t, g, dstrE, dowE, true, -durW)) continue;
+              // scambio: S prende il turno di W e W quello di S
+              cella[S.n + '|' + g] = W.cod;
+              cella[W.n + '|' + g] = S.cod;
+              togliAssegnazione(S.n, S.cod, g);
+              togliAssegnazione(W.n, W.cod, g);
+              registraAssegnazione(S.n, W.cod, g);
+              registraAssegnazione(W.n, S.cod, g);
+              oreMese[S.n] = (oreMese[S.n] || 0) - durS + durW;
+              oreMese[W.n] = (oreMese[W.n] || 0) - durW + durS;
+              for (const [nome, cod] of [
+                [S.n, W.cod],
+                [W.n, S.cod],
+              ]) {
+                const nn = nuove.find((x) => x.collaboratore === nome && x.data === dstrE);
+                if (nn) nn.codice = cod;
+                else {
+                  const sw = rigaDi[nome + '|' + g] && sostituzioniWd.find((x) => x.id === rigaDi[nome + '|' + g].id);
+                  if (sw) sw.codice = cod;
+                }
+              }
+              scambiEquilibrio++;
+              fatto = true;
+              break;
+            }
+            if (fatto) break;
+          }
+          if (!fatto) break;
+        }
+      }
+    }
+  }
+
   // ===== CGF DEI FESTIVI LAVORATI IN QUESTO MESE =====
   // Chi ha appena ricevuto un turno in un festivo con diritto matura un
   // recupero: si mette nei giorni DOPO il festivo, con le stesse regole.
@@ -3069,6 +3377,11 @@ async function generaBozzaPiano(usaCoperture) {
         ' posti senza candidato idoneo' +
         (riparati ? ' (altri ' + riparati + ' risolti spostando un turno)' : '') +
         (tappatiFine ? '\n• ' + tappatiFine + ' posti coperti nella passata finale (dopo riposi e WD)' : '') +
+        (scambiEquilibrio
+          ? '\n• ' +
+            scambiEquilibrio +
+            ' scambi di turno per equilibrare forti e deboli nelle fasce (Equilibrio dei livelli)'
+          : '') +
         (riposiSistemati
           ? '\n• ' + riposiSistemati + ' riposi attorno alla domenica sistemati spostando un turno a un collega'
           : '') +

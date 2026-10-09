@@ -420,7 +420,9 @@ function _fziAnteprima() {
     nuovi.length +
     ' nomi nuovi' +
     (r.nuoveComp.length ? ' · specialita nuove: ' + escP(r.nuoveComp.map((k) => k.label).join(', ')) : '') +
-    '</p><div style="max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:3px;padding:0 6px">' +
+    '</p>' +
+    _fziAvvisoGruppi(z) +
+    '<div style="max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:3px;padding:0 6px">' +
     (nuovi.length
       ? '<p style="font-weight:700;margin:8px 0 4px">Nomi non trovati fra i collaboratori di ' +
         escP(repartoLabel(z.rep)) +
@@ -439,6 +441,36 @@ function _fziAnteprima() {
   _fziApriFinestra(h);
 }
 
+// competenze con livello usate dall import ma non collegate a un gruppo di turni: la bozza
+// non le vede come abilitazione finche non si collegano (Piano > Impostazioni)
+function _fziSenzaGruppo(z) {
+  const cfgG = window._pianoCompGruppiCfg || {};
+  const comps = _fziComp(z.rep);
+  const usate = new Set(z.colonne.map((c) => c.comp).filter((k) => k && k !== '__nuova'));
+  return comps.filter(
+    (k) =>
+      (parseInt(k.livello) || 0) >= 1 &&
+      usate.has(k.key) &&
+      !cfgG[k.key] &&
+      !(typeof _COMPETENZE_GRUPPI_DEFAULT !== 'undefined' && _COMPETENZE_GRUPPI_DEFAULT[k.key]),
+  );
+}
+function _fziAvvisoGruppi(z) {
+  const senza = _fziSenzaGruppo(z);
+  if (!senza.length) return '';
+  return (
+    '<p style="margin:0 0 8px;padding:8px 10px;border-radius:3px;background:var(--paper2);border-left:3px solid var(--c-rosso,#c0392b)"><b>Da fare dopo l import:</b> ' +
+    escP(senza.map((k) => k.label).join(', ')) +
+    (senza.length === 1 ? ' non e collegata' : ' non sono collegate') +
+    ' a un gruppo di turni. Finche non le colleghi (Piano &gt; Impostazioni, competenze e gruppi, per esempio al gruppo ' +
+    escP(
+      [...new Set((pianoTurniCache || []).filter((t) => (t.reparto_dip || 'slots') === z.rep).map((t) => t.gruppo))]
+        .filter(Boolean)
+        .join(', ') || 'del settore',
+    ) +
+    ') la bozza non le considera per abilitare le persone ai turni.</p>'
+  );
+}
 async function _fziApplica() {
   const z = _fzi;
   const r = z.calcolo;

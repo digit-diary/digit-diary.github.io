@@ -800,6 +800,10 @@ const _REGOLE_GRUPPO_TIPI = {
     'Questi turni solo da un livello di Formazione in su (es: 10,10C,9:L2 · L1-L2 = solo L1 e L2 · eccezioni per persona in Preferenze, Turni consentiti)',
   minimo_livello_giorno:
     'Almeno N persone di un livello di Formazione al giorno, con filtri (es: L3:2:NOTTURNO:4,5 = 2 di livello L3 o piu sui turni notturni, venerdi e sabato · 0=lun ... 6=dom)',
+  minimo_competenza_giorno:
+    'Almeno N persone con una competenza di Formazione (anche una specialita Extra, es. Poker) al giorno, con filtri facoltativi: tipo di turno, giorni, fascia oraria',
+  equilibrio_livelli:
+    'Forti e deboli distribuiti nelle fasce orarie: in ogni fascia almeno N persone dal livello scelto in su e livello medio vicino a quello del giorno. La bozza bilancia, Valida segnala',
   turni_solo_collaboratori:
     'Questi turni li fanno solo i collaboratori scelti (es: AX solo a tre persone): vale per bozza, Migliora, proposte e Valida',
   coordinatori:
@@ -820,6 +824,8 @@ const _REGOLE_GRUPPO_ETICHETTE = {
   minimo_livello_giorno: 'Minimo di un livello al giorno',
   coordinatori: 'Coordinatori (apertura e chiusura)',
   turni_solo_collaboratori: 'Turni riservati a collaboratori scelti',
+  minimo_competenza_giorno: 'Minimo con una competenza al giorno',
+  equilibrio_livelli: 'Equilibrio dei livelli nelle fasce orarie',
 };
 // MODULO GUIDATO DELLE REGOLE DI GRUPPO (v415, richiesta del titolare 08/10/2026): per
 // ogni tipo i campi giusti (funzione, livello, numero, tipo di turno, giorni con le
@@ -864,6 +870,40 @@ const _RG_SCHEMI = {
     leggi: (v) => {
       const p = v.split(':');
       return { fz: p[0] || '', turni: p[1] || '', gg: (p[2] || '').split(',').filter((x) => x !== '') };
+    },
+  },
+  minimo_competenza_giorno: {
+    campi: ['comp', 'n', 'tipo', 'gg', 'fascia'],
+    componi: (c) =>
+      c.comp && parseInt(c.n) >= 1
+        ? [c.comp, parseInt(c.n), c.tipo || '', c.gg.join(','), c.fascia || ''].join('|').replace(/\|+$/, '')
+        : '',
+    leggi: (v) => {
+      const p = v.split('|');
+      return {
+        comp: (p[0] || '').toLowerCase(),
+        n: p[1] || '1',
+        tipo: p[2] || '',
+        gg: (p[3] || '').split(',').filter((x) => x !== ''),
+        fascia: p[4] || '',
+      };
+    },
+  },
+  equilibrio_livelli: {
+    campi: ['fasce', 'forte', 'minf', 'scarto', 'gg'],
+    componi: (c) =>
+      c.fasce
+        ? [c.fasce.replace(/\s+/g, ''), c.forte || '', c.minf || '0', c.scarto || '0', c.gg.join(',')].join('|')
+        : '',
+    leggi: (v) => {
+      const p = v.split('|');
+      return {
+        fasce: p[0] || '14-18,18-22,22-02,02-05', // regola nuova: le fasce tipiche di una serata
+        forte: p[1] || '',
+        minf: p[2] || '1',
+        scarto: p[3] || '1',
+        gg: (p[4] || '').split(',').filter((x) => x !== ''),
+      };
     },
   },
   turni_solo_collaboratori: {
@@ -943,6 +983,12 @@ function _rgLeggi(tipo, v) {
     turniN: '',
     coord: [],
     collab: [],
+    comp: '',
+    fascia: '',
+    fasce: '14-18,18-22,22-02,02-05',
+    forte: '',
+    minf: '1',
+    scarto: '1',
     campo: '',
     op: '>',
     val: '',
@@ -1011,6 +1057,39 @@ function _rgFrase(r) {
       return c.fz + ' fa solo i turni ' + c.turni + (c.gg.length ? giorniTxt : ', sempre');
     case 'livello_turni':
       return 'I turni ' + c.turni + ' solo da ' + (c.lvmax ? c.lv + ' a ' + c.lvmax : c.lv + ' in su');
+    case 'minimo_competenza_giorno': {
+      const fx = c.fascia && typeof _pianoFasciaDaTesto === 'function' ? _pianoFasciaDaTesto(c.fascia) : null;
+      const fasciaT = fx ? ' fra le ' + fx.etichetta.replace('-', ' e le ') : c.fascia ? ' fra le ' + c.fascia : '';
+      return (
+        'Almeno ' +
+        c.n +
+        (c.n === '1' ? ' persona' : ' persone') +
+        ' con ' +
+        (typeof _pianoEtichettaCompetenza === 'function' ? _pianoEtichettaCompetenza(c.comp) : c.comp) +
+        tipoTxt +
+        fasciaT +
+        ' ' +
+        gr +
+        giorniTxt
+      );
+    }
+    case 'equilibrio_livelli': {
+      const fs = (typeof _pianoFasceDaTesto === 'function' ? _pianoFasceDaTesto(c.fasce) : []).map((f) => f.etichetta);
+      const parti = [];
+      if (c.forte && parseInt(c.minf) > 0)
+        parti.push('almeno ' + c.minf + ' di livello ' + String(c.forte).toUpperCase() + ' o piu');
+      if (parseFloat(c.scarto) > 0)
+        parti.push('livello medio non piu di ' + String(c.scarto).replace('.', ',') + ' sotto quello del giorno');
+      return (
+        'In ogni fascia (' +
+        (fs.join(', ') || c.fasce) +
+        ') ' +
+        (parti.join(' e ') || 'nessun controllo') +
+        ' ' +
+        gr +
+        giorniTxt
+      );
+    }
     case 'turni_solo_collaboratori': {
       const nomeV = (x) => {
         const cc = collaboratoriCache.find((k) => k.nome.toLowerCase() === x.toLowerCase());
@@ -1286,6 +1365,78 @@ function _rgCampiHtml(tipo, c) {
           ),
         ),
       );
+    if (k === 'comp') {
+      const compS = (getCompetenzeConfigAll()[_pianoReparto()] || []).slice();
+      out.push(
+        campo(
+          'Competenza (Formazione)',
+          '<select id="rgc-comp" style="' +
+            stileSel +
+            '">' +
+            (compS.length
+              ? compS
+                  .map(
+                    (k2) =>
+                      '<option value="' +
+                      escP(k2.key) +
+                      '"' +
+                      (String(k2.key).toLowerCase() === String(c.comp).toLowerCase() ? ' selected' : '') +
+                      '>' +
+                      escP(((parseInt(k2.livello) || 0) >= 1 ? 'L' + k2.livello : 'Extra') + ' · ' + k2.label) +
+                      '</option>',
+                  )
+                  .join('')
+              : '<option value="">nessuna competenza in Formazione per questo settore</option>') +
+            '</select>',
+        ),
+      );
+    }
+    if (k === 'fascia')
+      out.push(
+        campo(
+          'Fascia oraria (facoltativa)',
+          '<input type="text" id="rgc-fascia" value="' +
+            escP(c.fascia) +
+            '" placeholder="es. 22:00-02:00" style="width:140px;padding:6px">',
+        ),
+      );
+    if (k === 'fasce')
+      out.push(
+        '<div class="field" style="flex-basis:100%"><label>Fasce orarie (separate da virgola; dopo la mezzanotte = stessa serata)</label><input type="text" id="rgc-fasce" value="' +
+          escP(c.fasce) +
+          '" placeholder="14-18, 18-22, 22-02, 02-05" style="width:100%;max-width:360px;padding:6px;box-sizing:border-box"></div>',
+      );
+    if (k === 'forte')
+      out.push(
+        campo(
+          'Forte dal livello',
+          '<select id="rgc-forte" style="' +
+            stileSel +
+            '"><option value="">nessuno</option>' +
+            livelli
+              .map((l) => '<option' + (l === String(c.forte).toUpperCase() ? ' selected' : '') + '>' + l + '</option>')
+              .join('') +
+            '</select>',
+        ),
+      );
+    if (k === 'minf')
+      out.push(
+        campo(
+          'Forti minimo per fascia',
+          '<input type="number" id="rgc-minf" min="0" max="20" value="' +
+            escP(String(c.minf)) +
+            '" style="width:70px;padding:6px">',
+        ),
+      );
+    if (k === 'scarto')
+      out.push(
+        campo(
+          'Scarto massimo dal livello medio del giorno (0 = non controllare)',
+          '<input type="number" id="rgc-scarto" min="0" max="5" step="0.5" value="' +
+            escP(String(c.scarto)) +
+            '" style="width:70px;padding:6px">',
+        ),
+      );
     if (k === 'n')
       out.push(
         campo(
@@ -1426,6 +1577,12 @@ function _rgLeggiCampi() {
     turniN: turniDi('rgc-turniN'),
     coord: [...document.querySelectorAll('input[name="rgc-coord"]:checked')].map((x) => x.value),
     collab: [...document.querySelectorAll('input[name="rgc-collab"]:checked')].map((x) => x.value),
+    comp: ((document.getElementById('rgc-comp') || {}).value || '').trim(),
+    fascia: val('rgc-fascia').replace(/\s+/g, ''),
+    fasce: val('rgc-fasce').replace(/\s+/g, ''),
+    forte: val('rgc-forte'),
+    minf: val('rgc-minf'),
+    scarto: val('rgc-scarto').replace(',', '.'),
     campo: val('rgc-campo'),
     op: (document.getElementById('rgc-op') || {}).value || '>',
     val: val('rgc-val'),
@@ -2073,6 +2230,36 @@ function _pianoValidaRegolaGruppo(gruppo, tipo, valore, settore) {
       if (gg.some((x) => !/^[0-6]$/.test(x)))
         return 'I giorni vanno scritti come numeri da 0 (lunedi) a 6 (domenica), separati da virgola';
     }
+    return null;
+  }
+  if (t === 'minimo_competenza_giorno') {
+    const p = v.split('|');
+    const comp = (p[0] || '').toLowerCase();
+    const comps = (getCompetenzeConfigAll()[String(settore || '').toLowerCase()] || []).map((k) =>
+      String(k.key).toLowerCase(),
+    );
+    if (!comp || !comps.includes(comp))
+      return 'Scegli una competenza di Formazione del settore (Formazione, Configurazione, Competenze)';
+    if (!(parseInt(p[1]) >= 1)) return 'Il numero minimo va da 1 in su';
+    if (p[2] && !/^(DIURNO|NOTTURNO)$/.test(p[2])) return 'Tipo di turno: diurni, notturni o tutti';
+    if (p[3] && !/^[0-6](,[0-6])*$/.test(p[3])) return 'Giorni da 0 (lunedi) a 6 (domenica)';
+    if (p[4] && !_pianoFasciaDaTesto(p[4])) return 'Fascia oraria da scrivere come 22:00-02:00 oppure 22-02';
+    return null;
+  }
+  if (t === 'equilibrio_livelli') {
+    const p = v.split('|');
+    const parti = (p[0] || '').split(',').filter(Boolean);
+    if (!parti.length) return 'Scrivi almeno una fascia oraria, per esempio 14-18, 18-22, 22-02, 02-05';
+    const sbagliate = parti.filter((x) => !_pianoFasciaDaTesto(x));
+    if (sbagliate.length) return 'Fasce non valide: ' + sbagliate.join(', ') + ' (es. 22:00-02:00 oppure 22-02)';
+    const maxLvE = _rgMaxLivello();
+    if (!maxLvE) return 'Questo settore non ha livelli in Formazione: prima crea la scala dei livelli';
+    if (p[1] && !(_pianoLivelloDaTesto(p[1]) >= 1 && _pianoLivelloDaTesto(p[1]) <= maxLvE))
+      return 'Livello forte da L1 a L' + maxLvE;
+    if (!(parseInt(p[2]) > 0) && !(parseFloat(p[3]) > 0))
+      return 'Imposta i forti minimo per fascia oppure lo scarto massimo (o tutti e due)';
+    if (parseInt(p[2]) > 0 && !p[1]) return 'Scegli da quale livello uno conta come forte';
+    if (p[4] && !/^[0-6](,[0-6])*$/.test(p[4])) return 'Giorni da 0 (lunedi) a 6 (domenica)';
     return null;
   }
   if (t === 'turni_solo_collaboratori') {
