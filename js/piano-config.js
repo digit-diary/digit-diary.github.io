@@ -617,7 +617,7 @@ function _renderPianoRegoleCard() {
     '<li><b>Si / No</b> accende o spegne una preferenza. La casella <b>Attiva</b> spegne qualsiasi regola senza perdere il valore: spenta, e come se non esistesse.</li>' +
     '<li><b>Un valore diverso per un settore</b>: scegli il settore nel menu in alto e cambia il numero. Nasce l eccezione per quel settore; gli altri tengono il valore generale. "Torna al generale" la toglie. Esempio: riposo 11 ore ovunque, 12 ai Tavoli.</li>' +
     '<li><b>Regole nuove sui gruppi di lavoro</b> (chi puo fare cassa, quanti Supervisor al giorno, una funzione richiesta): si creano nella scheda <b>Regole di gruppo</b> qui sotto scegliendo il tipo dall elenco. Non serve scrivere codice.</li>' +
-    '<li><b>Preferenze di una persona</b> (solo diurni, turni vietati, settori abilitati, copertura di altri settori): nella sua scheda in Gestione collaboratori. Bozza e validatore le rispettano.</li>' +
+    '<li><b>Preferenze di una persona</b> (solo diurni, turni vietati, giorni di lavoro, accompagnamento, copertura di altri settori): in Piano &gt; Impostazioni, Preferenze collaboratori. Funzione e percentuale in Impostazioni &gt; Gestione collaboratori; competenze e livelli in Formazione. Bozza e validatore le rispettano.</li>' +
     '<li><b>Fonte</b>: sotto ogni regola normativa c e il riferimento (RAP, legge sul lavoro, direttiva). Se cambia il regolamento, cambia il numero qui: il programma non va toccato. Ogni modifica finisce nel Registro attivita.</li>' +
     '</ol></details>';
   if (vista)

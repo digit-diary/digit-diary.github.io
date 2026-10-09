@@ -6746,3 +6746,56 @@ body.ge-trascino * {
   text-transform: uppercase;
   color: var(--muted);
 }
+
+/* Piano > Regole: Chi puo fare cosa (v432) */
+.pcfc-tab {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 560px;
+  font-size: var(--fs-md, 0.875rem);
+}
+.pcfc-tab th,
+.pcfc-tab td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.pcfc-tab th {
+  font-size: var(--fs-sm, 0.8125rem);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.pcfc-chip {
+  display: inline-block;
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: var(--fs-sm, 0.8125rem);
+  white-space: nowrap;
+}
+.pcfc-si {
+  background: #e1efe6;
+  color: #2c6e49;
+}
+.pcfc-serve {
+  background: #f5ead2;
+  color: #8a5d0c;
+}
+.pcfc-no {
+  background: #f7e2db;
+  color: #a8432d;
+}
+body.dark-theme .pcfc-si {
+  background: #1c3227;
+  color: #7fd1a6;
+}
+body.dark-theme .pcfc-serve {
+  background: #3a2f1b;
+  color: #e2b25a;
+}
+body.dark-theme .pcfc-no {
+  background: #3c241f;
+  color: #ef8b72;
+}

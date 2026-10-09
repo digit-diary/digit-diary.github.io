@@ -51,6 +51,7 @@ Ordine = ordine di caricamento in index.html. Il Piano di lavoro e diviso in die
 | 34 | piano-cambi.js | 2341 | PIANO · copia Excel, stampa PDF, cambi turno (scambio, esigenze, cerca cambio), copertura malattia |
 | 35 | piano-schede.js | 2950 | PIANO · timbrature, statistiche, import vacanze, saldo ore dell anno, esportazione formato HR |
 | 36 | piano-impostazioni.js | 1550 | PIANO · mappature e impostazioni, solver esterno, formulari, card congedi non pagati |
+| 36b | piano-chi-fa-cosa.js | 310 | PIANO · card Chi puo fare cosa (sola lettura): per persona o turno e giorno, esito della bozza, motivo e posto dove si cambia |
 | 37 | piano-celle.js | 1051 | PIANO · stampa singolo collaboratore, menu tasto destro, modifica rapida delle celle |
 | 38 | piano-briefing-ui.js | 1773 | PIANO · scheda Briefing (compilazione, numeri cassa, formato, Annulla/Ripristina del giorno) e corsi |
 | 39 | piano-extra.js | 2278 | PIANO · copia/incolla a blocchi, annulla/ripristina, selezione sparsa, trova, migliora ore, formazione, scheda Crediti |

@@ -2954,7 +2954,12 @@ async function _renderPianoCore() {
         _renderPianoCorsiCard() +
         '</div>';
     } else if (_pianoTab === 'regole') {
-      h += '<div id="piano-config">' + _renderPianoRegoleCard() + _renderPianoRegoleGruppoCard() + '</div>';
+      h +=
+        '<div id="piano-config">' +
+        (typeof _pianoChiFaCosaSegnaposto === 'function' ? _pianoChiFaCosaSegnaposto() : '') +
+        _renderPianoRegoleCard() +
+        _renderPianoRegoleGruppoCard() +
+        '</div>';
     } else if (_pianoTab === 'festivi') {
       await _generaFestiviSeMancanti();
       await _pianoCaricaFestivita(window._pianoFestiviAnnoSel || parseInt(_pianoMeseSel.split('-')[0]));

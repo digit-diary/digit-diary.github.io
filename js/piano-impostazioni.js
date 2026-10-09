@@ -12,7 +12,7 @@ function _renderPianoMappatureCard() {
   let h =
     '<div class="main-card" style="margin-top:16px"><div class="card-header">Turni per funzione · ' +
     escP(repartoLabel(_pianoReparto())) +
-    ' (admin)</div><div style="padding:10px 14px">';
+    '</div><div style="padding:10px 14px">';
   // SPIEGAZIONE CHIARA (v428, richiesta del titolare: "non e chiaro"): su chi agisce ogni
   // mappatura e cosa fa davvero; un solo PRINCIPALE o AMMESSO limita TUTTA la funzione
   const pill = (col, t) => '<span class="mini-badge" style="background:' + col + ';cursor:default">' + t + '</span>';
@@ -213,7 +213,7 @@ async function rimuoviPianoMappatura(id) {
 function _renderPianoImpostazioniCard() {
   if (!isAdmin()) return '';
   let h =
-    '<div class="main-card" style="margin-top:16px"><div class="card-header">Impostazioni piano (admin)</div><div style="padding:10px 14px">';
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Impostazioni piano</div><div style="padding:10px 14px">';
   h +=
     '<div class="add-tipo-row"><div class="field"><label>Ore settimanali contratto (per il saldo ore)</label><input type="number" step="0.5" id="pi-ore-sett" value="' +
     _pianoOreSett +
@@ -255,7 +255,7 @@ function _renderPianoImpostazioniCard() {
   // competenze Formazione -> gruppi del piano
   h +=
     '<p style="font-size:var(--fs-md,.875rem);font-weight:700;margin:12px 0 4px">Competenze Formazione → gruppi del piano</p>' +
-    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:6px">Chi ha la competenza CERTIFICATA in Formazione diventa idoneo anche al gruppo indicato (in aggiunta ai suoi Settori). "-" = nessun collegamento.</p>';
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:6px">Per i gruppi collegati qui <b>decide la Formazione</b>: chi ha la competenza certificata e abilitato al gruppo, chi non ce l ha ne e escluso, anche se il gruppo era fra i suoi Settori (togliere una spunta in Formazione toglie la persona da quei turni). I gruppi senza collegamento seguono i Settori della persona. "-" = nessun collegamento.</p>';
   // solo i gruppi dei turni DI QUESTO settore (i turni sono divisi per settore)
   const gruppiDisp = [
     ...new Set(
@@ -1985,7 +1985,7 @@ function _renderPianoRegoleGruppoCard() {
     ),
   ].sort();
   let h =
-    '<div class="main-card" style="margin-top:16px"><div class="card-header">Regole di gruppo (admin)</div><div style="padding:10px 14px">';
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Regole di gruppo</div><div style="padding:10px 14px">';
   h +=
     '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:6px">Regole di idoneità per settore/gruppo: chi può lavorare in un gruppo, limiti e minimi per funzione. Applicate dalla bozza automatica e dal validatore.</p>';
   h +=

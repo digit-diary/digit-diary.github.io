@@ -685,7 +685,7 @@ function _renderPianoTurniCard() {
   let h =
     '<div class="main-card" style="margin-top:16px"><div class="card-header">Turni · ' +
     escP(repartoLabel(_pianoReparto())) +
-    ' (admin)</div><div style="padding:10px 14px">';
+    '</div><div style="padding:10px 14px">';
   // Il supplemento del 10% sul lavoro notturno (23:00-06:00) e' incluso nella
   // DURATA del turno: questo controllo verifica che tutte le durate lo
   // rispettino e propone la correzione dove manca.
@@ -884,6 +884,37 @@ async function salvaPianoTurno(id, campo, valore) {
     renderPiano();
     return;
   }
+  // CAMBIARE GRUPPO O DISATTIVARE UN TURNO (controllo del 09/10/2026): regole, mappature,
+  // collegamenti con le competenze e preferenze che lo citano smetterebbero di valere senza
+  // che nessuno lo veda. Prima di salvare si elenca cosa ne dipende e si chiede conferma.
+  if (
+    tV &&
+    ((campo === 'gruppo' && String(valore).trim().toUpperCase() !== String(tV.gruppo || '').toUpperCase()) ||
+      (campo === 'attivo' && !valore && tV.attivo !== false))
+  ) {
+    const dip = await _pianoDipendenzeTurno(tV, campo, valore);
+    if (
+      dip.length &&
+      !(await chiediConferma(
+        (campo === 'gruppo'
+          ? 'Spostare ' +
+            tV.codice +
+            ' dal gruppo ' +
+            (tV.gruppo || '-') +
+            ' al gruppo ' +
+            String(valore).trim().toUpperCase() +
+            '?'
+          : 'Disattivare il turno ' + tV.codice + '?') +
+          '\n\nQueste impostazioni ne dipendono e potrebbero non valere piu come prima:\n\u2022 ' +
+          dip.join('\n\u2022 ') +
+          '\n\nConfermi?',
+        { titolo: 'Turno ' + tV.codice },
+      ))
+    ) {
+      renderPiano();
+      return;
+    }
+  }
   try {
     const patch = {};
     if (campo === 'attivo' || campo === 'oltre23') patch[campo] = !!valore;
@@ -913,6 +944,99 @@ async function salvaPianoTurno(id, campo, valore) {
   } catch (e) {
     toast('Errore salvataggio turno');
   }
+}
+// cosa dipende da un turno (per l avviso prima di cambiarne il gruppo o disattivarlo)
+async function _pianoDipendenzeTurno(t, campo, valore) {
+  const rep = t.reparto_dip || 'slots';
+  const cod = String(t.codice).toUpperCase();
+  const gr = String(t.gruppo || '').toUpperCase();
+  const out = [];
+  const nomiDi = (l) => (l.length > 6 ? l.slice(0, 6).join(', ') + ' e altri ' + (l.length - 6) : l.join(', '));
+  const persone = collaboratoriCache.filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === rep);
+  const lista = (v) =>
+    String(v || '')
+      .toUpperCase()
+      .split(',')
+      .map((x) => x.trim())
+      .filter(Boolean);
+  // il gruppo resta senza turni attivi? (solo questo turno lo teneva in vita)
+  const altriDelGruppo = pianoTurniCache.filter(
+    (x) =>
+      x.id !== t.id &&
+      x.attivo !== false &&
+      (x.reparto_dip || 'slots') === rep &&
+      String(x.gruppo || '').toUpperCase() === gr,
+  );
+  const gruppoSparisce = gr && !altriDelGruppo.length;
+  if (campo === 'gruppo' || gruppoSparisce) {
+    const regG = pianoRegoleGruppoCache.filter(
+      (r) => r.attivo !== false && (r.reparto_dip || 'slots') === rep && String(r.gruppo || '').toUpperCase() === gr,
+    );
+    if (gruppoSparisce) out.push('il gruppo ' + gr + ' resta senza turni attivi');
+    if (gruppoSparisce && regG.length) out.push(regG.length + ' regole di gruppo del gruppo ' + gr);
+    const comp = Object.entries(window._pianoCompGruppiCfg || {}).filter(
+      ([, g]) => String(g || '').toUpperCase() === gr,
+    );
+    if (gruppoSparisce && comp.length)
+      out.push('competenze di Formazione collegate al gruppo ' + gr + ': ' + comp.map(([k]) => k).join(', '));
+    const conSett = persone.filter((c) => lista(c.settori_piano).includes(gr)).map((c) => c.nome);
+    if (gruppoSparisce && conSett.length) out.push('Settori di ' + nomiDi(conSett));
+    const conAcc = persone.filter((c) => lista(c.accompagnamento_settori).includes(gr)).map((c) => c.nome);
+    if (gruppoSparisce && conAcc.length) out.push('Accompagnamento di ' + nomiDi(conAcc));
+    if (campo === 'gruppo') {
+      const nuovo = String(valore || '')
+        .trim()
+        .toUpperCase();
+      const nuovoEsiste = pianoTurniCache.some(
+        (x) =>
+          x.attivo !== false && (x.reparto_dip || 'slots') === rep && String(x.gruppo || '').toUpperCase() === nuovo,
+      );
+      if (!nuovoEsiste)
+        out.push(
+          'il gruppo ' +
+            nuovo +
+            ' e nuovo: nessuno vi e abilitato finche non lo colleghi a una competenza, ai Settori delle persone o a "Turni riservati"',
+        );
+      else out.push('chi e abilitato al gruppo ' + gr + ' ma non al gruppo ' + nuovo + ' non potra piu fare ' + cod);
+    }
+  }
+  // regole che citano la sigla (turni riservati, coordinatori, livelli...)
+  const citano = pianoRegoleGruppoCache.filter(
+    (r) =>
+      r.attivo !== false &&
+      (r.reparto_dip || 'slots') === rep &&
+      String(r.valore || '')
+        .toUpperCase()
+        .split(/[^A-Z0-9*]+/)
+        .includes(cod),
+  );
+  if (campo === 'attivo' && citano.length) out.push(citano.length + ' regole di gruppo citano ' + cod);
+  const mapp = (typeof pianoMappatureCache !== 'undefined' ? pianoMappatureCache : []).filter(
+    (m) => (m.reparto_dip || 'slots') === rep && String(m.turno_codice).toUpperCase() === cod,
+  );
+  if (campo === 'attivo' && mapp.length)
+    out.push('Turni per funzione: ' + mapp.map((m) => m.funzione + ' ' + m.tipo).join(', '));
+  if (campo === 'attivo') {
+    const blocc = persone.filter(
+      (c) => lista(c.turni_bloccati).includes(cod) || lista(c.turni_consentiti).includes(cod),
+    );
+    if (blocc.length) out.push('turni bloccati o consentiti di ' + nomiDi(blocc.map((c) => c.nome)));
+    try {
+      const oggi = typeof oggiLocale === 'function' ? oggiLocale() : new Date().toISOString().slice(0, 10);
+      const f =
+        (await secGet(
+          'piano_fabbisogni?turno_codice=eq.' +
+            encodeURIComponent(t.codice) +
+            '&reparto_dip=eq.' +
+            rep +
+            '&data=gte.' +
+            oggi +
+            '&limit=500',
+        )) || [];
+      if (f.length) out.push('fabbisogno da oggi in poi: ' + f.length + ' giorni con ' + cod);
+    } catch (e) {}
+  }
+  return out;
 }
 async function aggiungiPianoTurno() {
   if (!isAdmin()) return;
@@ -994,7 +1118,7 @@ async function eliminaPianoTurno(id) {
 function _renderPianoCodiciCard() {
   if (!isAdmin()) return '';
   let h =
-    '<div class="main-card" style="margin-top:16px"><div class="card-header">Codici speciali (admin)</div><div style="padding:10px 14px">';
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Codici speciali</div><div style="padding:10px 14px">';
   h +=
     '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:6px">Assenze e situazioni non lavorative. "Riposo" = il codice conta come giorno di riposo per le regole. Le ore seguono le formule CCL originali.</p>';
   h +=

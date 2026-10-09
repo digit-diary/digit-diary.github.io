@@ -32,7 +32,7 @@ function _renderOrganicoInterruttoreCard() {
   if (!isAdmin()) return '';
   const on = organicoAttivo();
   return (
-    '<div class="main-card" style="margin-top:16px"><div class="card-header">Analisi organico (admin)</div><div style="padding:10px 14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">' +
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Analisi organico</div><div style="padding:10px 14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">' +
     '<span style="font-size:var(--fs-md,.875rem)">La scheda <b>Organico</b> del Piano e <b style="color:' +
     (on ? 'var(--c-verde,#2c6e49)' : 'var(--c-rosso,#c0392b)') +
     '">' +

@@ -2144,7 +2144,7 @@ async function esportaReportIncentiviPDF() {
 function _renderFormazioneConfig() {
   const cfgC = getCompetenzeConfigAll();
   const cfgP = getPuntiConfig();
-  let html = '<div class="settings-section"><h4>Configurazione (admin)</h4>';
+  let html = '<div class="settings-section"><h4>Configurazione</h4>';
   // nomi dei livelli personalizzabili
   html +=
     '<p style="font-size:var(--fs-md,.875rem);font-weight:700;margin:8px 0 4px">Nomi dei livelli · ' +
