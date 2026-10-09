@@ -33,6 +33,7 @@ Ordine = ordine di caricamento in index.html. Il Piano di lavoro e diviso in die
 | 17 | ai.js | 457 | Intelligenza artificiale configurabile: fornitori compatibili (Groq, Ollama/Llama, LM Studio), in uso e riserva, chiavi nel database (get_ai_key/set_ai_key), prova collegamento, aiChat/aiModello/aiPronta |
 | 18 | moduli.js | 2846 | Moduli disciplinari, PDF, AI senza dati personali, anagrafica collaboratori |
 | 19 | formazione.js | 3073 | Multidisciplinarita: matrice competenze, livelli, punti/premi, Report Incentivi |
+| 19b | formazione-import.js | 579 | Import competenze da Excel a matrice (colonne -> competenze, anteprima, nuovi, Annulla l ultimo import), ogni settore |
 | 20 | valutazioni.js | 1177 | Valutazione annuale: aree, import Excel, PDF HR |
 | 21 | rapporto.js | 1096 | Rapporto giornaliero, parser assenze/cassa |
 | 22 | stats.js | 983 | Statistiche, grafici |

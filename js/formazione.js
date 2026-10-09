@@ -2176,7 +2176,18 @@ function _renderFormazioneConfig() {
         rep +
         '" style="font-size:var(--fs-sm,.8125rem);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:12px 0 6px">Competenze ' +
         escP(repartoLabel(rep)) +
-        '</p><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:0 0 6px">Ordine: prima L1, poi L2, poi L3... Con le frecce scegli l ordine dentro lo stesso livello; dal menu cambi il livello di una competenza.</p>';
+        '</p><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:0 0 6px">Ordine: prima L1, poi L2, poi L3... Con le frecce scegli l ordine dentro lo stesso livello; dal menu cambi il livello di una competenza.</p>' +
+        // IMPORT DA EXCEL (v429): file a matrice nomi x competenze con le X
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 8px">' +
+        '<label class="btn-act" style="cursor:pointer;margin:0">Importa da Excel<input type="file" accept=".xlsx,.xls,.xlsm" style="display:none" onchange="formImportaMatrice(this,\'' +
+        rep +
+        '\')"></label>' +
+        (typeof _fziUltimoImport === 'function' && (_fziUltimoImport() || {}).rep === rep
+          ? '<button class="btn-act" onclick="formAnnullaUltimoImport()">Annulla l ultimo import (' +
+            escP(_fziUltimoImport().file) +
+            ')</button>'
+          : '') +
+        '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">un collaboratore per riga, una competenza per colonna, X = la sa fare</span></div>';
       const lista = cfgC[rep] || [];
       // elenco fuori ordine (es. un L1 aggiunto dopo un L2 prima della v376): si rimette
       // in ordine di livello con un clic

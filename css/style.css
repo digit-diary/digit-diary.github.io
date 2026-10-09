@@ -6723,3 +6723,26 @@ body.ge-trascino * {
   font-size: var(--fs-sm, 0.8125rem);
   color: var(--muted);
 }
+
+/* Formazione: import competenze da Excel (v429) */
+.fzi-tab {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: var(--fs-md, 0.875rem);
+}
+.fzi-tab th,
+.fzi-tab td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.fzi-tab th {
+  position: sticky;
+  top: 0;
+  background: var(--paper2);
+  font-size: var(--fs-sm, 0.8125rem);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
