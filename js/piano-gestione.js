@@ -76,8 +76,8 @@ function _renderPianoDomenicheBody() {
   let h =
     '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Diritto: ' +
     diritto +
-    ' domeniche libere all anno (regola "domeniche_libere_anno"). Vacanza e malattia non contano ne\' tra le libere ne\' tra le lavorate (stesso criterio del validatore e di Benessere)' +
-    (chkSab ? '; il sabato deve finire entro le 23, come nel validatore' : '') +
+    ' domeniche libere all anno (regola "Domeniche libere garantite in un anno"). Vacanza e malattia non contano né tra le libere né tra le lavorate (stesso criterio di Valida regole e di Benessere)' +
+    (chkSab ? '; il sabato deve finire entro le 23, come in Valida regole' : '') +
     '. Nei mesi senza piano non si conta nulla. Rosso = le domeniche rimaste nell anno non bastano più per arrivare al diritto: da li in poi vanno restituite per prime.</p>';
   h +=
     '<div style="overflow:auto;max-height:66vh"><table id="piano-domeniche-table" class="piano-table piano-fisse3" style="min-width:1050px;font-size:var(--fs-sm,.8125rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Fun</th><th>%</th>';
@@ -1619,7 +1619,7 @@ async function pianoAssegnaCgfMese() {
         ':\n\n' +
         elenco +
         (daFare.length > 25 ? '\n... e altri ' + (daFare.length - 25) : '') +
-        '\n\nIl conteggio tiene conto del riporto e dei recuperi già dati nei mesi precedenti; valgono le regole cgf_max_mese, cgf_distanza_giorni e cgf_non_con_vacanze. Le celle scritte a mano non vengono toccate.',
+        '\n\nIl conteggio tiene conto del riporto e dei recuperi già dati nei mesi precedenti; valgono le regole "Recuperi automatici al massimo per persona in un mese", "Giorni minimi fra due recuperi" e "Mai un recupero il giorno prima o dopo una vacanza". Le celle scritte a mano non vengono toccate.',
     ))
   )
     return;
@@ -1725,7 +1725,7 @@ function _renderPianoFestiviCard() {
         (_pianoFestivoDaCgf(f)
           ? ' <span class="tipo-item-default">(CGF)</span>'
           : f.cgf && _festivoCgfDefault(f.data)
-            ? ' <span class="tipo-item-default" title="Flag CGF attivo ma festivo non parificato alla domenica: escluso dalla regola cgf_solo_parificati">(senza CGF: non parificato)</span>'
+            ? ' <span class="tipo-item-default" title="Festivo con recupero (CGF), ma non parificato alla domenica: non matura il recupero (regola &quot;Il recupero matura solo sui festivi parificati alla domenica&quot;)">(senza CGF: non parificato)</span>'
             : f.cgf
               ? ' <span class="tipo-item-default" title="Cade di domenica: nessun recupero">(domenica)</span>'
               : '') +
@@ -1743,7 +1743,7 @@ function _renderPianoFestiviCard() {
     annoSel +
     '" min="2024" max="2050" style="width:90px"></div>' +
     '<button class="btn-add-tipo" onclick="generaPianoFestivi()">Genera festivi anno</button>' +
-    '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">11 festivi italiani (Lunedì dell&#39;Angelo calcolato dalla Pasqua)</span></div>';
+    '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">15 festivi del Canton Ticino (quelli che cambiano data calcolati dalla Pasqua)</span></div>';
   h += '</div></div>';
   return h;
 }
@@ -2712,7 +2712,9 @@ async function pianoFestivitaAggiungi() {
     toast('Aggiunta: ' + nome);
     renderPiano();
   } catch (e) {
-    toast('Già presente o errore');
+    if (/duplicate key|already exists|23505/i.test((e && e.message) || ''))
+      toastErrore("Questa festività c'è già per quel giorno");
+    else toastErrore('Festività NON aggiunta: ' + ((e && e.message) || e) + '. Riprova.', 8000);
   }
 }
 function _renderPianoFestivitaCard() {

@@ -655,7 +655,7 @@ function renderBiometricSettings() {
 async function resetPasswordOperatore(nome) {
   const b = document.getElementById('pwd-modal-content');
   b.innerHTML =
-    '<h3>Resetta password</h3><p>Imposta una nuova password temporanea per <strong>' +
+    '<h3>Nuova password</h3><p>Imposta una nuova password temporanea per <strong>' +
     escP(nome) +
     '</strong></p><div class="pwd-field"><label>Nuova password</label><input type="password" id="reset-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="reset-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiResetPwdOp(\'' +
     _jsArg(nome) +

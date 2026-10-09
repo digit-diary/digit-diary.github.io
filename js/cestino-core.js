@@ -350,7 +350,7 @@ function _esitoInBlocco(msgOk, falliti) {
 async function salvaFixImpiego() {
   // stesso permesso della scheda collaboratore (Impiego)
   if (!puoModificare('gestione_impiego')) {
-    toast('Riservato all amministratore');
+    toastErrore('Non hai il permesso per questa azione');
     return;
   }
   const sel = [...document.querySelectorAll('[data-fix-imp]')];
@@ -389,7 +389,7 @@ async function pulisciPianoDisattivati() {
   if (!_pianoAzioneAutoConsentita('cancella')) return; // azione automatica: permesso apposito
   // cancella righe del piano: stesso permesso della griglia turni
   if (!puoModificare('gestione_piano')) {
-    toast('Riservato all amministratore');
+    toastErrore('Non hai il permesso per questa azione');
     return;
   }
   try {
@@ -793,7 +793,7 @@ async function orfanoSposta(nome, idx) {
 async function orfanoElimina(nome, n) {
   // cancella righe del piano: stesso permesso della griglia turni
   if (!puoModificare('gestione_piano')) {
-    toast('Riservato all amministratore');
+    toastErrore('Non hai il permesso per questa azione');
     return;
   }
   if (
@@ -806,7 +806,13 @@ async function orfanoElimina(nome, n) {
     ))
   )
     return;
-  if (!(await chiediConferma("Confermi definitivamente l'eliminazione dei " + n + ' turni di "' + nome + '"?'))) return;
+  if (
+    !(await chiediConferma("Confermi definitivamente l'eliminazione dei " + n + ' turni di "' + nome + '"?', {
+      pericolo: true,
+      ok: 'Elimina',
+    }))
+  )
+    return;
   try {
     await secDel('piano', 'collaboratore=eq.' + encodeURIComponent(nome));
     logAzione('Turni orfani eliminati', nome + ' (' + n + ' righe)');

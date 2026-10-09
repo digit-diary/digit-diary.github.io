@@ -627,7 +627,7 @@
           ></div>
         </div>
         <div class="main-card" id="dash-alerts">
-          <div class="card-header">Alert attivi</div>
+          <div class="card-header">Avvisi attivi</div>
           <div
             id="dash-alert-list"
             style="padding: 14px; max-height: 300px; overflow-y: auto"
@@ -925,7 +925,7 @@
               oninput="render()"
             />
           </div>
-          <button class="btn-reset" onclick="resetFiltri()">Reset</button>
+          <button class="btn-reset" onclick="resetFiltri()">Azzera filtri</button>
           <div class="export-btns">
             <button class="btn-export" onclick="esportaCSV()">CSV</button>
             <button class="btn-export btn-export-pdf" onclick="esportaPDF()">
@@ -1351,7 +1351,7 @@
           <p
             style="color: var(--muted); font-size: var(--fs-sm,.8125rem); margin-bottom: 8px"
           >
-            I 15 collaboratori più attivi nel diario
+            I 15 collaboratori con più registrazioni nel diario
           </p>
           <div class="chart-wrap" style="max-height: 400px">
             <canvas id="chart-collab"></canvas>
@@ -1482,7 +1482,7 @@
               style="cursor: pointer; min-width: 150px"
             />
           </div>
-          <button class="btn-reset" onclick="resetConsFiltri()">Reset</button>
+          <button class="btn-reset" onclick="resetConsFiltri()">Azzera filtri</button>
           <div class="filter-group filter-cerca">
             <input type="text" id="cons-filt-cerca" class="campo-cerca" placeholder="Cerca nelle consegne..." aria-label="Cerca nelle consegne" oninput="renderConsegne()" />
           </div>
@@ -1828,7 +1828,7 @@
               style="cursor: pointer; min-width: 150px"
             />
           </div>
-          <button class="btn-reset" onclick="resetMaisonFiltri()">Reset</button>
+          <button class="btn-reset" onclick="resetMaisonFiltri()">Azzera filtri</button>
           <div class="export-btns">
             <button class="btn-export" onclick="esportaMaisonCSV()">CSV</button>
             <button
@@ -3149,7 +3149,7 @@
               color: var(--muted);
               font-weight: 600;
             "
-            >Template rapidi</span
+            >Testi pronti</span
           >
           <div class="template-rapidi-wrap" style="margin-top: 6px">
             <button
@@ -3597,7 +3597,7 @@
         <div class="add-tipo-row sez-form"><div class="field"><label>Nome nuovo campo</label><input type="text" id="new-campo-nome" placeholder="es. Bar, VIP Area" /></div><button class="btn-add-tipo" onclick="aggiungiCampoRapporto()">Aggiungi campo</button></div>
       </div>
       <div class="settings-section" data-gruppo="Persone e accessi" id="collab-section" style="display: none">
-        <div class="sez-head"><div><h4>Collaboratori</h4><p class="sez-desc">Anagrafica del settore aperto: nome, impiego, categoria, funzione, percentuale, lingue, date. Competenze e livelli si gestiscono in Formazione, preferenze e coperture nel Piano.</p></div></div>
+        <div class="sez-head"><div><h4>Gestione collaboratori</h4><p class="sez-desc">Anagrafica del settore aperto: nome, impiego, categoria, funzione, percentuale, lingue, date. Competenze e livelli si gestiscono in Formazione, preferenze e coperture nel Piano.</p></div></div>
         <div id="collaboratori-list"></div>
         <div class="add-tipo-row sez-form"><div class="field"><label>Nome nuovo collaboratore</label><input type="text" id="new-collab-nome" placeholder="Cognome Nome" /></div><button class="btn-add-tipo" onclick="aggiungiCollaboratore()">Aggiungi</button><button class="btn-secondario" onclick="document.getElementById('import-collab-file').click()">Importa da Excel o CSV</button><input type="file" id="import-collab-file" accept=".xlsx,.xls,.csv,.txt" style="display: none" onchange="importaCollaboratori(this)" /></div>
       </div>
@@ -3633,7 +3633,7 @@
         <p id="maison-autodelete-status" class="sez-stato"></p>
       </div>
       <div class="settings-section" data-gruppo="Maison" id="soglie-alert-section" style="display: none">
-        <div class="sez-head"><div><h4>Alert cassa e percorso disciplinare</h4><p class="sez-desc">Gli importi e il numero di episodi che fanno scattare i suggerimenti nella Panoramica.</p></div></div>
+        <div class="sez-head"><div><h4>Avvisi cassa e percorso disciplinare</h4><p class="sez-desc">Gli importi e il numero di episodi che fanno scattare i suggerimenti nella Panoramica.</p></div></div>
         <p class="sez-sottotitolo">Differenze di cassa</p>
         <div class="add-tipo-row sez-form"><div class="field"><label>Allineamento: differenza singola da CHF</label><input type="number" id="soglia-allin-input" min="1" step="1" /></div><div class="field"><label>RDI: cumulativo dall ultima RDI da CHF</label><input type="number" id="soglia-rdi-input" min="1" step="1" /></div><button class="btn-add-tipo" onclick="salvaSoglieAlert()">Salva soglie</button></div>
         <p id="soglie-alert-status" class="sez-stato"></p>

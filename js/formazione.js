@@ -1502,6 +1502,30 @@ async function toggleCompetenza(collabId, key, cb) {
       }
     });
   }
+  // TOGLIERE una competenza cambia i turni che il Piano propone: si chiede sempre conferma,
+  // dicendo l effetto (prima si salvava al clic e la persona spariva dai turni dell area)
+  if (!attiva) {
+    const nomeC = compAtt ? compAtt.label : key;
+    const area = typeof _pianoCompetenzeGruppi === 'function' ? (_pianoCompetenzeGruppi() || {})[key] : null;
+    if (
+      !(await chiediConferma(
+        'Togliere la competenza "' +
+          nomeC +
+          '" a ' +
+          c.nome +
+          '?' +
+          (area
+            ? '\n\nDa quel momento il Piano non gli proporrà più i turni dell area ' +
+              String(area).toUpperCase() +
+              ' (bozza, cambi, coperture).'
+            : ''),
+        { ok: 'Togli', pericolo: true },
+      ))
+    ) {
+      cb.checked = true;
+      return;
+    }
+  }
   if (!attiva && lvAtt > 0) {
     const superiori = compsRep.filter((k) => (parseInt(k.livello) || 0) > lvAtt && nuove[k.key] === true);
     if (superiori.length) {
@@ -1929,7 +1953,7 @@ async function esportaMatricePDF() {
   if (!window.jspdf) {
     toast('Caricamento PDF...');
     if (!(await caricaJsPDF())) {
-      toast('Errore caricamento libreria PDF');
+      toastErrore('Non riesco a preparare il PDF: controlla la connessione internet e riprova');
       return;
     }
   }
@@ -2003,7 +2027,7 @@ async function esportaReportIncentiviPDF() {
   if (!window.jspdf) {
     toast('Caricamento PDF...');
     if (!(await caricaJsPDF())) {
-      toast('Errore caricamento libreria PDF');
+      toastErrore('Non riesco a preparare il PDF: controlla la connessione internet e riprova');
       return;
     }
   }
@@ -2871,6 +2895,7 @@ async function rimuoviInvIncentivo(idx) {
 }
 async function rimuoviSoglia(idx) {
   if (!_soloAdminCfg()) return;
+  if (!(await chiediConferma('Eliminare questa soglia dei premi?'))) return;
   const cfg = getPuntiConfig();
   cfg.soglie = cfg.soglie.filter((_, i) => i !== idx);
   await savePuntiConfig(cfg);

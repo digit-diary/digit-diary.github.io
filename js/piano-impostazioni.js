@@ -1879,7 +1879,7 @@ async function rinominaFormulario(id) {
     logAzione('Formulario rinominato', nome + ' (' + cartella + ')');
     renderPiano();
   } catch (e) {
-    toast('Errore');
+    toastErrore('Formulario NON rinominato: ' + ((e && e.message) || e) + '. Riprova.', 8000);
   }
 }
 async function eliminaFormulario(id) {
@@ -2073,7 +2073,7 @@ function _renderPianoRegoleGruppoCard() {
       .join('') +
     '</ul></li>' +
     '<li><b>Livelli di Formazione</b>: il livello di ognuno e quello di Formazione (L2 = tutte le competenze fino a L2 certificate). Chi deve fare un turno anche senza il livello lo trova in Preferenze collaboratori, <b>Turni consentiti</b>. Quando qualcuno sale di livello, i turni si aprono da soli; sotto la regola si vede quante persone la soddisfano.</li>' +
-    '<li>Le regole valgono per il <b>settore aperto</b>: ogni settore ha le sue, con le sue sigle e le sue funzioni. Agiscono nel validatore, nella bozza, nei cambi turno e nella scrittura manuale (avviso).</li>' +
+    '<li>Le regole valgono per il <b>settore aperto</b>: ogni settore ha le sue, con le sue sigle e le sue funzioni. Agiscono in Valida regole, nella bozza, nei cambi turno e nella scrittura a mano (avviso).</li>' +
     '</ol></details>' +
     '<div id="rg-modulo" style="margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:3px;background:var(--paper2)">' +
     '<div class="add-tipo-row" onchange="rgAggiornaAnteprima()" oninput="rgAggiornaAnteprima()"><div class="field"><label>Area</label><select id="rg-gruppo" style="padding:8px" onchange="rgGruppoCambiato()">' +

@@ -87,7 +87,7 @@ function switchPage(name) {
     const sb = document.getElementById('sicurezza-btns');
     if (sb) {
       sb.innerHTML = isAdmin()
-        ? '<button class="btn-settings" onclick="cambiaPassword()">Cambia password master</button>'
+        ? '<button class="btn-settings" onclick="cambiaPassword()">Cambia password principale</button>'
         : '<button class="btn-settings" onclick="cambiaPasswordOperatore()">Cambia la mia password</button>';
     }
     renderCollaboratoriUI();

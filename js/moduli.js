@@ -722,7 +722,10 @@ async function generaModuloPDF(tipo) {
     chiudiModulo();
   } catch (e) {
     console.error(e);
-    toast('PDF generato (errore salvataggio DB)');
+    toastErrore(
+      'Il PDF è pronto, ma il modulo NON è stato salvato: premi di nuovo Salva (' + ((e && e.message) || e) + ')',
+      10000,
+    );
   }
 }
 function drawFieldLine(doc, x, y, label, value, pw) {
@@ -836,7 +839,7 @@ function renderModuliList() {
       '<div class="filter-group"><span class="filter-label">Dal</span><input type="text" id="mod-filt-dal" placeholder="Seleziona..." readonly style="cursor:pointer;min-width:150px"></div>';
     hdr +=
       '<div class="filter-group"><span class="filter-label">Al</span><input type="text" id="mod-filt-al" placeholder="Seleziona..." readonly style="cursor:pointer;min-width:150px"></div>';
-    hdr += '<button class="btn-reset" onclick="resetModuliFiltri()">Reset</button></div>';
+    hdr += '<button class="btn-reset" onclick="resetModuliFiltri()">Azzera filtri</button></div>';
     hdr += '<div id="mod-list-results" style="padding:10px"></div>';
     c.innerHTML = hdr;
     if (window.flatpickr) {
@@ -2947,7 +2950,7 @@ function render() {
           (typeof isVis !== 'function' || isVis('promemoria')
             ? '<button class="btn-act" onclick="promemoriaDaRegistrazione(' +
               e.id +
-              ')" title="Crea un promemoria di follow-up già compilato">Promemoria</button>'
+              ')" title="Crea un promemoria di verifica già compilato">Promemoria</button>'
             : '') +
           '<button class="btn-act del" onclick="elimina(' +
           e.id +

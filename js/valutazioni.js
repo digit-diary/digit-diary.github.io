@@ -953,7 +953,7 @@ async function esportaValutazionePDF(id) {
   if (!window.jspdf) {
     toast('Caricamento PDF...');
     if (!(await caricaJsPDF())) {
-      toast('Errore caricamento libreria PDF');
+      toastErrore('Non riesco a preparare il PDF: controlla la connessione internet e riprova');
       return;
     }
   }
@@ -1062,7 +1062,7 @@ async function esportaValutazionePDF(id) {
     Object.assign({}, stileTab, {
       startY: y,
       head: [
-        ['Area di valutazione', 'Grado', 'Punteggio', 'Valore', 'Totale', 'Paramentro di valutazione e/o osservazioni'],
+        ['Area di valutazione', 'Grado', 'Punteggio', 'Valore', 'Totale', 'Parametro di valutazione e/o osservazioni'],
       ],
       body: [
         ['', '', '', '', '', ''],

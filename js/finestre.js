@@ -22,11 +22,40 @@ function _finestraApri(tipo, testo, predefinito, opz) {
 function _finestraMostra(tipo, testo, predefinito, opz) {
   return new Promise((risolvi) => {
     const t = String(testo == null ? '' : testo);
-    // pulsante rosso quando la domanda riguarda un eliminazione o una cancellazione
-    const pericolo = opz.pericolo != null ? opz.pericolo : /\b(elimin|cancell|rimuov|svuot|sovrascriv)/i.test(t);
+    // pulsante rosso SOLO quando la domanda stessa e un eliminazione ("Eliminare...?",
+    // "Svuotare...?"), con il suo verbo sul pulsante. Prima bastava la parola in qualsiasi
+    // punto del testo: "Annullare la cancellazione?" o "il tipo NON verra eliminato"
+    // mostravano un pulsante rosso "Elimina" per azioni che non eliminavano niente.
+    const VERBI = {
+      eliminare: 'Elimina',
+      cancellare: 'Cancella',
+      svuotare: 'Svuota',
+      rimuovere: 'Rimuovi',
+      togliere: 'Togli',
+      sovrascrivere: 'Sovrascrivi',
+      elimino: 'Elimina',
+      cancello: 'Cancella',
+      svuoto: 'Svuota',
+      rimuovo: 'Rimuovi',
+      tolgo: 'Togli',
+      sovrascrivo: 'Sovrascrivi',
+    };
+    const mV = t
+      .trim()
+      .match(
+        /^(?:(?:sei\s+)?sicur[oa]\s+di\s+voler\s+)?(eliminare|cancellare|svuotare|rimuovere|togliere|sovrascrivere|elimino|cancello|svuoto|rimuovo|tolgo|sovrascrivo)\b/i,
+      );
+    const pericolo = opz.pericolo != null ? opz.pericolo : !!mV;
     const titolo = opz.titolo || (tipo === 'avviso' ? 'Avviso' : tipo === 'testo' ? 'Inserisci' : 'Conferma');
     const okLbl =
-      opz.ok || (tipo === 'avviso' ? 'OK' : tipo === 'testo' ? 'Conferma' : pericolo ? 'Elimina' : 'Conferma');
+      opz.ok ||
+      (tipo === 'avviso'
+        ? 'OK'
+        : tipo === 'testo'
+          ? 'Conferma'
+          : pericolo
+            ? (mV && VERBI[mV[1].toLowerCase()]) || 'Elimina'
+            : 'Conferma');
     const noLbl = opz.annulla || 'Annulla';
 
     const velo = document.createElement('div');

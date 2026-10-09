@@ -25,13 +25,13 @@ const VIS_ITEMS = {
   },
   funzioni: {
     ricerca_globale: 'Ricerca globale',
-    alert_cassa: 'Alert cassa',
-    alert_rischio: 'Alert rischio',
+    alert_cassa: 'Avvisi cassa',
+    alert_rischio: 'Avvisi di rischio',
     alert_compleanni: 'Compleanni maison',
-    template_rapidi: 'Template rapidi',
+    template_rapidi: 'Testi pronti',
     firma_digitale: 'Firma digitale',
-    qr_code: 'QR Code su PDF',
-    ai_moduli: 'AI (Genera + Migliora testo)',
+    qr_code: 'Codice QR sui PDF',
+    ai_moduli: 'Intelligenza artificiale nei moduli (scrive e migliora il testo)',
   },
   // Permessi di MODIFICA: chi non è abilitato vede comunque i dati in sola lettura.
   // Default: solo admin. "Operatori selezionati" = es. l'operatore HR.
@@ -49,7 +49,7 @@ const VIS_ITEMS = {
     piano_auto_vacanze:
       'Piano · VACANZE E CGF AUTOMATICI: importa il file vacanze, applica le vacanze del mese al piano, assegna i CGF del mese (la V di una persona dagli Avvisi resta libera)',
     piano_auto_import:
-      'Piano · IMPORT DA FILE: importa il piano da Excel, il fabbisogno da Excel e il file della timbratrice (copiare, incollare ed esportare restano liberi)',
+      'Piano · Importare da file: importa il piano da Excel, il fabbisogno da Excel e il file della timbratrice (copiare, incollare ed esportare restano liberi)',
     piano_formazioni:
       'Piano · PIANIFICARE FORMAZIONI: nuova formazione, proposte di cambi e applica, annulla, segna svolta (con certificazione della competenza), formatori e modelli',
     piano_fabbisogno:
@@ -62,7 +62,7 @@ const VIS_ITEMS = {
     sblocco_piano_chiuso:
       'Giorni chiusi · sbloccare un giorno passato del piano per correggerlo (con motivo obbligatorio, tracciato nel registro)',
     vista_malattie_pct:
-      'Pattern malattie · percentuali per giorno della settimana, avviso Lunedì/Venerdì e confronto con la media del team nella scheda collaboratore (analisi riservata, richiesta HR)',
+      'Andamento delle malattie · percentuali per giorno della settimana, avviso Lunedì/Venerdì e confronto con la media del team nella scheda collaboratore (analisi riservata, richiesta HR)',
     gestione_corsi: 'Corsi · pianificare corsi nel piano: data, orario e partecipanti (es. supervisor)',
     gestione_briefing:
       'Briefing · compilare e modificare il foglio del giorno e le pause (senza toccare la griglia turni)',
@@ -2358,11 +2358,13 @@ function initSezioniRichiudibili(rootId) {
   // restano Gestione Collaboratori (si regola coi suoi permessi) e Sicurezza
   // (impronta del dispositivo, personale)
   if (rootId === 'page-impostazioni' && !isAdmin()) {
-    const perOperatori = ['Gestione Collaboratori', 'Sicurezza'];
+    // il titolo sta dentro l intestazione della sezione (.sez-head): prima si cercava solo
+    // un h4 figlio diretto e con un nome vecchio, cosi non si nascondeva nessuna sezione
+    const perOperatori = ['gestione collaboratori', 'collaboratori', 'sicurezza'];
     root.querySelectorAll('.settings-section').forEach((sec) => {
-      const h = sec.querySelector(':scope > h4');
+      const h = sec.querySelector('h4');
       if (!h) return;
-      const titolo = (h.childNodes[0].textContent || '').trim();
+      const titolo = (h.childNodes[0].textContent || '').trim().toLowerCase();
       if (!perOperatori.includes(titolo)) sec.style.display = 'none';
     });
   }

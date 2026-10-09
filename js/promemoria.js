@@ -101,7 +101,9 @@ async function _salvaPromemoriaEsegui() {
     String(dScad.getDate()).padStart(2, '0');
   const ripetizione = (document.getElementById('pm-ripetizione') || {}).value || null;
   const remindLabel =
-    remindGiorni === 0 ? 'il giorno stesso alle ' + remindOra : remindGiorni + ' giorno/i prima alle ' + remindOra;
+    remindGiorni === 0
+      ? 'il giorno stesso alle ' + remindOra
+      : remindGiorni + (remindGiorni === 1 ? ' giorno' : ' giorni') + ' prima alle ' + remindOra;
   const ripLabel = ripetizione
     ? {
         giornaliero: 'ogni giorno',
@@ -250,7 +252,7 @@ async function eliminaPromemoria(id) {
     toast('Solo un amministratore può eliminare i promemoria');
     return;
   }
-  if (!(await chiediConferma('Eliminare questo promemoria?'))) return;
+  if (!(await chiediConferma('Eliminare questo promemoria per sempre? Non va nel Cestino.'))) return;
   try {
     await secDel('promemoria', 'id=eq.' + id);
     promemoriaCache = promemoriaCache.filter((x) => x.id !== id);

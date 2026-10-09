@@ -494,7 +494,8 @@ function renderRischioAlerts() {
   renderAlertCompatti();
 }
 async function ignoraAlertSuggerimento(nome, tipo) {
-  if (!(await chiediConferma('Ignorare questo suggerimento per ' + nome + '?\nVerrà registrato nel log.'))) return;
+  if (!(await chiediConferma('Ignorare questo suggerimento per ' + nome + '?\nResta scritto nel registro attività.')))
+    return;
   const _ignKey = '_alert_ign_' + nome.toLowerCase().replace(/\s/g, '_') + '_' + tipo;
   localStorage.setItem(_ignKey, '1');
   logAzione('Alert ignorato', nome + ' · suggerimento ' + tipo + ' ignorato da ' + getOperatore());

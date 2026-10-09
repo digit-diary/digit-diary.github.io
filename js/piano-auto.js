@@ -279,7 +279,7 @@ async function _pianoAutoEsegui(rep, ym, minuti) {
             );
           const fin = esito.ricerca.applicata ? D : P;
           if (fin.legge || fin.scoperti)
-            righe.push('Da controllare in Piano > Calendario con "Valida regole" prima di pubblicarlo.');
+            righe.push('Da controllare in Piano > Calendario con "Valida regole" prima di usarlo.');
         } else if (b.scoperti) righe.push('• ' + b.scoperti + ' posti senza candidato idoneo');
         // COPERTURE DA ALTRI SETTORI e MIGLIORA ORE (richiesta del titolare 08/10/2026: la
         // generazione automatica fa la stessa sequenza che si fa a mano). Le coperture

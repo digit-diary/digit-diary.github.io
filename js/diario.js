@@ -328,7 +328,7 @@ function _suggerisciFollowUp(nome, testo) {
   // Niente dati dentro onclick: un a-capo o una virgoletta nel testo della
   // richiesta rendeva morti tutti i bottoni. Nome e testo restano in chiusura.
   b.innerHTML =
-    '<h3>Scadenza follow-up</h3><p style="margin-bottom:14px">Richiesta registrata per <strong>' +
+    '<h3>Scadenza della verifica</h3><p style="margin-bottom:14px">Richiesta registrata per <strong>' +
     escP(nome) +
     '</strong>. Entro quando va risolta?</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">' +
     opzioni
@@ -375,7 +375,7 @@ async function _creaFollowUp(nome, testo, dataDirecta) {
     promemoriaCache.push(r[0]);
     document.getElementById('pwd-modal').classList.add('hidden');
     aggiornaPromemoriaBadge();
-    toast('Promemoria follow-up creato per ' + nome);
+    toast('Promemoria di verifica creato per ' + nome);
   } catch (e) {
     toast('Errore creazione promemoria');
   }
@@ -738,9 +738,10 @@ async function _diarioNdNelPiano(nome, giorni) {
       nome +
         ' ha già dei turni nel piano in quei giorni: ' +
         elenco +
-        '.\n\nCerco subito chi li copre? (Copertura già compilata: alla conferma ND a ' +
+        '.\n\nCerco subito chi li copre? Alla conferma ' +
         nome +
-        ' e turno al sostituto.)\nAnnulla = i turni diventano ND e i posti restano da coprire.',
+        ' risulta non disponibile (ND) e il turno passa al sostituto. Altrimenti i turni diventano ND e i posti restano da coprire.',
+      { ok: 'Cerca chi copre', annulla: 'Lascia i posti scoperti', titolo: 'Turni da coprire' },
     );
     if (cerca) {
       const g = turni.map((t) => parseInt(t.data.substring(8, 10)));

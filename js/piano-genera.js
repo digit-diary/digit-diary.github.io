@@ -3565,24 +3565,30 @@ async function cancellaBozzaPiano() {
   const ym = _pianoMeseSel;
   const da = ym + '-01';
   const a = ym + '-' + String(_pianoUltimoGiorno(ym)).padStart(2, '0');
-  const nonProtette = _pianoRighe.filter((r) => !r.protetto).length;
-  const protette = _pianoRighe.length - nonProtette;
+  // si contano SOLO le celle di questo settore, come quelle che si cancellano (prima si
+  // contavano anche quelle di chi copre da un altro settore: "TUTTE (120)" e poi "110 rimosse")
+  const mieC = _pianoRighe.filter((r) => (r.reparto_dip || 'slots') === _pianoReparto());
+  const nonProtette = mieC.filter((r) => !r.protetto).length;
+  const protette = mieC.length - nonProtette;
+  const meseTxt = new Date(ym + '-01T12:00:00').toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
   const b = document.getElementById('pwd-modal-content');
   b.innerHTML =
-    '<h3>Cancella piano · ' +
-    ym +
+    '<h3>Svuota il piano di ' +
+    escP(meseTxt) +
+    ' · ' +
+    escP(typeof repartoLabel === 'function' ? repartoLabel(_pianoReparto()) : _pianoReparto()) +
     '</h3><p style="margin-bottom:14px;font-size:var(--fs-md,.875rem)">' +
     nonProtette +
-    ' celle generate/non protette, ' +
+    ' celle scritte dalla bozza o senza lucchetto, ' +
     protette +
-    ' protette (manuali/vacanze).</p>' +
+    ' con il lucchetto (vacanze, scritte a mano). Si può annullare con Annulla.</p>' +
     '<div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button>' +
-    '<button class="btn-modal-ok" onclick="eseguiCancellaPiano(false)">Solo non protette (' +
+    '<button class="btn-modal-ok" onclick="eseguiCancellaPiano(false)">Solo senza lucchetto (' +
     nonProtette +
     ')</button>' +
     (puoAzioniAutoPiano('cancella')
       ? '<button class="btn-modal-ok" style="background:var(--accent)" onclick="eseguiCancellaPiano(true)">TUTTE (' +
-        _pianoRighe.length +
+        mieC.length +
         ')</button>'
       : '') +
     '</div>';
@@ -3615,11 +3621,11 @@ async function eseguiCancellaPiano(tutto) {
       'data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + (tutto ? '' : '&protetto=eq.false'),
     );
     logAzione('Piano: cancellato', ym + ' · ' + n + ' celle (tutto=' + tutto + ')');
-    toast('Piano cancellato: ' + n + ' celle rimosse');
+    toast('Piano svuotato: ' + n + ' celle tolte (si può annullare con Annulla)');
     _pianoViolCelle = {};
     _pianoViolLista = null;
     renderPiano();
   } catch (e) {
-    toast('Errore cancellazione');
+    toastErrore('Piano NON svuotato: ' + ((e && e.message) || e), 8000);
   }
 }

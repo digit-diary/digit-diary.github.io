@@ -1877,7 +1877,7 @@ async function pianoScriviOreMese(nome) {
     _pianoYtdKey = ''; // l'YTD dei mesi seguenti cambia: si ricalcola
     renderPiano();
   } catch (e) {
-    toast('Errore nel salvataggio (la tabella piano_ore_mese esiste?)');
+    toastErrore('Ore del mese NON salvate: ' + ((e && e.message) || e) + '. Riprova.', 8000);
     console.error('pianoScriviOreMese', e);
   }
 }
@@ -2161,7 +2161,7 @@ async function _renderPianoCore() {
             'Genera con il solver',
             'generaConSolver()',
             'pbar-ok',
-            'Motore di ottimizzazione sul server interno (OR-Tools): piano ottimo del mese, equità garantita. Usa le stesse regole del settore e non tocca le celle esistenti',
+            'Motore avanzato sul server interno: cerca il piano migliore del mese, distribuendo il lavoro in modo equo. Usa le stesse regole del settore e non tocca le celle esistenti',
           );
         if (
           puoAuto &&
@@ -2218,7 +2218,7 @@ async function _renderPianoCore() {
             'Ordine predefinito',
             'ripristinaOrdinePiano()',
             '',
-            'Trascina i nomi per riordinare; questo pulsante ripristina SUP, BO, poi gli altri',
+            'Trascina i nomi per riordinare; questo pulsante ripristina l ordine predefinito (responsabili, vice, SUP, BO, poi gli altri; i jolly in fondo)',
           ) +
             _pianoColoriBarHtml() +
             (puoAuto || (puoMod && puoAzioniAutoPiano('cancella'))

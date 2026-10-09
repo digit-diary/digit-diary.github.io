@@ -274,7 +274,14 @@ async function annullaConsegna(id) {
     toast('Non puoi annullare: già letta da ' + c.letto_da);
     return;
   }
-  if (!(await chiediConferma("Annullare l'invio di questa consegna? Verrà eliminata."))) return;
+  if (
+    !(await chiediConferma("Annullare l'invio di questa consegna? Verrà eliminata.", {
+      pericolo: true,
+      ok: "Annulla l'invio",
+      annulla: 'Tieni',
+    }))
+  )
+    return;
   try {
     await secDel('consegne_turno', 'id=eq.' + id);
     consegneCache = consegneCache.filter((x) => x.id !== id);
@@ -420,7 +427,7 @@ function renderDashboard() {
       (alertCassa ? ' red' : '') +
       '">' +
       alertCassa +
-      '</div><div class="stat-label">Alert cassa</div></div>';
+      '</div><div class="stat-label">Avvisi cassa</div></div>';
   statsH +=
     '<div class="stat"><div class="stat-num blue">' +
     regOggi +
@@ -586,7 +593,7 @@ function renderDashboard() {
             '</strong> <span style="font-size:var(--fs-sm,.8125rem);font-weight:700;color:' +
             (isOggi ? 'var(--accent2)' : 'var(--muted)') +
             '">' +
-            (isOggi ? 'COMPLEANNO OGGI!' : 'tra ' + bd.giorni + ' giorno/i') +
+            (isOggi ? 'COMPLEANNO OGGI!' : 'tra ' + bd.giorni + (bd.giorni === 1 ? ' giorno' : ' giorni')) +
             '</span></div></div>';
         });
     }
@@ -612,7 +619,7 @@ function renderDashboard() {
             '</strong> <span style="font-size:var(--fs-sm,.8125rem);font-weight:700;color:' +
             (isOggi ? 'var(--accent2)' : 'var(--muted)') +
             '">' +
-            (isOggi ? 'COMPLEANNO OGGI!' : 'tra ' + bd.giorni + ' giorno/i') +
+            (isOggi ? 'COMPLEANNO OGGI!' : 'tra ' + bd.giorni + (bd.giorni === 1 ? ' giorno' : ' giorni')) +
             '</span></div></div>';
         });
     }
@@ -1004,7 +1011,7 @@ async function generaReportSettimanale(sez) {
   if (!window.jspdf) {
     toast('Caricamento PDF...');
     if (!(await caricaJsPDF())) {
-      toast('Errore caricamento libreria PDF');
+      toastErrore('Non riesco a preparare il PDF: controlla la connessione internet e riprova');
       return;
     }
   }
@@ -1432,7 +1439,7 @@ async function generaReportAnnuale(sez) {
   if (!window.jspdf) {
     toast('Caricamento PDF...');
     if (!(await caricaJsPDF())) {
-      toast('Errore caricamento libreria PDF');
+      toastErrore('Non riesco a preparare il PDF: controlla la connessione internet e riprova');
       return;
     }
   }

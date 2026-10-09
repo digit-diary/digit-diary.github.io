@@ -488,7 +488,7 @@ async function esportaListaMaisonPDF() {
   if (!window.jspdf) {
     toast('Caricamento PDF...');
     if (!(await caricaJsPDF())) {
-      toast('Errore caricamento libreria PDF');
+      toastErrore('Non riesco a preparare il PDF: controlla la connessione internet e riprova');
       return;
     }
   }

@@ -1176,7 +1176,7 @@ async function esportaGdOggiPDF() {
   if (!window.jspdf) {
     toast('Caricamento PDF...');
     if (!(await caricaJsPDF())) {
-      toast('Errore');
+      toastErrore('Non riesco a preparare il PDF: controlla la connessione internet e riprova');
       return;
     }
   }
@@ -2497,7 +2497,7 @@ async function esportaMaisonClientePDF(nome) {
   if (!window.jspdf) {
     toast('Caricamento PDF...');
     if (!(await caricaJsPDF())) {
-      toast('Errore caricamento libreria PDF');
+      toastErrore('Non riesco a preparare il PDF: controlla la connessione internet e riprova');
       return;
     }
   }

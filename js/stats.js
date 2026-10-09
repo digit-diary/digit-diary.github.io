@@ -499,7 +499,7 @@ async function esportaPDF() {
   if (!window.jspdf) {
     toast('Caricamento PDF...');
     if (!(await caricaJsPDF())) {
-      toast('Errore caricamento libreria PDF');
+      toastErrore('Non riesco a preparare il PDF: controlla la connessione internet e riprova');
       return;
     }
   }
@@ -696,13 +696,13 @@ function _rdGiorniMalattia(entries) {
 }
 async function esportaReportDirezionePDF() {
   if (!isAdmin()) {
-    toast('Solo admin');
+    toastErrore('Il report della direzione lo crea l amministratore');
     return;
   }
   if (!window.jspdf) {
     toast('Caricamento PDF...');
     if (!(await caricaJsPDF())) {
-      toast('Errore caricamento libreria PDF');
+      toastErrore('Non riesco a preparare il PDF: controlla la connessione internet e riprova');
       return;
     }
   }

@@ -1189,11 +1189,19 @@ async function salvaOrdinePiano(nomi) {
 }
 async function ripristinaOrdinePiano() {
   if (!puoGestirePiano()) return;
+  // l ordine fatto a mano trascinando i nomi si perde: si chiede prima
+  if (
+    !(await chiediConferma(
+      'Tornare all ordine predefinito dei nomi (responsabili, vice, SUP, BO, poi gli altri; i jolly in fondo)? L ordine fatto trascinando i nomi si perde.',
+      { ok: 'Ripristina ordine' },
+    ))
+  )
+    return;
   window._pianoOrdineCollab = window._pianoOrdineCollab || {};
   delete window._pianoOrdineCollab[_pianoReparto()];
   if (!(await salvaImp('piano_ordine_collab', JSON.stringify(window._pianoOrdineCollab)))) return;
   logAzione('Piano: ordine predefinito', _pianoReparto());
-  toast('Ordine predefinito: SUP, BO, poi gli altri');
+  toast('Ordine predefinito: responsabili, vice, SUP, BO, poi gli altri; i jolly in fondo');
   renderPiano();
 }
 

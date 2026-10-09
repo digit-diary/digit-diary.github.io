@@ -1680,7 +1680,7 @@ async function _pianoVersioniHtml() {
   try {
     momenti = (await _rpcSicura('piano_storico_momenti', { p_token: getOpToken(), p_reparto: rep, p_ym: ym })) || [];
   } catch (e) {
-    return '<div class="main-card" style="margin-bottom:16px"><div class="card-header">Versioni del mese</div><div style="padding:12px 14px;color:var(--muted)">Lo storico delle celle non e ancora disponibile su questo database (serve la migrazione 20260901).</div></div>';
+    return '<div class="main-card" style="margin-bottom:16px"><div class="card-header">Versioni del mese</div><div style="padding:12px 14px;color:var(--muted)">Lo storico delle celle non è ancora attivo su questo server: serve un aggiornamento del database (avvisa l IT).</div></div>';
   }
   const puo = puoGestirePiano();
   const ora = (t) => new Date(t).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
@@ -2295,7 +2295,7 @@ async function toggleVacanzaConfermata(id) {
     );
     renderPiano();
   } catch (e) {
-    toast('Errore');
+    toastErrore('Vacanza NON cambiata: ' + ((e && e.message) || e) + '. Riprova.', 8000);
   }
 }
 // settimana ISO (anno, numero) di una data
@@ -2476,7 +2476,7 @@ async function eliminaVacanza(id) {
     logAzione('Vacanza eliminata', v.collaboratore + ' settimana ' + v.settimana + '/' + v.anno);
     renderPiano();
   } catch (e) {
-    toast('Errore');
+    toastErrore('Vacanza NON eliminata: ' + ((e && e.message) || e) + '. Riprova.', 8000);
   }
 }
 async function eliminaTutteVacanze() {
@@ -2496,13 +2496,16 @@ async function eliminaTutteVacanze() {
   )
     return;
   try {
-    // la tabella non ha il settore: si cancellano le righe del settore aperto una per una
-    for (const v of _pianoVacCache) await secDel('piano_vacanze', 'id=eq.' + v.id);
-    logAzione('Vacanze: eliminate tutte', String(anno));
-    toast('Vacanze ' + anno + ' eliminate');
+    // la tabella non ha il settore: si cancellano le righe del settore aperto per numero,
+    // in UNA sola operazione (o tutte o nessuna: prima una alla volta, e fermandosi a meta
+    // ne restava una parte con il solo messaggio "Errore")
+    const ids = _pianoVacCache.map((v) => v.id);
+    if (ids.length) await secDel('piano_vacanze', 'id=in.(' + ids.join(',') + ')');
+    logAzione('Vacanze: eliminate tutte', String(anno) + ' · ' + ids.length + ' settimane');
+    toast('Vacanze ' + anno + ' eliminate: ' + ids.length + ' settimane (si può annullare con Annulla)');
     renderPiano();
   } catch (e) {
-    toast('Errore');
+    toastErrore('Vacanze NON eliminate (nessuna è stata toccata): ' + ((e && e.message) || e), 8000);
   }
 }
 

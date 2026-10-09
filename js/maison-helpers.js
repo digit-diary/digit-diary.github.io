@@ -988,7 +988,7 @@ async function esportaMaisonPDF() {
   if (!window.jspdf) {
     toast('Caricamento PDF...');
     if (!(await caricaJsPDF())) {
-      toast('Errore caricamento libreria PDF');
+      toastErrore('Non riesco a preparare il PDF: controlla la connessione internet e riprova');
       return;
     }
   }
@@ -1751,7 +1751,7 @@ async function esportaSpeseExtraPDF() {
   if (!window.jspdf) {
     toast('Caricamento PDF...');
     if (!(await caricaJsPDF())) {
-      toast('Errore caricamento libreria PDF');
+      toastErrore('Non riesco a preparare il PDF: controlla la connessione internet e riprova');
       return;
     }
   }
@@ -1836,7 +1836,7 @@ function aggiornaLoginOperatori() {
     })
     .sort();
   loginNome.innerHTML =
-    '<option value="">-- Admin (password master) --</option>' +
+    '<option value="">-- Amministratore (password principale) --</option>' +
     ops
       .map(function (n) {
         return '<option value="' + escP(n) + '">' + escP(n) + '</option>';

@@ -40,19 +40,19 @@ const PIANO_REGOLE_GUIDA = {
     g: 'Riposo e giorni di lavoro',
     n: 'Ore minime di riposo fra due turni',
     t: 'numero',
-    d: 'Validatore, bozza, cambi turno, coperture',
+    d: 'Valida regole, bozza, cambi turno, coperture',
   },
   max_consecutivi: {
     g: 'Riposo e giorni di lavoro',
     n: 'Giorni di lavoro consecutivi al massimo',
     t: 'numero',
-    d: 'Validatore, bozza, cambi turno, coperture',
+    d: 'Valida regole, bozza, cambi turno, coperture',
   },
   no_4w1c1w: {
     g: 'Riposo e giorni di lavoro',
     n: 'Vietato: 4 giorni di lavoro, 1 di riposo, poi di nuovo lavoro',
     t: 'sino',
-    d: 'Validatore e bozza',
+    d: 'Valida regole e bozza',
   },
   blocchi_compatti: {
     g: 'Riposo e giorni di lavoro',
@@ -94,55 +94,55 @@ const PIANO_REGOLE_GUIDA = {
     g: 'Domeniche',
     n: 'Domeniche libere garantite in un anno',
     t: 'numero',
-    d: 'Validatore, tabella Domeniche, Benessere, bozza',
+    d: 'Valida regole, tabella Domeniche, Benessere, bozza',
   },
   turno_prima_domenica_libera: {
     g: 'Domeniche',
     n: 'La domenica libera vale solo se il sabato finisce entro le 23',
     t: 'sino',
-    d: 'Validatore, tabella Domeniche, Benessere',
+    d: 'Valida regole, tabella Domeniche, Benessere',
   },
   tolleranza_ore: {
     g: 'Ore e saldo',
     n: 'Scarto accettato dalle ore dovute del mese (più o meno)',
     t: 'numero',
-    d: 'Validatore, bozza, Migliora ore',
+    d: 'Valida regole, bozza, Migliora ore',
   },
   tolleranza_ore_sopra: {
     g: 'Ore e saldo',
     n: 'Ore massime sopra le dovute del mese (se attiva vince sulla precedente)',
     t: 'numero',
-    d: 'Validatore, bozza, Migliora ore',
+    d: 'Valida regole, bozza, Migliora ore',
   },
   tolleranza_ore_sotto: {
     g: 'Ore e saldo',
     n: 'Ore massime sotto le dovute del mese (se attiva vince sulla precedente)',
     t: 'numero',
-    d: 'Validatore',
+    d: 'Valida regole',
   },
   riposo_domenica_libera_ore: {
     g: 'Domeniche',
     n: 'Domenica libera: ore consecutive minime di riposo (comprese le 23 del sabato - 23 della domenica)',
     t: 'numero',
-    d: 'Validatore, avviso sulla cella, bozza, scheda Avvisi',
+    d: 'Valida regole, avviso sulla cella, bozza, scheda Avvisi',
   },
   riposo_domenica_lavorata_ore: {
     g: 'Domeniche',
     n: 'Domenica lavorata: ore consecutive minime di riposo nella settimana prima oppure in quella dopo (lunedì-sabato)',
     t: 'numero',
-    d: 'Validatore, avviso sulla cella, scheda Avvisi',
+    d: 'Valida regole, avviso sulla cella, scheda Avvisi',
   },
   ore_settimana_con_notturno: {
     g: 'Ore e saldo',
     n: 'Il massimo di ore della settimana comprende il 10% notturno (Si) o solo le ore da orologio (No)',
     t: 'sino',
-    d: 'Validatore, avviso sulla cella, bozza, scheda Avvisi',
+    d: 'Valida regole, avviso sulla cella, bozza, scheda Avvisi',
   },
   ore_settimana_max: {
     g: 'Ore e saldo',
     n: 'Ore lavorate massime nella settimana lunedì-domenica (con o senza il 10% notturno: vedi la regola sotto)',
     t: 'numero',
-    d: 'Validatore, avviso sulla cella, bozza, scheda Avvisi',
+    d: 'Valida regole, avviso sulla cella, bozza, scheda Avvisi',
   },
   saldo_ore_max: {
     g: 'Ore e saldo',
@@ -166,13 +166,13 @@ const PIANO_REGOLE_GUIDA = {
     g: 'Ausiliari (jolly)',
     n: 'Ore massime al mese per gli ausiliari senza percentuale',
     t: 'numero',
-    d: 'Validatore e bozza',
+    d: 'Valida regole e bozza',
   },
   jolly_ore_min: {
     g: 'Ausiliari (jolly)',
     n: 'Ore minime al mese per gli ausiliari senza percentuale',
     t: 'numero',
-    d: 'Validatore (solo avviso)',
+    d: 'Valida regole (solo avviso)',
   },
   jolly_codici_gia_pagati: {
     g: 'Ausiliari (jolly)',
@@ -355,12 +355,17 @@ const PIANO_REGOLE_GUIDA = {
     t: 'numero',
     d: 'Applica vacanze e bozza',
   },
-  diurno_prima_vacanza: { g: 'Vacanze', n: 'Turno diurno il giorno prima della vacanza', t: 'sino', d: 'Validatore' },
+  diurno_prima_vacanza: {
+    g: 'Vacanze',
+    n: 'Turno diurno il giorno prima della vacanza',
+    t: 'sino',
+    d: 'Valida regole',
+  },
   funzioni_fanno_tutto: {
     g: 'Funzioni e turni',
     n: 'Funzioni che a mano possono fare qualsiasi turno (il livello alto comprende quelli sotto, come in Formazione)',
     t: 'testo',
-    d: 'Scrittura manuale, validatore, cambi turno e coperture (la bozza automatica segue le regole del settore)',
+    d: 'Scrittura manuale, Valida regole, cambi turno e coperture (la bozza automatica segue le regole del settore)',
   },
   chiusura_ora_normale: {
     g: 'Orari di chiusura',
@@ -617,7 +622,7 @@ function _renderPianoRegoleCard() {
     '<li><b>Si / No</b> accende o spegne una preferenza. La casella <b>Attiva</b> spegne qualsiasi regola senza perdere il valore: spenta, e come se non esistesse.</li>' +
     '<li><b>Un valore diverso per un settore</b>: scegli il settore nel menu in alto e cambia il numero. Nasce l eccezione per quel settore; gli altri tengono il valore generale. "Torna al generale" la toglie. Esempio: riposo 11 ore ovunque, 12 ai Tavoli.</li>' +
     '<li><b>Regole nuove sui gruppi di lavoro</b> (chi può fare cassa, quanti Supervisor al giorno, una funzione richiesta): si creano nella card <b>Regole di gruppo</b>, più in basso in questa scheda, scegliendo il tipo dall elenco. Non serve scrivere codice.</li>' +
-    '<li><b>Preferenze di una persona</b> (solo diurni, turni vietati, giorni di lavoro, accompagnamento, copertura di altri settori): in Piano &gt; Impostazioni, Preferenze collaboratori. Funzione e percentuale in Impostazioni &gt; Gestione collaboratori; competenze e livelli in Formazione. Bozza e validatore le rispettano.</li>' +
+    '<li><b>Preferenze di una persona</b> (solo diurni o notturni, turni bloccati, giorni di lavoro, affiancamento): in Piano &gt; Impostazioni, Preferenze collaboratori. La copertura di altri settori, la funzione e la percentuale in Impostazioni &gt; Gestione collaboratori; competenze e livelli in Formazione. La bozza e Valida regole le rispettano.</li>' +
     '<li><b>Fonte</b>: sotto ogni regola normativa c e il riferimento (RAP, legge sul lavoro, direttiva). Se cambia il regolamento, cambia il numero qui: il programma non va toccato. Ogni modifica finisce nel Registro attività.</li>' +
     '</ol></details>';
   if (vista)

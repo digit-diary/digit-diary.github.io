@@ -205,7 +205,7 @@ async function eliminaNotaSmart(id) {
       renderNoteCollega();
       toast('Invio annullato per tutti');
     } catch (e) {
-      toast('Errore');
+      toastErrore('Invio NON annullato: ' + ((e && e.message) || e) + '. Riprova.', 8000);
     }
   } else {
     if (!(await chiediConferma('Eliminare dalla tua vista?'))) return;
@@ -214,7 +214,7 @@ async function eliminaNotaSmart(id) {
       renderNoteCollega();
       toast('Messaggio eliminato dalla tua vista');
     } catch (e) {
-      toast('Errore');
+      toastErrore('Messaggio NON nascosto: ' + ((e && e.message) || e) + '. Riprova.', 8000);
     }
   }
 }
@@ -224,13 +224,19 @@ async function annullaInvioNota(id) {
   const letti = _chatLetti(id).filter((l) => l.operatore !== cm.da_operatore);
   const qualcunoHaLetto = letti.length > 0;
   if (qualcunoHaLetto) {
-    if (!(await chiediConferma('Qualcuno ha già letto questo messaggio. Eliminare solo dalla tua vista?'))) return;
+    if (
+      !(await chiediConferma('Qualcuno ha già letto questo messaggio. Eliminare solo dalla tua vista?', {
+        pericolo: true,
+        ok: 'Elimina per me',
+      }))
+    )
+      return;
     try {
       await _chatPatchMessage(id, { nascosta_mitt: true });
       renderNoteCollega();
       toast('Messaggio nascosto per te');
     } catch (e) {
-      toast('Errore');
+      toastErrore('Messaggio NON nascosto: ' + ((e && e.message) || e) + '. Riprova.', 8000);
     }
   } else {
     if (!(await chiediConferma("Nessuno ha ancora letto. Annullare l'invio per tutti?"))) return;
@@ -2661,7 +2667,7 @@ function apriSchedaCollaboratore(nome) {
   // nei riquadri in alto lo vede chi vede lo Storico HR (v348; prima tutti).
   const _vedePatternMal = isAdmin() || (typeof puoModificare === 'function' && puoModificare('vista_malattie_pct'));
   if (totMal > 0 && _vedePatternMal) {
-    html += '<div class="scheda-section"><h4>Pattern malattie</h4>';
+    html += '<div class="scheda-section"><h4>Andamento delle malattie</h4>';
     const malEntries = entries.filter((e) => e.tipo === tipoMal);
     const dayDist = [0, 0, 0, 0, 0, 0, 0];
     malEntries.forEach((e) => {
@@ -2739,7 +2745,7 @@ function apriSchedaCollaboratore(nome) {
     '<input type="text" id="scheda-tl-dal" placeholder="Dal..." readonly style="cursor:pointer;padding:4px 10px;border:1px solid var(--line);border-radius:2px;font-size:var(--fs-sm,.8125rem);background:var(--paper2);color:var(--ink);width:120px">';
   html +=
     '<input type="text" id="scheda-tl-al" placeholder="Al..." readonly style="cursor:pointer;padding:4px 10px;border:1px solid var(--line);border-radius:2px;font-size:var(--fs-sm,.8125rem);background:var(--paper2);color:var(--ink);width:120px">';
-  html += '<button class="btn-reset" onclick="schedaResetTlFilter(\'' + neS + '\')">Reset</button>';
+  html += '<button class="btn-reset" onclick="schedaResetTlFilter(\'' + neS + '\')">Azzera filtri</button>';
   html += '<span id="scheda-tl-tipo-chip"></span>';
   html += '</div>';
   html +=
@@ -3485,7 +3491,7 @@ async function _salvaFineContratto(nome, val, togli) {
 }
 async function eliminaHrEvento(id, nome) {
   if (!isAdmin()) return;
-  if (!(await chiediConferma('Eliminare questo evento dallo storico HR?'))) return;
+  if (!(await chiediConferma('Eliminare questo evento dallo storico HR per sempre? Non va nel Cestino.'))) return;
   try {
     await secDel('hr_eventi', 'id=eq.' + id);
     hrEventiCache = hrEventiCache.filter(function (e) {
