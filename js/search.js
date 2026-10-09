@@ -43,7 +43,7 @@ function _eseguiRicercaGlobale(q) {
         '"><span class="rg-badge" style="background:var(--c-verdeacqua)">scheda</span><span class="rg-text"><strong>' +
         escP(c.nome) +
         '</strong>' +
-        (c.attivo === false ? ' · non piu attivo' : '') +
+        (c.attivo === false ? ' · non più attivo' : '') +
         '</span></div>';
       // dal nome direttamente al Piano: mese corrente, cella di oggi
       if (c.attivo !== false && typeof pianoApriCella === 'function' && (typeof isVis !== 'function' || isVis('piano')))
@@ -566,7 +566,7 @@ async function _eseguiRiepilogoMensile() {
       _checkPage(30);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(11);
-      doc.text('Top 10 collaboratori con piu registrazioni', mx, y);
+      doc.text('Top 10 collaboratori con più registrazioni', mx, y);
       y += 2;
       doc.autoTable({
         theme: 'grid',

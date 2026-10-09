@@ -574,9 +574,9 @@
           motivo:
             'Da ' +
             elencoMesi(da) +
-            ' (piu vacanze della media e ore che non bastano) verso ' +
+            ' (più vacanze della media e ore che non bastano) verso ' +
             elencoMesi(a) +
-            ' (ore in piu del fabbisogno). Spostando una parte delle vacanze, d accordo con i collaboratori, il carico si distribuisce senza costi.',
+            ' (ore in più del fabbisogno). Spostando una parte delle vacanze, d accordo con i collaboratori, il carico si distribuisce senza costi.',
           scenario: { vacanzeSposta: sposta },
           effetto: effetto({ vacanzeSposta: sposta }),
         });
@@ -596,7 +596,7 @@
         out.push({
           tipo: 'disponibilita',
           titolo:
-            'Chiedere piu disponibilita ai ' +
+            'Chiedere più disponibilità ai ' +
             jolly +
             ' ausiliari attuali (fino al ' +
             Math.round(massimo * 100) +
@@ -606,7 +606,7 @@
             neiMesi(Object.keys(perMese)).slice(1) +
             ' gli ausiliari pianificati al ' +
             Math.round(P.jollyPct * 100) +
-            '% non bastano. Se sono disponibili per qualche turno in piu, la carenza si copre con chi conosce gia il lavoro, senza nuove assunzioni.',
+            '% non bastano. Se sono disponibili per qualche turno in più, la carenza si copre con chi conosce già il lavoro, senza nuove assunzioni.',
           scenario: { jollyPctMesi: perMese },
           effetto: effetto({ jollyPctMesi: perMese }),
         });
@@ -627,7 +627,7 @@
             (x) =>
               (sc.jollyPctMesi[x.mese] = Math.min(1, Math.ceil((P.jollyPct + -x.differenzaFte / jolly) * 20) / 20)),
           );
-          come = 'piu disponibilita degli ausiliari attuali ' + neiMesi(dopo.map((x) => x.mese));
+          come = 'più disponibilità degli ausiliari attuali ' + neiMesi(dopo.map((x) => x.mese));
         } else {
           const mediaR = dopo.reduce((s, x) => s + -x.differenzaFte, 0) / dopo.length;
           const ultimo = dopo[dopo.length - 1].mese;
@@ -645,7 +645,7 @@
         out.push({
           tipo: 'combinata',
           titolo: 'Vacanze spostate e ' + come,
-          motivo: 'Spostare le vacanze copre gia una parte della carenza senza costi; per il resto basta ' + come + '.',
+          motivo: 'Spostare le vacanze copre già una parte della carenza senza costi; per il resto basta ' + come + '.',
           scenario: sc,
           effetto: effetto(sc),
         });
@@ -671,7 +671,7 @@
           arr1(strutturale) +
           ' tempi pieni netti: e una carenza stabile, non stagionale.',
         alternativa:
-          'In alternativa, la stessa quantita di ore aumentando la percentuale di chi oggi lavora a tempo parziale e lo desidera.',
+          'In alternativa, la stessa quantità di ore aumentando la percentuale di chi oggi lavora a tempo parziale e lo desidera.',
         scenario: { aggiunte: agg },
         effetto: effetto({ aggiunte: agg }),
       });
@@ -698,11 +698,11 @@
           Math.round(pct * 100) +
           '% nei mesi di punta',
         motivo:
-          'Piu richiesta che ore nette ' +
+          'Più richiesta che ore nette ' +
           neiMesi(nomiMesi) +
           '. In media ' +
           arr1(media) +
-          ' tempi pieni in piu, solo in quel periodo: un ausiliario segue la stagione senza ore dovute negli altri mesi.',
+          ' tempi pieni in più, solo in quel periodo: un ausiliario segue la stagione senza ore dovute negli altri mesi.',
         scenario: { aggiunte: agg },
         mesi: nomiMesi,
         effetto: effetto({ aggiunte: agg }),
@@ -722,8 +722,8 @@
         tipo: 'persone',
         titolo:
           manca === 1
-            ? 'Una persona in piu per le domeniche e i giorni di punta'
-            : manca + ' persone in piu per le domeniche e i giorni di punta',
+            ? 'Una persona in più per le domeniche e i giorni di punta'
+            : manca + ' persone in più per le domeniche e i giorni di punta',
         motivo:
           'Con ' +
           corti[0].teste +
@@ -796,12 +796,12 @@
             nome +
             ': formare ' +
             (g.servono === 1 ? 'un collaboratore' : g.servono + ' collaboratori') +
-            ' gia in organico',
+            ' già in organico',
           motivo:
             perche +
-            'Si possono abilitare persone che ci sono gia (prima chi ha piu ore libere): ' +
+            'Si possono abilitare persone che ci sono già (prima chi ha più ore libere): ' +
             daFormare.join(', ') +
-            '. Formare chi conosce gia il casino costa meno di una nuova assunzione.',
+            '. Formare chi conosce già il casino costa meno di una nuova assunzione.',
           effettoTesto: 'persone abilitate a ' + nome + ' da ' + g.abilitati + ' a ' + (g.abilitati + g.servono),
           formare: daFormare,
           informativo: false,
@@ -810,11 +810,11 @@
         out.push({
           tipo: 'gruppo',
           gruppo: nome,
-          titolo: nome + ': serve ' + (g.servono === 1 ? 'una persona' : g.servono + ' persone') + ' abilitate in piu',
+          titolo: nome + ': serve ' + (g.servono === 1 ? 'una persona' : g.servono + ' persone') + ' abilitate in più',
           motivo:
             perche +
             (daFormare.length
-              ? 'Formando chi c e gia (' + daFormare.join(', ') + ') non si arriva al numero: '
+              ? 'Formando chi c e già (' + daFormare.join(', ') + ') non si arriva al numero: '
               : 'Non ci sono altri collaboratori da formare: ') +
             'nelle nuove ricerche conviene cercare persone abilitate a ' +
             nome +
@@ -833,7 +833,7 @@
     const testoProfilo = profilo.length
       ? 'Profilo da cercare: abilitato a ' + elencoMesiTesto(profilo.slice(0, 3)) + '.'
       : G.length
-        ? 'Profilo: il gruppo con piu ore e ' + G[0].gruppo + '.'
+        ? 'Profilo: il gruppo con più ore e ' + G[0].gruppo + '.'
         : '';
     out.forEach((g) => {
       if (testoProfilo && g.scenario && (g.scenario.aggiunte || []).length) {
@@ -846,7 +846,7 @@
     if (margine.length)
       out.push({
         tipo: 'margine',
-        titolo: 'Capacita in piu in ' + margine.length + (margine.length === 1 ? ' mese' : ' mesi'),
+        titolo: 'Capacità in più in ' + margine.length + (margine.length === 1 ? ' mese' : ' mesi'),
         motivo:
           neiMesi(margine.map((x) => x.mese))
             .charAt(0)

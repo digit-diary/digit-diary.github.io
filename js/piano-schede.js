@@ -248,7 +248,7 @@ async function importaTimbrature(input) {
       ok += esiti.reduce((s, x) => s + x, 0);
     }
     logAzione('Timbrature importate', ok + '/' + valide.length + ' da ' + file.name);
-    toast('Importate ' + ok + ' timbrature' + (doppie ? ' (' + doppie + ' gia presenti, saltate)' : ''));
+    toast('Importate ' + ok + ' timbrature' + (doppie ? ' (' + doppie + ' già presenti, saltate)' : ''));
     if (errori.length)
       toastErrore(
         errori.length +
@@ -765,7 +765,7 @@ async function caricaStatisticheAnnoPiano(forza) {
   h +=
     '<div style="overflow-x:auto"><table id="piano-statanno-table" class="piano-table" style="min-width:760px;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Ore ' +
     (meseFiltro ? escP(MESI[parseInt(meseFiltro.substring(5, 7)) - 1] || meseFiltro) : 'anno') +
-    '</th><th title="Sui mesi con un piano">Ore dovute</th><th>Giorni lavorati</th><th>Diurni</th><th>Notturni</th><th>Weekend</th><th>Domeniche</th><th>Vacanze</th><th>Malattie</th><th title="Festivi con diritto lavorati, non in malattia, fino alla fine del mese aperto nel Piano (solo personale fisso)">CGF maturati</th><th title="Giorni CGF effettivamente goduti (quelli caduti in malattia non contano)">CGF goduti</th><th title="Riporto dall anno prima + maturati - goduti: quanti recuperi restano da dare">Saldo CGF</th><th title="Festivi parificati alle domeniche lavorati dagli ausiliari (jolly): danno diritto al supplemento del 50% sul salario orario lordo (RAP Allegato 1). Sono nove giorni fissi e valgono anche di domenica">Suppl. 50%</th><th title="Ore lavorate nella fascia notturna (23:00-06:00). Il supplemento del 10% e gia compreso nella durata dei turni: questa colonna serve da controllo, non e un credito da dare a parte">Ore notte</th><th title="Solo ausiliari (jolly): ore effettivamente lavorate nell anno e indennita calcolate su quel totale secondo il RAP Allegato 1 (vacanze 8.33% con 4 settimane o 10.65% con 5, tredicesima 8.33%). I jolly non hanno una percentuale contrattuale: tutto si calcola sulle ore fatte">Ore lavorate · indennita</th></tr></thead><tbody>';
+    '</th><th title="Sui mesi con un piano">Ore dovute</th><th>Giorni lavorati</th><th>Diurni</th><th>Notturni</th><th>Weekend</th><th>Domeniche</th><th>Vacanze</th><th>Malattie</th><th title="Festivi con diritto lavorati, non in malattia, fino alla fine del mese aperto nel Piano (solo personale fisso)">CGF maturati</th><th title="Giorni CGF effettivamente goduti (quelli caduti in malattia non contano)">CGF goduti</th><th title="Riporto dall anno prima + maturati - goduti: quanti recuperi restano da dare">Saldo CGF</th><th title="Festivi parificati alle domeniche lavorati dagli ausiliari (jolly): danno diritto al supplemento del 50% sul salario orario lordo (RAP Allegato 1). Sono nove giorni fissi e valgono anche di domenica">Suppl. 50%</th><th title="Ore lavorate nella fascia notturna (23:00-06:00). Il supplemento del 10% e già compreso nella durata dei turni: questa colonna serve da controllo, non e un credito da dare a parte">Ore notte</th><th title="Solo ausiliari (jolly): ore effettivamente lavorate nell anno e indennita calcolate su quel totale secondo il RAP Allegato 1 (vacanze 8.33% con 4 settimane o 10.65% con 5, tredicesima 8.33%). I jolly non hanno una percentuale contrattuale: tutto si calcola sulle ore fatte">Ore lavorate · indennita</th></tr></thead><tbody>';
   ordineCollabPiano(Object.keys(st), _pianoReparto()).forEach((n) => {
     const o = st[n];
     const info = _pianoCollabInfo(n) || {};
@@ -833,7 +833,7 @@ async function caricaStatisticheAnnoPiano(forza) {
         ? Math.round(o.oreNotte * 10) / 10 +
           'h nella fascia notturna: il supplemento del 10% (' +
           _pianoNotteRecupero(o.oreNotte) +
-          "h) e' gia' compreso nelle ore dei turni"
+          'h) è già compreso nelle ore dei turni'
         : '') +
       '">' +
       (o.oreNotte ? Math.round(o.oreNotte * 10) / 10 + 'h' : '') +
@@ -935,7 +935,7 @@ async function _pianoVacDirittoCard(anno) {
     cfg.base1 +
     ' giorni, poi ' +
     cfg.base2 +
-    '; nell anno del passaggio si matura mese per mese. Giorni in piu per anzianita UNA VOLTA SOLA, nell anno dell anniversario (l anno dopo si torna a ' +
+    '; nell anno del passaggio si matura mese per mese. Giorni in più per anzianità UNA VOLTA SOLA, nell anno dell anniversario (l anno dopo si torna a ' +
     cfg.base2 +
     '): 10 anni +' +
     cfg.bonus[0].giorni +
@@ -969,7 +969,7 @@ async function _pianoVacDirittoCard(anno) {
       (x.r.bonus
         ? ' + ' +
           x.r.bonus +
-          ' per anzianita (' +
+          ' per anzianità (' +
           x.r.voci.map((v) => v.anni + ' anni, solo nel ' + v.dal).join(', ') +
           ')'
         : '') +
@@ -1009,7 +1009,7 @@ async function _pianoVacDirittoCard(anno) {
     h +=
       '<p style="font-size:var(--fs-sm,.8125rem);color:var(--c-rosso,#c0392b);margin-top:8px">' +
       senzaData +
-      ' collaboratori non compaiono perche manca la data di inizio contratto nella loro scheda.</p>';
+      ' collaboratori non compaiono perché manca la data di inizio contratto nella loro scheda.</p>';
   // AVVISO DI OTTOBRE: quando si pianificano le vacanze dell'anno dopo serve
   // sapere in anticipo chi cambia scaglione, per non assegnare giorni sbagliati
   const mese = new Date().getMonth() + 1;
@@ -1039,7 +1039,7 @@ async function _pianoVacDirittoCard(anno) {
         '</b><p style="font-size:var(--fs-md,.875rem);margin:4px 0 0">Nel pianificare le vacanze del prossimo anno, ' +
         cambi.length +
         (cambi.length === 1 ? ' collaboratore avra' : ' collaboratori avranno') +
-        ' piu giorni:</p><ul style="margin:6px 0 0 18px;font-size:var(--fs-md,.875rem)">' +
+        ' più giorni:</p><ul style="margin:6px 0 0 18px;font-size:var(--fs-md,.875rem)">' +
         cambi
           .map(
             (x) =>
@@ -1420,7 +1420,7 @@ function _renderPianoSaldoAnnoCard() {
   h += '</div><div style="padding:10px 14px" id="piano-saldoanno">';
   if (!dati || dati.anno !== anno) {
     h +=
-      '<p style="font-size:var(--fs-md,.875rem);color:var(--muted);margin-bottom:8px">Riporto di inizio anno piu il saldo di ogni mese, come il foglio Saldo Ore del piano. I mesi gia pianificati contano anche se sono nel futuro, cosi si vede in anticipo chi andra fuori dalla banda e chi deve recuperare.</p>' +
+      '<p style="font-size:var(--fs-md,.875rem);color:var(--muted);margin-bottom:8px">Riporto di inizio anno più il saldo di ogni mese, come il foglio Saldo Ore del piano. I mesi già pianificati contano anche se sono nel futuro, così si vede in anticipo chi andra fuori dalla banda e chi deve recuperare.</p>' +
       '<button class="btn-export" style="font-size:var(--fs-md,.875rem);padding:6px 14px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="pianoCaricaSaldoAnno()">Calcola l anno ' +
       anno +
       '</button></div></div>';
@@ -1432,11 +1432,11 @@ function _renderPianoSaldoAnnoCard() {
     _pianoReparto(),
   );
   h +=
-    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Saldo del mese = ore fatte meno ore dovute, con dentro gli scostamenti del Recupero ore. Il totale e il riporto piu i mesi. E in ordine (verde) se resta fra ' +
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Saldo del mese = ore fatte meno ore dovute, con dentro gli scostamenti del Recupero ore. Il totale e il riporto più i mesi. E in ordine (verde) se resta fra ' +
     banda.min +
     ' e +' +
     banda.max +
-    ' ore: la banda si cambia nella scheda Regole. Clic sul riporto per scriverlo: se gli dai una data, i mesi gia compresi restano grigi con un punto e non vengono contati due volte.</p>';
+    ' ore: la banda si cambia nella scheda Regole. Clic sul riporto per scriverlo: se gli dai una data, i mesi già compresi restano grigi con un punto e non vengono contati due volte.</p>';
   h +=
     '<div style="overflow:auto;max-height:72vh"><table id="piano-saldoanno-table" class="piano-table piano-fisse3" style="min-width:1100px;font-size:var(--fs-sm,.8125rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Fun</th><th>%</th><th title="Saldo con cui entra nell anno. Clic per scriverlo">Riporto</th>';
   for (let m = 1; m <= 12; m++) h += '<th>' + (MESI[m - 1] || m) + '</th>';
@@ -1498,7 +1498,7 @@ function _renderPianoSaldoAnnoCard() {
       // fossero ore in credito.
       if (v === 'riporto') {
         h +=
-          '<td style="color:var(--line);background:var(--paper2)" title="Mese gia compreso nel riporto: non si conta due volte">\u00b7</td>';
+          '<td style="color:var(--line);background:var(--paper2)" title="Mese già compreso nel riporto: non si conta due volte">\u00b7</td>';
         return;
       }
       if (jolly) {
@@ -1657,7 +1657,7 @@ async function _renderPianoSaldoTab() {
   h +=
     '</tbody></table></div><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);padding:8px 14px">Dovute = giorni/7 × ' +
     _pianoOreSett +
-    'h × percentuale (jolly esclusi). Pianificate = ore turni + codici speciali (V, M... scalati per percentuale). YTD = cumulato da gennaio: nei mesi passati valgono le ore timbrate se presenti, altrimenti il piano. Clic su "Saldo mese" per scrivere le ore reali del mese: un mese gia chiuso si corregge solo indicando il motivo.</p></div>';
+    'h × percentuale (jolly esclusi). Pianificate = ore turni + codici speciali (V, M... scalati per percentuale). YTD = cumulato da gennaio: nei mesi passati valgono le ore timbrate se presenti, altrimenti il piano. Clic su "Saldo mese" per scrivere le ore reali del mese: un mese già chiuso si corregge solo indicando il motivo.</p></div>';
   return h;
 }
 
@@ -1775,7 +1775,7 @@ async function pianoStoricoRiporta(quando, esatto) {
   );
   const quandoIt = new Date(istante).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'medium' });
   if (!diverse.length) {
-    toast('Il mese e gia com era il ' + quandoIt);
+    toast('Il mese e già com era il ' + quandoIt);
     return;
   }
   diverse.sort((a, b) => a.split('|')[1].localeCompare(b.split('|')[1]) || a.localeCompare(b));
@@ -2134,7 +2134,7 @@ async function confermaScambioSettimane() {
     toastErrore(
       'Il ' +
         chiuso.split('-').reverse().join('.') +
-        ' e\' un giorno chiuso: lo scambio toccherebbe il passato. Sblocca il giorno (permesso "Giorni chiusi") oppure scegli settimane future.',
+        ' è un giorno chiuso: lo scambio toccherebbe il passato. Sblocca il giorno (permesso "Giorni chiusi") oppure scegli settimane future.',
     );
     return;
   }
@@ -2339,7 +2339,7 @@ async function modificaVacanza(id) {
     [
       {
         titolo: 'Giorni',
-        nota: 'Il periodo vero, anche su piu settimane: le settimane le mette il programma (sposta la riga o ne aggiunge).',
+        nota: 'Il periodo vero, anche su più settimane: le settimane le mette il programma (sposta la riga o ne aggiunge).',
         campi: [
           {
             id: 'dal',
@@ -2376,7 +2376,7 @@ async function modificaVacanza(id) {
     }
     const giorni = Math.round((new Date(al + 'T12:00:00') - new Date(dal + 'T12:00:00')) / 86400000) + 1;
     if (giorni > 120) {
-      toast('Periodo troppo lungo (piu di 120 giorni): controlla le date');
+      toast('Periodo troppo lungo (più di 120 giorni): controlla le date');
       return;
     }
     const cur = new Date(dal + 'T12:00:00');
@@ -2417,7 +2417,7 @@ async function modificaVacanza(id) {
   if (conflitti.length) {
     await mostraAvviso(
       v.collaboratore +
-        ' ha gia altro in ' +
+        ' ha già altro in ' +
         conflitti.map((p) => 'settimana ' + p.settimana + ' (' + _vacCodice(occupata(p)) + ')').join(', ') +
         ': correggi prima quella riga.',
       { titolo: 'Modifica vacanza' },
@@ -2961,7 +2961,7 @@ async function _applicaVacanzeMese(interattivo, opz) {
       await Promise.all(orfane.slice(i, i + 10).map((r) => secDel('piano', 'id=eq.' + r.id)));
     }
     nOrfane = orfane.length;
-    if (nOrfane) logAzione('Vacanze: V rimosse', ym + ' · ' + nOrfane + " giorni non piu' in vacanza");
+    if (nOrfane) logAzione('Vacanze: V rimosse', ym + ' · ' + nOrfane + ' giorni non più in vacanza');
   }
   // via le V/C/WD dei giri precedenti: i WD (non protetti) e i C scritti da
   // "Applica" (protetti ma generati); gli inserimenti a mano restano
@@ -3416,7 +3416,7 @@ async function applicaVacanzePiano() {
     await mostraAvviso(
       'V scritte nel piano senza vacanza nel file (' +
         r.vSenzaFile.length +
-        ' giorni): lasciate come sono. Se la vacanza non c e piu, toglile a mano; se c e, aggiungila nella scheda Vacanze.\n\n' +
+        ' giorni): lasciate come sono. Se la vacanza non c e più, toglile a mano; se c e, aggiungila nella scheda Vacanze.\n\n' +
         _vacElencoGiorni(r.vSenzaFile),
       { titolo: 'Vacanze da controllare' },
     );

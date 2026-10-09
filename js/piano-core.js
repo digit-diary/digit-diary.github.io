@@ -64,7 +64,7 @@ function _pianoSchedaRiservata(titolo, permesso) {
     '<p>Questa scheda e riservata. Serve il permesso <b>' +
     permesso +
     '</b>.</p>' +
-    '<p style="color:var(--muted);font-size:var(--fs-md,.875rem);margin-top:8px">Lo assegna un amministratore da <b>Impostazioni · Visibilita e permessi</b>, scegliendo "Operatori selezionati" e aggiungendo il tuo nome.</p>' +
+    '<p style="color:var(--muted);font-size:var(--fs-md,.875rem);margin-top:8px">Lo assegna un amministratore da <b>Impostazioni · Visibilità e permessi</b>, scegliendo "Operatori selezionati" e aggiungendo il tuo nome.</p>' +
     '</div></div>'
   );
 }
@@ -157,7 +157,7 @@ async function _pianoConsentiSaldoMese(ym) {
   const motivo = await chiediTesto(
     'MESE CHIUSO \u00b7 ' +
       lbl +
-      "\n\nIl saldo di un mese passato e' un dato consolidato: si corregge solo con un motivo, che resta nel registro.\n\nScrivi il MOTIVO della correzione (obbligatorio):",
+      '\n\nIl saldo di un mese passato è un dato consolidato: si corregge solo con un motivo, che resta nel registro.\n\nScrivi il MOTIVO della correzione (obbligatorio):',
   );
   if (motivo === null || !String(motivo).trim()) {
     toast('Correzione annullata: senza motivo il mese resta chiuso');
@@ -184,7 +184,7 @@ async function _pianoConsentiScrittura(dstr, silenzioso) {
   const motivo = await chiediTesto(
     'GIORNATA CHIUSA \u00b7 ' +
       dataIt +
-      "\n\nIl piano dei giorni passati non si modifica piu' per distrazione: e' un documento.\n\nScrivi il MOTIVO della correzione (obbligatorio, resta nel registro).\nIl giorno restera' sbloccato per dieci minuti:",
+      "\n\nIl piano dei giorni passati non si modifica più per distrazione: è un documento.\n\nScrivi il MOTIVO della correzione (obbligatorio, resta nel registro).\nIl giorno restera' sbloccato per dieci minuti:",
   );
   if (motivo === null || !String(motivo).trim()) {
     toast('Correzione annullata: senza motivo il giorno resta chiuso');
@@ -229,7 +229,7 @@ function _pianoAzioneAutoConsentita(tipo) {
   toast(
     'Serve il permesso ' +
       (PIANO_AUTO_NOMI[tipo] || 'azioni automatiche del piano') +
-      ' (Impostazioni > Visibilita e permessi)',
+      ' (Impostazioni > Visibilità e permessi)',
   );
   return false;
 }
@@ -1671,7 +1671,7 @@ function _pianoTestoYtd(nome, saldo, ytd, ore) {
     f(mesi) +
     '\n' +
     'Questo mese: ' +
-    (dentro ? 'gia compreso nel riporto' : !ore ? 'senza ore, non conta' : f(saldo)) +
+    (dentro ? 'già compreso nel riporto' : !ore ? 'senza ore, non conta' : f(saldo)) +
     '\n' +
     'Totale: ' +
     f(ytd)
@@ -2161,7 +2161,7 @@ async function _renderPianoCore() {
             'Genera con il solver',
             'generaConSolver()',
             'pbar-ok',
-            'Motore di ottimizzazione sul server interno (OR-Tools): piano ottimo del mese, equita garantita. Usa le stesse regole del settore e non tocca le celle esistenti',
+            'Motore di ottimizzazione sul server interno (OR-Tools): piano ottimo del mese, equità garantita. Usa le stesse regole del settore e non tocca le celle esistenti',
           );
         if (
           puoAuto &&
@@ -2178,7 +2178,7 @@ async function _renderPianoCore() {
             'Migliora la bozza',
             'pianoMigliora()',
             'pbar-ok',
-            'Ricerca a tempo sulla bozza: prova scambi e spostamenti e tiene solo quelli che migliorano regole, posti scoperti e ore. Piu tempo, risultato migliore. Mostra prima e dopo e chiede prima di applicare',
+            'Ricerca a tempo sulla bozza: prova scambi e spostamenti e tiene solo quelli che migliorano regole, posti scoperti e ore. Più tempo, risultato migliore. Mostra prima e dopo e chiede prima di applicare',
           );
         if (puoAuto)
           g += pbtn(
@@ -2200,16 +2200,16 @@ async function _renderPianoCore() {
               )
             : '') +
             pbtn(
-              'Perche scoperto',
+              'Perché scoperto',
               'pianoPercheScoperti()',
               '',
-              'Per ogni posto del fabbisogno rimasto scoperto: chi c era, perche nessuno l ha preso e cosa manca (personale, formazione, impostazioni, regole)',
+              'Per ogni posto del fabbisogno rimasto scoperto: chi c era, perché nessuno l ha preso e cosa manca (personale, formazione, impostazioni, regole)',
             ) +
             pbtn(
               'Copertura malattia',
               'apriCoperturaMalattia()',
               '',
-              'Trova chi puo coprire i turni di un collaboratore in malattia',
+              'Trova chi può coprire i turni di un collaboratore in malattia',
             ),
         );
         h += pgrp(
@@ -2226,7 +2226,7 @@ async function _renderPianoCore() {
                   'Cancella piano',
                   'cancellaBozzaPiano()',
                   'pbar-warn',
-                  'Svuota il mese di questo settore (si puo annullare)',
+                  'Svuota il mese di questo settore (si può annullare)',
                 )
               : ''),
         );
@@ -2271,7 +2271,7 @@ async function _renderPianoCore() {
           h +=
             '<div style="margin:6px 0;padding:4px 10px;font-size:var(--fs-sm,.8125rem);color:var(--muted);border-left:3px solid ' +
             (inTempo ? '#d4b86a' : '#c0392b') +
-            '">Non disponibilita\' ' +
+            '">Non disponibilità ' +
             escP(lblNext) +
             ' (termine: il ' +
             gLim +
@@ -2457,7 +2457,7 @@ async function _renderPianoCore() {
               cls += ' piano-malattia-c';
               stile = '';
               titolo =
-                "Malattia nel giorno di recupero festivo (CGF): il recupero non e' goduto e resta a credito" +
+                'Malattia nel giorno di recupero festivo (CGF): il recupero non è goduto e resta a credito' +
                 (titolo ? ' · ' + titolo : '');
             }
           } else if (malattie[nome + '|' + dstr]) {
@@ -2467,7 +2467,7 @@ async function _renderPianoCore() {
           } else if (ndMap[nome + '|' + dstr]) {
             cella = 'ND';
             cls += ' piano-nd-auto';
-            titolo = "Non disponibilita' registrata nel Diario (automatica): la bozza non assegna turni";
+            titolo = 'Non disponibilità registrata nel Diario (automatica): la bozza non assegna turni';
           }
           // DOMENICA LIBERA VALIDA (una delle 12): lettera rossa, calcolata dai dati
           // a ogni disegno, quindi segue qualsiasi cambio (piano, Rapporto, Diario).
@@ -2600,7 +2600,7 @@ async function _renderPianoCore() {
                   })()
                 : '<span class="piano-estraneo" title="Collaboratore del settore ' +
                   escP(repartoLabel(infoC.reparto_dip || 'slots')) +
-                  ': non e\' abilitato a coprire qui, il suo piano dovrebbe stare nel suo settore">' +
+                  ': non è abilitato a coprire qui, il suo piano dovrebbe stare nel suo settore">' +
                   escP(repartoLabel(infoC.reparto_dip || 'slots')) +
                   '</span>'
               : '') +

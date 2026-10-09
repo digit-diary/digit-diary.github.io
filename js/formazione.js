@@ -1670,9 +1670,9 @@ async function _insertPuntiEvento(nome, punti, azione, descrizione) {
   if (_stessoMotivo) {
     if (
       !(await chiediConferma(
-        "ATTENZIONE: punti gia' assegnati.\n\n" +
+        'ATTENZIONE: punti già assegnati.\n\n' +
           nome +
-          " ha gia' ricevuto " +
+          ' ha già ricevuto ' +
           (_stessoMotivo.punti > 0 ? '+' : '') +
           _stessoMotivo.punti +
           ' punti per questo stesso motivo il ' +
@@ -1691,7 +1691,7 @@ async function _insertPuntiEvento(nome, punti, azione, descrizione) {
       _stessoGiorno &&
       !(await chiediConferma(
         nome +
-          " ha gia' ricevuto oggi " +
+          ' ha già ricevuto oggi ' +
           (_stessoGiorno.punti > 0 ? '+' : '') +
           _stessoGiorno.punti +
           ' punti per "' +
@@ -2385,7 +2385,7 @@ function _renderFormazioneConfig() {
   html +=
     '<p style="font-size:var(--fs-sm,.8125rem);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Punti al raggiungimento del livello (0 = disattivato)</p>';
   html +=
-    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:6px">Un livello vale nei settori dove esiste: i settori con una scala piu corta si fermano prima.</p>';
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:6px">Un livello vale nei settori dove esiste: i settori con una scala più corta si fermano prima.</p>';
   for (let l = 1; l <= _lvMaxT; l++) {
     html +=
       '<div class="tipo-item"><div class="tipo-item-name">Livello ' +
@@ -2482,7 +2482,7 @@ async function cambiaLivelloCompetenzaCfg(rep, idx, val) {
         _compLvTesto(k.livello) +
         ' a ' +
         _compLvTesto(lv) +
-        '?\n\nIl livello dei collaboratori si ricalcola (un livello richiede tutte le competenze fino a quel livello). Le spunte gia date restano.',
+        '?\n\nIl livello dei collaboratori si ricalcola (un livello richiede tutte le competenze fino a quel livello). Le spunte già date restano.',
     ))
   ) {
     renderFormazione();
@@ -2547,7 +2547,7 @@ async function aggiungiCompetenzaCfg(rep) {
   const gia = cfg[rep].findIndex((k) => k.key === key || _compNomeNorm(k.label) === _compNomeNorm(nome));
   if (gia >= 0) {
     const g = cfg[rep][gia];
-    if ((parseInt(g.livello) || 0) === lv) toast('"' + g.label + '" esiste gia in ' + _compLvTesto(lv));
+    if ((parseInt(g.livello) || 0) === lv) toast('"' + g.label + '" esiste già in ' + _compLvTesto(lv));
     // stessa competenza in un altro livello: si sposta quella (le spunte restano)
     else await cambiaLivelloCompetenzaCfg(rep, gia, lv);
     return;
@@ -2574,7 +2574,7 @@ async function rinominaCompetenzaCfg(rep, idx) {
     return;
   }
   if (cfg[rep].some((x, j) => j !== idx && _compNomeNorm(x.label) === _compNomeNorm(label))) {
-    toast('Esiste gia una competenza "' + label + '" in questo settore');
+    toast('Esiste già una competenza "' + label + '" in questo settore');
     return;
   }
   const vecchio = k.label;
@@ -3064,7 +3064,7 @@ function _renderPopupCopertura() {
       escP(assente) +
       '</h3><p style="color:var(--muted);font-size:var(--fs-md,.875rem);margin-bottom:14px">Cambio turno del ' +
       dataLabel +
-      ": chi ha accettato la modifica puo' ricevere i punti disponibilita'; chi ha rifiutato si puo' segnare qui sotto.</p>"
+      ': chi ha accettato la modifica può ricevere i punti disponibilità; chi ha rifiutato si può segnare qui sotto.</p>'
     : '<h3>Copertura turno · ' +
       escP(assente) +
       '</h3><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding:8px 12px;background:var(--paper2);border-left:3px solid var(--accent2);border-radius:3px">' +
@@ -3131,7 +3131,7 @@ function _renderPopupCopertura() {
       .join('') +
     '</select>' +
     (ctx.turnoAssente
-      ? '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:5px">Accanto a ogni nome: che turno ha quel giorno e se e formato per il turno scoperto. Chi non e formato si puo scegliere lo stesso, ma resta scritto nel registro.</p>'
+      ? '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:5px">Accanto a ogni nome: che turno ha quel giorno e se e formato per il turno scoperto. Chi non e formato si può scegliere lo stesso, ma resta scritto nel registro.</p>'
       : '') +
     '</div>';
   if (azNeg) {
@@ -3437,7 +3437,7 @@ async function formLivelliDaTurni() {
       .filter((r) => String(r.data).substring(0, 10) <= oggiStr || !r.generato);
     await _pianoProponiCertificazioniBulk(
       righe.map((r) => ({ nome: r.collaboratore, codice: r.codice, commento: r.commento || '' })),
-      { titolo: 'Livelli dai turni del piano (ultimi 12 mesi e piano gia scritto)', avvisaVuoto: true },
+      { titolo: 'Livelli dai turni del piano (ultimi 12 mesi e piano già scritto)', avvisaVuoto: true },
     );
   } catch (e) {
     console.error(e);

@@ -94,7 +94,7 @@ async function ndSincronizzaPersona(nome, ym, opz) {
       if (c) Object.assign(c, patch);
       if (!senzaLog)
         logAzione(
-          'Modulo non disponibilita',
+          'Modulo non disponibilità',
           nome + ' ' + ym + (giorni.length ? ' aggiornato: ' + giorni.length + ' giorni' : ' tolto (nessun ND)'),
         );
     } else if (giorni.length) {
@@ -107,10 +107,10 @@ async function ndSincronizzaPersona(nome, ym, opz) {
         reparto_dip: dati.reparto || 'slots',
       });
       if (salvato && salvato[0]) cache.unshift(salvato[0]);
-      if (!senzaLog) logAzione('Modulo non disponibilita', nome + ' ' + ym + ' creato: ' + giorni.length + ' giorni');
+      if (!senzaLog) logAzione('Modulo non disponibilità', nome + ' ' + ym + ' creato: ' + giorni.length + ' giorni');
     }
   } catch (e) {
-    console.warn('modulo non disponibilita', nome, ym, e);
+    console.warn('modulo non disponibilità', nome, ym, e);
   }
 }
 
@@ -311,10 +311,10 @@ async function ndApriModulo(id) {
     mostraPdfPreview(
       doc,
       nome,
-      'Non disponibilita ' + (m.collaboratore || '') + ' ' + String(m.data_modulo || '').substring(0, 7),
+      'Non disponibilità ' + (m.collaboratore || '') + ' ' + String(m.data_modulo || '').substring(0, 7),
     );
     logAzione(
-      'Aperto modulo non disponibilita',
+      'Aperto modulo non disponibilità',
       (m.collaboratore || '') + ' ' + String(m.data_modulo || '').substring(0, 7),
     );
   } catch (e) {

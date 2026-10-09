@@ -444,7 +444,7 @@ async function _renewTokenUnaVolta() {
     if (typeof toastErrore === 'function')
       toastErrore(
         typeof navigator !== 'undefined' && navigator.onLine === false
-          ? 'Connessione assente: le modifiche non vengono salvate finche la rete non torna.'
+          ? 'Connessione assente: le modifiche non vengono salvate finché la rete non torna.'
           : 'Sessione scaduta: esci e rientra con la password per continuare a salvare.',
         9000,
       );

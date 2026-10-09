@@ -1680,7 +1680,7 @@ function _renderPianoCorsiCard() {
   // operatori senza permesso corsi: elenco in sola lettura (orario aggiornabile)
   if (!puoCorsi) {
     let hRO =
-      '<div class="main-card" style="margin-top:16px"><div class="card-header">Corsi</div><div style="padding:12px 14px"><table class="piano-table" style="min-width:420px;font-size:var(--fs-md,.875rem)"><thead><tr><th>Sigla</th><th style="text-align:left">Descrizione</th><th title="Durata in ore decimali e, accanto, in ore e minuti: 8.33 = 8h20, perche 20 minuti sono un terzo di ora">Ore</th><th>Orario</th></tr></thead><tbody>';
+      '<div class="main-card" style="margin-top:16px"><div class="card-header">Corsi</div><div style="padding:12px 14px"><table class="piano-table" style="min-width:420px;font-size:var(--fs-md,.875rem)"><thead><tr><th>Sigla</th><th style="text-align:left">Descrizione</th><th title="Durata in ore decimali e, accanto, in ore e minuti: 8.33 = 8h20, perché 20 minuti sono un terzo di ora">Ore</th><th>Orario</th></tr></thead><tbody>';
     corsi.forEach((c) => {
       const orario = ((window._pianoCorsiOrari || {})[c.codice] || '').split('-');
       hRO +=

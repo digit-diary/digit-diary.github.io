@@ -2766,7 +2766,7 @@ async function eliminaMaisonCliente(nome) {
   // eliminazioni in blocco: solo amministratore, come per le Spese extra
   // (prima i pulsanti erano aperti a ogni operatore)
   if (!isAdmin()) {
-    toast("Solo un amministratore puo' eliminare tutte le righe di un cliente");
+    toast('Solo un amministratore può eliminare tutte le righe di un cliente');
     return;
   }
   if (_isSoloCondiviso(nome)) {
@@ -3153,7 +3153,7 @@ async function eliminaMaisonGiorno() {
   // eliminazioni in blocco: solo amministratore, come per le Spese extra
   // (prima i pulsanti erano aperti a ogni operatore)
   if (!isAdmin()) {
-    toast("Solo un amministratore puo' eliminare le registrazioni di un giorno");
+    toast('Solo un amministratore può eliminare le registrazioni di un giorno');
     return;
   }
   const sel = document.getElementById('maison-del-giorno');
@@ -3187,7 +3187,7 @@ async function eliminaMaisonMese() {
   // eliminazioni in blocco: solo amministratore, come per le Spese extra
   // (prima i pulsanti erano aperti a ogni operatore)
   if (!isAdmin()) {
-    toast("Solo un amministratore puo' eliminare le registrazioni di un mese");
+    toast('Solo un amministratore può eliminare le registrazioni di un mese');
     return;
   }
   const sel = document.getElementById('maison-del-mese');

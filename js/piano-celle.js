@@ -382,7 +382,7 @@ async function pianoBloccaCella(nome, dstr, blocca) {
     // tenuto libero: visita, appuntamento). Scambi e coperture lo saltano.
     if (!r) {
       const motivoV = await chiediTesto(
-        "Il giorno e' vuoto: lo segno come congedo C bloccato.\n\n" +
+        'Il giorno è vuoto: lo segno come congedo C bloccato.\n\n' +
           nome +
           ' \u00b7 ' +
           giorno +
@@ -416,7 +416,7 @@ async function pianoBloccaCella(nome, dstr, blocca) {
       return;
     }
     const motivo = await chiediTesto(
-      'Perche questa cella non si deve toccare?\n\n' +
+      'Perché questa cella non si deve toccare?\n\n' +
         nome +
         ' \u00b7 ' +
         giorno +
@@ -608,7 +608,7 @@ async function confermaCambioEsigenze() {
   if (!r) return;
   if (
     r.motivo_blocco &&
-    !(await chiediConferma("La cella e' bloccata per: " + r.motivo_blocco + '\n\nLa cambi lo stesso?'))
+    !(await chiediConferma('La cella è bloccata per: ' + r.motivo_blocco + '\n\nLa cambi lo stesso?'))
   )
     return;
   _pianoUndoSnap('cambio per esigenze ' + sel.data);
@@ -816,7 +816,7 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
         if (codPrec[rel(-k)] === 'V') dedicato = 'congedo di recupero DOPO le vacanze';
       if (dedicato)
         avvisiExtra.push(
-          "questo giorno e' un " + dedicato + ': assegnandogli il turno ' + codiceNuovo + ' quel riposo viene tolto',
+          'questo giorno è un ' + dedicato + ': assegnandogli il turno ' + codiceNuovo + ' quel riposo viene tolto',
         );
     }
     // ore lavorate nella settimana lunedi-domenica (45.1): con la cella nuova
@@ -942,7 +942,7 @@ function _pianoMessaggioSiglaSbagliata(codice) {
     codice +
     '" non esiste tra i turni e i codici speciali di ' +
     repartoLabel(_pianoReparto()) +
-    ". La cella e' rimasta com'era." +
+    ". La cella è rimasta com'era." +
     (vicina ? ' Forse intendevi "' + vicina + '"?' : '')
   );
 }
@@ -970,7 +970,7 @@ async function pianoSalvaCella(nome, dstr, codice) {
         _pianoMotivoFuoriRapporto(nome, dstr) +
         ', il ' +
         dstr.split('-').reverse().join('.') +
-        ' non si modifica (si puo solo svuotare la cella). Per cambiarlo: Gestione collaboratori > Disattiva (cambia o togli la data) o scheda > Storico HR.',
+        ' non si modifica (si può solo svuotare la cella). Per cambiarlo: Gestione collaboratori > Disattiva (cambia o togli la data) o scheda > Storico HR.',
       9000,
     );
     return false;
@@ -978,7 +978,7 @@ async function pianoSalvaCella(nome, dstr, codice) {
   if (cod !== 'ND' || prima === 'ND') return _pianoSalvaCellaBase(nome, dstr, codice);
   if (!_pianoEJolly(nome)) {
     toastErrore(
-      nome + ' e fisso: i fissi non danno disponibilita, quindi l ND non si mette (vale solo per i jolly).',
+      nome + ' e fisso: i fissi non danno disponibilità, quindi l ND non si mette (vale solo per i jolly).',
       8000,
     );
     return false;
@@ -987,21 +987,21 @@ async function pianoSalvaCella(nome, dstr, codice) {
     'ND a ' + nome + ' il ' + dstr.split('-').reverse().join('.') + (prima ? ' (oggi ' + prima + ')' : '') + '.',
     [
       {
-        titolo: 'Tipo di non disponibilita',
+        titolo: 'Tipo di non disponibilità',
         campi: [
           {
             id: 'tipo',
             tipo: 'scelta',
             valore: 'normale',
             opzioni: [
-              { valore: 'normale', etichetta: 'Non disponibilita data dal collaboratore' },
+              { valore: 'normale', etichetta: 'Non disponibilità data dal collaboratore' },
               { valore: 'chiamata', etichetta: 'Chiamata ma non disponibile' },
             ],
           },
         ],
       },
     ],
-    { titolo: 'Non disponibilita', ok: 'Salva' },
+    { titolo: 'Non disponibilità', ok: 'Salva' },
   );
   if (!sc) return false;
   if (sc.tipo !== 'chiamata') return _pianoSalvaCellaBase(nome, dstr, 'ND');

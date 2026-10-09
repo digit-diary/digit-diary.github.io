@@ -577,7 +577,7 @@
                 x.pos +
                 ' in sala alle ' +
                 ora(x.ini) +
-                ': il venerdi e il sabato chi da le pause in cassa resta in cassa',
+                ': il venerdì e il sabato chi da le pause in cassa resta in cassa',
               celle: [x.r + '|' + b.base],
             });
           }),

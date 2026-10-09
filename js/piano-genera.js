@@ -434,7 +434,7 @@ function _pianoTestoRiposo(v) {
         _pianoGgMm(v.domenica) +
         ' lavorata: nessun riposo di ' +
         v.min +
-        ' ore ne nella settimana prima ne in quella dopo (il piu lungo: prima ' +
+        ' ore ne nella settimana prima ne in quella dopo (il più lungo: prima ' +
         v.prima +
         ', dopo ' +
         v.dopo +
@@ -1071,7 +1071,7 @@ function _pianoViolazioniPersona(nome, righeMese, righeSett, ctx) {
   righeMese.forEach((r) => {
     if (!_pianoIsLavoro(r.codice) || r.codice === 'ND') return;
     if (ctx.ndV[r.collaboratore + '|' + r.data])
-      aggiungi(parseInt(r.data.split('-')[2]), r.codice + " su un giorno di NON disponibilita' (dal Diario)");
+      aggiungi(parseInt(r.data.split('-')[2]), r.codice + ' su un giorno di NON disponibilità (dal Diario)');
   });
   // TURNO ATTORNO ALLE C DELLE VACANZE (decisione del titolare 08/10/2026, tassativa): il
   // giorno prima delle C di partenza e il primo dopo le C del rientro devono avere un turno
@@ -1393,7 +1393,7 @@ function _pianoViolazioniGruppi(righe, ctx) {
               const forti = forte ? v.filter((x) => x >= forte).length : 0;
               const problemi = [];
               if (forte && minF && forti < minF)
-                problemi.push(forti + ' di livello L' + forte + ' o piu (minimo ' + minF + ')');
+                problemi.push(forti + ' di livello L' + forte + ' o più (minimo ' + minF + ')');
               if (scarto && m < mG - scarto) problemi.push('livello medio ' + fmt(m) + ' (giorno ' + fmt(mG) + ')');
               if (problemi.length)
                 lista.push({
@@ -1437,7 +1437,7 @@ function _pianoViolazioniGruppi(righe, ctx) {
                   nVal +
                   ' di livello L' +
                   lvMin +
-                  ' o piu' +
+                  ' o più' +
                   (gr !== '*' ? ' nel gruppo ' + gr : '') +
                   (tipoF ? ' sui turni ' + tipoF : '') +
                   ' (trovati ' +
@@ -1923,7 +1923,7 @@ async function pianoProponiCorrezioniImport(ym, errori) {
       res.dopo.scoperti +
       ' · celle che cambiano: ' +
       res.cambi.length +
-      '\nNessuna altra regola peggiora. Niente cambia finche non premi Applica.</div><div class="fzp-scorri" style="max-height:46vh;margin-top:8px"><table class="fzp-tab" style="width:100%"><thead><tr><th>Collaboratore</th><th>Giorno</th><th>Nel file</th><th>Proposto</th></tr></thead><tbody>' +
+      '\nNessuna altra regola peggiora. Niente cambia finché non premi Applica.</div><div class="fzp-scorri" style="max-height:46vh;margin-top:8px"><table class="fzp-tab" style="width:100%"><thead><tr><th>Collaboratore</th><th>Giorno</th><th>Nel file</th><th>Proposto</th></tr></thead><tbody>' +
       cambi +
       '</tbody></table></div><div class="finestra-pulsanti"><button type="button" class="finestra-no" data-s="">Lascia il piano del file</button><button type="button" class="finestra-ok" data-s="ok">Applica</button></div></div>';
     document.body.appendChild(v);
@@ -1952,11 +1952,11 @@ async function pianoProponiCorrezioniImport(ym, errori) {
 const _PIANO_TIPI_VIOLAZIONE = [
   ['riposo sotto il minimo fra due turni', /di riposo dopo/],
   ['troppi giorni lavorativi di fila', /giorni lavorativi consecutivi/],
-  ['riposo singolo dopo 4 o piu giorni (4+1+1)', /riposo singolo dopo/],
+  ['riposo singolo dopo 4 o più giorni (4+1+1)', /riposo singolo dopo/],
   ['troppe ore nella settimana', /lavorate nella settimana/],
   ['riposo attorno alla domenica o domeniche libere', /domenica/i],
   ['ore del mese fuori tolleranza', /ore mese/],
-  ['idoneita, accompagnamento e regole del settore', /./],
+  ['idoneità, accompagnamento e regole del settore', /./],
 ];
 async function pianoRiepilogoViolazioni(ym, titolo) {
   if (_pianoMeseSel !== ym) return;
@@ -1996,7 +1996,7 @@ async function pianoRiepilogoViolazioni(ym, titolo) {
       chi.join(', ') +
       (persone > chi.length ? ' e altri ' + (persone - chi.length) : '') +
       '.\n\nCon "Mostra nel calendario" le celle si colorano in rosso e sotto compare l elenco con nome, giorno e motivo. Il piano e stato importato com e: il programma non sposta le celle importate.',
-    { titolo: titolo || 'Controllo delle regole', ok: 'Mostra nel calendario', annulla: 'Piu tardi' },
+    { titolo: titolo || 'Controllo delle regole', ok: 'Mostra nel calendario', annulla: 'Più tardi' },
   );
   if (!vedi || _pianoMeseSel !== ym) return;
   _pianoViolCelle = r.celle;
@@ -2056,7 +2056,7 @@ async function completaConCoperture() {
         _pianoMeseSel +
         ' usando chi copre da altri settori:\n\n' +
         chi.map((x) => '\u2022 ' + x).join('\n') +
-        "\n\nI turni gia' inseriti non vengono toccati. Fallo DOPO aver generato i piani dei loro reparti, cosi' si vede chi e' davvero libero.",
+        '\n\nI turni già inseriti non vengono toccati. Fallo DOPO aver generato i piani dei loro reparti, così si vede chi è davvero libero.',
     ))
   )
     return;
@@ -3483,7 +3483,7 @@ async function generaBozzaPiano(usaCoperture) {
   ) {
     // Le C di riempimento e le vacanze sono gia' state riscritte per poter
     // calcolare la bozza: chi rinuncia deve ritrovare il mese com'era.
-    await _pianoRipristinaUltimoSnapshot("Bozza annullata: il mese e' tornato com'era");
+    await _pianoRipristinaUltimoSnapshot("Bozza annullata: il mese è tornato com'era");
     return;
   }
   try {
@@ -3501,7 +3501,7 @@ async function generaBozzaPiano(usaCoperture) {
       toastErrore(
         nuove.length -
           inseriteTot +
-          ' celle della bozza non scritte: in quei giorni c era gia una cella (scritta da un altro settore o nel frattempo). Controlla gli Avvisi',
+          ' celle della bozza non scritte: in quei giorni c era già una cella (scritta da un altro settore o nel frattempo). Controlla gli Avvisi',
       );
     for (const sw of sostituzioniWd) {
       await secPatch('piano', 'id=eq.' + sw.id, {
@@ -3531,9 +3531,9 @@ async function generaBozzaPiano(usaCoperture) {
       'Bozza generata: ' +
         r.inserite +
         ' celle scritte' +
-        (r.inserite < nuove.length ? ' su ' + nuove.length + " (le altre esistevano gia')" : '') +
+        (r.inserite < nuove.length ? ' su ' + nuove.length + ' (le altre esistevano già)' : '') +
         (scoperti.length ? ' · ' + scoperti.length + ' scoperti' : '') +
-        (wdExtra.length ? ' · ' + wdExtra.length + ' turni presto in piu accanto alle vacanze' : '') +
+        (wdExtra.length ? ' · ' + wdExtra.length + ' turni presto in più accanto alle vacanze' : '') +
         (wdRestano.length ? ' · ' + wdRestano.length + ' WD senza turno diurno (vedi Valida)' : ''),
     );
     _pianoViolLista = null;
@@ -3545,8 +3545,8 @@ async function generaBozzaPiano(usaCoperture) {
         await chiediConferma(
           scoperti.length +
             (scoperti.length === 1 ? ' posto e rimasto scoperto' : ' posti sono rimasti scoperti') +
-            '. Vuoi vedere perche e cosa manca (personale, formazione, impostazioni)? Prima puoi anche provare Migliora la bozza: il pulsante Perche scoperto resta nella barra.',
-          { titolo: 'Posti scoperti', ok: 'Vedi perche', annulla: 'Dopo' },
+            '. Vuoi vedere perché e cosa manca (personale, formazione, impostazioni)? Prima puoi anche provare Migliora la bozza: il pulsante Perché scoperto resta nella barra.',
+          { titolo: 'Posti scoperti', ok: 'Vedi perché', annulla: 'Dopo' },
         )
       )
         await pianoPercheScoperti();

@@ -136,8 +136,8 @@ async function _salvaEsegui() {
     if (typeof _pianoEJolly === 'function' && _pianoCollabInfo(nome) && !_pianoEJolly(nome)) {
       await mostraAvviso(
         nome +
-          ' non e un jolly: la non disponibilita (ND) vale solo per i jolly. Per un collaboratore fisso si usa un congedo o un cambio turno.',
-        { titolo: 'Non disponibilita' },
+          ' non e un jolly: la non disponibilità (ND) vale solo per i jolly. Per un collaboratore fisso si usa un congedo o un cambio turno.',
+        { titolo: 'Non disponibilità' },
       );
       return;
     }
@@ -146,8 +146,8 @@ async function _salvaEsegui() {
     if (typeof _pianoCollabInfo === 'function' && !_pianoCollabInfo(nome)) {
       await mostraAvviso(
         nome +
-          ' non e fra i collaboratori attivi. La non disponibilita vale solo per i jolly: crealo prima come jolly in Gestione collaboratori (o controlla il nome), poi registra la ND.',
-        { titolo: 'Non disponibilita' },
+          ' non e fra i collaboratori attivi. La non disponibilità vale solo per i jolly: crealo prima come jolly in Gestione collaboratori (o controlla il nome), poi registra la ND.',
+        { titolo: 'Non disponibilità' },
       );
       return;
     }
@@ -163,7 +163,7 @@ async function _salvaEsegui() {
           '\u26a0 ' +
             fuoriT.length +
             (fuoriT.length === 1 ? " giorno e'" : ' giorni sono') +
-            " FUORI TEMPO (il termine di consegna era gia' passato):\n\n" +
+            ' FUORI TEMPO (il termine di consegna era già passato):\n\n' +
             fuoriT.map((ds) => '\u2022 ' + new Date(ds + 'T12:00:00').toLocaleDateString('it-IT')).join('\n') +
             '\n\nRegistro comunque? La nota "fuori termine" restera\' scritta.',
         ))
@@ -736,9 +736,9 @@ async function _diarioNdNelPiano(nome, giorni) {
   if (puo && turni.every((t) => t.data.substring(0, 7) === turni[0].data.substring(0, 7))) {
     const cerca = await chiediConferma(
       nome +
-        ' ha gia dei turni nel piano in quei giorni: ' +
+        ' ha già dei turni nel piano in quei giorni: ' +
         elenco +
-        '.\n\nCerco subito chi li copre? (Copertura gia compilata: alla conferma ND a ' +
+        '.\n\nCerco subito chi li copre? (Copertura già compilata: alla conferma ND a ' +
         nome +
         ' e turno al sostituto.)\nAnnulla = i turni diventano ND e i posti restano da coprire.',
     );
@@ -852,7 +852,7 @@ async function confermaCambioTipo() {
     _pianoCollabInfo(e0.nome) &&
     !_pianoEJolly(e0.nome)
   ) {
-    toastErrore(e0.nome + ' e fisso: la non disponibilita vale solo per i jolly.');
+    toastErrore(e0.nome + ' e fisso: la non disponibilità vale solo per i jolly.');
     return;
   }
   try {
@@ -992,7 +992,7 @@ async function chiediOmonimo(testo, nomi, contesto, chiave) {
     return n + ' (' + [rep, c.funzione].filter(Boolean).join(', ') + ')';
   };
   const r = await chiediModulo(
-    '"' + testo + '"' + (contesto ? ' ' + contesto : '') + ' corrisponde a piu collaboratori. Chi e?',
+    '"' + testo + '"' + (contesto ? ' ' + contesto : '') + ' corrisponde a più collaboratori. Chi e?',
     [
       {
         titolo: 'Collaboratore',

@@ -321,7 +321,7 @@ async function _renderPianoFormazioniTab() {
       : '') +
     '</div><div style="padding:12px 14px">';
   h +=
-    '<p style="font-size:var(--fs-md,.875rem);color:var(--muted);margin:0 0 10px;max-width:950px">Scegli allievo, competenza, formatore, quanti giorni e il periodo: il programma mette i turni del modello del reparto (prima i diurni, poi le notti, se possibile nel fine settimana). Se il piano e gia fatto propone i cambi necessari rispettando tutte le regole, con meno cambi possibile: ogni proposta si stampa prima di confermare. L allievo e in piu rispetto al fabbisogno. A formazione finita la competenza viene certificata e il livello si aggiorna nella scheda Formazione.</p>';
+    '<p style="font-size:var(--fs-md,.875rem);color:var(--muted);margin:0 0 10px;max-width:950px">Scegli allievo, competenza, formatore, quanti giorni e il periodo: il programma mette i turni del modello del reparto (prima i diurni, poi le notti, se possibile nel fine settimana). Se il piano e già fatto propone i cambi necessari rispettando tutte le regole, con meno cambi possibile: ogni proposta si stampa prima di confermare. L allievo e in più rispetto al fabbisogno. A formazione finita la competenza viene certificata e il livello si aggiorna nella scheda Formazione.</p>';
   // in corso e pianificate
   const attive = tutte.filter((f) => (f.dati || {}).stato === 'pianificata');
   const svolte = tutte.filter((f) => (f.dati || {}).stato === 'svolta');
@@ -427,7 +427,7 @@ function _formFormatoriHtml(puo) {
   const comps = _formCompetenze();
   if (!comps.length) return '';
   let h =
-    '<h4 style="margin:14px 0 8px">Formatori</h4><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:0 0 6px">Chi puo formare per ogni competenza: vengono proposti per primi, ma come formatore si puo scegliere chiunque sia abilitato a quel reparto.</p>';
+    '<h4 style="margin:14px 0 8px">Formatori</h4><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:0 0 6px">Chi può formare per ogni competenza: vengono proposti per primi, ma come formatore si può scegliere chiunque sia abilitato a quel reparto.</p>';
   comps.forEach((c) => {
     const fm = _formFormatori(c.key);
     h +=
@@ -568,7 +568,7 @@ async function formazioneScegliFormatori(compKey) {
   velo.innerHTML =
     '<div class="finestra-box" role="dialog" aria-modal="true" style="width:min(520px,100%)"><h3>Formatori · ' +
     escP(comp.label) +
-    '</h3><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:0 0 10px">Spunta chi puo formare per questa competenza: nelle nuove formazioni viene proposto per primo. Cerca scrivendo una parte del nome.</p>' +
+    '</h3><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:0 0 10px">Spunta chi può formare per questa competenza: nelle nuove formazioni viene proposto per primo. Cerca scrivendo una parte del nome.</p>' +
     _selPersHtml(
       'fzf-sel',
       [
@@ -680,7 +680,7 @@ async function formazioneNuova(pre) {
     riga(
       'Formatori diurni',
       '<div id="fz-box-d"></div>',
-      'Uno o piu: per ogni giorno si prende il primo libero, nell ordine scelto.',
+      'Uno o più: per ogni giorno si prende il primo libero, nell ordine scelto.',
     ) +
     riga(
       'Formatori notti',
@@ -744,7 +744,7 @@ async function formazioneNuova(pre) {
           collaboratoriCache.find((c) => c.nome.toLowerCase() === completo.toLowerCase());
         if (gia) {
           toastErrore(
-            'Esiste gia: ' +
+            'Esiste già: ' +
               gia.nome +
               (gia.attivo === false ? ' (disattivato: riattivalo in Gestione collaboratori)' : '') +
               '. Toglie la spunta Nuovo allievo e sceglilo dalla lista',
@@ -797,7 +797,7 @@ async function formazioneNuova(pre) {
         return;
       }
       if (richiesta.formatoriD.concat(richiesta.formatoriN).includes(richiesta.allievo)) {
-        toastErrore('L allievo non puo essere anche formatore');
+        toastErrore('L allievo non può essere anche formatore');
         return;
       }
       if (!richiesta.dal || !richiesta.al || richiesta.al < richiesta.dal) {
@@ -805,7 +805,7 @@ async function formazioneNuova(pre) {
         return;
       }
       if (richiesta.dal < oggi) {
-        toastErrore('Il periodo non puo cominciare nel passato');
+        toastErrore('Il periodo non può cominciare nel passato');
         return;
       }
       if (_formPiu(richiesta.dal, 92) < richiesta.al) {
@@ -1150,7 +1150,7 @@ function _formMostraProposte() {
     _formGg(r.dal) +
     ' al ' +
     _formGg(r.al) +
-    '</div><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:4px 0 0">Le proposte sono ordinate dalla migliore. Niente cambia finche non premi Applica; Stampa per farla vedere prima.</p>';
+    '</div><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:4px 0 0">Le proposte sono ordinate dalla migliore. Niente cambia finché non premi Applica; Stampa per farla vedere prima.</p>';
   if (!P.lista.length) h += '<p style="margin-top:12px">Nessuna proposta trovata.</p>';
   P.lista.forEach((p, i) => {
     const c = p.candidato;

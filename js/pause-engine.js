@@ -92,7 +92,7 @@ const PAUSE_REGOLE_TIPI = {
   turno: {
     nome: 'Pause di un turno preciso',
     spiega:
-      'Vale piu della regola per durata. Scrivi 0 per un turno senza pausa. Con i giorni scelti vale solo in quei giorni.',
+      'Vale più della regola per durata. Scrivi 0 per un turno senza pausa. Con i giorni scelti vale solo in quei giorni.',
     esempio: 'Turno S3, domenica: 15+15',
   },
   distanza: {
@@ -103,7 +103,7 @@ const PAUSE_REGOLE_TIPI = {
   fascia: {
     nome: 'Fascia senza pause',
     spiega: 'Nei giorni scelti nessuna pausa in questa fascia oraria (ora di punta). Senza giorni vale sempre.',
-    esempio: 'Venerdi e sabato dalle 23.00 alle 01.00',
+    esempio: 'Venerdì e sabato dalle 23.00 alle 01.00',
   },
   insieme: {
     nome: 'Persone in pausa insieme',
@@ -292,13 +292,13 @@ function _peValidaRegolaPausa(r, settore, altre) {
         (o) => o.tipo === 'turno' && String(o.turno).toUpperCase() === cod && _peGiorniStessi(o.giorni, r.giorni),
       )
     )
-      av.push('Esiste gia una regola per il turno ' + cod + ' negli stessi giorni: questa la sostituisce');
+      av.push('Esiste già una regola per il turno ' + cod + ' negli stessi giorni: questa la sostituisce');
   }
   if (r.tipo === 'distanza') {
     const m = parseInt(r.minuti);
     if (!(m >= 0 && m <= 240)) return { errore: 'I minuti vanno da 0 a 240' };
     if ((altre || []).some((o) => o.tipo === 'distanza'))
-      av.push('Esiste gia una distanza minima: questa la sostituisce');
+      av.push('Esiste già una distanza minima: questa la sostituisce');
   }
   if (r.tipo === 'fascia') {
     if (!oraOk(r.da) || !oraOk(r.a)) return { errore: 'Scrivi gli orari come 23.00 e 01.00' };
@@ -312,7 +312,7 @@ function _peValidaRegolaPausa(r, settore, altre) {
     const n = parseInt(r.n);
     if (!(n >= 1 && n <= 20)) return { errore: 'Il numero di persone va da 1 a 20' };
     if ((altre || []).some((o) => o.tipo === 'insieme'))
-      av.push('Esiste gia un massimo di persone in pausa: questa lo sostituisce');
+      av.push('Esiste già un massimo di persone in pausa: questa lo sostituisce');
     if (sett === 'slots')
       av.push('Negli Slots le pause seguono gli schemi fissi: questa regola segnala le sovrapposizioni, non le sposta');
   }
@@ -2575,10 +2575,10 @@ function _peOttimizza(c, righe, dstr) {
       const d1 = _pcPunteggio(c, persone, true);
       const motivo =
         d1.vuota < d0.vuota
-          ? 'cosi la sala non resta vuota'
+          ? 'così la sala non resta vuota'
           : d1.avvisi < d0.avvisi
-            ? 'cosi le pause rispettano le regole'
-            : 'cosi nessuno va in pausa nella prima o nell ultima mezz ora del turno';
+            ? 'così le pause rispettano le regole'
+            : 'così nessuno va in pausa nella prima o nell ultima mezz ora del turno';
       // dove e finita la riga spostata (stessa postazione, orario vicino)
       const blk = PC.blocchi(c).find((b) => b.base === meglio.base && b.nome === meglio.nome);
       const dopo =
@@ -2672,7 +2672,7 @@ function _peRisolviSalaVuota(c, righe, dstr) {
       fin: dopo.fin,
       daIni: prima.ini,
       daFin: prima.fin,
-      motivo: 'cosi la sala non resta vuota',
+      motivo: 'così la sala non resta vuota',
       r: meglio.r2,
       base: meglio.b.base,
     });
@@ -3551,7 +3551,7 @@ async function briefGeneraPause() {
         pred = localStorage.getItem('pause_cassa_vensab') || 'normale';
       } catch (e) {}
       const sc = await chiediModulo(
-        'Venerdi e sabato con tre cassieri o piu: chi da le pause delle casse?',
+        'Venerdì e sabato con tre cassieri o più: chi da le pause delle casse?',
         [
           {
             titolo: 'Pause delle casse',
@@ -4117,7 +4117,7 @@ function briefPausaSpostaA(base, rDa, rA) {
       c.celle = o.celle;
       c.nR = o.nR;
       _briefDimentica();
-      toast('Qui la riga non si puo spostare: tra le due posizioni c e una riga che non si scambia');
+      toast('Qui la riga non si può spostare: tra le due posizioni c e una riga che non si scambia');
       _briefRefreshPause();
       return;
     }
@@ -4245,7 +4245,7 @@ async function briefPausaEliminaColonna(base, r) {
   }
   const chi = String(hdr.v || '') + (nome && nome.v ? ' ' + nome.v : '');
   if (
-    !(await chiediConferma('Elimino la colonna ' + chi + ' con tutte le sue righe?\n\nSi puo annullare con Annulla.'))
+    !(await chiediConferma('Elimino la colonna ' + chi + ' con tutte le sue righe?\n\nSi può annullare con Annulla.'))
   )
     return;
   _briefRicorda();
@@ -5450,7 +5450,7 @@ function _pcProposteHtml(c) {
     return (
       '<details class="pb-proposte" style="margin:0 0 8px;padding:6px 10px;font-size:var(--fs-sm,.8125rem);background:var(--card-bg,#fff);border-left:3px solid var(--c-verde,#2e7d32)"><summary style="cursor:pointer"><b>Sistemato dal programma (' +
       l.length +
-      ')</b>: pause aggiunte e spostamenti che rispettano tutte le regole, gia applicati</summary>' +
+      ')</b>: pause aggiunte e spostamenti che rispettano tutte le regole, già applicati</summary>' +
       righe.join('<br>') +
       '<div style="margin-top:4px;color:var(--muted)">Per cambiarli usa le frecce o scrivi nelle celle; Annulla torna al foglio di prima.</div></details>'
     );
@@ -5737,7 +5737,7 @@ function _briefRenderPauseCfg() {
       .map((k) => '<li><b>' + escP(PAUSE_REGOLE_TIPI[k].nome) + '</b>: ' + escP(PAUSE_REGOLE_TIPI[k].esempio) + '</li>')
       .join('') +
     '</ul>' +
-    '<p style="margin:6px 0;color:var(--muted)">Ogni settore ha le sue regole. Una regola per un turno preciso vale piu di quella per durata; una regola con i giorni indicati (Lun-Gio, Ven-Sab, Dom) vale piu di una senza giorni. Cosi si possono avere pause diverse da lunedi a giovedi, venerdi e sabato, e domenica. ' +
+    '<p style="margin:6px 0;color:var(--muted)">Ogni settore ha le sue regole. Una regola per un turno preciso vale più di quella per durata; una regola con i giorni indicati (Lun-Gio, Ven-Sab, Dom) vale più di una senza giorni. Così si possono avere pause diverse da lunedì a giovedì, venerdì e sabato, e domenica. ' +
     (sett === 'slots'
       ? 'Negli Slots gli schemi di copertura (BG1, Q2, BG3, chi copre chi) restano quelli di sempre: le regole decidono quante pause e quanto lunghe, e segnalano in giallo le pause che non rispettano fascia, distanza o persone insieme.'
       : 'In questo settore le regole guidano direttamente la generazione delle pause.') +
@@ -5769,7 +5769,7 @@ function _briefRenderPauseCfg() {
       '<label style="display:inline-flex;align-items:center;gap:4px"><input type="checkbox" id="pcfg-ott-attivo"' +
       (oc.attivo ? ' checked' : '') +
       '> attiva</label>' +
-      '<span>segnala chi aspetta la pausa piu di</span><select id="pcfg-ott-max" style="padding:4px">' +
+      '<span>segnala chi aspetta la pausa più di</span><select id="pcfg-ott-max" style="padding:4px">' +
       [120, 150, 165, 180, 195, 210, 240]
         .map(
           (m) =>

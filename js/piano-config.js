@@ -27,7 +27,7 @@ const PIANO_REGOLE_FONTE = {
   jolly_ore_max: 'RAP All. 1 · personale ausiliario',
   tolleranza_ore: 'RAP 3.1: 41 ore settimanali su media mensile',
   tolleranza_ore_sopra: 'RAP 3.1: max 45 ore in alta stagione',
-  ore_settimana_max: 'Legge sul lavoro · indicazione del titolare: 45.1 ore lavorate lunedi-domenica',
+  ore_settimana_max: 'Legge sul lavoro · indicazione del titolare: 45.1 ore lavorate lunedì-domenica',
   ore_settimana_con_notturno: 'Indicazione del titolare (30.09): il massimo comprende il 10% notturno',
   riposo_domenica_libera_ore: 'LL art. 18-20a, OLL 1 art. 21: 35 ore (11 + 24) comprese le 23 sab - 23 dom',
   riposo_domenica_lavorata_ore: 'OLL 2 art. 12 cpv. 2 (case da gioco): 36 + 11 = 47 ore consecutive',
@@ -104,7 +104,7 @@ const PIANO_REGOLE_GUIDA = {
   },
   tolleranza_ore: {
     g: 'Ore e saldo',
-    n: 'Scarto accettato dalle ore dovute del mese (piu o meno)',
+    n: 'Scarto accettato dalle ore dovute del mese (più o meno)',
     t: 'numero',
     d: 'Validatore, bozza, Migliora ore',
   },
@@ -128,7 +128,7 @@ const PIANO_REGOLE_GUIDA = {
   },
   riposo_domenica_lavorata_ore: {
     g: 'Domeniche',
-    n: 'Domenica lavorata: ore consecutive minime di riposo nella settimana prima oppure in quella dopo (lunedi-sabato)',
+    n: 'Domenica lavorata: ore consecutive minime di riposo nella settimana prima oppure in quella dopo (lunedì-sabato)',
     t: 'numero',
     d: 'Validatore, avviso sulla cella, scheda Avvisi',
   },
@@ -140,7 +140,7 @@ const PIANO_REGOLE_GUIDA = {
   },
   ore_settimana_max: {
     g: 'Ore e saldo',
-    n: 'Ore lavorate massime nella settimana lunedi-domenica (con o senza il 10% notturno: vedi la regola sotto)',
+    n: 'Ore lavorate massime nella settimana lunedì-domenica (con o senza il 10% notturno: vedi la regola sotto)',
     t: 'numero',
     d: 'Validatore, avviso sulla cella, bozza, scheda Avvisi',
   },
@@ -176,7 +176,7 @@ const PIANO_REGOLE_GUIDA = {
   },
   jolly_codici_gia_pagati: {
     g: 'Ausiliari (jolly)',
-    n: 'Codici che per gli ausiliari valgono zero ore (indennita gia pagata)',
+    n: 'Codici che per gli ausiliari valgono zero ore (indennita già pagata)',
     t: 'testo',
     d: 'Calendario, saldo, statistiche',
   },
@@ -218,9 +218,9 @@ const PIANO_REGOLE_GUIDA = {
   },
   nd_jolly_giorno: {
     g: 'Ausiliari (jolly)',
-    n: 'Giorno del mese entro cui gli ausiliari consegnano le non disponibilita',
+    n: 'Giorno del mese entro cui gli ausiliari consegnano le non disponibilità',
     t: 'numero',
-    d: 'Formulario non disponibilita',
+    d: 'Formulario non disponibilità',
   },
   cgf_solo_parificati: {
     g: 'Festivi e recuperi (CGF)',
@@ -260,31 +260,31 @@ const PIANO_REGOLE_GUIDA = {
   },
   vacanze_bonus_10anni: {
     g: 'Vacanze',
-    n: 'Giorni in piu nell anno dei 10 anni di servizio (una volta sola)',
+    n: 'Giorni in più nell anno dei 10 anni di servizio (una volta sola)',
     t: 'numero',
     d: 'Scheda Vacanze (diritto)',
   },
   vacanze_bonus_15anni: {
     g: 'Vacanze',
-    n: 'Giorni in piu nell anno dei 15 anni di servizio (una volta sola)',
+    n: 'Giorni in più nell anno dei 15 anni di servizio (una volta sola)',
     t: 'numero',
     d: 'Scheda Vacanze (diritto)',
   },
   vacanze_bonus_20anni: {
     g: 'Vacanze',
-    n: 'Giorni in piu nell anno dei 20 anni di servizio (una volta sola)',
+    n: 'Giorni in più nell anno dei 20 anni di servizio (una volta sola)',
     t: 'numero',
     d: 'Scheda Vacanze (diritto)',
   },
   vacanze_bonus_25anni: {
     g: 'Vacanze',
-    n: 'Giorni in piu nell anno dei 25 anni di servizio (una volta sola)',
+    n: 'Giorni in più nell anno dei 25 anni di servizio (una volta sola)',
     t: 'numero',
     d: 'Scheda Vacanze (diritto)',
   },
   vacanze_bonus_30anni: {
     g: 'Vacanze',
-    n: 'Giorni in piu nell anno dei 30 anni di servizio (una volta sola)',
+    n: 'Giorni in più nell anno dei 30 anni di servizio (una volta sola)',
     t: 'numero',
     d: 'Scheda Vacanze (diritto)',
   },
@@ -370,7 +370,7 @@ const PIANO_REGOLE_GUIDA = {
   },
   chiusura_ora_tardi: {
     g: 'Orari di chiusura',
-    n: 'Ora di chiusura il venerdi, il sabato e la notte prima di un festivo',
+    n: 'Ora di chiusura il venerdì, il sabato e la notte prima di un festivo',
     t: 'numero',
     d: 'Calendario, ore dei turni prolungati, briefing',
   },
@@ -382,7 +382,7 @@ const PIANO_REGOLE_GUIDA = {
   },
   chiusura_giorni_tardi: {
     g: 'Orari di chiusura',
-    n: 'Giorni della settimana che chiudono tardi (0 domenica, 5 venerdi, 6 sabato)',
+    n: 'Giorni della settimana che chiudono tardi (0 domenica, 5 venerdì, 6 sabato)',
     t: 'testo',
     d: 'Calendario, ore dei turni prolungati, briefing',
   },
@@ -394,7 +394,7 @@ const PIANO_REGOLE_GUIDA = {
   },
   congedo_np_mesi_anzianita: {
     g: 'Congedi non pagati',
-    n: 'Oltre questi mesi di congedo l anzianita si sposta in avanti (0 = ogni giorno di congedo la sposta)',
+    n: 'Oltre questi mesi di congedo l anzianità si sposta in avanti (0 = ogni giorno di congedo la sposta)',
     t: 'numero',
     d: 'Giubilei, scheda Vacanze, scheda Congedi',
   },
@@ -616,9 +616,9 @@ function _renderPianoRegoleCard() {
     '<li><b>Cambia il valore</b> nella casella e premi Invio o clicca fuori: si salva da solo e vale subito in tutto il programma. La colonna "Dove agisce" dice in quali schermate la regola conta.</li>' +
     '<li><b>Si / No</b> accende o spegne una preferenza. La casella <b>Attiva</b> spegne qualsiasi regola senza perdere il valore: spenta, e come se non esistesse.</li>' +
     '<li><b>Un valore diverso per un settore</b>: scegli il settore nel menu in alto e cambia il numero. Nasce l eccezione per quel settore; gli altri tengono il valore generale. "Torna al generale" la toglie. Esempio: riposo 11 ore ovunque, 12 ai Tavoli.</li>' +
-    '<li><b>Regole nuove sui gruppi di lavoro</b> (chi puo fare cassa, quanti Supervisor al giorno, una funzione richiesta): si creano nella card <b>Regole di gruppo</b>, piu in basso in questa scheda, scegliendo il tipo dall elenco. Non serve scrivere codice.</li>' +
+    '<li><b>Regole nuove sui gruppi di lavoro</b> (chi può fare cassa, quanti Supervisor al giorno, una funzione richiesta): si creano nella card <b>Regole di gruppo</b>, più in basso in questa scheda, scegliendo il tipo dall elenco. Non serve scrivere codice.</li>' +
     '<li><b>Preferenze di una persona</b> (solo diurni, turni vietati, giorni di lavoro, accompagnamento, copertura di altri settori): in Piano &gt; Impostazioni, Preferenze collaboratori. Funzione e percentuale in Impostazioni &gt; Gestione collaboratori; competenze e livelli in Formazione. Bozza e validatore le rispettano.</li>' +
-    '<li><b>Fonte</b>: sotto ogni regola normativa c e il riferimento (RAP, legge sul lavoro, direttiva). Se cambia il regolamento, cambia il numero qui: il programma non va toccato. Ogni modifica finisce nel Registro attivita.</li>' +
+    '<li><b>Fonte</b>: sotto ogni regola normativa c e il riferimento (RAP, legge sul lavoro, direttiva). Se cambia il regolamento, cambia il numero qui: il programma non va toccato. Ogni modifica finisce nel Registro attività.</li>' +
     '</ol></details>';
   if (vista)
     h +=
@@ -871,7 +871,7 @@ async function pianoRegolaEccezione(nome) {
     toast('Eccezione creata: ' + nome + ' = ' + val + ' per ' + pulito);
     renderPiano();
   } catch (e) {
-    toast('Errore: esiste gia\' una regola "' + nome + '" per quei settori');
+    toast('Errore: esiste già una regola "' + nome + '" per quei settori');
   }
 }
 // Cambia i settori di una regola specifica (vuoto = torna generale)
@@ -2255,7 +2255,7 @@ async function _importaPianoDaWb(wb, ym, opz) {
           : '') +
         '\n• ' +
         uguali +
-        ' celle gia uguali' +
+        ' celle già uguali' +
         (nTenute ? '\n• ' + nTenute + ' celle diverse che restano come sono:\n' + righeTenute.join('\n') : '') +
         (sigleScartate ? '\n• ' + sigleScartate + ' sigle sconosciute scartate' : '') +
         (nuoviCollab.length
@@ -2284,7 +2284,7 @@ async function _importaPianoDaWb(wb, ym, opz) {
               .join(', ')
           : '') +
         '\n• Ordine dei collaboratori nel calendario: come nel file' +
-        '\n\nSi puo annullare con Annulla del piano.',
+        '\n\nSi può annullare con Annulla del piano.',
       [
         {
           titolo: 'Come importare',
@@ -2465,7 +2465,7 @@ async function _importaPianoDaWb(wb, ym, opz) {
           ultimoPrima.split('-').reverse().join('.') +
           '?\n\n' +
           daFermare.map((x) => '• ' + x.nome).join('\n') +
-          '\n\nFino a quel giorno resta tutto (piano, ore, storico); dal giorno dopo non sono piu nel piano e nelle ore dovute. La data si cambia in Gestione collaboratori > Disattiva o nella scheda > Storico HR. Annulla = restano come sono.',
+          '\n\nFino a quel giorno resta tutto (piano, ore, storico); dal giorno dopo non sono più nel piano e nelle ore dovute. La data si cambia in Gestione collaboratori > Disattiva o nella scheda > Storico HR. Annulla = restano come sono.',
       ))
     ) {
       for (const c of daFermare) {
@@ -2742,7 +2742,7 @@ async function copiaFabbisognoMese() {
   }
   const nomiProfilo = {
     FESTIVO: 'domeniche e festivi',
-    CHIUSURA5: 'venerdi, sabato e vigilie (chiusura alle 5)',
+    CHIUSURA5: 'venerdì, sabato e vigilie (chiusura alle 5)',
     D1: 'lunedi',
     D2: 'martedi',
     D3: 'mercoledi',
@@ -2755,14 +2755,14 @@ async function copiaFabbisognoMese() {
         ymPrec +
         ' a ' +
         _pianoMeseSel +
-        '?\n\nNon si copia giorno per giorno ma per tipo di giornata, cosi i venerdi\nrestano venerdi: ' +
+        '?\n\nNon si copia giorno per giorno ma per tipo di giornata, così i venerdì\nrestano venerdì: ' +
         Object.keys(riepilogo)
           .filter((k) => modello[k])
           .map((k) => (nomiProfilo[k] || k) + ' (' + riepilogo[k] + ')')
           .join(', ') +
         '.\nI festivi prendono l assetto della domenica, le vigilie quello del sabato.\n\n' +
         nuovi.length +
-        ' celle da scrivere. Le celle gia impostate non vengono toccate.' +
+        ' celle da scrivere. Le celle già impostate non vengono toccate.' +
         (senzaModello.length
           ? '\n\nAttenzione: per ' +
             senzaModello.map((k) => nomiProfilo[k] || k).join(', ') +
@@ -2889,7 +2889,7 @@ async function pianoVerificaDurateNotte() {
     });
     h += '</tbody></table></div>';
     h +=
-      '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:8px">In rosso i turni in cui manca il supplemento (le ore andrebbero aumentate), in giallo quelli che ne hanno piu\' del previsto. Controlla prima di correggere: un turno puo\' avere una durata diversa per accordi particolari (per esempio pause non pagate).</p>';
+      '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:8px">In rosso i turni in cui manca il supplemento (le ore andrebbero aumentate), in giallo quelli che ne hanno più del previsto. Controlla prima di correggere: un turno può avere una durata diversa per accordi particolari (per esempio pause non pagate).</p>';
     h +=
       '<div class="pwd-modal-btns" style="margin-top:12px;flex-wrap:wrap;gap:6px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button>' +
       '<button class="btn-modal-ok" onclick="pianoCorreggiDurateNotte()">Correggi tutte le durate</button></div>';
@@ -2911,7 +2911,7 @@ async function pianoCorreggiDurateNotte() {
     !(await chiediConferma(
       'Aggiorno la durata di ' +
         lista.length +
-        " turni con il supplemento notturno compreso?\n\nLe ore gia' salvate nei piani non cambiano da sole: il nuovo valore vale dai prossimi conteggi.",
+        ' turni con il supplemento notturno compreso?\n\nLe ore già salvate nei piani non cambiano da sole: il nuovo valore vale dai prossimi conteggi.',
     ))
   )
     return;

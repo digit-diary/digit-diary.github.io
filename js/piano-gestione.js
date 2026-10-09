@@ -78,12 +78,12 @@ function _renderPianoDomenicheBody() {
     diritto +
     ' domeniche libere all anno (regola "domeniche_libere_anno"). Vacanza e malattia non contano ne\' tra le libere ne\' tra le lavorate (stesso criterio del validatore e di Benessere)' +
     (chkSab ? '; il sabato deve finire entro le 23, come nel validatore' : '') +
-    '. Nei mesi senza piano non si conta nulla. Rosso = le domeniche rimaste nell anno non bastano piu per arrivare al diritto: da li in poi vanno restituite per prime.</p>';
+    '. Nei mesi senza piano non si conta nulla. Rosso = le domeniche rimaste nell anno non bastano più per arrivare al diritto: da li in poi vanno restituite per prime.</p>';
   h +=
     '<div style="overflow:auto;max-height:66vh"><table id="piano-domeniche-table" class="piano-table piano-fisse3" style="min-width:1050px;font-size:var(--fs-sm,.8125rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Fun</th><th>%</th>';
   for (let m = 1; m <= 12; m++) h += '<th title="Domeniche libere nel mese">' + (MESI[m - 1] || m) + '</th>';
   h +=
-    '<th title="Domeniche libere gia avute nei mesi pianificati">Libere</th><th title="Domeniche con un turno">Lavorate</th><th>Diritto</th><th title="Quante ne mancano al diritto">Restano</th></tr></thead><tbody>';
+    '<th title="Domeniche libere già avute nei mesi pianificati">Libere</th><th title="Domeniche con un turno">Lavorate</th><th>Diritto</th><th title="Quante ne mancano al diritto">Restano</th></tr></thead><tbody>';
   let scritte = 0;
   nomi.forEach((nome) => {
     const info = _pianoCollabInfo(nome) || {};
@@ -410,12 +410,12 @@ async function caricaBenesserePiano() {
           : '') +
         '</th>' +
         thOrd('indice', 'Indice', 'Punteggio complessivo, 100 = carico ben distribuito') +
-        thOrd('domLib', 'Dom. libere', 'Domeniche libere gia trascorse quest anno') +
+        thOrd('domLib', 'Dom. libere', 'Domeniche libere già trascorse quest anno') +
         thOrd('domLav', 'Dom. lavorate', 'Domeniche in cui ha lavorato') +
         thOrd('we', 'Weekend', 'Sabati e domeniche lavorati (giornate, non fine settimana interi)') +
         thOrd('notti', 'Notti', 'Turni notturni') +
         thOrd('riposiIsolati', 'Riposi isolati', 'Riposi di un solo giorno tra due periodi di lavoro') +
-        thOrd('serieMax', 'Serie max', 'Serie piu lunga di giorni consecutivi') +
+        thOrd('serieMax', 'Serie max', 'Serie più lunga di giorni consecutivi') +
         thOrd('vac', 'Vacanze', 'Giorni di vacanza goduti') +
         thOrd('mal', 'Malattie', 'Giorni di malattia: segnale da leggere, non tolgono punti') +
         thOrd('oreLav', 'Ore lavorate', 'Ore effettivamente lavorate nell anno') +
@@ -452,7 +452,7 @@ async function caricaBenesserePiano() {
           (x.p.mesiPiano || 0) +
           ' mesi)' +
           (x.p.domTardi ? ' · ' + x.p.domTardi + ' non valide: il sabato si finisce dopo le 23' : '') +
-          (x.p.domAssenza ? ' · ' + x.p.domAssenza + ' escluse perche in vacanza o malattia' : '') +
+          (x.p.domAssenza ? ' · ' + x.p.domAssenza + ' escluse perché in vacanza o malattia' : '') +
           '">' +
           x.p.domLib +
           '<span style="font-weight:400;color:var(--muted);font-size:var(--fs-md,.875rem)">/' +
@@ -488,7 +488,7 @@ async function caricaBenesserePiano() {
       '<p style="font-size:var(--fs-md,.875rem);color:var(--muted);margin-bottom:6px">' +
       _benesserePeriodoLbl(calcolati, anno) +
       ' ' +
-      ', su dati del piano. L indice va da 0 a 100 e pesa: domeniche libere (25), equita nei weekend (20), carico notturno (15), qualita del riposo (15), giorni consecutivi (15), vacanze godute (10). ' +
+      ', su dati del piano. L indice va da 0 a 100 e pesa: domeniche libere (25), equità nei weekend (20), carico notturno (15), qualità del riposo (15), giorni consecutivi (15), vacanze godute (10). ' +
       'Le <b>malattie non tolgono punti</b>: sono un segnale da leggere insieme al resto, non una colpa. Passa il mouse su una riga per il dettaglio dei punti.</p>';
     h += '<div style="margin:8px 0 10px;max-width:720px"><canvas id="benessere-chart" height="150"></canvas></div>';
     h += tabella(
@@ -589,7 +589,7 @@ function _benesserePeriodoLbl(calcolati, anno) {
     '</b> (' +
     lista.length +
     (lista.length === 1 ? ' mese con piano completo' : ' mesi con piano completo') +
-    '). I mesi incompleti o non ancora pianificati restano fuori dal conteggio, cosi i confronti sono corretti.'
+    '). I mesi incompleti o non ancora pianificati restano fuori dal conteggio, così i confronti sono corretti.'
   );
 }
 // Ordina le tabelle del benessere SENZA ricaricare i dati: si riordinano le
@@ -656,7 +656,7 @@ function _renderPianoTurniCard() {
     let hRO =
       '<div class="main-card" style="margin-top:16px"><div class="card-header">Turni · ' +
       escP(repartoLabel(_pianoReparto())) +
-      '</div><div style="padding:10px 14px"><div style="overflow-x:auto"><table class="piano-table" style="min-width:520px;font-size:var(--fs-md,.875rem)"><thead><tr><th>Codice</th><th title="Area di lavoro del turno (SALA, CASSA, REC...)">Area</th><th>Inizio</th><th>Fine</th><th title="Durata in ore decimali e, accanto, in ore e minuti: 8.33 = 8h20, perche 20 minuti sono un terzo di ora">Ore</th><th>Tipo</th></tr></thead><tbody>';
+      '</div><div style="padding:10px 14px"><div style="overflow-x:auto"><table class="piano-table" style="min-width:520px;font-size:var(--fs-md,.875rem)"><thead><tr><th>Codice</th><th title="Area di lavoro del turno (SALA, CASSA, REC...)">Area</th><th>Inizio</th><th>Fine</th><th title="Durata in ore decimali e, accanto, in ore e minuti: 8.33 = 8h20, perché 20 minuti sono un terzo di ora">Ore</th><th>Tipo</th></tr></thead><tbody>';
     turniRO.forEach((t) => {
       hRO +=
         '<tr><td style="font-weight:700;background:' +
@@ -692,11 +692,11 @@ function _renderPianoTurniCard() {
   h +=
     '<div style="background:var(--paper2);border:1px solid var(--line);border-radius:3px;padding:10px 12px;margin-bottom:12px">' +
     '<b style="font-size:var(--fs-md,.875rem)">Supplemento notturno del 10%</b>' +
-    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:4px 0 8px">Chi lavora nella fascia notturna (23:00-06:00) matura il 10% di quelle ore in piu\', e questo supplemento deve essere gia\' compreso nella durata del turno. Il controllo confronta ogni turno con la durata attesa.</p>' +
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:4px 0 8px">Chi lavora nella fascia notturna (23:00-06:00) matura il 10% di quelle ore in più, e questo supplemento deve essere già compreso nella durata del turno. Il controllo confronta ogni turno con la durata attesa.</p>' +
     '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px" onclick="pianoVerificaDurateNotte()">Controlla le durate dei turni</button>' +
     '</div>';
   h +=
-    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:720px;font-size:var(--fs-md,.875rem)"><thead><tr><th>Codice</th><th title="Area di lavoro del turno (SALA, CASSA, REC...)">Area</th><th>Inizio</th><th>Fine</th><th title="Ora di fine nei giorni in cui il casino chiude alle 5: venerdi, sabato, vigilie di festivita, 31 dicembre. Vuoto = il turno finisce sempre alla stessa ora">Fine (chiusura 5)</th><th title="Durata in ore decimali e, accanto, in ore e minuti: 8.33 = 8h20, perche 20 minuti sono un terzo di ora">Ore</th><th>Tipo</th><th>Colore</th><th>Oltre 23</th><th>Attivo</th><th></th></tr></thead><tbody>';
+    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:720px;font-size:var(--fs-md,.875rem)"><thead><tr><th>Codice</th><th title="Area di lavoro del turno (SALA, CASSA, REC...)">Area</th><th>Inizio</th><th>Fine</th><th title="Ora di fine nei giorni in cui il casino chiude alle 5: venerdì, sabato, vigilie di festività, 31 dicembre. Vuoto = il turno finisce sempre alla stessa ora">Fine (chiusura 5)</th><th title="Durata in ore decimali e, accanto, in ore e minuti: 8.33 = 8h20, perché 20 minuti sono un terzo di ora">Ore</th><th>Tipo</th><th>Colore</th><th>Oltre 23</th><th>Attivo</th><th></th></tr></thead><tbody>';
   turni
     .slice()
     .sort((x, y) => (x.gruppo || '').localeCompare(y.gruppo || '') || x.codice.localeCompare(y.codice))
@@ -730,7 +730,7 @@ function _renderPianoTurniCard() {
         t.id +
         ',\'ora_fine\',this.value)" style="padding:2px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td><input type="time" value="' +
         escP((t.ora_fine_tardi || '').substring(0, 5)) +
-        '" title="Ora di fine nei giorni in cui si chiude alle 5 (venerdi, sabato, vigilie di festivita, 31 dicembre). Vuoto = finisce sempre alla stessa ora" onchange="salvaPianoTurno(' +
+        '" title="Ora di fine nei giorni in cui si chiude alle 5 (venerdì, sabato, vigilie di festività, 31 dicembre). Vuoto = finisce sempre alla stessa ora" onchange="salvaPianoTurno(' +
         t.id +
         ',\'ora_fine_tardi\',this.value)" style="padding:2px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)"></td><td><input type="number" step="0.25" value="' +
         (t.durata_ore || 0) +
@@ -809,7 +809,7 @@ function _pianoModificheHtml() {
     '<b style="font-size:var(--fs-md,.875rem)">Modifiche fatte adesso (' +
     lista.length +
     ')</b>' +
-    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:4px 0 6px">Sono gia salvate: il programma registra ogni campo appena lo cambi. Questo elenco serve solo a ricordare che cosa hai toccato in questa sessione. Resta anche nel Registro attivita, con nome e ora.</p>' +
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:4px 0 6px">Sono già salvate: il programma registra ogni campo appena lo cambi. Questo elenco serve solo a ricordare che cosa hai toccato in questa sessione. Resta anche nel Registro attività, con nome e ora.</p>' +
     '<ul style="margin:0 0 8px 18px;font-size:var(--fs-md,.875rem)">' +
     lista
       .map(
@@ -853,7 +853,7 @@ function _pianoValidaTurno(campo, valore, t) {
     if (!/^[A-Z0-9]{1,6}$/i.test(v))
       return 'La sigla deve avere da 1 a 6 lettere o cifre, senza spazi (es. C0, Z8, L1)';
     if (pianoCodiciCache.some((c) => String(c.codice).toUpperCase() === v.toUpperCase()))
-      return 'La sigla ' + v.toUpperCase() + ' e gia un codice speciale (V, M, C, CGF...): scegline un altra';
+      return 'La sigla ' + v.toUpperCase() + ' e già un codice speciale (V, M, C, CGF...): scegline un altra';
     if (
       pianoTurniCache.some(
         (x) =>
@@ -862,7 +862,7 @@ function _pianoValidaTurno(campo, valore, t) {
           (x.reparto_dip || 'slots') === _pianoReparto(),
       )
     )
-      return 'La sigla ' + v.toUpperCase() + ' esiste gia in questo settore';
+      return 'La sigla ' + v.toUpperCase() + ' esiste già in questo settore';
   }
   if (campo === 'gruppo' && !/^[A-Z0-9_ ]{1,20}$/i.test(v))
     return 'Il gruppo deve essere una parola (es. SALA, CASSA, BO)';
@@ -908,7 +908,7 @@ async function salvaPianoTurno(id, campo, valore) {
           : campo === 'tipo'
             ? 'Cambiare ' + tV.codice + ' in ' + String(valore || '').toLowerCase() + '?'
             : 'Disattivare il turno ' + tV.codice + '?') +
-          '\n\nQueste impostazioni ne dipendono e potrebbero non valere piu come prima:\n\u2022 ' +
+          '\n\nQueste impostazioni ne dipendono e potrebbero non valere più come prima:\n\u2022 ' +
           dip.join('\n\u2022 ') +
           '\n\nConfermi?',
         { titolo: 'Turno ' + tV.codice },
@@ -1009,8 +1009,8 @@ async function _pianoDipendenzeTurno(t, campo, valore) {
     if (pref.length)
       out.push(
         (nuovoT === 'NOTTURNO'
-          ? 'fanno solo turni diurni e non lo potranno piu fare: '
-          : 'fanno solo notturni e non lo potranno piu fare: ') + nomiDi(pref.map((c) => c.nome)),
+          ? 'fanno solo turni diurni e non lo potranno più fare: '
+          : 'fanno solo notturni e non lo potranno più fare: ') + nomiDi(pref.map((c) => c.nome)),
       );
     const vieta = pianoRegoleGruppoCache.filter(
       (r) =>
@@ -1034,7 +1034,7 @@ async function _pianoDipendenzeTurno(t, campo, valore) {
       out.push(
         'l area ' +
           nuovo +
-          ' e nuova: nessuno vi e abilitato finche non la colleghi a una competenza di Formazione o a "Turni riservati"',
+          ' e nuova: nessuno vi e abilitato finché non la colleghi a una competenza di Formazione o a "Turni riservati"',
       );
     // chi perde o guadagna davvero il turno (stesso controllo della bozza, senza giorno)
     try {
@@ -1055,7 +1055,7 @@ async function _pianoDipendenzeTurno(t, campo, valore) {
       if (prima && !dopo) perdono.push(c.nome);
       if (!prima && dopo) guadagnano.push(c.nome);
     });
-    if (perdono.length) out.push('non potranno piu fare ' + cod + ' (per la bozza): ' + nomiDi(perdono));
+    if (perdono.length) out.push('non potranno più fare ' + cod + ' (per la bozza): ' + nomiDi(perdono));
     if (guadagnano.length) out.push('potranno fare ' + cod + ' (per la bozza): ' + nomiDi(guadagnano));
     const regNuovo = pianoRegoleGruppoCache.filter(
       (r) => r.attivo !== false && (r.reparto_dip || 'slots') === rep && String(r.gruppo || '').toUpperCase() === nuovo,
@@ -1211,7 +1211,7 @@ function _renderPianoCodiciCard() {
   h +=
     '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:6px">Assenze e situazioni non lavorative. "Riposo" = il codice conta come giorno di riposo per le regole. Le ore seguono le formule CCL originali.</p>';
   h +=
-    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:640px;font-size:var(--fs-md,.875rem)"><thead><tr><th>Codice</th><th style="text-align:left">Descrizione</th><th title="Durata in ore decimali e, accanto, in ore e minuti: 8.33 = 8h20, perche 20 minuti sono un terzo di ora">Ore</th><th title="Le ore vengono scalate per la percentuale d\'impiego">Scala %</th><th title="Inserendolo nel piano chiede orario di inizio e fine (es. JG)">Chiede orario</th><th>Riposo</th><th>Attivo</th><th></th></tr></thead><tbody>';
+    '<div style="overflow-x:auto"><table class="piano-table" style="min-width:640px;font-size:var(--fs-md,.875rem)"><thead><tr><th>Codice</th><th style="text-align:left">Descrizione</th><th title="Durata in ore decimali e, accanto, in ore e minuti: 8.33 = 8h20, perché 20 minuti sono un terzo di ora">Ore</th><th title="Le ore vengono scalate per la percentuale d\'impiego">Scala %</th><th title="Inserendolo nel piano chiede orario di inizio e fine (es. JG)">Chiede orario</th><th>Riposo</th><th>Attivo</th><th></th></tr></thead><tbody>';
   pianoCodiciCache
     .slice()
     .sort((x, y) => x.codice.localeCompare(y.codice))
@@ -1318,10 +1318,10 @@ function _pianoValidaCodice(campo, valore, c) {
   if (campo === 'codice') {
     if (!/^[A-Z0-9]{1,8}$/i.test(v)) return 'Il codice deve avere da 1 a 8 lettere o cifre, senza spazi';
     if (pianoCodiciCache.some((x) => x !== c && String(x.codice).toUpperCase() === v.toUpperCase()))
-      return 'Il codice ' + v.toUpperCase() + ' esiste gia';
+      return 'Il codice ' + v.toUpperCase() + ' esiste già';
     const turnoUguale = pianoTurniCache.find((x) => String(x.codice).toUpperCase() === v.toUpperCase());
     if (turnoUguale)
-      return 'La sigla ' + v.toUpperCase() + ' e gia un turno di ' + repartoLabel(turnoUguale.reparto_dip || 'slots');
+      return 'La sigla ' + v.toUpperCase() + ' e già un turno di ' + repartoLabel(turnoUguale.reparto_dip || 'slots');
   }
   if (campo === 'ore') {
     const n = parseFloat(v.replace(',', '.'));
@@ -1372,7 +1372,7 @@ async function pianoRiportoCgf() {
     escP(repartoLabel(_pianoReparto())) +
     '</h3><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Recuperi festivi maturati fino al 31.12.' +
     (anno - 1) +
-    " e non ancora goduti (negativo = presi in anticipo). Con un riporto registrato il programma non conta piu' i festivi e i CGF dell'anno prima. Vuoto = nessun riporto.</p>" +
+    " e non ancora goduti (negativo = presi in anticipo). Con un riporto registrato il programma non conta più i festivi e i CGF dell'anno prima. Vuoto = nessun riporto.</p>" +
     '<div style="max-height:52vh;overflow:auto"><table class="piano-table" style="min-width:100%;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Riporto</th></tr></thead><tbody>';
   nomi.forEach((n) => {
     const r = _pianoCgfRiporto[n + '|' + anno];
@@ -1474,7 +1474,7 @@ async function pianoElencoCgfDaDare() {
     escP(_pianoMeseSel.split('-')[0]) +
     '</h3><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Conteggio fino alla fine di ' +
     escP(_pianoMeseSel) +
-    " (i mesi futuri non contano). Riporto dall'anno prima + festivi con diritto lavorati (non in malattia) - recuperi goduti. Senza riporto registrato si conta anche l'anno precedente. Un CGF caduto in malattia non e' goduto: resta a credito. Solo personale fisso" +
+    " (i mesi futuri non contano). Riporto dall'anno prima + festivi con diritto lavorati (non in malattia) - recuperi goduti. Senza riporto registrato si conta anche l'anno precedente. Un CGF caduto in malattia non è goduto: resta a credito. Solo personale fisso" +
     (_pianoCgfSoloParificati() ? ', solo festivi parificati alla domenica (regola cgf_solo_parificati)' : '') +
     '.</p>';
   if (!righe.length) h += '<p style="font-size:var(--fs-md,.875rem)">Nessun festivo lavorato quest\'anno.</p>';
@@ -1496,7 +1496,7 @@ async function pianoElencoCgfDaDare() {
         '</td><td style="font-weight:700;color:' +
         (r.resta > 0 ? '#c0392b' : r.resta < 0 ? '#8b6914' : '#2c6e49') +
         '">' +
-        (r.resta > 0 ? r.resta : r.resta < 0 ? r.resta + " (in piu')" : '0') +
+        (r.resta > 0 ? r.resta : r.resta < 0 ? r.resta + ' (in più)' : '0') +
         '</td></tr>';
     });
     h += '</tbody></table></div>';
@@ -1574,12 +1574,12 @@ async function pianoAssegnaCgfMese() {
           (daTogliere.length === 1 ? 'o' : 'i') +
           ' non spetta' +
           (daTogliere.length === 1 ? '' : 'no') +
-          " piu' (festivo non lavorato, per esempio per malattia):\n\n" +
+          ' più (festivo non lavorato, per esempio per malattia):\n\n' +
           daTogliere.map((r) => '• ' + r.collaboratore.split(' ')[0] + ' ' + r.data).join('\n') +
           '\n\nLi trasformo in congedo C?',
       )
     ) {
-      _pianoUndoSnap('CGF in piu tolti ' + ym);
+      _pianoUndoSnap('CGF in più tolti ' + ym);
       for (const r of daTogliere) {
         await secPatch('piano', 'id=eq.' + r.id, {
           codice: 'C',
@@ -1589,7 +1589,7 @@ async function pianoAssegnaCgfMese() {
         });
         r.codice = 'C';
       }
-      logAzione('Piano: CGF in piu tolti', ym + ' · ' + daTogliere.length);
+      logAzione('Piano: CGF in più tolti', ym + ' · ' + daTogliere.length);
     }
   }
   if (!daFare.length) {
@@ -1600,7 +1600,7 @@ async function pianoAssegnaCgfMese() {
     await mostraAvviso(
       'Nessun recupero da assegnare in ' +
         ym +
-        ".\n\nO i saldi sono gia' a posto, oppure non ci sono giorni liberi dove metterli (giorni vuoti o C messi dalla bozza; le celle scritte a mano non vengono toccate).",
+        '.\n\nO i saldi sono già a posto, oppure non ci sono giorni liberi dove metterli (giorni vuoti o C messi dalla bozza; le celle scritte a mano non vengono toccate).',
     );
     return;
   }
@@ -1619,7 +1619,7 @@ async function pianoAssegnaCgfMese() {
         ':\n\n' +
         elenco +
         (daFare.length > 25 ? '\n... e altri ' + (daFare.length - 25) : '') +
-        "\n\nIl conteggio tiene conto del riporto e dei recuperi gia' dati nei mesi precedenti; valgono le regole cgf_max_mese, cgf_distanza_giorni e cgf_non_con_vacanze. Le celle scritte a mano non vengono toccate.",
+        '\n\nIl conteggio tiene conto del riporto e dei recuperi già dati nei mesi precedenti; valgono le regole cgf_max_mese, cgf_distanza_giorni e cgf_non_con_vacanze. Le celle scritte a mano non vengono toccate.',
     ))
   )
     return;
@@ -1761,7 +1761,7 @@ async function aggiungiPianoFestivo() {
     return;
   }
   if (pianoFestiviCache.some((f) => String(f.data).substring(0, 10) === data)) {
-    toastErrore('Il ' + data.split('-').reverse().join('.') + ' e gia in elenco');
+    toastErrore('Il ' + data.split('-').reverse().join('.') + ' e già in elenco');
     return;
   }
   try {
@@ -1990,7 +1990,7 @@ function _pianoRecuperoAggiornaRiga(nome) {
   if (!tr) return;
   tr.querySelectorAll('input[data-data]').forEach((inp) => {
     const v = parseFloat(inp.value);
-    inp.className = 'rec-cella' + (v > 0 ? ' rec-piu' : v < 0 ? ' rec-meno' : '');
+    inp.className = 'rec-cella' + (v > 0 ? ' rec-più' : v < 0 ? ' rec-meno' : '');
   });
   const tot = _pianoRecuperoTotale(nome, _pianoMeseSel);
   const cel = tr.querySelector('.rec-totale');
@@ -2003,7 +2003,7 @@ function _pianoRecuperoAggiornaRiga(nome) {
         _pianoOreHm(Math.abs(tot)) +
         '</div>'
       : '';
-    cel.className = 'rec-totale' + (tot > 0 ? ' rec-piu' : tot < 0 ? ' rec-meno' : '');
+    cel.className = 'rec-totale' + (tot > 0 ? ' rec-più' : tot < 0 ? ' rec-meno' : '');
   }
   _pianoRecuperoTotaliGenerali();
 }
@@ -2019,9 +2019,9 @@ function _pianoRecuperoTotaliGenerali() {
   });
   const netto = Math.round((piu + meno) * 100) / 100;
   box.innerHTML =
-    '<span class="rec-piu">+' +
+    '<span class="rec-più">+' +
     _pianoOreHm(piu) +
-    '</span> in piu &middot; <span class="rec-meno">-' +
+    '</span> in più &middot; <span class="rec-meno">-' +
     _pianoOreHm(Math.abs(meno)) +
     '</span> in meno &middot; saldo del settore <b>' +
     (netto > 0 ? '+' : netto < 0 ? '-' : '') +
@@ -2395,7 +2395,7 @@ async function _renderPianoRecuperoTab() {
     '</span>' +
     '<span id="piano-recupero-riepilogo" style="margin-left:auto;font-size:var(--fs-md,.875rem);font-weight:400"></span></div><div style="padding:10px 14px">';
   h +=
-    '<p style="font-size:var(--fs-md,.875rem);color:var(--muted);line-height:1.55;margin-bottom:10px">Si aggiorna <b>ogni giorno</b>: nella casella del giorno si scrive quanto il collaboratore ha lavorato in piu o in meno rispetto al turno previsto. <b>-1</b> significa un ora in meno (rosso), <b>+3</b> tre ore in piu (verde). Casella vuota = ha fatto esattamente il suo turno. Il totale del mese entra nel <b>saldo ore</b>, quindi il conteggio resta aggiornato senza aspettare la fine del mese.</p>';
+    '<p style="font-size:var(--fs-md,.875rem);color:var(--muted);line-height:1.55;margin-bottom:10px">Si aggiorna <b>ogni giorno</b>: nella casella del giorno si scrive quanto il collaboratore ha lavorato in più o in meno rispetto al turno previsto. <b>-1</b> significa un ora in meno (rosso), <b>+3</b> tre ore in più (verde). Casella vuota = ha fatto esattamente il suo turno. Il totale del mese entra nel <b>saldo ore</b>, quindi il conteggio resta aggiornato senza aspettare la fine del mese.</p>';
   if (!nomi.length) {
     h += '<p style="color:var(--muted);padding:10px 0">Nessun collaboratore in questo settore.</p></div></div>';
     return h;
@@ -2478,7 +2478,7 @@ async function _renderPianoRecuperoTab() {
         '<td data-gg="' +
         dstr.substring(8) +
         '" style="padding:1px"><input class="rec-cella' +
-        (v > 0 ? ' rec-piu' : v < 0 ? ' rec-meno' : '') +
+        (v > 0 ? ' rec-più' : v < 0 ? ' rec-meno' : '') +
         '" data-nome="' +
         escP(nome).replace(/"/g, '&quot;') +
         '" data-data="' +
@@ -2497,7 +2497,7 @@ async function _renderPianoRecuperoTab() {
     const tot = _pianoRecuperoTotale(nome, ym);
     h +=
       '<td class="rec-totale' +
-      (tot > 0 ? ' rec-piu' : tot < 0 ? ' rec-meno' : '') +
+      (tot > 0 ? ' rec-più' : tot < 0 ? ' rec-meno' : '') +
       '">' +
       (tot
         ? (tot > 0 ? '+' : '') +
@@ -2585,7 +2585,7 @@ const PIANO_FESTIVITA_ELENCHI = {
     ['2026-01-06', 'Epifania del Signore'],
     ['2026-03-08', 'Festa internazionale della donna'],
     ['2026-04-05', 'Pasqua'],
-    ['2026-04-06', "Lunedi dell'Angelo"],
+    ['2026-04-06', "Lunedì dell'Angelo"],
     ['2026-04-25', 'Festa della Liberazione'],
     ['2026-05-01', 'Festa del Lavoro'],
     ['2026-06-02', 'Festa della Repubblica Italiana'],
@@ -2602,7 +2602,7 @@ const PIANO_FESTIVITA_ELENCHI = {
     ['2027-01-01', 'Capodanno'],
     ['2027-01-06', 'Epifania'],
     ['2027-03-28', 'Pasqua'],
-    ['2027-03-29', "Lunedi dell'Angelo"],
+    ['2027-03-29', "Lunedì dell'Angelo"],
     ['2027-04-25', 'Festa della Liberazione'],
     ['2027-05-01', 'Festa dei Lavoratori'],
     ['2027-06-02', 'Festa della Repubblica'],
@@ -2627,18 +2627,18 @@ async function pianoImportaFestivita(anno) {
   const gia = new Set((pianoFestivitaCache || []).map((f) => String(f.data).substring(0, 10) + '|' + f.nome));
   const nuovi = _pianoFestivitaProposte(anno).filter((f) => !gia.has(f.data + '|' + f.nome));
   if (!nuovi.length) {
-    toast('Le festivita del ' + anno + ' sono gia inserite');
+    toast('Le festività del ' + anno + ' sono già inserite');
     return;
   }
   if (
     !(await chiediConferma(
       'Inserisco ' +
         nuovi.length +
-        ' festivita per il ' +
+        ' festività per il ' +
         anno +
         ':\n\n' +
         nuovi.map((f) => '\u2022 ' + f.data.split('-').reverse().join('.') + '  ' + f.nome).join('\n') +
-        '\n\nQuelle gia presenti non vengono toccate.',
+        '\n\nQuelle già presenti non vengono toccate.',
     ))
   )
     return;
@@ -2659,8 +2659,8 @@ async function pianoImportaFestivita(anno) {
   }
   _pianoFestivitaScarta(anno);
   await _pianoCaricaFestivita(anno);
-  logAzione('Festivita importate', anno + ': ' + n + ' giorni');
-  toast(n + ' festivita inserite per il ' + anno);
+  logAzione('Festività importate', anno + ': ' + n + ' giorni');
+  toast(n + ' festività inserite per il ' + anno);
   renderPiano();
 }
 async function pianoFestivitaToggle(id) {
@@ -2670,7 +2670,7 @@ async function pianoFestivitaToggle(id) {
   const nuovo = f.attivo === false;
   await secPatch('piano_festivita', 'id=eq.' + id, { attivo: nuovo });
   f.attivo = nuovo;
-  logAzione('Festivita ' + (nuovo ? 'riattivata' : 'disattivata'), f.nome + ' ' + f.data);
+  logAzione('Festività ' + (nuovo ? 'riattivata' : 'disattivata'), f.nome + ' ' + f.data);
   renderPiano();
 }
 async function pianoFestivitaElimina(id) {
@@ -2681,7 +2681,7 @@ async function pianoFestivitaElimina(id) {
     return;
   await secDel('piano_festivita', 'id=eq.' + id);
   pianoFestivitaCache = pianoFestivitaCache.filter((x) => x.id !== id);
-  logAzione('Festivita eliminata', f.nome + ' ' + f.data);
+  logAzione('Festività eliminata', f.nome + ' ' + f.data);
   renderPiano();
 }
 async function pianoFestivitaAggiungi() {
@@ -2708,11 +2708,11 @@ async function pianoFestivitaAggiungi() {
     });
     _pianoFestivitaScarta(parseInt(data.split('-')[0]));
     await _pianoCaricaFestivita(parseInt(data.split('-')[0]));
-    logAzione('Festivita aggiunta', nome + ' ' + data);
+    logAzione('Festività aggiunta', nome + ' ' + data);
     toast('Aggiunta: ' + nome);
     renderPiano();
   } catch (e) {
-    toast('Gia presente o errore');
+    toast('Già presente o errore');
   }
 }
 function _renderPianoFestivitaCard() {
@@ -2724,7 +2724,7 @@ function _renderPianoFestivitaCard() {
     .filter((f) => parseInt(String(f.data).substring(0, 4)) === anno)
     .sort((a, b) => String(a.data).localeCompare(String(b.data)));
   let h =
-    '<div class="main-card" style="margin-top:16px"><div class="card-header">Festivita e orari di chiusura ' +
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Festività e orari di chiusura ' +
     anno +
     '</div><div style="padding:12px 16px">';
   h +=
@@ -2736,29 +2736,29 @@ function _renderPianoFestivitaCard() {
     cfg.giorniTardi.map((g) => GG[g]).join(' e il ') +
     '. <b>La notte prima di un giorno di festa</b> si chiude alle <b>' +
     cfg.oraTardi +
-    ':00</b> anche in mezzo alla settimana, perche e quella la sera in cui la gente esce; il <b>31 dicembre</b> si chiude alle <b>' +
+    ':00</b> anche in mezzo alla settimana, perché e quella la sera in cui la gente esce; il <b>31 dicembre</b> si chiude alle <b>' +
     cfg.oraFineAnno +
     ':00</b>. Quei giorni compaiono nel calendario con il marcatore <b>CH' +
     cfg.oraTardi +
-    '</b> in cima alla colonna, cosi si sa dove serve piu personale. Gli orari si cambiano nella scheda Regole.</p>';
+    '</b> in cima alla colonna, così si sa dove serve più personale. Gli orari si cambiano nella scheda Regole.</p>';
   h +=
     '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">' +
     '<button class="btn-export" onclick="pianoImportaFestivita(' +
     anno +
-    ')">Inserisci le festivita del ' +
+    ')">Inserisci le festività del ' +
     anno +
     '</button>' +
     '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
     (PIANO_FESTIVITA_ELENCHI[anno]
       ? 'elenco fornito dalla direzione'
-      : 'calcolate: dodici festivita italiane di legge, Pasqua compresa') +
+      : 'calcolate: dodici festività italiane di legge, Pasqua compresa') +
     '</span></div>';
   if (!righe.length) {
-    h += '<p style="padding:8px 0;color:var(--muted)">Nessuna festivita registrata per il ' + anno + '.</p>';
+    h += '<p style="padding:8px 0;color:var(--muted)">Nessuna festività registrata per il ' + anno + '.</p>';
   } else {
     h +=
       '<div style="overflow-x:auto"><table class="piano-table" style="min-width:560px"><thead><tr>' +
-      '<th style="text-align:left">Data</th><th>Giorno</th><th style="text-align:left">Festivita</th><th title="Il giorno prima della festa: e quella la notte in cui si chiude piu tardi">Si chiude tardi il</th><th title="Cosa compare in cima alla colonna del calendario, quel giorno">Nel piano</th><th></th></tr></thead><tbody>';
+      '<th style="text-align:left">Data</th><th>Giorno</th><th style="text-align:left">Festività</th><th title="Il giorno prima della festa: e quella la notte in cui si chiude più tardi">Si chiude tardi il</th><th title="Cosa compare in cima alla colonna del calendario, quel giorno">Nel piano</th><th></th></tr></thead><tbody>';
     righe.forEach((f) => {
       const d = String(f.data).substring(0, 10);
       // il marcatore si mette la VIGILIA, cioe' il giorno prima della festa
@@ -2803,7 +2803,7 @@ function _renderPianoFestivitaCard() {
           ? '<span style="color:var(--muted)">spenta</span>'
           : ch.marcatore
             ? '<b style="background:#8b4a8b;color:#fff;padding:2px 8px;border-radius:2px">' + ch.marcatore + '</b>'
-            : '<span style="color:var(--muted)" title="quella notte si chiude gia tardi per prassi: non serve segnalarlo">-</span>') +
+            : '<span style="color:var(--muted)" title="quella notte si chiude già tardi per prassi: non serve segnalarlo">-</span>') +
         '</td><td style="white-space:nowrap"><button class="btn-act" style="font-size:var(--fs-sm,.8125rem)" onclick="pianoFestivitaToggle(' +
         f.id +
         ')">' +
@@ -2815,9 +2815,9 @@ function _renderPianoFestivitaCard() {
     h += '</tbody></table></div>';
   }
   h +=
-    '<div class="add-tipo-row" style="margin-top:12px"><div class="field"><label>Data</label><input type="date" id="festivita-data"></div>' +
-    '<div class="field"><label>Festivita</label><input type="text" id="festivita-nome" placeholder="Es. Santo patrono"></div>' +
-    '<div class="field"><label>Chiusura (facoltativa)</label><input type="number" id="festivita-ora" step="0.5" min="0" max="12" placeholder="' +
+    '<div class="add-tipo-row" style="margin-top:12px"><div class="field"><label>Data</label><input type="date" id="festività-data"></div>' +
+    '<div class="field"><label>Festività</label><input type="text" id="festività-nome" placeholder="Es. Santo patrono"></div>' +
+    '<div class="field"><label>Chiusura (facoltativa)</label><input type="number" id="festività-ora" step="0.5" min="0" max="12" placeholder="' +
     cfg.oraTardi +
     '"></div>' +
     '<button class="btn-add-tipo" onclick="pianoFestivitaAggiungi()">+ Aggiungi</button></div>';
@@ -3176,12 +3176,12 @@ async function _pianoRiconciliaCgf(nome, ym, opz) {
       (opz.manuali || aMano) &&
       !(await chiediConferma(
         nome +
-          ' non lavora piu un festivo del mese: ' +
+          ' non lavora più un festivo del mese: ' +
           (candidati.length === 1 ? 'il recupero CGF del ' : 'i recuperi CGF del ') +
           candidati.map((r) => String(r.data).substring(8, 10) + '.' + String(r.data).substring(5, 7)).join(', ') +
-          (candidati.length === 1 ? ' non spetta piu.' : ' non spettano piu.') +
-          '\n\nLo trasformo in congedo C? (se no resta CGF e nell elenco dei recuperi risulta "in piu")',
-        { titolo: 'Recupero festivo non piu dovuto', ok: 'Si, diventa C', annulla: 'No, lascia CGF' },
+          (candidati.length === 1 ? ' non spetta più.' : ' non spettano più.') +
+          '\n\nLo trasformo in congedo C? (se no resta CGF e nell elenco dei recuperi risulta "in più")',
+        { titolo: 'Recupero festivo non più dovuto', ok: 'Si, diventa C', annulla: 'No, lascia CGF' },
       ))
     )
       return 0;
@@ -3433,7 +3433,7 @@ const PIANO_FESTIVI_PARIFICATI = [
   'capodanno',
   'epifania',
   'lunedì di pasqua',
-  'lunedi di pasqua',
+  'lunedì di pasqua',
   'ascensione',
   'festa nazionale', // 1° agosto
   '1 agosto',

@@ -168,7 +168,7 @@ async function salvaModificaNota(id) {
   // FIX EDGE CASE #2: optimistic lock
   const snap = window._editNoteSnapshot;
   if (snap && snap.id === id && snap.originalMsg !== n.messaggio) {
-    toast("La nota e' stata modificata altrove. Riapri il messaggio per vedere la versione aggiornata.");
+    toast('La nota è stata modificata altrove. Riapri il messaggio per vedere la versione aggiornata.');
     document.getElementById('pwd-modal').classList.add('hidden');
     window._editNoteSnapshot = null;
     return;
@@ -512,7 +512,7 @@ function _adminGruppo(gid) {
 function _sonoAdminGruppo(gid) {
   const adm = String(gid || '').startsWith('__gruppo_custom_') ? _adminGruppo(gid) : '';
   if (adm && adm === getOperatore()) return true;
-  toast('Solo chi ha creato il gruppo puo modificarlo');
+  toast('Solo chi ha creato il gruppo può modificarlo');
   return false;
 }
 async function _rinominaGruppo(gid, partner) {
@@ -2695,7 +2695,7 @@ function apriSchedaCollaboratore(nome) {
       html +=
         '<div class="scheda-sick-flag" style="background:rgba(192,57,43,0.1);color:var(--accent)"><i class="icx icx-avviso"></i> ' +
         lunVenPct +
-        '% delle malattie cade di Lunedi o Venerdi (' +
+        '% delle malattie cade di Lunedì o Venerdì (' +
         lunVen +
         '/' +
         totMal +
@@ -3258,7 +3258,7 @@ function _renderStoricoHrSezione(nome) {
     // pulsante la apre. Dal giorno dopo non e piu operativo nel Piano; il resto resta.
     var dataFine = (c && c.data_fine_rapporto ? String(c.data_fine_rapporto).substring(0, 10) : '') || '';
     var spiegaFine =
-      'Ultimo giorno di lavoro: dal giorno dopo non e piu nel calendario, nella bozza, nelle coperture e nei cambi e non ha ore dovute. Diario, scheda, storico, vacanze e CGF restano.';
+      'Ultimo giorno di lavoro: dal giorno dopo non e più nel calendario, nella bozza, nelle coperture e nei cambi e non ha ore dovute. Diario, scheda, storico, vacanze e CGF restano.';
     html +=
       '<div id="hr-fine-riga" style="display:' +
       (dataFine ? 'flex' : 'none') +
@@ -3455,13 +3455,13 @@ async function _salvaFineContratto(nome, val, togli) {
       nome +
       ': ultimo giorno ' +
       val.split('-').reverse().join('.') +
-      '.\n\nDal giorno dopo non e piu nel calendario, nella bozza, nelle coperture e nei cambi e non ha ore dovute. Diario, scheda, storico, vacanze e CGF restano.' +
+      '.\n\nDal giorno dopo non e più nel calendario, nella bozza, nelle coperture e nei cambi e non ha ore dovute. Diario, scheda, storico, vacanze e CGF restano.' +
       (dopo.length
         ? '\n\nATTENZIONE: ha ancora ' +
           dopo.length +
           ' turni nel piano dopo quella data (dal ' +
           String(dopo[0].data).substring(0, 10).split('-').reverse().join('.') +
-          '): restano scritti finche non li sposti o li cancelli; nel calendario sono a righe grigie.'
+          '): restano scritti finché non li sposti o li cancelli; nel calendario sono a righe grigie.'
         : '');
   if (!(await chiediConferma(msg, { titolo: togli ? 'Torna operativo' : 'Fine contratto' }))) return false;
   try {

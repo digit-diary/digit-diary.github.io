@@ -518,12 +518,12 @@
       eqW = clamp(1 - Math.max(0, scarto) / 0.5); // +50% sulla media = 0 punti
     }
     voci.push({
-      nome: 'Equita nei weekend',
+      nome: 'Equità nei weekend',
       punti: Math.round(eqW * 20),
       max: 20,
       valore:
         (dati.weekendLavorati || 0) + ' weekend (media settore ' + Math.round(dati.weekendMediaSettore || 0) + ')',
-      nota: eqW >= 0.8 ? 'in linea col settore' : 'piu carico della media',
+      nota: eqW >= 0.8 ? 'in linea col settore' : 'più carico della media',
     });
     // 3) CARICO NOTTURNO (15): quota di notti sui giorni lavorati
     const quotaN = dati.giorniLavorati > 0 ? (dati.notti || 0) / dati.giorniLavorati : 0;
@@ -539,7 +539,7 @@
     // 4) QUALITA' DEL RIPOSO (15): i riposi isolati recuperano poco
     const isolati = clamp(1 - (dati.riposiIsolati || 0) / 8);
     voci.push({
-      nome: 'Qualita del riposo',
+      nome: 'Qualità del riposo',
       punti: Math.round(isolati * 15),
       max: 15,
       valore: (dati.riposiIsolati || 0) + ' riposi di un solo giorno',
@@ -551,7 +551,7 @@
       nome: 'Giorni consecutivi',
       punti: Math.round(serie * 15),
       max: 15,
-      valore: 'serie piu lunga: ' + (dati.serieMax || 0) + ' giorni (limite ' + maxCons + ')',
+      valore: 'serie più lunga: ' + (dati.serieMax || 0) + ' giorni (limite ' + maxCons + ')',
       nota: (dati.serieMax || 0) <= maxCons ? 'entro il limite' : 'oltre il limite',
     });
     // 6) VACANZE GODUTE (10): staccare davvero
@@ -723,7 +723,7 @@
       { data: anno + '-01-01', nome: 'Capodanno' },
       { data: anno + '-01-06', nome: 'Epifania' },
       { data: p, nome: 'Pasqua' },
-      { data: _piu(p, 1), nome: "Lunedi dell'Angelo" },
+      { data: _piu(p, 1), nome: "Lunedì dell'Angelo" },
       { data: anno + '-04-25', nome: 'Festa della Liberazione' },
       { data: anno + '-05-01', nome: 'Festa del Lavoro' },
       { data: anno + '-06-02', nome: 'Festa della Repubblica' },

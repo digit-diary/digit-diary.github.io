@@ -21,7 +21,7 @@ const VIS_ITEMS = {
     promemoria: 'Promemoria',
     maison: 'Costi Maison',
     inventario: 'Inventario',
-    registro: 'Registro attivita',
+    registro: 'Registro attività',
   },
   funzioni: {
     ricerca_globale: 'Ricerca globale',
@@ -62,12 +62,12 @@ const VIS_ITEMS = {
     sblocco_piano_chiuso:
       'Giorni chiusi · sbloccare un giorno passato del piano per correggerlo (con motivo obbligatorio, tracciato nel registro)',
     vista_malattie_pct:
-      'Pattern malattie · percentuali per giorno della settimana, avviso Lunedi/Venerdi e confronto con la media del team nella scheda collaboratore (analisi riservata, richiesta HR)',
+      'Pattern malattie · percentuali per giorno della settimana, avviso Lunedì/Venerdì e confronto con la media del team nella scheda collaboratore (analisi riservata, richiesta HR)',
     gestione_corsi: 'Corsi · pianificare corsi nel piano: data, orario e partecipanti (es. supervisor)',
     gestione_briefing:
       'Briefing · compilare e modificare il foglio del giorno e le pause (senza toccare la griglia turni)',
     storico_hr:
-      'Storico HR · VEDERE: contratto, anzianita, giubilei, congedi, allegati, costo errori, malattie e percorso disciplinare nella scheda (sezione riservata)',
+      'Storico HR · VEDERE: contratto, anzianità, giubilei, congedi, allegati, costo errori, malattie e percorso disciplinare nella scheda (sezione riservata)',
     storico_hr_modifica:
       'Storico HR · MODIFICARE: inizio e fine contratto, data di nascita, giubilei, congedi non pagati (es. HR)',
     vista_valutazioni: 'Valutazioni · VEDERE le valutazioni annuali (chi le gestisce le vede comunque)',
@@ -112,7 +112,7 @@ const VIS_ITEMS = {
     ptabmod_timbrature: 'Piano · Timbrature (inserimento)',
     ptabmod_turni: 'Piano · Turni (durate e orari)',
     ptabmod_regole: 'Piano · Regole (valori)',
-    ptabmod_festivi: 'Piano · Festivi (calendario e festivita)',
+    ptabmod_festivi: 'Piano · Festivi (calendario e festività)',
     ptabmod_impostazioni: 'Piano · Impostazioni (preferenze e mappature)',
   },
 };
@@ -515,7 +515,7 @@ async function applicaProfili() {
   const ok = await chiediConferma(
     'Applicare i profili?\n\n' +
       elenco +
-      '\n\nVengono riscritte tutte le righe di Visibilita e permessi per questi ' +
+      '\n\nVengono riscritte tutte le righe di Visibilità e permessi per questi ' +
       conProfilo.length +
       ' operatori.' +
       (senzaProfilo.length ? ' Gli altri ' + senzaProfilo.length + ' restano come sono adesso.' : ''),
@@ -529,7 +529,7 @@ async function applicaProfili() {
 function renderProfiliUI(opList) {
   let html = '<div class="vis-gruppo">Profili</div>';
   html +=
-    '<p class="sez-desc" style="margin-bottom:10px">Assegna a ogni operatore la sua figura, poi premi "Applica i profili": tutte le righe qui sotto vengono impostate da sole come nel documento firmato. Chi resta senza profilo non viene toccato. Dopo, si puo\' sempre correggere la singola riga a mano.</p>';
+    '<p class="sez-desc" style="margin-bottom:10px">Assegna a ogni operatore la sua figura, poi premi "Applica i profili": tutte le righe qui sotto vengono impostate da sole come nel documento firmato. Chi resta senza profilo non viene toccato. Dopo, si può sempre correggere la singola riga a mano.</p>';
   html += '<div style="margin-bottom:12px">';
   opList.forEach((nome) => {
     html +=
@@ -635,7 +635,7 @@ function _profCustomEditorHtml() {
       .map((o) => '<option value="op:' + escP(o) + '">Come ' + escP(o) + '</option>')
       .join('') +
     '</optgroup></select><button class="btn-secondario" onclick="profCustomPrecompila()">Riempi la tabella</button><span style="color:var(--muted)">Riempie le caselle qui sotto; poi cambi quello che vuoi e salvi.</span></div>' +
-    '<p class="sez-desc" style="margin-bottom:8px">Modifica = puo cambiare; Vede = solo lettura; No = non la vede. Le voci di modifica del Piano e i permessi non hanno la sola vista, tranne le viste riservate.</p>';
+    '<p class="sez-desc" style="margin-bottom:8px">Modifica = può cambiare; Vede = solo lettura; No = non la vede. Le voci di modifica del Piano e i permessi non hanno la sola vista, tranne le viste riservate.</p>';
   gruppi.forEach(([g, titolo]) => {
     const voci = VIS_ITEMS[g] || {};
     h +=
@@ -704,7 +704,7 @@ function profCustomCrea() {
     return;
   }
   if (_profiliTuttiIds().some((p) => _profiloNome(p).toLowerCase() === nome.toLowerCase())) {
-    toast('Esiste gia un profilo con questo nome');
+    toast('Esiste già un profilo con questo nome');
     return;
   }
   window._profCustomEdit = { id: '', nome: nome, voci: _profCustomVociDa(base) };
@@ -741,7 +741,7 @@ async function profCustomSalva() {
   }
   const doppio = _profiliTuttiIds().some((p) => p !== ed.id && _profiloNome(p).toLowerCase() === nome.toLowerCase());
   if (doppio) {
-    toast('Esiste gia un profilo con questo nome');
+    toast('Esiste già un profilo con questo nome');
     return;
   }
   const voci = {};
@@ -788,7 +788,7 @@ async function profCustomElimina(id) {
     (usato.length
       ? '\n\nE assegnato a: ' +
         usato.join(', ') +
-        '. Questi operatori restano senza profilo; i loro permessi attuali non cambiano finche non premi "Applica i profili".'
+        '. Questi operatori restano senza profilo; i loro permessi attuali non cambiano finché non premi "Applica i profili".'
       : '');
   if (!(await chiediConferma(msg))) return;
   const obj = Object.assign({}, _profiliCustom());
@@ -866,7 +866,7 @@ async function renderVisibilitaUI() {
   });
   html += '<div class="vis-gruppo">Piano &middot; schede modificabili</div>';
   html +=
-    '<p class="sez-desc" style="margin-bottom:10px">Restringe la MODIFICA di una scheda senza nasconderla: chi resta fuori la vede in sola lettura. Vale in aggiunta ai permessi qui sotto (chi non ha "Piano di lavoro" non modifica comunque). "Tutti" = nessuna restrizione in piu\'.</p>';
+    '<p class="sez-desc" style="margin-bottom:10px">Restringe la MODIFICA di una scheda senza nasconderla: chi resta fuori la vede in sola lettura. Vale in aggiunta ai permessi qui sotto (chi non ha "Piano di lavoro" non modifica comunque). "Tutti" = nessuna restrizione in più.</p>';
   Object.entries(VIS_ITEMS.piano_modifica).forEach(([k, label]) => {
     html += '<div class="vis-riga"><span class="vis-nome">' + label + '</span>';
     html += _visRadioHtml(k, visGet(k), opList);
@@ -1788,7 +1788,7 @@ function renderBuoniTipiUI() {
     (extra || '') +
     '>';
   let h =
-    '<div style="overflow:auto"><table class="piano-table" style="font-size:var(--fs-md,.875rem);min-width:640px"><thead><tr><th>Sigla</th><th style="text-align:left">Nome</th><th>Valore CHF</th><th>Attivo</th><th style="text-align:left" title="Settori in cui il buono compare nei menu (Maison, Inventario). Nessuna spunta = tutti">Settori</th><th style="text-align:left" title="Per i tipi aggiunti: parole che, scritte nel file Maison, indicano questo buono (separate da virgola). La sigla con la quantita (es. 2 XX) si riconosce sempre">Parole nel file importato</th></tr></thead><tbody>';
+    '<div style="overflow:auto"><table class="piano-table" style="font-size:var(--fs-md,.875rem);min-width:640px"><thead><tr><th>Sigla</th><th style="text-align:left">Nome</th><th>Valore CHF</th><th>Attivo</th><th style="text-align:left" title="Settori in cui il buono compare nei menu (Maison, Inventario). Nessuna spunta = tutti">Settori</th><th style="text-align:left" title="Per i tipi aggiunti: parole che, scritte nel file Maison, indicano questo buono (separate da virgola). La sigla con la quantità (es. 2 XX) si riconosce sempre">Parole nel file importato</th></tr></thead><tbody>';
   BUONI_TIPI.forEach((t) => {
     const base = BUONI_TIPI_BASE.some((b) => b.codice === t.codice);
     h +=
@@ -1827,7 +1827,7 @@ function renderBuoniTipiUI() {
   h +=
     '<div class="add-tipo-row sez-form" style="margin-top:12px"><div class="field"><label>Nuova sigla</label><input id="bt-nuovo-cod" maxlength="6" placeholder="es. BR" style="width:90px;text-transform:uppercase"></div><div class="field"><label>Nome</label><input id="bt-nuovo-nome" placeholder="es. Buono Brunch"></div><div class="field"><label>Valore CHF</label><input id="bt-nuovo-val" type="number" min="0" step="0.5" style="width:90px"></div><div class="field"><label>Parole nel file (facoltative)</label><input id="bt-nuovo-parole" placeholder="es. brunch"></div><button class="btn-add-tipo" onclick="aggiungiBuonoTipo()">+ Aggiungi</button></div>';
   h +=
-    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:6px 0 0">La sigla non si puo cambiare dopo l aggiunta: e scritta nelle registrazioni. Un tipo che non si usa piu si disattiva: sparisce dai menu ma resta leggibile nello storico, nelle statistiche e negli export. Con le spunte dei Settori un buono compare solo nei menu di quei settori (nessuna spunta = in tutti).</p>';
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:6px 0 0">La sigla non si può cambiare dopo l aggiunta: e scritta nelle registrazioni. Un tipo che non si usa più si disattiva: sparisce dai menu ma resta leggibile nello storico, nelle statistiche e negli export. Con le spunte dei Settori un buono compare solo nei menu di quei settori (nessuna spunta = in tutti).</p>';
   box.innerHTML = h;
 }
 // settori con la Maison (buoni): quelli dove l inventario ha la categoria Buoni
@@ -1897,7 +1897,7 @@ async function aggiungiBuonoTipo() {
     return;
   }
   if (BUONI_TIPI.some((t) => t.codice === cod)) {
-    toast('La sigla ' + cod + ' esiste gia');
+    toast('La sigla ' + cod + ' esiste già');
     return;
   }
   if (!nome) {
@@ -2051,12 +2051,12 @@ function renderConservazioneUI() {
   if (g) g.value = String(gg);
   if (st)
     st.textContent = anni
-      ? "Protezione ATTIVA: le voci piu' vecchie di " +
+      ? 'Protezione ATTIVA: le voci più vecchie di ' +
         gg +
         ' giorni e degli ultimi ' +
         anni +
         ' anni non si possono eliminare definitivamente.'
-      : "Protezione DISATTIVATA: tutto e' eliminabile definitivamente dal Cestino.";
+      : 'Protezione DISATTIVATA: tutto è eliminabile definitivamente dal Cestino.';
 }
 async function salvaConservazioneAnni(v) {
   if (!isAdmin()) return;
@@ -2581,7 +2581,7 @@ function stampaSchedaPermessi() {
     '<!DOCTYPE html><html lang="it"><head><meta charset="utf-8"><title>Scheda permessi</title><style>body{font-family:Georgia,serif;color:#1c1a17;margin:24px;font-size:13px}h1{font-size:var(--fs-xl,1.25rem);margin:0 0 4px}h2{font-size:var(--fs-lg,1.0625rem);margin:22px 0 6px;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid #000;padding-bottom:4px}table{border-collapse:collapse;width:100%;font-size:11.5px}th,td{border:1px solid #999;padding:3px 6px;text-align:center}th{background:#eee}td.l{text-align:left}tr.g td{background:#f3efe6;text-align:left;font-weight:700}.si{background:#e3f0e8;font-weight:700}.no{color:#999}p{margin:4px 0;color:#444}.nb{margin:12px 0}@media print{.nb{display:none}body{margin:10mm}table{font-size:10px}}</style></head><body>' +
     '<h1>Diario Collaboratori · scheda dei permessi attuali</h1><p>Stato delle Impostazioni al ' +
     oggi +
-    '. Si = puo (vedere la pagina o la scheda, oppure eseguire la funzione); vuoto = no. L amministratore puo tutto ed e escluso dalla tabella.</p><div class="nb"><button onclick="window.print()">Stampa / PDF</button></div>';
+    '. Si = può (vedere la pagina o la scheda, oppure eseguire la funzione); vuoto = no. L amministratore può tutto ed e escluso dalla tabella.</p><div class="nb"><button onclick="window.print()">Stampa / PDF</button></div>';
   h +=
     '<h2>Operatori, profilo e settori</h2><table><tr><th>Operatore</th><th>Profilo</th><th>Settori</th><th>Accessi extra</th></tr>';
   ops.forEach((o) => {
@@ -2601,7 +2601,7 @@ function stampaSchedaPermessi() {
       '</td></tr>';
   });
   h +=
-    '</table><h2>Cosa puo vedere e fare ognuno</h2><table><tr><th style="text-align:left">Voce</th><th>Impostazione</th>' +
+    '</table><h2>Cosa può vedere e fare ognuno</h2><table><tr><th style="text-align:left">Voce</th><th>Impostazione</th>' +
     ops.map((o) => '<th>' + escP(o) + '</th>').join('') +
     '</tr>';
   gruppi.forEach(([gt, voci]) => {

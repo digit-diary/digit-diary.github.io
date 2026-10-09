@@ -403,7 +403,7 @@ function _aiPreset(tipo, soloVista) {
   if (nota)
     nota.textContent =
       tipo === 'ollama'
-        ? 'Sul server interno: indirizzo /ai/v1 (inoltro IIS verso Ollama). Il modello deve essere gia scaricato (ollama pull). Dati e testi restano nel casino.'
+        ? 'Sul server interno: indirizzo /ai/v1 (inoltro IIS verso Ollama). Il modello deve essere già scaricato (ollama pull). Dati e testi restano nel casino.'
         : tipo === 'lmstudio'
           ? 'Avviare il server di LM Studio e scrivere il nome del modello caricato.'
           : tipo === 'groq'

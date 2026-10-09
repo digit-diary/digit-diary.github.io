@@ -124,7 +124,7 @@ async function aggiungiPianoMappatura() {
       (m) => m.funzione === fz && m.turno_codice === turno && (m.reparto_dip || 'slots') === _pianoReparto(),
     )
   ) {
-    toastErrore('Mappatura gia presente: ' + fz + ' → ' + turno);
+    toastErrore('Mappatura già presente: ' + fz + ' → ' + turno);
     return;
   }
   // il primo PRINCIPALE o AMMESSO limita tutta la funzione: lo si dice prima di salvare
@@ -155,7 +155,7 @@ async function aggiungiPianoMappatura() {
         repartoLabel(_pianoReparto()) +
         ' ha la funzione ' +
         fz +
-        ': la mappatura non avra effetto finche qualcuno non ha questa funzione.\n\nAggiungerla comunque?';
+        ': la mappatura non avra effetto finché qualcuno non ha questa funzione.\n\nAggiungerla comunque?';
     if (!(await chiediConferma(testo, { titolo: 'Turni per funzione' }))) return;
   }
   try {
@@ -204,7 +204,7 @@ async function rimuoviPianoMappatura(id) {
       toast(
         'Mappatura rimossa: chi ha la funzione ' +
           m.funzione +
-          ' non e piu limitato (segue settori, Formazione e Regole di gruppo)',
+          ' non e più limitato (segue settori, Formazione e Regole di gruppo)',
         7000,
       );
     else toast('Mappatura rimossa');
@@ -361,7 +361,7 @@ async function generaConSolver() {
         ym +
         ' (' +
         repartoLabel(rep) +
-        ') con il solver sul server interno?\n\nLe celle esistenti (vacanze, protette, malattie, blocchi) non vengono toccate; le celle generate da una bozza precedente vengono sostituite. Il calcolo puo durare fino a due minuti.',
+        ') con il solver sul server interno?\n\nLe celle esistenti (vacanze, protette, malattie, blocchi) non vengono toccate; le celle generate da una bozza precedente vengono sostituite. Il calcolo può durare fino a due minuti.',
     ))
   )
     return;
@@ -526,7 +526,7 @@ async function salvaPianoFunzioni(v) {
         repartoLabel(rep) +
         '. Restano nei menu anche ' +
         restano.join(', ') +
-        ', perche le hanno ancora dei collaboratori del settore: per toglierle, cambia prima la funzione nelle loro schede.',
+        ', perché le hanno ancora dei collaboratori del settore: per toglierle, cambia prima la funzione nelle loro schede.',
       { titolo: 'Funzioni disponibili' },
     );
   else toast('Funzioni di ' + repartoLabel(rep) + ' aggiornate');
@@ -796,18 +796,18 @@ const _REGOLE_GRUPPO_TIPI = {
   turni_solo_funzioni:
     'I turni scelti li fanno solo le funzioni scelte (per esempio L1 e 9 solo Back Office e Supervisor)',
   funzione_turni_giorni:
-    'Nei giorni scelti la funzione fa solo i turni scelti (per esempio i Supervisor da lunedi a giovedi solo i turni che iniziano con Z, L1 e 9)',
+    'Nei giorni scelti la funzione fa solo i turni scelti (per esempio i Supervisor da lunedì a giovedì solo i turni che iniziano con Z, L1 e 9)',
   livello_turni:
     'I turni scelti solo da un livello di Formazione in su; eccezioni per persona in Preferenze, Turni consentiti',
   minimo_livello_giorno: 'Almeno quante persone di un livello di Formazione al giorno, anche solo certi giorni o turni',
   minimo_competenza_giorno:
-    'Almeno quante persone con una competenza di Formazione (anche una specialita Extra, per esempio Poker) al giorno, con giorni, tipo di turno e fascia oraria facoltativi',
+    'Almeno quante persone con una competenza di Formazione (anche una specialità Extra, per esempio Poker) al giorno, con giorni, tipo di turno e fascia oraria facoltativi',
   equilibrio_livelli:
     'Forti e deboli distribuiti nelle fasce orarie: in ogni fascia almeno quanti forti e livello medio vicino a quello del giorno. La bozza bilancia, Valida segnala',
   turni_solo_collaboratori:
     'I turni scelti li fanno solo i collaboratori scelti (per esempio AX a tre persone): vale per bozza, Migliora, proposte e Valida',
   coordinatori:
-    'Ogni giorno un coordinatore di giorno (turni di apertura) e uno di notte (turni di chiusura: vale quello che finisce piu tardi), scelti fra i collaboratori indicati; se mancano, ne propone un altro. Escono in rosso nel piano e nel briefing',
+    'Ogni giorno un coordinatore di giorno (turni di apertura) e uno di notte (turni di chiusura: vale quello che finisce più tardi), scelti fra i collaboratori indicati; se mancano, ne propone un altro. Escono in rosso nel piano e nel briefing',
 };
 // Etichette in italiano per la scheda (la lingua di chi la usa)
 const _REGOLE_GRUPPO_ETICHETTE = {
@@ -1067,7 +1067,7 @@ function _rgFrase(r) {
         (c.n === '1' ? ' persona' : ' persone') +
         ' di livello ' +
         c.lv +
-        ' o piu' +
+        ' o più' +
         tipoTxt +
         ' ' +
         gr +
@@ -1100,9 +1100,9 @@ function _rgFrase(r) {
       const fs = (typeof _pianoFasceDaTesto === 'function' ? _pianoFasceDaTesto(c.fasce) : []).map((f) => f.etichetta);
       const parti = [];
       if (c.forte && parseInt(c.minf) > 0)
-        parti.push('almeno ' + c.minf + ' di livello ' + String(c.forte).toUpperCase() + ' o piu');
+        parti.push('almeno ' + c.minf + ' di livello ' + String(c.forte).toUpperCase() + ' o più');
       if (parseFloat(c.scarto) > 0)
-        parti.push('livello medio non piu di ' + String(c.scarto).replace('.', ',') + ' sotto quello del giorno');
+        parti.push('livello medio non più di ' + String(c.scarto).replace('.', ',') + ' sotto quello del giorno');
       return (
         'In ogni fascia (' +
         (fs.join(', ') || c.fasce) +
@@ -1129,7 +1129,7 @@ function _rgFrase(r) {
         'Ogni giorno un coordinatore' +
         (c.turniG ? ' di giorno (' + c.turniG + ')' : '') +
         (c.turniG && c.turniN ? ' e uno' : '') +
-        (c.turniN ? ' di notte (' + c.turniN + ', quello che finisce piu tardi)' : '') +
+        (c.turniN ? ' di notte (' + c.turniN + ', quello che finisce più tardi)' : '') +
         ', fra: ' +
         c.coord.map(nomeVero).join(', ') +
         '; se mancano, il programma ne propone un altro'
@@ -2010,7 +2010,7 @@ function _renderPianoRegoleGruppoCard() {
   let h =
     '<div class="main-card" style="margin-top:16px"><div class="card-header">Regole di gruppo</div><div style="padding:10px 14px">';
   h +=
-    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:6px">Chi puo fare quali turni in ogni area del settore aperto, quante persone servono al giorno e come distribuirle. Le rispettano bozza, Migliora e Valida. Per vedere l effetto su una persona o un turno: Chi puo fare cosa, qui sopra.</p>';
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:6px">Chi può fare quali turni in ogni area del settore aperto, quante persone servono al giorno e come distribuirle. Le rispettano bozza, Migliora e Valida. Per vedere l effetto su una persona o un turno: Chi può fare cosa, qui sopra.</p>';
   h +=
     '<div style="overflow-x:auto"><table class="piano-table" style="min-width:680px;font-size:var(--fs-md,.875rem)"><thead><tr><th>Area</th><th style="text-align:left">Regola</th><th>Attiva</th><th></th></tr></thead><tbody>';
   pianoRegoleGruppoCache
@@ -2133,7 +2133,7 @@ function _pianoRegolaLivelloChi(r) {
     '">' +
     ok.length +
     ' persone con ' +
-    (max ? 'livello L' + min + '-L' + max : 'livello L' + min + ' o piu') +
+    (max ? 'livello L' + min + '-L' + max : 'livello L' + min + ' o più') +
     (eccezioni ? ' + ' + eccezioni + ' eccezioni' : '') +
     (poche ? ' · troppo poche' : '') +
     '</div>'
@@ -2157,7 +2157,7 @@ function _pianoValidaRegolaGruppo(gruppo, tipo, valore, settore) {
       .split(',')
       .map((x) => x.trim())
       .filter((x) => x && !fzOk(x));
-    if (!v) return 'Scrivi una o piu funzioni separate da virgola (es. SUP oppure BO,SUP)';
+    if (!v) return 'Scrivi una o più funzioni separate da virgola (es. SUP oppure BO,SUP)';
     if (ignote.length)
       return (
         'Funzioni sconosciute in ' +
@@ -2174,7 +2174,7 @@ function _pianoValidaRegolaGruppo(gruppo, tipo, valore, settore) {
       .map((x) => x.trim())
       .filter((x) => x && x !== 'DIURNO' && x !== 'NOTTURNO');
     if (!v || ignoti.length)
-      return 'Il tipo di turno puo essere solo DIURNO o NOTTURNO (anche entrambi: DIURNO,NOTTURNO)';
+      return 'Il tipo di turno può essere solo DIURNO o NOTTURNO (anche entrambi: DIURNO,NOTTURNO)';
     return null;
   }
   if (t === 'richiede_campo') {
@@ -2241,7 +2241,7 @@ function _pianoValidaRegolaGruppo(gruppo, tipo, valore, settore) {
   if (t === 'minimo_livello_giorno') {
     const m = v.match(/^(L?\d+):(\d+)(?::(DIURNO|NOTTURNO)?)?(?::([0-6](,[0-6])*))?$/);
     if (!m)
-      return 'Formato atteso LIVELLO:NUMERO[:DIURNO|NOTTURNO[:giorni]], per esempio L3:2:NOTTURNO:4,5 (0=lunedi ... 6=domenica)';
+      return 'Formato atteso LIVELLO:NUMERO[:DIURNO|NOTTURNO[:giorni]], per esempio L3:2:NOTTURNO:4,5 (0=lunedì ... 6=domenica)';
     if (!lvOk(m[1])) return 'Livello non valido: in ' + ctx.label + ' la scala va da L1 a L' + maxLv;
     return null;
   }
@@ -2260,7 +2260,7 @@ function _pianoValidaRegolaGruppo(gruppo, tipo, valore, settore) {
     if (parti[2] != null && parti[2].trim() !== '') {
       const gg = parti[2].split(',').map((x) => x.trim());
       if (gg.some((x) => !/^[0-6]$/.test(x)))
-        return 'I giorni vanno scritti come numeri da 0 (lunedi) a 6 (domenica), separati da virgola';
+        return 'I giorni vanno scritti come numeri da 0 (lunedì) a 6 (domenica), separati da virgola';
     }
     return null;
   }
@@ -2274,7 +2274,7 @@ function _pianoValidaRegolaGruppo(gruppo, tipo, valore, settore) {
       return 'Scegli una competenza di Formazione del settore (Formazione, Configurazione, Competenze)';
     if (!(parseInt(p[1]) >= 1)) return 'Il numero minimo va da 1 in su';
     if (p[2] && !/^(DIURNO|NOTTURNO)$/.test(p[2])) return 'Tipo di turno: diurni, notturni o tutti';
-    if (p[3] && !/^[0-6](,[0-6])*$/.test(p[3])) return 'Giorni da 0 (lunedi) a 6 (domenica)';
+    if (p[3] && !/^[0-6](,[0-6])*$/.test(p[3])) return 'Giorni da 0 (lunedì) a 6 (domenica)';
     if (p[4] && !_pianoFasciaDaTesto(p[4])) return 'Fascia oraria da scrivere come 22:00-02:00 oppure 22-02';
     if (p[5]) {
       const sigle = new Set(_pianoTurniReparto().map((x) => String(x.codice).toUpperCase()));
@@ -2299,7 +2299,7 @@ function _pianoValidaRegolaGruppo(gruppo, tipo, valore, settore) {
     if (!(parseInt(p[2]) > 0) && !(parseFloat(p[3]) > 0))
       return 'Imposta i forti minimo per fascia oppure lo scarto massimo (o tutti e due)';
     if (parseInt(p[2]) > 0 && !p[1]) return 'Scegli da quale livello uno conta come forte';
-    if (p[4] && !/^[0-6](,[0-6])*$/.test(p[4])) return 'Giorni da 0 (lunedi) a 6 (domenica)';
+    if (p[4] && !/^[0-6](,[0-6])*$/.test(p[4])) return 'Giorni da 0 (lunedì) a 6 (domenica)';
     return null;
   }
   if (t === 'turni_solo_collaboratori') {
@@ -2380,7 +2380,7 @@ function _pianoValidaRegolaGruppo(gruppo, tipo, valore, settore) {
   if (t === 'minimo_funzione_giorno') {
     const m = v.match(/^([A-Z0-9_]+):(\d+)(?::(DIURNO|NOTTURNO)?)?(?::([0-6](,[0-6])*))?$/);
     if (!m)
-      return 'Formato atteso FUNZIONE:NUMERO[:DIURNO|NOTTURNO[:giorni]], per esempio SUP:1:NOTTURNO:4,5 (0=lunedi ... 6=domenica)';
+      return 'Formato atteso FUNZIONE:NUMERO[:DIURNO|NOTTURNO[:giorni]], per esempio SUP:1:NOTTURNO:4,5 (0=lunedì ... 6=domenica)';
     if (!fzOk(m[1])) return 'Funzione sconosciuta in ' + ctx.label + ': ' + m[1];
     return null;
   }
@@ -2426,7 +2426,7 @@ async function aggiungiRegolaGruppo() {
         r.id !== window._rgModifica,
     )
   ) {
-    toastErrore('Il settore ha gia una regola Coordinatori: usa Modifica per cambiarla');
+    toastErrore('Il settore ha già una regola Coordinatori: usa Modifica per cambiarla');
     return;
   }
   if (!gruppo || !tipo || !valore) {
@@ -2519,9 +2519,9 @@ function _renderPianoCongediNpCard() {
       ? 'Oltre <b>' + sg + ' giorni</b> il diritto vacanze dell anno si riduce in proporzione; '
       : '<b>Ogni giorno</b> di congedo riduce in proporzione il diritto vacanze dell anno; ') +
     (sm
-      ? 'oltre <b>' + sm + ' mesi</b> l anzianita di servizio si sposta in avanti di tutta la durata'
-      : '<b>ogni giorno</b> di congedo sposta in avanti l anzianita di servizio') +
-    ' (giubilei e giorni di vacanza in piu). Le due soglie si cambiano nella scheda Regole. Il congedo si registra anche dalla scheda del collaboratore.</p>';
+      ? 'oltre <b>' + sm + ' mesi</b> l anzianità di servizio si sposta in avanti di tutta la durata'
+      : '<b>ogni giorno</b> di congedo sposta in avanti l anzianità di servizio') +
+    ' (giubilei e giorni di vacanza in più). Le due soglie si cambiano nella scheda Regole. Il congedo si registra anche dalla scheda del collaboratore.</p>';
   if (!puoModCnp)
     h +=
       '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:0 0 10px">Registrare o eliminare un congedo: serve il permesso Storico HR (modificare).</p>';
@@ -2590,7 +2590,7 @@ function _renderPianoCongediNpCard() {
           );
         });
       }
-      if (gg > sm * 30.44) eff.push('anzianita spostata di ' + gg + ' giorni');
+      if (gg > sm * 30.44) eff.push('anzianità spostata di ' + gg + ' giorni');
       if (!eff.length) eff.push('solo piano (CNP)');
       h +=
         '<tr data-nome="' +
@@ -2638,7 +2638,7 @@ async function apriCongedoNpScheda(nome) {
   const r = await chiediModulo(
     'Congedo non pagato di ' +
       nome +
-      ': nel piano i giorni diventano CNP (zero ore) e non contano per l anzianita (giubilei e giorni di vacanza in piu).',
+      ': nel piano i giorni diventano CNP (zero ore) e non contano per l anzianità (giubilei e giorni di vacanza in più).',
     [
       {
         titolo: 'Periodo',
@@ -2696,7 +2696,7 @@ async function registraCongedoNp(x) {
   }
   const gg = Math.round((new Date(al + 'T12:00:00') - new Date(dal + 'T12:00:00')) / 86400000) + 1;
   if (gg > 366) {
-    toastErrore('Un congedo di piu di un anno non e previsto dal regolamento');
+    toastErrore('Un congedo di più di un anno non e previsto dal regolamento');
     return false;
   }
   if (!motivo) {
@@ -2708,7 +2708,7 @@ async function registraCongedoNp(x) {
   );
   if (sovrapposto) {
     toastErrore(
-      'Si sovrappone a un congedo gia registrato (' +
+      'Si sovrappone a un congedo già registrato (' +
         String(sovrapposto.dal).substring(0, 10) +
         ' / ' +
         String(sovrapposto.al).substring(0, 10) +
@@ -2720,7 +2720,7 @@ async function registraCongedoNp(x) {
   const sm = isNaN(sogliaMesi) ? 6 : sogliaMesi;
   const avviso =
     gg > sm * 30.44
-      ? '\n\nL anzianita di servizio si sposta in avanti di ' + gg + ' giorni (giubilei e giorni di vacanza in piu).'
+      ? '\n\nL anzianità di servizio si sposta in avanti di ' + gg + ' giorni (giubilei e giorni di vacanza in più).'
       : '';
   if (
     !(await chiediConferma(
@@ -2838,7 +2838,7 @@ function _renderPianoPreferenzeCard() {
       '<label for="pref-bloccati-gruppi" title="Reparti dei turni: competenza certificata in Formazione oppure turni di quel reparto nel piano dell ultimo anno">a chi non copre</label>' +
       inp('pref-bloccati-gruppi', 'gruppi', bc.gruppi, 'Es: SALA, REC, CASSA', 150) +
       '<button class="btn-act" onclick="pianoBloccaSenzaRequisiti()" title="Mostra chi oggi non ha i requisiti e, dopo la conferma, aggiunge i turni bloccati">Applica ora</button>' +
-      '<span style="flex-basis:100%;font-size:var(--fs-xs,.75rem);color:var(--muted)">I collaboratori nuovi partono con questi turni bloccati (all import Excel non chi nel file fa gia tutti quei reparti); poi si cambiano nella loro riga.</span></div>';
+      '<span style="flex-basis:100%;font-size:var(--fs-xs,.75rem);color:var(--muted)">I collaboratori nuovi partono con questi turni bloccati (all import Excel non chi nel file fa già tutti quei reparti); poi si cambiano nella loro riga.</span></div>';
   }
   h +=
     '<div style="display:flex;margin-bottom:8px"><input type="text" id="pref-collab-cerca" class="piano-cerca campo-cerca" placeholder="Cerca collaboratore..." oninput="_filtraPrefCollab(this.value)"></div>';
@@ -2850,15 +2850,15 @@ function _renderPianoPreferenzeCard() {
   const prefSolaLettura = !puoGestirePiano() && !puoModificareStoricoHr();
   if (prefSolaLettura)
     h +=
-      '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:6px">Sola lettura: le preferenze le cambia chi gestisce il piano o chi puo modificare lo Storico HR.</p>';
+      '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:6px">Sola lettura: le preferenze le cambia chi gestisce il piano o chi può modificare lo Storico HR.</p>';
   h +=
     '<fieldset' +
     (prefSolaLettura ? ' disabled' : '') +
-    ' style="border:0;padding:0;margin:0;min-width:0"><div style="overflow-x:auto"><table class="piano-table" id="pref-collab-table" style="min-width:760px;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Funzione</th><th>%</th><th>Solo diurni</th><th title="Solo turni notturni">Solo notturni</th><th title="Non sta nella rotazione (es. ufficio): bozza, Migliora, coperture e cambi non le propongono mai turni e la bozza non riempie i giorni vuoti. Turni scritti a mano; le ore contano come sempre">Turni solo a mano</th><th style="text-align:left" title="Giorni in cui lavora: negli altri non viene mai proposto (bozza, Migliora, generazione automatica, cerca cambio, copertura malattia, formazioni). Nessuna spunta = tutti i giorni">Giorni di lavoro</th><th style="text-align:left">Turni bloccati (CSV)</th><th style="text-align:left" title="Eccezioni alle regole Turni per livello: questi turni li puo fare anche senza il livello richiesto (CSV)">Turni consentiti</th>' +
+    ' style="border:0;padding:0;margin:0;min-width:0"><div style="overflow-x:auto"><table class="piano-table" id="pref-collab-table" style="min-width:760px;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Funzione</th><th>%</th><th>Solo diurni</th><th title="Solo turni notturni">Solo notturni</th><th title="Non sta nella rotazione (es. ufficio): bozza, Migliora, coperture e cambi non le propongono mai turni e la bozza non riempie i giorni vuoti. Turni scritti a mano; le ore contano come sempre">Turni solo a mano</th><th style="text-align:left" title="Giorni in cui lavora: negli altri non viene mai proposto (bozza, Migliora, generazione automatica, cerca cambio, copertura malattia, formazioni). Nessuna spunta = tutti i giorni">Giorni di lavoro</th><th style="text-align:left">Turni bloccati (CSV)</th><th style="text-align:left" title="Eccezioni alle regole Turni per livello: questi turni li può fare anche senza il livello richiesto (CSV)">Turni consentiti</th>' +
     (soloSlots
       ? '<th title="La bozza le privilegia sui turni L1">Preferisce L1</th><th title="Livello accoglienza (0-2): serve per il gruppo ACCOGLIENZA">Accoglienza</th>'
       : '') +
-    '<th style="text-align:left" title="Aree dove lavora affiancato: puo fare i turni ma mai da solo (es: REC)">Affiancato in</th><th style="text-align:left" title="Altri reparti in cui lavora (CSV, es: valet): appare anche nei loro piani e le ore si sommano">Reparti extra</th><th style="text-align:left" title="Derivate dalle competenze certificate in Formazione (sola lettura: si cambiano in Formazione)">Aree abilitate</th></tr></thead><tbody>';
+    '<th style="text-align:left" title="Aree dove lavora affiancato: può fare i turni ma mai da solo (es: REC)">Affiancato in</th><th style="text-align:left" title="Altri reparti in cui lavora (CSV, es: valet): appare anche nei loro piani e le ore si sommano">Reparti extra</th><th style="text-align:left" title="Derivate dalle competenze certificate in Formazione (sola lettura: si cambiano in Formazione)">Aree abilitate</th></tr></thead><tbody>';
   collabs.forEach((c) => {
     h +=
       '<tr data-pref-nome="' +
@@ -2890,7 +2890,7 @@ function _renderPianoPreferenzeCard() {
       c.id +
       ',\'turni_bloccati\',this.value)" style="width:140px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td style="text-align:left"><input type="text" value="' +
       escP(c.turni_consentiti || '') +
-      '" placeholder="Es: 10,9" title="Turni che puo fare anche senza il livello richiesto (regole Turni per livello)" onchange="salvaPreferenzaCollab(' +
+      '" placeholder="Es: 10,9" title="Turni che può fare anche senza il livello richiesto (regole Turni per livello)" onchange="salvaPreferenzaCollab(' +
       c.id +
       ',\'turni_consentiti\',this.value)" style="width:100px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td>' +
       (soloSlots
@@ -3090,7 +3090,7 @@ async function pianoBloccaSenzaRequisiti() {
       motivo[c.nome] = 'manca ' + manca.join(', ');
     });
   if (!nomi.length) {
-    toast('Tutti quelli senza ' + cfg.gruppi + ' hanno gia ' + codici.join(', ') + ' bloccati');
+    toast('Tutti quelli senza ' + cfg.gruppi + ' hanno già ' + codici.join(', ') + ' bloccati');
     return;
   }
   const velo = document.createElement('div');
@@ -3102,7 +3102,7 @@ async function pianoBloccaSenzaRequisiti() {
     escP(repartoLabel(rep)) +
     ' che non coprono ' +
     escP(cfg.gruppi) +
-    ': ne la competenza certificata in Formazione, ne turni di quel reparto nel piano dell ultimo anno. Togli la spunta a chi vuoi lasciare libero; i turni bloccati che hanno gia restano.</p>' +
+    ': ne la competenza certificata in Formazione, ne turni di quel reparto nel piano dell ultimo anno. Togli la spunta a chi vuoi lasciare libero; i turni bloccati che hanno già restano.</p>' +
     _selPersHtml('blk-sel', [{ titolo: 'Da bloccare', nomi: nomi }], nomi, { dettagli: motivo }) +
     '<div class="finestra-pulsanti"><button type="button" class="finestra-no" id="blk-no">Annulla</button><button type="button" class="finestra-ok" id="blk-ok">Blocca ' +
     escP(codici.join(', ')) +
@@ -3188,7 +3188,7 @@ function _pianoGiorniSettSelect(c) {
   let o = '<option value=""' + (v ? '' : ' selected') + '>tutti</option>';
   for (let k = 1; k <= 6; k++) o += '<option value="' + k + '"' + (v === k ? ' selected' : '') + '>' + k + '</option>';
   return (
-    '<label style="margin-left:8px;font-size:var(--fs-xs,.75rem);white-space:nowrap" title="Giorni di lavoro al massimo nella settimana lunedi-domenica. Con piu giorni spuntati (es. G V S D e 3) il programma sceglie ogni settimana quali, cosi puo lasciare libere anche delle domeniche">a settimana <select onchange="salvaPreferenzaCollab(' +
+    '<label style="margin-left:8px;font-size:var(--fs-xs,.75rem);white-space:nowrap" title="Giorni di lavoro al massimo nella settimana lunedì-domenica. Con più giorni spuntati (es. G V S D e 3) il programma sceglie ogni settimana quali, così può lasciare libere anche delle domeniche">a settimana <select onchange="salvaPreferenzaCollab(' +
     c.id +
     ',\'giorni_settimana\',this.value)" style="padding:1px 2px">' +
     o +
@@ -3221,11 +3221,11 @@ function _pianoAvvisoDomenicheGiorni(c) {
       (max ? ', ' + max + ' giorni a settimana' : '') +
       '.\n\nCosi lavora tutte le domeniche: le domeniche libere del regolamento (almeno ' +
       min +
-      ' all anno, con il sabato che finisce entro le 23) non sono garantite e Valida regole le segnalera.\n\nSoluzione: spunta un giorno in piu (es. giovedi) e scegli "a settimana" ' +
+      ' all anno, con il sabato che finisce entro le 23) non sono garantite e Valida regole le segnalera.\n\nSoluzione: spunta un giorno in più (es. giovedì) e scegli "a settimana" ' +
       set.length +
       ': ogni settimana il programma sceglie quali ' +
       set.length +
-      ' giorni dare e puo lasciare libere alcune domeniche.',
+      ' giorni dare e può lasciare libere alcune domeniche.',
     { titolo: 'Domeniche libere non garantite' },
   );
 }

@@ -160,7 +160,7 @@ function capitalizzaNome(s) {
 // fetch"). Qui si traducono SOLO per chi legge: il testo originale resta nell errore (i
 // controlli del programma lo riconoscono) e nella console.
 const _ERRORI_IN_CHIARO = [
-  [/duplicate key value violates unique constraint\s*"?[\w.]*"?/gi, 'esiste gia (dato doppio)'],
+  [/duplicate key value violates unique constraint\s*"?[\w.]*"?/gi, 'esiste già (dato doppio)'],
   [/(TypeError:\s*)?(Failed to fetch|NetworkError[^\s.,;:)]*|Load failed)/gi, 'connessione assente'],
   [/violates foreign key constraint\s*"?[\w.]*"?/gi, 'e collegato ad altri dati'],
   [/null value in column "?(\w+)"?[^,.;]*violates not-null constraint/gi, 'manca un dato obbligatorio ($1)'],
@@ -547,11 +547,11 @@ async function _verificaNome(nome) {
       b.innerHTML =
         '<h3>Nome simile trovato</h3><p style="margin-bottom:16px">Hai scritto <strong>"' +
         escP(nome) +
-        '"</strong> ma esiste gia un collaboratore simile:</p><div style="text-align:center;margin-bottom:20px"><button class="btn-salva" data-verify-usa="best" style="background:#2c6e49;padding:12px 24px;font-size:var(--fs-lg,1.0625rem)">Usa "' +
+        '"</strong> ma esiste già un collaboratore simile:</p><div style="text-align:center;margin-bottom:20px"><button class="btn-salva" data-verify-usa="best" style="background:#2c6e49;padding:12px 24px;font-size:var(--fs-lg,1.0625rem)">Usa "' +
         escP(best) +
         '"</button></div><div style="text-align:center"><button class="btn-salva" data-verify-usa="nome" style="background:var(--paper2);color:var(--muted);border:1px solid var(--line);padding:10px 20px;font-size:var(--fs-md,.875rem);box-shadow:none">No, usa "' +
         escP(nome) +
-        '" cosi com\'e</button></div>';
+        '" così com\'e</button></div>';
       const scelte = { best, nome };
       b.querySelectorAll('[data-verify-usa]').forEach((btn) => {
         btn.addEventListener('click', () => {

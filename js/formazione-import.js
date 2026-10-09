@@ -197,7 +197,7 @@ function _fziMostraColonne() {
       .join('') +
     '<option value="__nuova"' +
     (scelta === '__nuova' ? ' selected' : '') +
-    '>+ nuova specialita (Extra): ' +
+    '>+ nuova specialità (Extra): ' +
     escP(titolo) +
     '</option>';
   const sel = 'padding:6px 8px;max-width:100%;box-sizing:border-box';
@@ -271,7 +271,7 @@ function _fziMostraColonne() {
     '</tbody></table></div>' +
     '<label style="display:flex;gap:8px;align-items:flex-start;margin-top:10px"><input type="checkbox" id="fzi-cumul"' +
     (z.cumulativo ? ' checked' : '') +
-    '><span>Chi ha un livello ha anche tutti quelli sotto (ISP 3 comprende ISP 2 e ISP 1, e cosi via)</span></label>' +
+    '><span>Chi ha un livello ha anche tutti quelli sotto (ISP 3 comprende ISP 2 e ISP 1, e così via)</span></label>' +
     '<label style="display:flex;gap:8px;align-items:flex-start;margin-top:6px"><input type="checkbox" id="fzi-sost"' +
     (z.sostituisci ? ' checked' : '') +
     '><span>Il file vale per le colonne scelte: dove manca la X la competenza si toglie (le altre competenze restano)</span></label>' +
@@ -419,7 +419,7 @@ function _fziAnteprima() {
     ' con modifiche</b> · ' +
     nuovi.length +
     ' nomi nuovi' +
-    (r.nuoveComp.length ? ' · specialita nuove: ' + escP(r.nuoveComp.map((k) => k.label).join(', ')) : '') +
+    (r.nuoveComp.length ? ' · specialità nuove: ' + escP(r.nuoveComp.map((k) => k.label).join(', ')) : '') +
     '</p>' +
     _fziAvvisoGruppi(z) +
     '<div style="max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:3px;padding:0 6px">' +
@@ -462,7 +462,7 @@ function _fziAvvisoGruppi(z) {
     '<p style="margin:0 0 8px;padding:8px 10px;border-radius:3px;background:var(--paper2);border-left:3px solid var(--c-rosso,#c0392b)"><b>Da fare dopo l import:</b> ' +
     escP(senza.map((k) => k.label).join(', ')) +
     (senza.length === 1 ? ' non e collegata' : ' non sono collegate') +
-    ' a un gruppo di turni. Finche non le colleghi (Piano &gt; Impostazioni, competenze e gruppi, per esempio al gruppo ' +
+    ' a un gruppo di turni. Finché non le colleghi (Piano &gt; Impostazioni, competenze e gruppi, per esempio al gruppo ' +
     escP(
       [...new Set((pianoTurniCache || []).filter((t) => (t.reparto_dip || 'slots') === z.rep).map((t) => t.gruppo))]
         .filter(Boolean)

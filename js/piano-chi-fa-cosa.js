@@ -220,7 +220,7 @@ function _pcfcSpiega(nome, t, dowG, idoneita) {
     default:
       return {
         esito: 'si',
-        motivo: 'ha gia lavorato nell area ' + gruppoT + ' (storia dei turni)' + coda,
+        motivo: 'ha già lavorato nell area ' + gruppoT + ' (storia dei turni)' + coda,
         dove: 'formazione',
       };
   }
@@ -260,13 +260,13 @@ function _pcfcPercheAMano(nome, t, dowG, bozzaOk, manoOk) {
   const fz = String(info.funzione || '').toUpperCase();
   if (!manoOk) return 'scritto a mano da un avviso: a mano le regole sono diverse da quelle della bozza';
   if (fz && _pianoFunzioniFannoTutto().has(fz))
-    return 'a mano ' + fz + ' puo fare ogni turno (regola Funzioni che fanno tutto)';
+    return 'a mano ' + fz + ' può fare ogni turno (regola Funzioni che fanno tutto)';
   if (info.turni_solo_a_mano) return 'fuori rotazione: i suoi turni si scrivono a mano';
   if (_pcfcLista(info.turni_bloccati).includes(String(t.codice).toUpperCase()))
     return 'a mano il turno bloccato non da avviso';
   if (dowG != null && !PianoRegole.lavoraNelGiorno(info, dowG)) return 'a mano i giorni di lavoro non danno avviso';
   if (_pianoCoperturaCfg(info)) return 'a mano le coperture da un altro settore non danno avviso';
-  return 'a mano il controllo e piu largo di quello della bozza';
+  return 'a mano il controllo e più largo di quello della bozza';
 }
 
 function _pcfcChip(esito) {
@@ -356,7 +356,7 @@ function pcfcVai(i) {
           escP(fz) +
           ' evidenziata. Per dargli ' +
           escP(cod) +
-          ' aggiungilo qui sotto (gia compilato) come AMMESSO o PRINCIPALE.'
+          ' aggiungilo qui sotto (già compilato) come AMMESSO o PRINCIPALE.'
         : ' Funzione ' + escP(fz) + ' evidenziata.';
     trova = () => {
       const els = document.querySelectorAll('[data-mapp-fz="' + CSS.escape(fz) + '"]');
@@ -392,7 +392,7 @@ function pcfcVai(i) {
   if (typeof navMostraBarra === 'function')
     navMostraBarra({
       html: titolo + consiglio,
-      etichetta: 'Torna a Chi puo fare cosa',
+      etichetta: 'Torna a Chi può fare cosa',
       origine: origine,
       alRitorno: () => _pcfcTornaQui(chiave),
     });
@@ -468,7 +468,7 @@ function _pcfcCosaDecide(t) {
     voci.map((v) => '<li>' + v + '</li>').join('') +
     '</ul>' +
     (voci.length > 3
-      ? '<p class="pcfc-nota">Piu voci decidono lo stesso turno: per ogni persona esclusa, il motivo nella tabella dice quale.</p>'
+      ? '<p class="pcfc-nota">Più voci decidono lo stesso turno: per ogni persona esclusa, il motivo nella tabella dice quale.</p>'
       : '') +
     '</div>'
   );
@@ -537,10 +537,10 @@ async function _pcfcRender() {
   const opz = (v, testo, attivo) =>
     '<option value="' + escP(v) + '"' + (attivo ? ' selected' : '') + '>' + escP(testo) + '</option>';
   let h =
-    '<div class="main-card" style="margin-top:16px"><div class="card-header">Chi puo fare cosa · ' +
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Chi può fare cosa · ' +
     escP(repartoLabel(rep)) +
     '</div><div style="padding:10px 14px">' +
-    '<p class="pcfc-intro">Sola lettura. Dice chi e <b>abilitato</b> a ogni turno e perche, con il pulsante che porta dove si cambia. Fra gli abilitati la bozza sceglie poi tenendo conto di riposi, ore, vacanze, fabbisogno e regole del giorno.</p>' +
+    '<p class="pcfc-intro">Sola lettura. Dice chi e <b>abilitato</b> a ogni turno e perché, con il pulsante che porta dove si cambia. Fra gli abilitati la bozza sceglie poi tenendo conto di riposi, ore, vacanze, fabbisogno e regole del giorno.</p>' +
     '<div class="add-tipo-row" style="margin-bottom:8px">' +
     '<div class="field"><label for="pcfc-vista">Vista</label><select id="pcfc-vista" style="' +
     sel +
@@ -569,7 +569,7 @@ async function _pcfcRender() {
     '</select></div></div>' +
     '<p class="pcfc-legenda">' +
     _pcfcChip('si') +
-    ' la bozza puo darglielo &nbsp; ' +
+    ' la bozza può darglielo &nbsp; ' +
     _pcfcChip('serve') +
     ' solo se serve: dopo tutti gli altri e se e sotto le sue ore &nbsp; ' +
     _pcfcChip('no') +
@@ -641,7 +641,7 @@ async function _pcfcRender() {
     h +=
       _pcfcCosaDecide(t) +
       '<p class="pcfc-chi">' +
-      _pcfcPlur(conteggi.si + conteggi.serve, 'persona puo fare ', 'persone possono fare ') +
+      _pcfcPlur(conteggi.si + conteggi.serve, 'persona può fare ', 'persone possono fare ') +
       escP(t.codice) +
       (st.dow == null ? '' : ' di ' + _PCFC_GIORNI[st.dow]) +
       ', su ' +
@@ -671,7 +671,7 @@ async function _pcfcRender() {
       titolo +
       '</td><td class="pcfc-c-esito">' +
       chip +
-      '</td><td class="pcfc-c-perche">' +
+      '</td><td class="pcfc-c-perché">' +
       escP(r.sp.motivo) +
       (r.diverso ? ' <span class="pcfc-allarme">(da verificare: la bozza decide diversamente)</span>' : '') +
       '</td><td class="pcfc-c-mano">' +
@@ -680,7 +680,7 @@ async function _pcfcRender() {
           (r.mano ? 'pcfc-si' : 'pcfc-no') +
           '">' +
           (r.mano ? 'Nessun avviso' : 'Avviso') +
-          '</span> <span class="pcfc-mano-perche">' +
+          '</span> <span class="pcfc-mano-perché">' +
           escP(r.percheMano) +
           '</span>'
         : '<span class="pcfc-uguale">come la bozza</span>') +
@@ -692,7 +692,7 @@ async function _pcfcRender() {
   const testa = (primaCol) =>
     '<div class="pcfc-scroll"><table class="pcfc-tab"><thead><tr><th>' +
     primaCol +
-    '</th><th>Bozza</th><th>Perche</th><th>A mano</th><th>Dove si cambia</th></tr></thead><tbody>';
+    '</th><th>Bozza</th><th>Perché</th><th>A mano</th><th>Dove si cambia</th></tr></thead><tbody>';
   let corpo = '';
   if (st.vista === 'persona') {
     // per area: titolo con il conteggio; un area tutta esclusa per lo stesso motivo = una riga

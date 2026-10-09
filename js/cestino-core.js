@@ -191,9 +191,9 @@ async function eliminaDefinitivo(tabella, id) {
   const dataRec = rec ? rec.data || rec.data_modulo || rec.created_at : null;
   if (typeof inArchivioProtetto === 'function' && dataRec && inArchivioProtetto(dataRec)) {
     await mostraAvviso(
-      "Non si puo' eliminare definitivamente.\n\nQuesta voce fa parte dell'archivio da conservare per " +
+      "Non si può eliminare definitivamente.\n\nQuesta voce fa parte dell'archivio da conservare per " +
         conservazioneAnni() +
-        " anni (regolamento aziendale).\n\nResta nel Cestino e si puo' ripristinare in qualsiasi momento.",
+        ' anni (regolamento aziendale).\n\nResta nel Cestino e si può ripristinare in qualsiasi momento.',
     );
     return;
   }
@@ -292,7 +292,7 @@ async function apriFixImpiego() {
     .sort((a, b) => (a.reparto_dip || '').localeCompare(b.reparto_dip || '') || a.nome.localeCompare(b.nome));
   if (!senza.length) {
     el.innerHTML =
-      '<p style="color:var(--c-verde,#2c6e49);font-weight:700">Tutti i collaboratori attivi hanno gia&#39; l&#39;impiego indicato.</p>';
+      '<p style="color:var(--c-verde,#2c6e49);font-weight:700">Tutti i collaboratori attivi hanno già&#39; l&#39;impiego indicato.</p>';
     return;
   }
   let h =
@@ -599,7 +599,7 @@ async function pianoRilevaCongedoNonPagato() {
       .filter((x) => x.mesi.length !== x.attuale);
     if (!proposte.length) {
       await mostraAvviso(
-        'Nessun congedo non pagato da registrare.\n\nNel piano non risultano mesi interi di sola "C" diversi da quanto gia\' segnato nelle schede.',
+        'Nessun congedo non pagato da registrare.\n\nNel piano non risultano mesi interi di sola "C" diversi da quanto già segnato nelle schede.',
       );
       return;
     }
@@ -624,7 +624,7 @@ async function pianoRilevaCongedoNonPagato() {
         'CONGEDO NON PAGATO (mesi interi di sola "C" nel piano)\n\n' +
           elenco +
           (proposte.length > 20 ? '\n... e altri ' + (proposte.length - 20) : '') +
-          "\n\nRegistro questi mesi sulle schede? I giubilei si sposteranno in avanti di altrettanto.\n\nATTENZIONE: il piano copre solo gli anni presenti nel programma. I congedi piu' vecchi vanno aggiunti a mano nella scheda del collaboratore.",
+          '\n\nRegistro questi mesi sulle schede? I giubilei si sposteranno in avanti di altrettanto.\n\nATTENZIONE: il piano copre solo gli anni presenti nel programma. I congedi più vecchi vanno aggiunti a mano nella scheda del collaboratore.',
       ))
     )
       return;
@@ -802,7 +802,7 @@ async function orfanoElimina(nome, n) {
         n +
         ' turni intestati a "' +
         nome +
-        "\".\n\nDa fare solo se non e' una persona (righe rimaste da vecchie importazioni). L'operazione non si annulla.",
+        '".\n\nDa fare solo se non è una persona (righe rimaste da vecchie importazioni). L\'operazione non si annulla.',
     ))
   )
     return;
@@ -978,7 +978,7 @@ async function controlloSalute() {
       'Turni nel settore giusto',
       fuoriSettore.length
         ? fuoriSettore.slice(0, 6).join(', ') +
-            ": hanno turni in un settore che non e' il loro e senza copertura configurata."
+            ': hanno turni in un settore che non è il loro e senza copertura configurata.'
         : 'Nessun turno in un settore non previsto.',
       fuoriSettore.length ? 'Gestione Collaboratori' : '',
     );
@@ -989,7 +989,7 @@ async function controlloSalute() {
       haFestiviPross ? 'ok' : 'attenzione',
       "Giorni festivi dell'anno prossimo",
       haFestiviPross
-        ? 'I festivi ' + annoPross + " sono gia' in archivio."
+        ? 'I festivi ' + annoPross + ' sono già in archivio.'
         : 'Mancano i festivi ' + annoPross + ": si creano da soli aprendo Piano → Festivi con quell'anno selezionato.",
       haFestiviPross ? '' : 'Piano · Festivi',
     );
@@ -1004,7 +1004,7 @@ async function controlloSalute() {
     const doppi = Object.entries(perCodice).filter(([, s]) => s.size > 1);
     add(
       doppi.length ? 'info' : 'ok',
-      "Sigle turno uguali in piu' settori",
+      'Sigle turno uguali in più settori',
       doppi.length
         ? doppi.map(([c, s]) => c + ' (' + [...s].join(', ') + ')').join(' · ') +
             '. Il programma li tiene separati, ma attenzione quando si leggono i piani.'
@@ -1124,7 +1124,7 @@ async function caricaDbStats() {
     consegne_turno: 'Consegne',
     promemoria: 'Promemoria',
     spese_extra: 'Spese Extra',
-    log_attivita: 'Log Attivita',
+    log_attivita: 'Log Attività',
     operatori_auth: 'Operatori',
     operator_sessions: 'Sessioni',
     impostazioni: 'Impostazioni',

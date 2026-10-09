@@ -37,7 +37,7 @@ function _renderOrganicoInterruttoreCard() {
     (on ? 'var(--c-verde,#2c6e49)' : 'var(--c-rosso,#c0392b)') +
     '">' +
     (on ? 'attiva' : 'disattivata') +
-    '</b>. Chi la vede si decide in Visibilita e permessi (Piano · Organico).</span>' +
+    '</b>. Chi la vede si decide in Visibilità e permessi (Piano · Organico).</span>' +
     '<button class="btn-export" onclick="organicoImpostaAttivo(' +
     (on ? 'false' : 'true') +
     ')">' +
@@ -55,12 +55,12 @@ const _orgCHF = (x) => 'CHF ' + (Math.round(x || 0) || 0).toLocaleString('de-CH'
 // costo di una proposta in parole (solo con i costi inseriti dall amministratore)
 function _organicoCostoTesto(c) {
   if (!c) return '';
-  if (!c.chf) return 'nessun costo in piu (le ore di contratto restano le stesse)';
+  if (!c.chf) return 'nessun costo in più (le ore di contratto restano le stesse)';
   return (
     _orgCHF(c.chf) +
     ' nei mesi rimasti (' +
     _orgOre(c.ore) +
-    ' ore pagate in piu)' +
+    ' ore pagate in più)' +
     (c.perOra ? ' · ' + _orgCHF(c.perOra) + ' per ora di carenza coperta' : '')
   );
 }
@@ -493,7 +493,7 @@ function _organicoVistaSituazione(s, x) {
       escP(g.titolo) +
       '</b>' +
       (g.consigliato
-        ? ' <span class="mini-badge" style="background:var(--c-verde,#2c6e49);font-size:11px;vertical-align:middle" title="Tra le proposte che risolvono di piu, quella con meno costi e cambiamenti">la piu leggera</span>'
+        ? ' <span class="mini-badge" style="background:var(--c-verde,#2c6e49);font-size:11px;vertical-align:middle" title="Tra le proposte che risolvono di più, quella con meno costi e cambiamenti">la più leggera</span>'
         : '');
     h += '<div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:4px">' + escP(g.motivo) + '</div>';
     if (g.alternativa)
@@ -622,7 +622,7 @@ function _organicoTabellaMesi(A, B) {
     th('Differenza ore') +
     th('Differenza tempi pieni', 'In tempi pieni netti del mese');
   h += th('Persone', 'In organico / minime per il giorno di punta / minime per le domeniche');
-  h += th('Riserva malattie', 'Persone a chiamata perche nel 95% dei giorni ogni malattia improvvisa abbia copertura');
+  h += th('Riserva malattie', 'Persone a chiamata perché nel 95% dei giorni ogni malattia improvvisa abbia copertura');
   h += th('Stato');
   if (B) h += th('Con le ipotesi', 'Differenza in tempi pieni e stato con le ipotesi del simulatore');
   h += '</tr></thead><tbody>';
@@ -708,7 +708,7 @@ function _organicoTabellaGruppi(s) {
   const G = OrganicoModello.gruppi(s.dati, s.base);
   if (!G.length) return '<p style="color:var(--muted)">Nessun fabbisogno nei mesi rimasti.</p>';
   let h =
-    '<div style="overflow:auto"><table id="organico-gruppi" class="piano-table" style="font-size:var(--fs-sm,.8125rem)"><thead><tr><th style="text-align:left">Gruppo</th><th>Ore richieste (mesi rimasti)</th><th title="Ore richieste diviso le ore nette di un tempo pieno">Tempi pieni netti</th><th>Posti massimi in un giorno</th><th title="Posti del giorno di punta divisi per la quota di presenza media">Persone minime</th><th title="Collaboratori abilitati a quel gruppo: settori del piano, competenze o turni gia fatti in quel gruppo">Persone abilitate</th><th title="Persone abilitate in piu che servono: per il giorno di punta o perche le ore del gruppo superano le ore degli abilitati">Mancano</th><th style="text-align:left" title="Collaboratori gia in organico non abilitati, prima chi ha piu ore nette">Si potrebbero formare</th></tr></thead><tbody>';
+    '<div style="overflow:auto"><table id="organico-gruppi" class="piano-table" style="font-size:var(--fs-sm,.8125rem)"><thead><tr><th style="text-align:left">Gruppo</th><th>Ore richieste (mesi rimasti)</th><th title="Ore richieste diviso le ore nette di un tempo pieno">Tempi pieni netti</th><th>Posti massimi in un giorno</th><th title="Posti del giorno di punta divisi per la quota di presenza media">Persone minime</th><th title="Collaboratori abilitati a quel gruppo: settori del piano, competenze o turni già fatti in quel gruppo">Persone abilitate</th><th title="Persone abilitate in più che servono: per il giorno di punta o perché le ore del gruppo superano le ore degli abilitati">Mancano</th><th style="text-align:left" title="Collaboratori già in organico non abilitati, prima chi ha più ore nette">Si potrebbero formare</th></tr></thead><tbody>';
   G.forEach((g) => {
     const rosso = g.servono > 0;
     h +=
@@ -737,7 +737,7 @@ function _organicoTabellaGruppi(s) {
       '</td></tr>';
   });
   h +=
-    '</tbody></table></div><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:4px 0 0">In rosso: servono persone abilitate in piu (per il giorno di punta o perche le ore del gruppo superano tutte le ore degli abilitati). Passa il mouse sul numero degli abilitati per vedere chi sono. Senza settori impostati una persona vale per tutti i gruppi.</p>';
+    '</tbody></table></div><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:4px 0 0">In rosso: servono persone abilitate in più (per il giorno di punta o perché le ore del gruppo superano tutte le ore degli abilitati). Passa il mouse sul numero degli abilitati per vedere chi sono. Senza settori impostati una persona vale per tutti i gruppi.</p>';
   return h;
 }
 
@@ -940,7 +940,7 @@ function _organicoVerificaHtml(s) {
   if (!v.righe.length)
     return h + '<p style="color:var(--muted)">Nessun mese chiuso con fabbisogno nel ' + s.base.anno + '.</p>';
   h +=
-    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:0 0 6px;max-width:900px">Per ogni mese chiuso: la carenza di ore che il modello calcola con le assenze vere, accanto a quello che e successo davvero. Ore scoperte = posti del fabbisogno rimasti senza nessuno; ore oltre contratto = ore fatte in piu dai fissi; ore non usate = ore di contratto dei fissi rimaste sotto il dovuto. La diagnosi dice da dove venivano i buchi.</p>';
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:0 0 6px;max-width:900px">Per ogni mese chiuso: la carenza di ore che il modello calcola con le assenze vere, accanto a quello che e successo davvero. Ore scoperte = posti del fabbisogno rimasti senza nessuno; ore oltre contratto = ore fatte in più dai fissi; ore non usate = ore di contratto dei fissi rimaste sotto il dovuto. La diagnosi dice da dove venivano i buchi.</p>';
   const DIAG = {
     organico: [
       'mancavano ore',
@@ -1009,7 +1009,7 @@ function _organicoMetodoHtml(s) {
   let h =
     '<h4 style="margin:16px 0 8px">Metodo e ipotesi</h4><div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);max-width:900px;line-height:1.55">';
   h +=
-    '<p style="margin:0 0 6px"><b>1. Ore.</b> Ore richieste = posti del fabbisogno per la durata dei turni (anche i giorni che chiudono piu tardi). Ore nette = ore di contratto (' +
+    '<p style="margin:0 0 6px"><b>1. Ore.</b> Ore richieste = posti del fabbisogno per la durata dei turni (anche i giorni che chiudono più tardi). Ore nette = ore di contratto (' +
     P.oreSett +
     ' ore settimanali per la percentuale; ausiliari al ' +
     Math.round(P.jollyPct * 100) +
@@ -1017,11 +1017,11 @@ function _organicoMetodoHtml(s) {
   h +=
     '<p style="margin:0 0 6px"><b>2. Persone.</b> Il giorno di punta chiede almeno posti / quota di presenza; le domeniche almeno posti / (' +
     (52 - P.domenicheLibere) +
-    '/52 x quota di presenza), perche ognuno ha ' +
+    '/52 x quota di presenza), perché ognuno ha ' +
     P.domenicheLibere +
     ' domeniche libere all anno. Una persona a tempo parziale conta come una persona intera nel giorno in cui lavora.</p>';
   h +=
-    '<p style="margin:0 0 6px"><b>3. Affidabilita.</b> Le malattie arrivano a caso: con la distribuzione binomiale (posti del giorno, tasso di malattia del mese) si calcola quante persone a chiamata servono perche nel ' +
+    '<p style="margin:0 0 6px"><b>3. Affidabilita.</b> Le malattie arrivano a caso: con la distribuzione binomiale (posti del giorno, tasso di malattia del mese) si calcola quante persone a chiamata servono perché nel ' +
     Math.round(P.livelloServizio * 100) +
     '% dei giorni ogni assenza improvvisa trovi copertura. <select onchange="window._organicoLivello=parseFloat(this.value);organicoRicalcola()" style="font-size:var(--fs-sm,.8125rem)">' +
     [0.9, 0.95, 0.99]
@@ -1038,18 +1038,18 @@ function _organicoMetodoHtml(s) {
       .join('') +
     '</select></p>';
   h +=
-    '<p style="margin:0 0 6px"><b>Dati.</b> Mesi passati: assenze vere dal piano. Mesi futuri: vacanze, CGF e congedi gia nel piano; dove il mese non e ancora pianificato, la quota media del diritto annuo; malattie e impegni dal tasso storico del mese, avvicinato alla media annua quando i giorni osservati sono pochi. I turni fatti in un altro settore contano come impegni. Organico = collaboratori di questo settore (chi copre da un altro resta nel suo).</p>';
+    '<p style="margin:0 0 6px"><b>Dati.</b> Mesi passati: assenze vere dal piano. Mesi futuri: vacanze, CGF e congedi già nel piano; dove il mese non e ancora pianificato, la quota media del diritto annuo; malattie e impegni dal tasso storico del mese, avvicinato alla media annua quando i giorni osservati sono pochi. I turni fatti in un altro settore contano come impegni. Organico = collaboratori di questo settore (chi copre da un altro resta nel suo).</p>';
   h +=
-    '<p style="margin:0 0 6px"><b>Suggerimenti.</b> Una carenza presente in tutti i mesi rimasti diventa un fisso (o percentuali piu alte per chi lo desidera); una carenza solo in alcuni mesi un ausiliario per quel periodo; poche persone per domeniche e punte un ausiliario a percentuale bassa. Ogni suggerimento mostra l effetto ricalcolato. Sono proposte da valutare, non decisioni automatiche.</p>' +
-    '<p style="margin:0 0 6px"><b>Per gruppo.</b> Per ogni gruppo dei turni (sala, cassa, accoglienza...) servono abbastanza persone abilitate per il giorno di punta, e le loro ore nette devono bastare per le ore del gruppo (lavorano anche negli altri gruppi, quindi e il minimo). Quando mancano, prima si propone di formare chi c e gia, partendo da chi ha piu ore libere; se non basta, le proposte di assunzione dicono quale profilo cercare.</p>' +
+    '<p style="margin:0 0 6px"><b>Suggerimenti.</b> Una carenza presente in tutti i mesi rimasti diventa un fisso (o percentuali più alte per chi lo desidera); una carenza solo in alcuni mesi un ausiliario per quel periodo; poche persone per domeniche e punte un ausiliario a percentuale bassa. Ogni suggerimento mostra l effetto ricalcolato. Sono proposte da valutare, non decisioni automatiche.</p>' +
+    '<p style="margin:0 0 6px"><b>Per gruppo.</b> Per ogni gruppo dei turni (sala, cassa, accoglienza...) servono abbastanza persone abilitate per il giorno di punta, e le loro ore nette devono bastare per le ore del gruppo (lavorano anche negli altri gruppi, quindi e il minimo). Quando mancano, prima si propone di formare chi c e già, partendo da chi ha più ore libere; se non basta, le proposte di assunzione dicono quale profilo cercare.</p>' +
     (P.costi
-      ? '<p style="margin:0 0 6px"><b>Costi.</b> Ore di contratto in piu nei mesi rimasti per il costo orario: fisso = ' +
+      ? '<p style="margin:0 0 6px"><b>Costi.</b> Ore di contratto in più nei mesi rimasti per il costo orario: fisso = ' +
         _orgCHF(P.costi.fissoAnno) +
         ' all anno / ' +
         P.oreSett * 52 +
         ' ore; ausiliario = ' +
         _orgCHF(P.costi.ausiliarioOra) +
-        ' all ora sulle ore pianificate. Spostare vacanze e formare chi c e gia non aggiungono ore di contratto (la formazione ha costi propri, non calcolati).</p>'
+        ' all ora sulle ore pianificate. Spostare vacanze e formare chi c e già non aggiungono ore di contratto (la formazione ha costi propri, non calcolati).</p>'
       : '');
   h += '</div>';
   return h;
@@ -1367,7 +1367,7 @@ async function organicoRapportoPdf() {
       s.par.domenicheLibere +
       ' libere all anno a testa). Affidabilita: riserva a chiamata per coprire le malattie improvvise nel ' +
       Math.round(s.par.livelloServizio * 100) +
-      '% dei giorni (distribuzione binomiale). Mesi passati con i dati veri, mesi futuri con le assenze note piu le malattie attese dallo storico. Tasso di malattia osservato: ' +
+      '% dei giorni (distribuzione binomiale). Mesi passati con i dati veri, mesi futuri con le assenze note più le malattie attese dallo storico. Tasso di malattia osservato: ' +
       _orgUno(A.tassi.media.malattia * 100) +
       '% dei giorni di servizio. I suggerimenti sono proposte da valutare.',
   );
@@ -1403,7 +1403,7 @@ function _orgSelPrezzo(id, val) {
   return (
     '<select id="' +
     id +
-    '" title="RAP Allegato 1: con il salario di base si aggiungono indennita vacanze e tredicesima; il prezzo comprensivo le contiene gia"><option value="base"' +
+    '" title="RAP Allegato 1: con il salario di base si aggiungono indennita vacanze e tredicesima; il prezzo comprensivo le contiene già"><option value="base"' +
     (val !== 'comprensivo' ? ' selected' : '') +
     '>Salario di base (+ indennita RAP)</option><option value="comprensivo"' +
     (val === 'comprensivo' ? ' selected' : '') +
@@ -1747,7 +1747,7 @@ function organicoCalcola() {
           ')'
         : '') +
       (cInd ? ' + vacanze ' + pVac + '% e tredicesima ' + p13 + '% (' + _orgCHF(Math.round(cInd)) + ')' : '') +
-      (jolly && c.prezzoTipo === 'comprensivo' ? ' · prezzo comprensivo: vacanze e tredicesima gia dentro (RAP)' : '');
+      (jolly && c.prezzoTipo === 'comprensivo' ? ' · prezzo comprensivo: vacanze e tredicesima già dentro (RAP)' : '');
   else e += '<br><span style="color:var(--muted)">Inserisci il costo orario per avere il costo.</span>';
   // testo del risultato per la stampa (senza pulsanti)
   c.stampa = e + '</div>';
@@ -1811,7 +1811,7 @@ function organicoCalcStampa() {
       postazioni +
       '</tbody></table><h2>Risultato</h2>' +
       c.stampa.replace(/ style="[^"]*"/g, '').replace(/<button[^>]*>.*?<\/button>/g, '') +
-      '<h2>Come si legge</h2><p class="nota">Le persone necessarie sono il piu alto di due conti: le ore delle postazioni divise per le ore nette di una persona (giorni del periodo x ore settimanali di un tempo pieno / 7 x percentuale, meno le assenze medie dello storico del settore: malattie, impegni, vacanze), e le persone che devono essere presenti insieme nelle ore piu cariche, sempre con le assenze. Riposi settimanali, malattie e vacanze sono quindi gia compresi. Costi secondo il RAP (Allegato 1): notturno 10% sulle ore fra le 23 e le 6; per gli ausiliari 50% nei festivi parificati alle domeniche e, con il salario di base, indennita vacanze e tredicesima. Per gli ausiliari non comprende gli oneri sociali del datore di lavoro. E un calcolo su ore e presenze: il rispetto di riposi minimi e giorni di fila persona per persona si verifica con il piano.</p></body></html>',
+      '<h2>Come si legge</h2><p class="nota">Le persone necessarie sono il più alto di due conti: le ore delle postazioni divise per le ore nette di una persona (giorni del periodo x ore settimanali di un tempo pieno / 7 x percentuale, meno le assenze medie dello storico del settore: malattie, impegni, vacanze), e le persone che devono essere presenti insieme nelle ore più cariche, sempre con le assenze. Riposi settimanali, malattie e vacanze sono quindi già compresi. Costi secondo il RAP (Allegato 1): notturno 10% sulle ore fra le 23 e le 6; per gli ausiliari 50% nei festivi parificati alle domeniche e, con il salario di base, indennita vacanze e tredicesima. Per gli ausiliari non comprende gli oneri sociali del datore di lavoro. E un calcolo su ore e presenze: il rispetto di riposi minimi e giorni di fila persona per persona si verifica con il piano.</p></body></html>',
   );
   w.document.close();
   setTimeout(() => w.print(), 300);

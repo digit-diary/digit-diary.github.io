@@ -532,7 +532,7 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno, scelte) {
           continue;
         }
         if (_sc && _sc.nome === '') {
-          ops.errors.push({ nome: nome, motivo: 'nome da chiarire: piu collaboratori con questo nome', riga });
+          ops.errors.push({ nome: nome, motivo: 'nome da chiarire: più collaboratori con questo nome', riga });
           continue;
         }
         const nomeFinale = (_sc && _sc.nome) || capitalizzaNome(nome);
@@ -926,7 +926,7 @@ async function _eseguiAssenzeOps(ops, ds, turno) {
   if (result.updated) summary.push(result.updated + ' aggiornate');
   if (result.deleted) summary.push(result.deleted + ' eliminate');
   if (ops.skipped.length) summary.push(ops.skipped.length + ' duplicati saltati');
-  if (summary.length) toast('Assenze: ' + summary.join(', ') + (usedFallback ? ' (modalita compatibilita)' : ''));
+  if (summary.length) toast('Assenze: ' + summary.join(', ') + (usedFallback ? ' (modalità compatibilita)' : ''));
   // per ultimo, perche nessun altro avviso lo copra
   if (falliti.length) {
     toastErrore('Assenze NON salvate per: ' + falliti.join(', ') + '. Riprova a salvare il rapporto.', 9000);

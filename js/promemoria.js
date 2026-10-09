@@ -247,7 +247,7 @@ async function riattivaPromemoria(id) {
 async function eliminaPromemoria(id) {
   // Il bottone e' solo per admin, ma il controllo va anche qui (chiamata diretta)
   if (!isAdmin()) {
-    toast("Solo un amministratore puo' eliminare i promemoria");
+    toast('Solo un amministratore può eliminare i promemoria');
     return;
   }
   if (!(await chiediConferma('Eliminare questo promemoria?'))) return;

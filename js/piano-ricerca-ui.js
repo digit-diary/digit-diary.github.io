@@ -493,7 +493,7 @@ async function pianoMigliora() {
   const scelta = await chiediModulo(
     'Il programma prova scambi e spostamenti fra le celle della bozza di ' +
       _pianoMeseSel +
-      ' e tiene solo quelli che migliorano: prima le regole (riposi, giorni di fila, ore della settimana, domeniche), poi i posti scoperti, poi le ore di ognuno.\n\nNon tocca vacanze, malattie, celle protette o bloccate, inserimenti a mano, giorni chiusi. Piu tempo ha, piu combinazioni prova.',
+      ' e tiene solo quelli che migliorano: prima le regole (riposi, giorni di fila, ore della settimana, domeniche), poi i posti scoperti, poi le ore di ognuno.\n\nNon tocca vacanze, malattie, celle protette o bloccate, inserimenti a mano, giorni chiusi. Più tempo ha, più combinazioni prova.',
     [
       {
         titolo: 'Tempo a disposizione',
@@ -581,7 +581,7 @@ async function pianoMigliora() {
   }
   const ok = await chiediModulo(
     riepilogo +
-      '\n\nVacanze, malattie, celle protette e inserimenti a mano non sono stati toccati. Applico? Si puo annullare con Annulla del piano.',
+      '\n\nVacanze, malattie, celle protette e inserimenti a mano non sono stati toccati. Applico? Si può annullare con Annulla del piano.',
     [],
     { titolo: 'Migliora la bozza', ok: 'Applica', annulla: 'Lascia com e' },
   );
@@ -707,7 +707,7 @@ async function _ricercaScrivi(res) {
         ' nuove, ' +
         togli.length +
         ' tolte' +
-        (saltate.length ? ', ' + saltate.length + ' lasciate perche modificate nel frattempo' : '') +
+        (saltate.length ? ', ' + saltate.length + ' lasciate perché modificate nel frattempo' : '') +
         ')',
     );
     if (!window._pianoAutoInCorso)
@@ -715,7 +715,7 @@ async function _ricercaScrivi(res) {
         'Bozza migliorata: ' +
           (res.cambi.length - saltate.length) +
           ' celle' +
-          (saltate.length ? ' · ' + saltate.length + ' lasciate come sono perche modificate a mano nel frattempo' : ''),
+          (saltate.length ? ' · ' + saltate.length + ' lasciate come sono perché modificate a mano nel frattempo' : ''),
       );
   } catch (e) {
     if (window._pianoAutoInCorso) throw e;

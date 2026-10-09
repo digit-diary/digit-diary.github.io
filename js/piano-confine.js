@@ -166,7 +166,7 @@ async function _pianoConfineAggiorna() {
   h += blocco(
     verso,
     _pianoConfineMeseLabel(verso && verso.ymB) +
-      ' e gia pianificato ed e da ricontrollare: i turni di fine ' +
+      ' e già pianificato ed e da ricontrollare: i turni di fine ' +
       _pianoConfineMeseLabel(ym) +
       ' rompono ' +
       ((verso && verso.lista.length) || 0) +
@@ -281,7 +281,7 @@ async function pianoConfineCorreggi(ymB) {
       '):' +
       celle +
       (res.cambi.length > 20 ? '\n• ...' : '') +
-      '\n\nSolo celle scritte dal programma; quelle scritte a mano restano. Si puo annullare con Annulla del piano.',
+      '\n\nSolo celle scritte dal programma; quelle scritte a mano restano. Si può annullare con Annulla del piano.',
     [],
     { titolo: 'Correzione al confine', ok: 'Applica', annulla: 'Lascia com e' },
   );

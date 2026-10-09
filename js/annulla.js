@@ -226,7 +226,7 @@
     // ---- inversione e riapplicazione ----
     async function controllaConflitto(table, id, attesi) {
       const cur = (await canale.leggi(table + '?' + chiave(table) + '=eq.' + id))[0];
-      if (!cur) throw new Error('La riga ' + parola(table) + ' non esiste piu');
+      if (!cur) throw new Error('La riga ' + parola(table) + ' non esiste più');
       Object.keys(attesi).forEach((k) => {
         if (!uguale(cur[k], attesi[k]))
           throw new Error(

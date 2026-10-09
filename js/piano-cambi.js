@@ -354,7 +354,7 @@ async function apriCercaCambioLibero() {
     toast('La cella deve avere un turno da coprire');
     return;
   }
-  toast("Cerco con chi puo' cambiare...");
+  toast('Cerco con chi può cambiare...');
   await _pianoCaricaStoriaGruppi(_pianoReparto()).catch(() => {}); // idoneita come la bozza
   const ym = _pianoMeseSel;
   const anno = parseInt(ym.split('-')[0]);
@@ -487,7 +487,7 @@ async function apriCercaCambioLibero() {
     });
   candidati.sort((a, b) => b.rest.length - a.rest.length || a.nome.localeCompare(b.nome));
   if (!candidati.length) {
-    toast("Nessun collega a riposo quel giorno puo' coprire " + r.codice + ' rispettando le regole');
+    toast('Nessun collega a riposo quel giorno può coprire ' + r.codice + ' rispettando le regole');
     return;
   }
   _ccDati = { nome: sel.nome, data: sel.data, codice: r.codice, candidati: candidati };
@@ -521,7 +521,7 @@ async function apriCercaCambioLibero() {
     '</select></div>' +
     '<div class="field" style="text-align:left;margin-top:8px"><label>Giorno di restituzione</label><select id="cc-rest" style="width:100%;padding:9px"></select></div>' +
     '<div class="field" style="text-align:left;margin-top:8px"><label>Motivazione</label><input type="text" id="cc-motivo" placeholder="Es: esigenze personali..."></div>' +
-    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:8px">Puoi stampare la lista dei colleghi con cui puo\' cambiare e consegnarla al collaboratore: lui chiede a chi vuole, poi si torna qui e si conferma. Alla conferma: celle aggiornate col commento del cambio, formulario cambio turno gia\' compilato da stampare e firmare, conteggio nel limite cambi del richiedente.</p>' +
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:8px">Puoi stampare la lista dei colleghi con cui può cambiare e consegnarla al collaboratore: lui chiede a chi vuole, poi si torna qui e si conferma. Alla conferma: celle aggiornate col commento del cambio, formulario cambio turno già compilato da stampare e firmare, conteggio nel limite cambi del richiedente.</p>' +
     '<div class="pwd-modal-btns" style="margin-top:12px;flex-wrap:wrap;gap:6px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button>' +
     '<button class="btn-export" style="padding:8px 14px" onclick="stampaListaCambioLibero()">Stampa lista colleghi</button>' +
     '<button class="btn-modal-ok" onclick="confermaCercaCambioLibero()">Applica cambio</button></div>';
@@ -630,7 +630,7 @@ async function confermaCercaCambioLibero() {
         !(await chiediConferma(
           'ATTENZIONE: ' +
             _ccDati.nome +
-            " ha gia' richiesto " +
+            ' ha già richiesto ' +
             n +
             '/' +
             maxC +
@@ -1590,7 +1590,7 @@ async function cercaSostitutiMalattia() {
     !d.catena
       ? ''
       : d.catena.tipo === 'scambio'
-        ? "In piu' il " +
+        ? 'In più il ' +
           d.catena.g1 +
           ': ' +
           d.sostituto.split(' ')[0] +
@@ -1601,7 +1601,7 @@ async function cercaSostitutiMalattia() {
           ' fa ' +
           d.catena.turnoX +
           ' (scambio alla pari)'
-        : "In piu' il " +
+        : 'In più il ' +
           d.catena.g1 +
           ': il turno ' +
           d.catena.turnoX +
@@ -1609,9 +1609,9 @@ async function cercaSostitutiMalattia() {
           d.sostituto.split(' ')[0] +
           ' passa a ' +
           d.catena.con.split(' ')[0] +
-          ", cosi' " +
+          ', così ' +
           d.sostituto.split(' ')[0] +
-          " puo' coprire";
+          ' può coprire';
   _malattiaPiano.descCatena = descCatena;
   let h =
     '<table class="piano-table" style="min-width:100%;font-size:var(--fs-sm,.8125rem)"><thead><tr><th></th><th>Giorno</th><th>Turno</th><th style="text-align:left">Sostituto proposto</th></tr></thead><tbody>';
@@ -1972,7 +1972,7 @@ async function confermaCoperturaMalattia() {
   const dstrDi = (g) => ym + '-' + String(g).padStart(2, '0');
   const rigaDi = {};
   _pianoRighe.forEach((r) => (rigaDi[r.collaboratore + '|' + parseInt(r.data.split('-')[2])] = r));
-  _pianoUndoSnap('copertura ' + (ass.codice === 'ND' ? 'non disponibilita ' : 'malattia ') + _pianoMeseSel);
+  _pianoUndoSnap('copertura ' + (ass.codice === 'ND' ? 'non disponibilità ' : 'malattia ') + _pianoMeseSel);
   let nM = 0;
   let nSost = 0;
   const sostituti = new Set();
@@ -2116,7 +2116,7 @@ async function confermaCoperturaMalattia() {
             az.punti +
             ' punti (copertura) a ' +
             [...sostituti].join(', ') +
-            "?\n\nAnnulla = nessun punto ora (si puo' fare dopo dal popup o da Formazione).",
+            '?\n\nAnnulla = nessun punto ora (si può fare dopo dal popup o da Formazione).',
         ))
       ) {
         for (const n of sostituti) {

@@ -473,7 +473,7 @@ async function pianoScriviSuSelezione(codice, celle) {
     return;
   }
   if (codice === 'ND') {
-    toastErrore('La ND si scrive una cella alla volta (chiede il tipo di non disponibilita)');
+    toastErrore('La ND si scrive una cella alla volta (chiede il tipo di non disponibilità)');
     return;
   }
   const lista = [];
@@ -487,7 +487,7 @@ async function pianoScriviSuSelezione(codice, celle) {
     lista.push({ nome: tr.dataset.nome, dstr: dstr, r: r });
   });
   if (!lista.length) {
-    toast('Nelle celle selezionate c e gia ' + codice);
+    toast('Nelle celle selezionate c e già ' + codice);
     return;
   }
   const persone = [...new Set(lista.map((x) => x.nome))];
@@ -524,7 +524,7 @@ async function pianoScriviSuSelezione(codice, celle) {
   } finally {
     window._pianoScritturaBlocco = null;
   }
-  logAzione('Piano: ' + codice + ' su piu celle', blocco.scritte + ' celle (' + _pianoMeseSel + ')');
+  logAzione('Piano: ' + codice + ' su più celle', blocco.scritte + ' celle (' + _pianoMeseSel + ')');
   // MALATTIA: Rapporto e Diario una volta per persona e per periodo di giorni di fila
   for (const nome of Object.keys(blocco.malattie)) {
     const giorni = blocco.malattie[nome].sort((a, b) => (a.data < b.data ? -1 : 1));
@@ -553,7 +553,7 @@ async function pianoScriviSuSelezione(codice, celle) {
   if (nonScritte.length) righe.push('Non scritte (vedi avviso): ' + nonScritte.join(', '));
   if (blocco.avvisi.length) righe.push('Regole da controllare:\n\u2022 ' + blocco.avvisi.join('\n\u2022 '));
   if (blocco.nonFormati.length) righe.push('Non formati per il turno: ' + [...new Set(blocco.nonFormati)].join(', '));
-  if (righe.length) await mostraAvviso(righe.join('\n\n'), { titolo: codice + ' su piu celle' });
+  if (righe.length) await mostraAvviso(righe.join('\n\n'), { titolo: codice + ' su più celle' });
 }
 async function _pianoIncollaSuSelezione(tab, testo) {
   const celle = _pianoBloccoCelle();
@@ -3007,7 +3007,7 @@ function _crInfoVacanzeResta(v) {
   return (
     'Spettanti ' +
     v.spett +
-    (v.spiega && v.spiega.bonus ? ' (di cui ' + v.spiega.bonus + ' per anzianita, solo quest anno)' : '') +
+    (v.spiega && v.spiega.bonus ? ' (di cui ' + v.spiega.bonus + ' per anzianità, solo quest anno)' : '') +
     '\n- pianificate ' +
     v.pian +
     (v.rest ? '\n+ restituite per malattia ' + v.rest : '') +
@@ -3044,15 +3044,15 @@ async function _renderPianoCreditiTab() {
     '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px" onclick="pianoCreditiStampa()">Stampa</button>' +
     '</div><div style="padding:10px 14px">';
   h +=
-    '<p style="font-size:var(--fs-md,.875rem);color:var(--muted);line-height:1.55;margin-bottom:10px">Per ogni collaboratore quello che gli resta o che deve recuperare. <b>Vacanze</b>: giorni spettanti nell anno meno le settimane registrate, piu i giorni restituiti per malattia (scheda Vacanze). <b>CGF</b>: recuperi festivi maturati e goduti fino alla fine di ' +
+    '<p style="font-size:var(--fs-md,.875rem);color:var(--muted);line-height:1.55;margin-bottom:10px">Per ogni collaboratore quello che gli resta o che deve recuperare. <b>Vacanze</b>: giorni spettanti nell anno meno le settimane registrate, più i giorni restituiti per malattia (scheda Vacanze). <b>CGF</b>: recuperi festivi maturati e goduti fino alla fine di ' +
     escP(meseLbl) +
-    ', mai i mesi futuri (scheda Festivi). <b>Saldo ore</b>: riporto piu i mesi dell anno, positivo = ore in piu fatte, negativo = ore da fare (scheda Saldo; va calcolato con il pulsante). <b>Recupero</b>: scostamenti del mese aperto (scheda Recupero ore). <b>Congedo NP</b>: giorni di congedo non pagato nell anno. Clic sulla riga per il dettaglio.</p>';
+    ', mai i mesi futuri (scheda Festivi). <b>Saldo ore</b>: riporto più i mesi dell anno, positivo = ore in più fatte, negativo = ore da fare (scheda Saldo; va calcolato con il pulsante). <b>Recupero</b>: scostamenti del mese aperto (scheda Recupero ore). <b>Congedo NP</b>: giorni di congedo non pagato nell anno. Clic sulla riga per il dettaglio.</p>';
   h +=
     '<div style="overflow:auto;max-height:72vh"><table id="piano-crediti-table" class="piano-table" style="min-width:1100px;font-size:var(--fs-sm,.8125rem)"><thead><tr>' +
     '<th style="text-align:left">Collaboratore</th><th>Funzione</th><th>%</th>' +
-    '<th title="Giorni di vacanza dell anno secondo anzianita">Vacanze spettanti</th><th title="Giorni delle settimane registrate">Pianificate</th><th title="Giorni V coperti da malattia, tornati disponibili">Restituite</th><th>Vacanze restano</th>' +
+    '<th title="Giorni di vacanza dell anno secondo anzianità">Vacanze spettanti</th><th title="Giorni delle settimane registrate">Pianificate</th><th title="Giorni V coperti da malattia, tornati disponibili">Restituite</th><th>Vacanze restano</th>' +
     '<th title="Riporto dall anno prima">CGF riporto</th><th>CGF maturati</th><th>CGF goduti</th><th>CGF restano</th>' +
-    '<th title="Riporto piu i mesi dell anno">Saldo ore ' +
+    '<th title="Riporto più i mesi dell anno">Saldo ore ' +
     anno +
     '</th><th title="Scostamenti del mese aperto">Recupero mese</th><th>Congedo NP</th></tr></thead><tbody>';
   dati.forEach((d, i) => {
@@ -3076,7 +3076,7 @@ async function _renderPianoCreditiTab() {
         '',
         false,
         d.vac && d.vac.spiega && d.vac.spiega.bonus
-          ? d.vac.spiega.base + ' di base + ' + d.vac.spiega.bonus + ' per anzianita (solo quest anno)'
+          ? d.vac.spiega.base + ' di base + ' + d.vac.spiega.bonus + ' per anzianità (solo quest anno)'
           : '',
       ) +
       _pianoCreditiNum(d.vac ? d.vac.pian : null, '', false, _crInfoVacanzePian(d.vac)) +
@@ -3150,7 +3150,7 @@ async function pianoCreditiDettaglio(i) {
         ' (scheda Festivi).',
     );
   if (d.saldoOre != null)
-    righe.push('Saldo ore ' + u.anno + ': ' + d.saldoOre + ' h, riporto piu i mesi con un piano (scheda Saldo).');
+    righe.push('Saldo ore ' + u.anno + ': ' + d.saldoOre + ' h, riporto più i mesi con un piano (scheda Saldo).');
   if (d.recMese != null)
     righe.push('Recupero ore di ' + u.meseLbl + ': ' + d.recMese + ' h di scostamenti (scheda Recupero ore).');
   if (d.cnp)
@@ -3382,7 +3382,7 @@ async function _pianoAvvisiLenti(forza) {
       // recuperi CGF
       const c = cgf[nome];
       if (c && c.resta > 0) voci.push({ grave: false, testo: c.resta + ' CGF da dare entro il 31.12' });
-      if (c && c.resta < 0) voci.push({ grave: true, testo: -c.resta + ' CGF in piu (da pareggiare)' });
+      if (c && c.resta < 0) voci.push({ grave: true, testo: -c.resta + ' CGF in più (da pareggiare)' });
       // domeniche libere
       let libere = 0;
       let future = 0;
@@ -3406,7 +3406,7 @@ async function _pianoAvvisiLenti(forza) {
             libere +
             ' su ' +
             diritto +
-            (restano > future ? ', non piu raggiungibile' : ', ne mancano ' + restano),
+            (restano > future ? ', non più raggiungibile' : ', ne mancano ' + restano),
         });
       }
       if (voci.length) out.anno.push({ nome: nome, voci: voci });
@@ -3749,7 +3749,7 @@ async function _renderPianoAvvisiTab() {
   const sez = {};
   // ore settimanali
   sez.sett =
-    '<p class="avv-intro">Settimane lunedi-domenica oltre <b>' +
+    '<p class="avv-intro">Settimane lunedì-domenica oltre <b>' +
     (v.max || '-') +
     ' ore' +
     (v.conNotte ? ' compreso il 10% notturno' : ' da orologio') +
@@ -3794,11 +3794,11 @@ async function _renderPianoAvvisiTab() {
     (parseFloat(_pianoRegolaVal('riposo_domenica_libera_ore')) || '-') +
     ' ore comprese le 23 del sabato e le 23 della domenica. <b>Domenica lavorata</b> (anche con il sabato oltre le 23): almeno ' +
     (parseFloat(_pianoRegolaVal('riposo_domenica_lavorata_ore')) || '-') +
-    ' ore consecutive nella settimana prima oppure in quella dopo (lunedi-sabato). La bozza non li crea; i valori si cambiano nella scheda Regole.</p>' +
+    ' ore consecutive nella settimana prima oppure in quella dopo (lunedì-sabato). La bozza non li crea; i valori si cambiano nella scheda Regole.</p>' +
     (!v.riposo.length
       ? vuoto('Tutte le domeniche del mese hanno il riposo giusto.')
       : tabella(
-          ['Collaboratore', 'Domenica', 'Tipo', 'Riposo piu lungo', 'Minimo', 'Da', 'A'],
+          ['Collaboratore', 'Domenica', 'Tipo', 'Riposo più lungo', 'Minimo', 'Da', 'A'],
           v.riposo.map(
             (x) =>
               '<tr' +
@@ -3826,7 +3826,7 @@ async function _renderPianoAvvisiTab() {
         ));
   // regole del mese
   sez.regole =
-    '<p class="avv-intro">Riposo minimo, giorni di lavoro di fila, idoneita e le altre regole del settore nel mese di ' +
+    '<p class="avv-intro">Riposo minimo, giorni di lavoro di fila, idoneità e le altre regole del settore nel mese di ' +
     escP(mese) +
     '.</p>' +
     (!v.regole.length
@@ -3854,7 +3854,7 @@ async function _renderPianoAvvisiTab() {
   sez.anno =
     '<p class="avv-intro">Chi al 31.12.' +
     a +
-    ' non arriva in pari: saldo ore fuori banda (mesi gia pianificati), recuperi CGF da dare o in piu, domeniche libere sotto il diritto. In rosso cio che non si sistema piu da solo.</p>' +
+    ' non arriva in pari: saldo ore fuori banda (mesi già pianificati), recuperi CGF da dare o in più, domeniche libere sotto il diritto. In rosso ciò che non si sistema più da solo.</p>' +
     (!l.anno.length
       ? vuoto('Tutti in pari con i mesi pianificati.')
       : tabella(
@@ -3901,7 +3901,7 @@ async function _renderPianoAvvisiTab() {
         ));
   // malattie lunghe
   sez.malattie =
-    '<p class="avv-intro">Malattie in corso da 10 giorni o piu. Dal 15. giorno ogni giorno vale 5.857 ore (41/7), che lavorasse o no.</p>' +
+    '<p class="avv-intro">Malattie in corso da 10 giorni o più. Dal 15. giorno ogni giorno vale 5.857 ore (41/7), che lavorasse o no.</p>' +
     (!l.malattie.length
       ? vuoto('Nessuna malattia lunga in corso.')
       : tabella(
@@ -4208,7 +4208,7 @@ async function _pianoAnalisiScoperti(ym) {
             const rr = rigaDi[n + '|' + k];
             if (rr && /^Eccezione:/i.test(rr.commento || '')) giaUsata = true;
           }
-          if (giaUsata) return out.regole.push({ nome: n, regola: testo + ' (eccezione gia usata questa settimana)' });
+          if (giaUsata) return out.regole.push({ nome: n, regola: testo + ' (eccezione già usata questa settimana)' });
           const corti = riposoOre(n, g, t).filter((x) => x.ore < minRip);
           // mai sotto le 8 ore di riposo (il minimo assoluto): niente eccezione da proporre
           if (corti.some((x) => x.ore < 8))
@@ -4263,26 +4263,26 @@ async function pianoPercheScoperti() {
     });
     window._pwdLargoObs.observe(modale, { attributes: true, attributeFilter: ['class'] });
   }
-  b.innerHTML = '<h3>Perche scoperto · ' + escP(ym) + '</h3><p>Analisi in corso...</p>';
+  b.innerHTML = '<h3>Perché scoperto · ' + escP(ym) + '</h3><p>Analisi in corso...</p>';
   document.getElementById('pwd-modal').classList.remove('hidden');
   let r;
   try {
     r = await _pianoAnalisiScoperti(ym);
   } catch (e) {
-    b.innerHTML = '<h3>Perche scoperto</h3><p>Analisi non riuscita: ' + escP((e && e.message) || String(e)) + '</p>';
+    b.innerHTML = '<h3>Perché scoperto</h3><p>Analisi non riuscita: ' + escP((e && e.message) || String(e)) + '</p>';
     return;
   }
   const chiudi =
     '<div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
   const settore = typeof repartoLabel === 'function' ? repartoLabel(_pianoReparto()) : _pianoReparto();
   if (!r.totPosti) {
-    b.innerHTML = '<h3>Perche scoperto</h3><p>Il mese non ha fabbisogno in ' + escP(settore) + '.</p>' + chiudi;
+    b.innerHTML = '<h3>Perché scoperto</h3><p>Il mese non ha fabbisogno in ' + escP(settore) + '.</p>' + chiudi;
     return;
   }
   const nScop = r.scoperti.reduce((s, x) => s + x.quanti, 0);
   const perc = Math.round(((r.totPosti - nScop) / r.totPosti) * 1000) / 10;
   let h =
-    '<h3>Perche scoperto · ' +
+    '<h3>Perché scoperto · ' +
     escP(settore) +
     ' · ' +
     escP(ym) +
@@ -4319,11 +4319,11 @@ async function pianoPercheScoperti() {
       '<b>Manca personale</b> in ' +
         senzaNessuno.length +
         (senzaNessuno.length === 1 ? ' posto' : ' posti') +
-        ': quel giorno nessuno era libero (tutti al lavoro, assenti o con il riposo gia fissato). Giorni: ' +
+        ': quel giorno nessuno era libero (tutti al lavoro, assenti o con il riposo già fissato). Giorni: ' +
         escP([...new Set(senzaNessuno.map((x) => _pianoDataBreve(x.data)))].join(', ')) +
         '. In vacanza o assenti in quei giorni: fino a ' +
         Math.max(...senzaNessuno.map((x) => x.assenti.length)) +
-        ' persone. Servono una o piu persone in piu (o un jolly) in quei giorni, oppure vacanze meno concentrate.',
+        ' persone. Servono una o più persone in più (o un jolly) in quei giorni, oppure vacanze meno concentrate.',
     );
   if (conNonFormati.length) {
     const perGruppo = {};
@@ -4339,7 +4339,7 @@ async function pianoPercheScoperti() {
           (nPosti === 1 ? ' posto' : ' posti') +
           ' si potevano coprire con persone libere quel giorno ma non formate per ' +
           escP(gr) +
-          '. Le piu spesso libere: ' +
+          '. Le più spesso libere: ' +
           chi.map(([n, k]) => escP(n) + ' (' + k + ')').join(', ') +
           '.',
       );
@@ -4398,7 +4398,7 @@ async function pianoPercheScoperti() {
       '<b>Possibile con eccezione</b>: ' +
         conEccezione.length +
         (conEccezione.length === 1 ? ' posto' : ' posti') +
-        ' si coprirebbero accettando un riposo piu corto. Ordine delle regole: prima le domeniche libere (12 all anno, mai eccezioni), poi le 11 ore, poi le 36 ore; per questo sono proposte prima le eccezioni sulle 36 ore. Solo se si e al limite: nella tabella, <b>Assegna comunque</b> (conferma, nota "Eccezione" sulla cella, Valida la segnala; poi si puo far finire prima).',
+        ' si coprirebbero accettando un riposo più corto. Ordine delle regole: prima le domeniche libere (12 all anno, mai eccezioni), poi le 11 ore, poi le 36 ore; per questo sono proposte prima le eccezioni sulle 36 ore. Solo se si e al limite: nella tabella, <b>Assegna comunque</b> (conferma, nota "Eccezione" sulla cella, Valida la segnala; poi si può far finire prima).',
     );
   if (conRegole.length) {
     const tutte = [];
@@ -4523,7 +4523,7 @@ async function pianoAssegnaEccezione(nome, dstr, codice, regola) {
         _pianoDataBreve(dstr) +
         ' copre un posto scoperto, ma non rispetta: ' +
         regola +
-        '.\n\nDa usare solo se si e al limite. La cella avra la nota "Eccezione" e Valida continuera a segnalarla (si puo far finire prima per rientrare nel riposo). Assegno?',
+        '.\n\nDa usare solo se si e al limite. La cella avra la nota "Eccezione" e Valida continuera a segnalarla (si può far finire prima per rientrare nel riposo). Assegno?',
       { titolo: 'Eccezione alla regola', ok: 'Assegna comunque', annulla: 'No' },
     ))
   )

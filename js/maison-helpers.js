@@ -81,7 +81,7 @@ function apriMultiSelectOperatori(hiddenInputId, btnId, title) {
   const mc = document.getElementById('pwd-modal-content');
   let html = '<h3>' + escP(title || 'Seleziona operatori') + '</h3>';
   html +=
-    '<p style="color:var(--muted);font-size:var(--fs-md,.875rem);margin-bottom:12px">Seleziona uno o piu\' destinatari, oppure "Tutti" per inviare a tutto il reparto.</p>';
+    '<p style="color:var(--muted);font-size:var(--fs-md,.875rem);margin-bottom:12px">Seleziona uno o più destinatari, oppure "Tutti" per inviare a tutto il reparto.</p>';
   // Opzione "Tutti"
   html +=
     '<div style="padding:10px 12px;background:var(--paper2);border-radius:3px;margin-bottom:10px"><label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:600"><input type="checkbox" id="msop-tutti"' +
@@ -158,7 +158,7 @@ function _scegliCandidatoNome(input, candidates) {
     const mc = document.getElementById('pwd-modal-content');
     let html = '<h3>Quale "' + escP(input) + '"?</h3>';
     html +=
-      '<p style="color:var(--muted);font-size:var(--fs-md,.875rem);margin-bottom:12px">Esistono piu\' clienti con questo cognome. Seleziona quello giusto:</p>';
+      '<p style="color:var(--muted);font-size:var(--fs-md,.875rem);margin-bottom:12px">Esistono più clienti con questo cognome. Seleziona quello giusto:</p>';
     html += '<div style="max-height:280px;overflow-y:auto">';
     candidates.forEach((c, i) => {
       html +=
@@ -1443,7 +1443,7 @@ function _renderSpeseExtraDel() {
 }
 async function eliminaSpeseExtraGiorno() {
   if (!isAdmin()) {
-    toast("Solo un amministratore puo' eliminare le spese extra di un giorno");
+    toast('Solo un amministratore può eliminare le spese extra di un giorno');
     return;
   }
   const sel = document.getElementById('se-del-giorno');
@@ -1480,7 +1480,7 @@ async function eliminaSpeseExtraGiorno() {
 }
 async function eliminaSpeseExtraMese() {
   if (!isAdmin()) {
-    toast("Solo un amministratore puo' eliminare le spese extra di un mese");
+    toast('Solo un amministratore può eliminare le spese extra di un mese');
     return;
   }
   const sel = document.getElementById('se-del-mese');
@@ -2231,7 +2231,7 @@ function apriHrAllegato(id) {
 }
 async function eliminaHrAllegato(id, nome) {
   if (!isAdmin()) {
-    toast("Solo un amministratore puo' eliminare gli allegati");
+    toast('Solo un amministratore può eliminare gli allegati');
     return;
   }
   if (!(await chiediConferma('Eliminare questo allegato? Operazione definitiva.'))) return;
@@ -2562,7 +2562,7 @@ async function rinominaCategoriaBase(key) {
   if (nuovo === null) return;
   const label = nuovo.trim();
   if (label && getInvCategorieExtra().some((c) => c.label.toLowerCase() === label.toLowerCase())) {
-    toast('Esiste gia una categoria con questo nome');
+    toast('Esiste già una categoria con questo nome');
     return;
   }
   await _setInvBase(key, { label: label && label !== INV_BASE_NOMI[key] ? label : '' });

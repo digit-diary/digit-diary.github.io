@@ -147,13 +147,13 @@ async function _pianoAutoEsegui(rep, ym, minuti) {
     // l ha fatta e magari gia corretta. Non si rifa: si avvisa e basta.
     if (generate.length > nGiorni) {
       stato = 'saltata';
-      esito.motivo = 'bozza gia presente';
+      esito.motivo = 'bozza già presente';
       righe.push(
         'Il piano di ' +
           meseL +
           ' (' +
           repL +
-          ') ha gia una bozza (' +
+          ') ha già una bozza (' +
           generate.length +
           ' turni generati): la generazione automatica non l ha toccata.',
       );
@@ -169,7 +169,7 @@ async function _pianoAutoEsegui(rep, ym, minuti) {
       } else {
         righe.push('Piano di ' + meseL + ' (' + repL + ') generato in automatico.');
         righe.push('• ' + (b.celle || 0) + ' celle scritte' + (b.cgf ? ', di cui ' + b.cgf + ' CGF' : ''));
-        if (aMano.length) righe.push('• ' + aMano.length + ' turni gia scritti a mano: lasciati come erano');
+        if (aMano.length) righe.push('• ' + aMano.length + ' turni già scritti a mano: lasciati come erano');
         // vacanze del file che cadono su una cella scritta a mano: non si tocca, si segnala
         const conflitti = auto.aManoNonToccate || [];
         if (conflitti.length) {
@@ -212,7 +212,7 @@ async function _pianoAutoEsegui(rep, ym, minuti) {
           );
         }
         if (b.volute > b.celle)
-          righe.push('• ' + (b.volute - b.celle) + ' celle non scritte perche in quei giorni c era gia una cella');
+          righe.push('• ' + (b.volute - b.celle) + ' celle non scritte perché in quei giorni c era già una cella');
         // MIGLIORA LA BOZZA per i minuti scelti
         if (minuti > 0 && (b.celle || 0) > 0) {
           const secondi = Math.min(10, minuti) * 60;
@@ -446,7 +446,7 @@ async function pianoAutoRenderCard() {
   const sel = 'padding:4px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)';
   let h =
     '<div class="main-card" style="margin-top:16px"><div class="card-header">Generazione automatica del piano</div><div style="padding:10px 14px">' +
-    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px;line-height:1.5">Dal giorno scelto in poi il primo PC con il programma aperto genera il piano del mese dopo (vacanze, congedi, CGF, turni) e lo migliora per i minuti indicati. Se il PC si accende piu tardi, la fa appena acceso. Una sola volta per mese e settore, anche con piu PC accesi. Serve che le vacanze dell anno siano importate: se mancano aspetta e avvisa. Non tocca mai gli inserimenti a mano; se il mese ha gia una bozza non la rifa. Alla fine avvisa con una nota chi ha il permesso "Genera bozza". Prossimo mese da generare: <b>' +
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px;line-height:1.5">Dal giorno scelto in poi il primo PC con il programma aperto genera il piano del mese dopo (vacanze, congedi, CGF, turni) e lo migliora per i minuti indicati. Se il PC si accende più tardi, la fa appena acceso. Una sola volta per mese e settore, anche con più PC accesi. Serve che le vacanze dell anno siano importate: se mancano aspetta e avvisa. Non tocca mai gli inserimenti a mano; se il mese ha già una bozza non la rifa. Alla fine avvisa con una nota chi ha il permesso "Genera bozza". Prossimo mese da generare: <b>' +
     escP(_pianoAutoMeseLabel(mese || '')) +
     '</b>.</p>' +
     '<div style="overflow-x:auto"><table class="tbl-semplice" style="border-collapse:collapse;font-size:var(--fs-sm,.8125rem)"><thead><tr>' +
@@ -588,7 +588,7 @@ async function pianoAutoRiprova(rep, mese) {
         _pianoAutoMeseLabel(mese) +
         ' (' +
         rep +
-        ')?\n\nParte subito su questo PC se il giorno e arrivato. Se il mese ha gia una bozza non la rifa: per rigenerarlo prima "Cancella piano".',
+        ')?\n\nParte subito su questo PC se il giorno e arrivato. Se il mese ha già una bozza non la rifa: per rigenerarlo prima "Cancella piano".',
     ))
   )
     return;
