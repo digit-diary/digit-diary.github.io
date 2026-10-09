@@ -370,8 +370,7 @@ async function apriCercaCambioLibero() {
   // SENZA filtro settore: chi lavora in due settori ha celle anche nell'altro
   // piano, e quel giorno NON e' libero (prima risultava libero e la sua cella
   // dell'altro settore veniva sovrascritta)
-  const righeTutte =
-    (await secGet('piano?data=gte.' + iso(daRange) + '&data=lte.' + iso(finoA) + '&limit=20000')) || [];
+  const righeTutte = (await secGet('piano?data=gte.' + iso(daRange) + '&data=lte.' + iso(finoA) + '')) || [];
   const mappe = {}; // nome -> {data: codice}
   const bloccate = {}; // nome|data -> motivo (celle bloccate con motivo: non si toccano)
   const rigaPer = {}; // nome|data -> riga (orari veri per il riposo)
@@ -1327,9 +1326,8 @@ async function cercaSostitutiMalattia() {
   _bAl.setDate(_bAl.getDate() + _nGiorniMese + 7);
   try {
     const _righeBordo =
-      (await secGet(
-        'piano?data=gte.' + _isoB(_bDa) + '&data=lt.' + ym + '-01&reparto_dip=eq.' + _pianoReparto() + '&limit=4000',
-      )) || [];
+      (await secGet('piano?data=gte.' + _isoB(_bDa) + '&data=lt.' + ym + '-01&reparto_dip=eq.' + _pianoReparto())) ||
+      [];
     const _righeBordo2 =
       (await secGet(
         'piano?data=gt.' +
@@ -1339,14 +1337,16 @@ async function cercaSostitutiMalattia() {
           '&data=lte.' +
           _isoB(_bAl) +
           '&reparto_dip=eq.' +
-          _pianoReparto() +
-          '&limit=4000',
+          _pianoReparto(),
       )) || [];
     [..._righeBordo, ..._righeBordo2].forEach((r) => {
       const idx = Math.round((new Date(r.data + 'T12:00:00') - _primoDelMese) / 86400000) + 1;
       cella[r.collaboratore + '|' + idx] = r.codice;
     });
-  } catch (e) {}
+  } catch (e) {
+    toastErrore('Ricerca fermata: non riesco a leggere i giorni prima e dopo il mese (riposi). Riprova.', 8000);
+    return;
+  }
   // dopo la fine del rapporto il giorno non e libero: nessuna proposta
   for (const nf of nomi)
     for (let g = 1; g <= _pianoUltimoGiorno(ym); g++)
@@ -1770,11 +1770,14 @@ async function _pianoMalattiaNelDiario(nome, dal, al, chiedi, codiceSostituito) 
   for (let d = new Date(dI); d <= dF; d.setDate(d.getDate() + 1)) {
     const dStr =
       d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    // gia registrato: una riga di quel giorno o una vecchia riga che copre piu giorni
+    // ("dal 02.11.2026 al 21.11.2026"): prima quel giorno veniva registrato due volte
     const esiste = datiCache.find(
       (e) =>
         (e.nome || '').toLowerCase() === nome.toLowerCase() &&
         e.tipo === tipoMal &&
-        String(e.data || '').startsWith(dStr),
+        !e.eliminato &&
+        (String(e.data || '').startsWith(dStr) || _pianoDateMalattia(e.testo || '', e.data).includes(dStr)),
     );
     if (!esiste) giorniNuovi.push(dStr);
   }
@@ -1823,6 +1826,7 @@ async function _pianoMalattiaNelDiario(nome, dal, al, chiedi, codiceSostituito) 
     return 0;
   const lbl = ' (dal ' + dI.toLocaleDateString('it-IT') + ' al ' + dF.toLocaleDateString('it-IT') + ')';
   let creati = 0;
+  const falliti = [];
   for (const dStr of giorniNuovi) {
     const rec = {
       id: Date.now() + creati,
@@ -1837,9 +1841,16 @@ async function _pianoMalattiaNelDiario(nome, dal, al, chiedi, codiceSostituito) 
       await secPost('registrazioni', rec);
       datiCache.unshift(rec);
       creati++;
-    } catch (e) {}
+    } catch (e) {
+      falliti.push(dStr.split('-').reverse().join('.'));
+    }
   }
   if (creati) logAzione('Malattia dal piano', nome + ' · ' + creati + ' giorni registrati nel Diario');
+  if (falliti.length)
+    toastErrore(
+      'Malattia di ' + nome + ' NON registrata nel Diario per ' + falliti.join(', ') + ': registrala dal Diario.',
+      10000,
+    );
   return creati;
 }
 // PIANO → DIARIO anche in rimozione: se una M sparisce dal piano (tolta o
@@ -1848,13 +1859,45 @@ async function _pianoMalattiaNelDiario(nome, dal, al, chiedi, codiceSostituito) 
 async function _pianoMalattiaViaDiario(nome, giorniDstr) {
   if (typeof datiCache === 'undefined' || typeof secPatch !== 'function') return 0;
   const tipoMal = typeof nomeCorrente === 'function' ? nomeCorrente('Malattia') : 'Malattia';
-  const daTogliere = datiCache.filter(
-    (e) =>
-      (e.nome || '').toLowerCase() === nome.toLowerCase() &&
-      e.tipo === tipoMal &&
-      !e.eliminato &&
-      giorniDstr.some((d) => String(e.data || '').startsWith(d)),
+  const suoi = datiCache.filter(
+    (e) => (e.nome || '').toLowerCase() === nome.toLowerCase() && e.tipo === tipoMal && !e.eliminato,
   );
+  // giorni coperti dalla riga. Il Diario e il piano scrivono UNA RIGA PER GIORNO con il
+  // periodo come etichetta finale "(dal 16/11/2026 al 18/11/2026)": vale solo il suo giorno.
+  // Una vecchia riga unica scritta a mano ("dal 2.11.2026 al 21.11.2026", "3 giorni")
+  // copre tutto il suo periodo.
+  const giorniDellaRiga = (e) => {
+    const g0 = String(e.data || '').substring(0, 10);
+    if (/\(dal \d{1,2}[./]\d{1,2}[./]\d{4} al \d{1,2}[./]\d{1,2}[./]\d{4}\)\s*$/.test(String(e.testo || '')))
+      return [g0];
+    const periodo = _pianoDateMalattia(e.testo || '', e.data);
+    return periodo.length ? periodo : [g0];
+  };
+  const daTogliere = [];
+  const periodiInteri = [];
+  suoi.forEach((e) => {
+    const gg = giorniDellaRiga(e);
+    if (!giorniDstr.some((d) => gg.includes(d))) return;
+    // una riga che copre anche giorni che restano in malattia non si cestina: toglierla
+    // cancellerebbe tutto il periodo (prima succedeva, con il messaggio "il giorno 30")
+    if (gg.some((d) => !giorniDstr.includes(d))) periodiInteri.push(e);
+    else daTogliere.push(e);
+  });
+  if (periodiInteri.length) {
+    const testo = periodiInteri
+      .map((e) => {
+        const gg = giorniDellaRiga(e);
+        return gg[0].split('-').reverse().join('.') + ' - ' + gg[gg.length - 1].split('-').reverse().join('.');
+      })
+      .join(', ');
+    await mostraAvviso(
+      'Nel Diario la malattia di ' +
+        nome +
+        ' e registrata come un periodo unico (' +
+        testo +
+        ').\n\nIl Diario resta com e: per accorciare il periodo modifica la registrazione nel Diario.',
+    );
+  }
   if (!daTogliere.length) return 0;
   const gg = daTogliere
     .map((e) => String(e.data).substring(8, 10) + '/' + String(e.data).substring(5, 7))
@@ -1877,14 +1920,19 @@ async function _pianoMalattiaViaDiario(nome, giorniDstr) {
   const op = getOperatore();
   const now = new Date().toISOString();
   let tolte = 0;
+  const nonTolte = [];
   for (const e of daTogliere) {
     try {
       await secPatch('registrazioni', 'id=eq.' + e.id, { eliminato: true, eliminato_da: op, eliminato_at: now });
       e.eliminato = true;
       _diarioTogliArchivioLeggero(e.id);
       tolte++;
-    } catch (err) {}
+    } catch (err) {
+      nonTolte.push(String(e.data).substring(8, 10) + '/' + String(e.data).substring(5, 7));
+    }
   }
+  if (nonTolte.length)
+    toastErrore('Diario NON aggiornato per ' + nonTolte.join(', ') + ': togli la malattia dal Diario.', 10000);
   datiCache = datiCache.filter((e) => !e.eliminato);
   if (tolte) {
     logAzione('Malattia tolta dal piano', nome + ' · ' + tolte + ' giorni spostati nel cestino del Diario');

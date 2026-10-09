@@ -1124,7 +1124,12 @@ async function parseDifferenzeCassa(text, ds, turno) {
             });
             esiste.importo = amount;
             esiste.testo = newTesto;
-          } catch (e) {}
+          } catch (e) {
+            toastErrore(
+              'Differenza cassa di ' + nomeCompleto + ' NON aggiornata nel Diario: ' + ((e && e.message) || e),
+              8000,
+            );
+          }
         }
         continue;
       }
@@ -1147,7 +1152,16 @@ async function parseDifferenzeCassa(text, ds, turno) {
         await secPost('registrazioni', rec);
         datiCache.unshift(rec);
         logAzione('Auto-registrazione differenza cassa', nomeCompleto + ' ' + amount.toFixed(2) + ' CHF');
-      } catch (e) {}
+      } catch (e) {
+        toastErrore(
+          'Differenza cassa di ' +
+            nomeCompleto +
+            ' NON registrata nel Diario: registrala a mano (' +
+            ((e && e.message) || e) +
+            ')',
+          10000,
+        );
+      }
     }
   }
   render();

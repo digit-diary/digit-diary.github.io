@@ -1539,12 +1539,19 @@ async function eseguiRinominaTipo(vecchioNome) {
       if (!(await salvaImp('tipi_ordine', JSON.stringify(tipiOrdine)))) return;
     }
     // Aggiorna registrazioni nel DB e nella cache
+    // le registrazioni con il tipo vecchio: se il database non le aggiorna, si dice (prima
+    // restavano orfane mentre la pagina mostrava il nome nuovo)
     try {
       await secPatch('registrazioni', 'tipo=eq.' + encodeURIComponent(vecchioNome), { tipo: nuovoNome });
-    } catch (e) {}
-    datiCache.forEach((e) => {
-      if (e.tipo === vecchioNome) e.tipo = nuovoNome;
-    });
+      datiCache.forEach((e) => {
+        if (e.tipo === vecchioNome) e.tipo = nuovoNome;
+      });
+    } catch (e) {
+      toastErrore(
+        'Le registrazioni con il tipo ' + vecchioNome + ' NON sono state rinominate: ' + ((e && e.message) || e),
+        10000,
+      );
+    }
   } else {
     const tp = tipiPersonalizzati.find((t) => t.nome === vecchioNome);
     if (tp) {
@@ -1558,12 +1565,19 @@ async function eseguiRinominaTipo(vecchioNome) {
       if (!(await saveTipiP())) return;
       if (!(await saveColoriOverride())) return;
       if (tipiOrdine.length && !(await salvaImp('tipi_ordine', JSON.stringify(tipiOrdine)))) return;
+      // le registrazioni con il tipo vecchio: se il database non le aggiorna, si dice (prima
+      // restavano orfane mentre la pagina mostrava il nome nuovo)
       try {
         await secPatch('registrazioni', 'tipo=eq.' + encodeURIComponent(vecchioNome), { tipo: nuovoNome });
-      } catch (e) {}
-      datiCache.forEach((e) => {
-        if (e.tipo === vecchioNome) e.tipo = nuovoNome;
-      });
+        datiCache.forEach((e) => {
+          if (e.tipo === vecchioNome) e.tipo = nuovoNome;
+        });
+      } catch (e) {
+        toastErrore(
+          'Le registrazioni con il tipo ' + vecchioNome + ' NON sono state rinominate: ' + ((e && e.message) || e),
+          10000,
+        );
+      }
     }
   }
   if (tipoSelezionato === vecchioNome) tipoSelezionato = nuovoNome;

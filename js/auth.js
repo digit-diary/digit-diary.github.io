@@ -334,6 +334,9 @@ async function eseguiForzaCambioPwdOp(nome) {
   }
 }
 async function esci() {
+  // il rapporto scritto negli ultimi secondi si salva prima di uscire (al massimo 4 s)
+  if (typeof flushRapportoSave === 'function')
+    await Promise.race([flushRapportoSave(), new Promise((x) => setTimeout(x, 4000))]).catch(() => {});
   const tk = getOpToken() || getAdminToken();
   if (tk) {
     // La sessione va chiusa sul server PRIMA del reload: senza attesa il

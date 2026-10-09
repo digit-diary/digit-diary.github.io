@@ -155,9 +155,34 @@ function capitalizzaNome(s) {
 }
 
 // TOAST & UTILS
+// ERRORI IN PAROLE SEMPLICI (controllo del 09/10/2026): i messaggi del database e della
+// rete arrivavano a schermo in inglese tecnico ("duplicate key value...", "Failed to
+// fetch"). Qui si traducono SOLO per chi legge: il testo originale resta nell errore (i
+// controlli del programma lo riconoscono) e nella console.
+const _ERRORI_IN_CHIARO = [
+  [/duplicate key value violates unique constraint\s*"?[\w.]*"?/gi, 'esiste gia (dato doppio)'],
+  [/(TypeError:\s*)?(Failed to fetch|NetworkError[^\s.,;:)]*|Load failed)/gi, 'connessione assente'],
+  [/violates foreign key constraint\s*"?[\w.]*"?/gi, 'e collegato ad altri dati'],
+  [/null value in column "?(\w+)"?[^,.;]*violates not-null constraint/gi, 'manca un dato obbligatorio ($1)'],
+  [/violates not-null constraint/gi, 'manca un dato obbligatorio'],
+  [/value too long for type[^,.;)]*/gi, 'testo troppo lungo'],
+  [/invalid input syntax for type \w+[^,.;)]*/gi, 'valore non valido'],
+  [/permission denied[^,.;)]*/gi, 'permesso negato dal database'],
+  [/JWT expired/gi, 'sessione scaduta: esci e rientra'],
+  [/canceling statement due to statement timeout|statement timeout/gi, 'il database ha impiegato troppo: riprova'],
+  [/Could not find the function[^,;)]*/gi, 'funzione non presente sul server: serve l aggiornamento (avvisa l IT)'],
+];
+function erroreInChiaro(m) {
+  let t = String(m == null ? '' : m);
+  _ERRORI_IN_CHIARO.forEach(([re, it]) => (t = t.replace(re, it)));
+  return t;
+}
 function toast(m, durata, tipo) {
   const t = document.getElementById('toast');
-  t.textContent = m;
+  const originale = String(m == null ? '' : m);
+  const chiaro = erroreInChiaro(originale);
+  if (chiaro !== originale) console.warn('Messaggio originale:', originale);
+  t.textContent = chiaro;
   // tipo 'errore': rosso e piu' a lungo, per i rifiuti che l'operatore deve vedere
   t.classList.toggle('errore', tipo === 'errore');
   t.classList.add('show');

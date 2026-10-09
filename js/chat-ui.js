@@ -593,7 +593,7 @@ function _apriRimuoviMembri(gid, partner) {
 async function _confermaRimuoviMembri(gid, partner) {
   if (!_sonoAdminGruppo(gid)) return;
   const cbs = document.querySelectorAll('.rm-member-cb:checked');
-  const daRimuovere = [...cbs].map((cb) => cb.value);
+  let daRimuovere = [...cbs].map((cb) => cb.value);
   if (!daRimuovere.length) {
     toast('Seleziona almeno una persona');
     return;
@@ -605,13 +605,21 @@ async function _confermaRimuoviMembri(gid, partner) {
     toast('Gruppo non trovato');
     return;
   }
+  const nonRimossi = [];
   for (const m of daRimuovere) {
     try {
       await secDel('chat_group_members', 'group_id=eq.' + group.id + '&operatore=eq.' + encodeURIComponent(m));
       chatGroupMembersCache = chatGroupMembersCache.filter((x) => !(x.group_id === group.id && x.operatore === m));
     } catch (e) {
       console.warn('Remove member fallita:', e.message);
+      nonRimossi.push(m);
     }
+  }
+  // chi non e stato tolto non si annuncia come rimosso (prima si diceva comunque "rimosso")
+  if (nonRimossi.length) {
+    toastErrore('Non rimossi dal gruppo: ' + nonRimossi.map((n) => _nomeBreve(n)).join(', '), 8000);
+    daRimuovere = daRimuovere.filter((m) => !nonRimossi.includes(m));
+    if (!daRimuovere.length) return;
   }
   // Manda messaggio di sistema notificando la rimozione
   const msgTxt =
@@ -688,8 +696,16 @@ async function _apriGruppoSelezionato() {
   renderNoteChat(window._noteConvAttiva);
   renderNoteCollega();
 }
+// il nome arriva dal testo dei messaggi: niente caratteri di markup (un nome con codice
+// HTML veniva eseguito nell intestazione di chi apriva la chat)
+function _gruppoNomePulito(v) {
+  return String(v || '')
+    .replace(/[<>"'`&]/g, '')
+    .trim()
+    .substring(0, 80);
+}
 function _getGruppoNome(gid) {
-  const ls = localStorage.getItem('_gruppo_nome_' + gid);
+  const ls = _gruppoNomePulito(localStorage.getItem('_gruppo_nome_' + gid));
   if (ls) return ls;
   // Cerca il nome più recente nei messaggi del gruppo (tag [GNAME:...])
   const notes = noteColleghiCache
@@ -697,9 +713,10 @@ function _getGruppoNome(gid) {
     .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
   if (notes.length) {
     const gm = (notes[0].messaggio || '').match(/\[GNAME:([^\]]+)\]/);
-    if (gm) {
-      localStorage.setItem('_gruppo_nome_' + gid, gm[1]);
-      return gm[1];
+    const nome = gm ? _gruppoNomePulito(gm[1]) : '';
+    if (nome) {
+      localStorage.setItem('_gruppo_nome_' + gid, nome);
+      return nome;
     }
   }
   return '';
@@ -1030,7 +1047,7 @@ function renderNoteChat(partner) {
             ? membri.map((n) => _nomeBreve(n)).join(', ')
             : _nomeBreve(membri[0]) + ', ' + _nomeBreve(membri[1]) + ' +' + (membri.length - 2));
       }
-      headerLabel = headerGruppo;
+      headerLabel = escP(headerGruppo);
     } else {
       const rep = _gidChat.replace('__gruppo_', '');
       headerLabel = rep === 'tutti' ? 'Tutti' : 'Tutti ' + (rep === 'slots' ? 'Slots' : 'Tavoli');
@@ -1067,7 +1084,7 @@ function renderNoteChat(partner) {
       if (n.da_operatore !== op) partners.add(n.da_operatore);
       if (n.a_operatore !== op) partners.add(n.a_operatore);
     });
-    headerLabel = [...partners].join(', ');
+    headerLabel = escP([...partners].join(', '));
   } else {
     headerLabel = escP(partner);
   }
@@ -1722,7 +1739,7 @@ async function _inviaNotaChatEsegui() {
       if (n.da_operatore !== op) ps.add(n.da_operatore);
     });
     dests = [...ps];
-    gid = crypto.randomUUID();
+    gid = _gidSend;
   } else if (window._noteConvGruppo && window._noteConvGruppo.gid) {
     dests = window._noteConvGruppo.dests;
     gid = window._noteConvGruppo.gid;
@@ -1789,8 +1806,16 @@ async function _inviaNotaChatEsegui() {
         }
       } else {
         chatGroupId = existingGroup.id;
-        // Assicura che dests siano membri (in caso il gruppo persistente abbia nuovi reparti)
-        for (const m of dests) {
+        // I destinatari di un gruppo esistente sono i suoi MEMBRI attuali: chi e stato
+        // rimosso non rientra (prima tornava dentro al primo messaggio, perche i
+        // destinatari si ricavavano dai messaggi vecchi). Solo i gruppi di settore
+        // (Tutti, Tutti Slots...) aggiungono da soli i colleghi nuovi del settore.
+        const deSettore = isPersGroup && !gid.startsWith('__gruppo_custom_');
+        if (!deSettore)
+          dests = chatGroupMembersCache
+            .filter((x) => x.group_id === chatGroupId && x.operatore !== op)
+            .map((x) => x.operatore);
+        for (const m of deSettore ? dests : []) {
           if (!chatGroupMembersCache.some((x) => x.group_id === chatGroupId && x.operatore === m)) {
             // Aggiungi al DB e cache
             try {

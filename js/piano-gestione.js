@@ -1885,7 +1885,7 @@ async function _pianoCaricaRecupero(ym) {
   const a = ym + '-' + String(_pianoUltimoGiorno(ym)).padStart(2, '0');
   const r =
     (await secGet(
-      'piano_recupero_ore?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&limit=5000',
+      'piano_recupero_ore?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '',
     )) || [];
   _pianoRecupero = {};
   r.forEach((x) => (_pianoRecupero[x.collaboratore + '|' + String(x.data).substring(0, 10)] = x));

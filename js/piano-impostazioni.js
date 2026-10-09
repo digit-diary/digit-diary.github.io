@@ -686,13 +686,7 @@ async function esportaPianoDati(tipo) {
     } else if (tipo === 'timbrature') {
       const t2 =
         (await secGet(
-          'piano_timbrature?data=gte.' +
-            ym +
-            '-01&data=lte.' +
-            ym +
-            '-' +
-            String(nGiorni).padStart(2, '0') +
-            '&limit=5000',
+          'piano_timbrature?data=gte.' + ym + '-01&data=lte.' + ym + '-' + String(nGiorni).padStart(2, '0') + '',
         )) || [];
       const righe = [['Collaboratore', 'Data', 'Entrata', 'Uscita', 'Ore', 'Fonte']];
       t2.forEach((t) =>

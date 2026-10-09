@@ -399,11 +399,16 @@ function _renewToken(tkUsato) {
 // rinnovo chiudeva il token mentre altre scritture erano ancora in viaggio: venivano
 // rifiutate con un falso "Permesso mancante" e Migliora la bozza non scriveva niente).
 // Sessione davvero scaduta: rinnovo (uno solo alla volta) e nuovo tentativo.
-async function _conSessione(chiama, tk) {
+// senzaRipetereSuRete: per gli INSERIMENTI. Con la rete caduta la prima richiesta puo
+// essere arrivata al database: ripeterla creava righe doppie (consegne, spese, una
+// registrazione contata due volte negli ammonimenti). Si ripete solo se la sessione era
+// scaduta (allora la prima e stata rifiutata).
+async function _conSessione(chiama, tk, senzaRipetereSuRete) {
   try {
     return await chiama(tk);
   } catch (e) {
     let err = e;
+    if (senzaRipetereSuRete && !err.sessione) throw err;
     if (!err.sessione && /Failed to fetch|NetworkError/i.test(err.message || '')) {
       await new Promise((x) => setTimeout(x, 800));
       try {
@@ -710,8 +715,64 @@ async function _secPostRaw(table, data) {
   // rinnovava qui (le registrazioni nuove fallivano con "Errore salvataggio") e un
   // errore di rete ripiegava sulla scrittura anonima, bloccata in silenzio dalle regole.
   const scrivi = (t) => _rpcSicura('secure_insert', { p_token: t, p_table: table, p_data: data });
-  const r = await _conSessione(scrivi, tk);
-  return r ? [r] : [];
+  try {
+    const r = await _conSessione(scrivi, tk, true);
+    return r ? [r] : [];
+  } catch (e) {
+    if (e.sessione || !/Failed to fetch|NetworkError/i.test(e.message || '')) throw e;
+    // riga con il suo numero (registrazioni, ...): si riprova, e un "esiste gia" vuol dire
+    // che la prima richiesta era arrivata
+    if (data && !Array.isArray(data) && data.id != null) {
+      await new Promise((x) => setTimeout(x, 800));
+      try {
+        const r = await scrivi(getOpToken() || tk);
+        return r ? [r] : [];
+      } catch (e2) {
+        if (/duplicate key|already exists|23505/i.test(e2.message || '')) return [data];
+        throw e2;
+      }
+    }
+    const err = new Error(
+      'Connessione interrotta durante il salvataggio: controlla se e stato salvato prima di riprovare',
+    );
+    err.rete = true;
+    throw err;
+  }
+}
+// SOSTITUZIONE IN UN COLPO SOLO (fabbisogno del mese, import Maison di un giorno): il
+// database cancella le righe del filtro e inserisce le nuove nella stessa operazione;
+// se qualcosa va storto non cambia niente. Prima si cancellava e poi si reinseriva a
+// pezzi: con la rete caduta a meta il mese restava senza fabbisogno.
+// Su un server non ancora aggiornato (funzione assente) si usa la strada di prima.
+async function secSostituisci(table, filter, righe) {
+  const tk = getOpToken();
+  const sql = _filtroSqlDaRest(filter);
+  if (!sql) throw new Error('secSostituisci senza filtro su ' + table);
+  if (tk) {
+    const opDel = _annullaPronto() ? await window.Annulla.primaDiDel(table, filter) : null;
+    try {
+      const r = await _conSessione(
+        (t) => _rpcSicura('secure_sostituisci', { p_token: t, p_table: table, p_filter: sql, p_rows: righe }),
+        tk,
+        true,
+      );
+      if (opDel) window.Annulla.conferma(opDel);
+      const nuove = Array.isArray(r) ? r : [];
+      if (_annullaPronto() && nuove.length) window.Annulla.dopoPost(table, nuove);
+      return nuove;
+    } catch (e) {
+      const manca =
+        e.status === 404 || /secure_sostituisci|PGRST202|Could not find the function/i.test(e.message || '');
+      if (!manca) throw e;
+    }
+  }
+  await secDel(table, filter);
+  const out = [];
+  for (let i = 0; i < righe.length; i += 10) {
+    const parte = await Promise.all(righe.slice(i, i + 10).map((x) => secPost(table, x)));
+    parte.forEach((p) => out.push(...(p || [])));
+  }
+  return out;
 }
 // Converte un filtro REST (id=eq.123&nome=eq.X) nel filtro SQL per le RPC secure_*
 // Ogni clausola passa da _filtroSqlClausola: un operatore che il canale non

@@ -294,10 +294,19 @@
       const g = st.pila.pop();
       if (!g) return null;
       st.inCorso = true;
+      let i = g.ops.length - 1;
       try {
-        for (let i = g.ops.length - 1; i >= 0; i--) await inverti(g.ops[i]);
+        for (; i >= 0; i--) await inverti(g.ops[i]);
       } catch (e) {
-        st.pila.push(g);
+        // fermo a meta: le operazioni gia annullate vanno fra quelle da Ripristinare, le
+        // altre restano da annullare (prima tornava nella pila tutto il gruppo: il nuovo
+        // Annulla ripeteva quelle gia fatte e dava conflitti all infinito)
+        const resto = g.ops.slice(0, i + 1);
+        const fatte = g.ops.slice(i + 1);
+        if (resto.length) st.pila.push(Object.assign({}, g, { ops: resto }));
+        if (fatte.length) st.redo.push(Object.assign({}, g, { ops: fatte, quandoAnnullato: canale.adesso() }));
+        notifica();
+        e.annullaParziale = fatte.length;
         throw e;
       } finally {
         st.inCorso = false;
@@ -312,10 +321,16 @@
       const g = st.redo.pop();
       if (!g) return null;
       st.inCorso = true;
+      let i = 0;
       try {
-        for (let i = 0; i < g.ops.length; i++) await riapplica(g.ops[i]);
+        for (; i < g.ops.length; i++) await riapplica(g.ops[i]);
       } catch (e) {
-        st.redo.push(g);
+        const fatte = g.ops.slice(0, i);
+        const resto = g.ops.slice(i);
+        if (resto.length) st.redo.push(Object.assign({}, g, { ops: resto }));
+        if (fatte.length) st.pila.push(Object.assign({}, g, { ops: fatte }));
+        notifica();
+        e.annullaParziale = fatte.length;
         throw e;
       } finally {
         st.inCorso = false;

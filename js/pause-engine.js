@@ -2415,25 +2415,30 @@ function _peGeneraSlots(righeTutte, dstr) {
   });
   if (!Object.keys(dT).length) return null;
   const ctx = { dT: dT, dN: dN, dc: _peCompetenze(righe), orari: _peOrariTurni(), c8Nomi: c8Nomi, c8Cd: c8Cd };
+  // il giorno vale solo durante questo calcolo: anche se qualcosa si ferma a meta (prima
+  // restava impostato e le regole di un altro giorno valevano fino a una ricarica)
   window._peDowCorrente = dow;
-  const sh = _peSheet();
-  const dataStr = dstr.split('-').reverse().join('.');
-  if (tipoGiorno === 'LUN-GIO') _peGeneraLunGio(sh, ctx, dataStr);
-  else if (tipoGiorno === 'VEN-SAB') _peGeneraVenSab(sh, ctx, dataStr);
-  else _peGeneraDomenica(sh, ctx, dataStr);
-  _peGeneraExtra(sh, ctx, tipoGiorno);
-  _peCompattaSala(sh);
-  const biglietto = _peBigliettoMattino(ctx);
-  const out = { tipo: 'slots', celle: sh.celle, nR: _peMaxR(sh), tipoGiorno: tipoGiorno };
-  if (biglietto) out.biglietti = [biglietto];
-  if (form.affiancati.length) out.formazione = form.affiancati;
-  const completate = _peCompletaPause(out, ctx, righe, dstr);
-  const spostate = _peRisolviSalaVuota(out, righe, dstr).concat(_peOttimizza(out, righe, dstr));
-  const proposte = completate.concat(spostate);
-  if (proposte.length) out.proposte = proposte;
-  _peDecidiConferma(out, righe, dstr, spostate.length);
-  window._peDowCorrente = null;
-  return out;
+  try {
+    const sh = _peSheet();
+    const dataStr = dstr.split('-').reverse().join('.');
+    if (tipoGiorno === 'LUN-GIO') _peGeneraLunGio(sh, ctx, dataStr);
+    else if (tipoGiorno === 'VEN-SAB') _peGeneraVenSab(sh, ctx, dataStr);
+    else _peGeneraDomenica(sh, ctx, dataStr);
+    _peGeneraExtra(sh, ctx, tipoGiorno);
+    _peCompattaSala(sh);
+    const biglietto = _peBigliettoMattino(ctx);
+    const out = { tipo: 'slots', celle: sh.celle, nR: _peMaxR(sh), tipoGiorno: tipoGiorno };
+    if (biglietto) out.biglietti = [biglietto];
+    if (form.affiancati.length) out.formazione = form.affiancati;
+    const completate = _peCompletaPause(out, ctx, righe, dstr);
+    const spostate = _peRisolviSalaVuota(out, righe, dstr).concat(_peOttimizza(out, righe, dstr));
+    const proposte = completate.concat(spostate);
+    if (proposte.length) out.proposte = proposte;
+    _peDecidiConferma(out, righe, dstr, spostate.length);
+    return out;
+  } finally {
+    window._peDowCorrente = null;
+  }
 }
 // ---------- OTTIMIZZATORE: il foglio migliore con le mosse delle frecce ----------
 // Dopo lo schema, il completamento e il risolutore della sala vuota, il programma

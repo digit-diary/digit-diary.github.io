@@ -1627,8 +1627,7 @@ async function _pianoFabbisognoDopoImport(wb, ym) {
     // nessuna sezione nel file: dai turni del piano appena importato, solo se il mese non
     // ha ancora un fabbisogno (non si sostituisce quello impostato a mano)
     if (esistenti.length) return;
-    const righe =
-      (await secGet('piano?data=gte.' + ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + rep + '&limit=8000')) || [];
+    const righe = (await secGet('piano?data=gte.' + ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + rep + '')) || [];
     const conta = {};
     righe.forEach((r) => {
       const c = String(r.codice || '').toUpperCase();
@@ -1680,9 +1679,8 @@ async function _pianoFabbisognoDopoImport(wb, ym) {
     )
       return;
   }
-  await secDel('piano_fabbisogni', 'data=gte.' + ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + rep);
-  for (let i = 0; i < nuovi.length; i += 10)
-    await Promise.all(nuovi.slice(i, i + 10).map((f) => secPost('piano_fabbisogni', f)));
+  // in un colpo solo: con la rete caduta a meta resta il fabbisogno di prima
+  await secSostituisci('piano_fabbisogni', 'data=gte.' + ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + rep, nuovi);
   logAzione('Fabbisogno dal file del piano', ym + ' ' + rep + ' · ' + nuovi.length + ' celle · ' + fonte);
   toast('Fabbisogno di ' + ym + ' caricato: ' + nuovi.length + ' celle (' + fonte + ')', 6000);
 }
@@ -1777,15 +1775,17 @@ async function importaFabbisognoExcel(input) {
       return;
     const da = ym + '-01';
     const a = ym + '-' + String(nGiorni).padStart(2, '0');
-    await secDel('piano_fabbisogni', 'data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto());
-    for (let i = 0; i < nuovi.length; i += 10)
-      await Promise.all(nuovi.slice(i, i + 10).map((f) => secPost('piano_fabbisogni', f)));
+    await secSostituisci(
+      'piano_fabbisogni',
+      'data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto(),
+      nuovi,
+    );
     logAzione('Fabbisogno importato', ym + ' · ' + nuovi.length + ' celle');
     toast('Fabbisogno importato: ' + nuovi.length + ' celle');
     renderPiano();
   } catch (e) {
     console.error(e);
-    toast('Errore lettura file fabbisogno');
+    toastErrore('Fabbisogno non importato: ' + ((e && e.message) || e) + '. Il fabbisogno di prima e rimasto.', 10000);
   }
 }
 // IMPORT PIANO da Excel/CSV (come l'import del foglio PIANO SLOTS in
@@ -2361,7 +2361,7 @@ async function _importaPianoDaWb(wb, ym, opz) {
             dataLocaleISO(d0) +
             '&data=lt.' +
             ym +
-            '-01&limit=5000',
+            '-01',
         )) || [];
       primaMese.forEach((r) => metti(r));
       (esistenti || []).forEach((r) => metti(r));

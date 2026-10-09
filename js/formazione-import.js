@@ -520,7 +520,7 @@ async function _fziApplica() {
         daFare.slice(i, i + 8).map(async (x) => {
           try {
             await secPatch('collaboratori', 'id=eq.' + x.collab.id, { competenze: x.dopo });
-            backup.push({ id: x.collab.id, nome: x.collab.nome, prima: x.prima });
+            backup.push({ id: x.collab.id, nome: x.collab.nome, prima: x.prima, dopo: x.dopo });
             x.collab.competenze = x.dopo;
             scritti++;
             if (x.piu.length && typeof _insertHrEvento === 'function')
@@ -541,10 +541,12 @@ async function _fziApplica() {
       const m = {};
       z.colonne.forEach((col) => (m[_fziNorma(col.titolo)] = col.comp));
       localStorage.setItem('fzi_mappa_' + z.rep, JSON.stringify(m));
-      localStorage.setItem(
-        'fzi_ultimo',
-        JSON.stringify({ rep: z.rep, file: z.nomeFile, quando: new Date().toISOString(), backup: backup }),
-      );
+      // un import che non ha scritto niente non cancella la copia di quello prima
+      if (backup.length)
+        localStorage.setItem(
+          'fzi_ultimo',
+          JSON.stringify({ rep: z.rep, file: z.nomeFile, quando: new Date().toISOString(), backup: backup }),
+        );
     } catch (e) {}
   }
   logAzione(
@@ -586,19 +588,46 @@ async function formAnnullaUltimoImport() {
   )
     return;
   let ok = 0;
+  const nonRipristinati = [];
   for (const b of daRipristinare) {
     try {
-      await secPatch('collaboratori', 'id=eq.' + b.id, { competenze: b.prima });
       const c = collaboratoriCache.find((x) => x.id === b.id);
-      if (c) c.competenze = b.prima;
+      // si rimettono SOLO le competenze che l import aveva cambiato: quelle spuntate dopo,
+      // a mano, restano (prima tornava tutto l elenco di allora e si perdevano)
+      let nuove = b.prima;
+      if (b.dopo && c) {
+        nuove = Object.assign({}, c.competenze || {});
+        const chiavi = new Set(Object.keys(b.prima || {}).concat(Object.keys(b.dopo || {})));
+        chiavi.forEach((k) => {
+          if (JSON.stringify((b.prima || {})[k]) === JSON.stringify((b.dopo || {})[k])) return;
+          if (JSON.stringify(nuove[k]) !== JSON.stringify((b.dopo || {})[k])) return; // cambiata dopo: resta
+          if ((b.prima || {})[k] === undefined) delete nuove[k];
+          else nuove[k] = b.prima[k];
+        });
+      }
+      await secPatch('collaboratori', 'id=eq.' + b.id, { competenze: nuove });
+      if (c) c.competenze = nuove;
       ok++;
-    } catch (e) {}
+    } catch (e) {
+      nonRipristinati.push(b);
+    }
   }
+  // chi non e stato ripristinato resta nella copia: un nuovo Annulla riprova solo loro
   try {
-    localStorage.removeItem('fzi_ultimo');
+    const resto = nonRipristinati.concat(u.backup.filter((b) => !b.prima));
+    if (nonRipristinati.length)
+      localStorage.setItem('fzi_ultimo', JSON.stringify(Object.assign({}, u, { backup: resto })));
+    else localStorage.removeItem('fzi_ultimo');
   } catch (e) {}
   logAzione('Formazione: import annullato', u.file + ' · ' + ok + ' collaboratori');
-  toast('Import annullato: ' + ok + ' collaboratori come prima');
+  if (nonRipristinati.length)
+    toastErrore(
+      'Non ripristinati: ' +
+        nonRipristinati.map((b) => b.nome).join(', ') +
+        '. Premi di nuovo Annulla l ultimo import.',
+      10000,
+    );
+  else toast('Import annullato: ' + ok + ' collaboratori come prima');
   if (typeof renderFormazione === 'function') renderFormazione();
 }
 function _fziUltimoImport() {

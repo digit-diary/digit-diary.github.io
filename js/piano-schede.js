@@ -154,16 +154,19 @@ async function importaTimbrature(input) {
       return;
     }
     const nomi = collaboratoriCache.filter((c) => c.attivo !== false);
+    // nome esatto o invertito; altrimenti tutte le parole intere, e solo se c e UNA persona
+    // sola ("Rossi Marco" non diventa piu "Rossi Marcolino")
     const matchNome = (n) => {
-      const nn = String(n).toLowerCase().trim();
-      const parti = nn.split(/\s+/);
-      const hit = nomi.find(
-        (c) =>
-          c.nome.toLowerCase() === nn ||
-          c.nome.toLowerCase() === parti.slice().reverse().join(' ') ||
-          parti.every((p) => c.nome.toLowerCase().includes(p)),
+      const nn = String(n).toLowerCase().trim().replace(/\s+/g, ' ');
+      if (!nn) return null;
+      const parti = nn.split(' ');
+      const esatto = nomi.find(
+        (c) => c.nome.toLowerCase() === nn || c.nome.toLowerCase() === parti.slice().reverse().join(' '),
       );
-      return hit ? hit.nome : null;
+      if (esatto) return esatto.nome;
+      const parole = (c) => c.nome.toLowerCase().split(/\s+/);
+      const simili = nomi.filter((c) => parti.every((p) => parole(c).includes(p)));
+      return simili.length === 1 ? simili[0].nome : null;
     };
     const normOra = (v) => {
       if (v instanceof Date)
@@ -175,15 +178,21 @@ async function importaTimbrature(input) {
       const m = String(v).match(/(\d{1,2})[:.](\d{2})/);
       return m ? m[1].padStart(2, '0') + ':' + m[2] : null;
     };
+    // prima il formato 2026-10-09 (prima "2026-10-09" diventava 2009-10-26), poi 09.10.2026;
+    // una data di Excel con il giorno locale (non quello UTC: a mezzanotte era il giorno prima)
     const normData = (v) => {
-      if (v instanceof Date) return v.toISOString().substring(0, 10);
+      if (v instanceof Date)
+        return (
+          v.getFullYear() + '-' + String(v.getMonth() + 1).padStart(2, '0') + '-' + String(v.getDate()).padStart(2, '0')
+        );
       if (typeof v === 'number' && v > 40000)
         return new Date(Math.round((v - 25569) * 86400000)).toISOString().substring(0, 10);
+      const iso = String(v).match(/^\s*(\d{4})-(\d{2})-(\d{2})/);
+      if (iso) return iso[1] + '-' + iso[2] + '-' + iso[3];
       const m = String(v).match(/(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})/);
       if (m)
         return (m[3].length === 2 ? '20' + m[3] : m[3]) + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
-      const iso = String(v).match(/(\d{4})-(\d{2})-(\d{2})/);
-      return iso ? iso[0] : null;
+      return null;
     };
     const valide = [];
     const scartate = [];
@@ -210,6 +219,8 @@ async function importaTimbrature(input) {
     )
       return;
     let ok = 0;
+    let doppie = 0;
+    const errori = [];
     for (let i = 0; i < valide.length; i += 10) {
       const blocco = valide.slice(i, i + 10);
       const esiti = await Promise.all(
@@ -225,19 +236,27 @@ async function importaTimbrature(input) {
             operatore: getOperatore(),
           }).then(
             () => 1,
-            () => 0,
+            (e) => {
+              // gia presente = doppione voluto; ogni altro errore si conta a parte
+              if (/duplicate key|already exists|23505/i.test((e && e.message) || '')) doppie++;
+              else errori.push(v.nome + ' ' + v.dt + ': ' + ((e && e.message) || e));
+              return 0;
+            },
           ),
         ),
       );
       ok += esiti.reduce((s, x) => s + x, 0);
     }
     logAzione('Timbrature importate', ok + '/' + valide.length + ' da ' + file.name);
-    toast(
-      'Importate ' +
-        ok +
-        ' timbrature' +
-        (valide.length - ok ? ' (' + (valide.length - ok) + ' duplicate saltate)' : ''),
-    );
+    toast('Importate ' + ok + ' timbrature' + (doppie ? ' (' + doppie + ' gia presenti, saltate)' : ''));
+    if (errori.length)
+      toastErrore(
+        errori.length +
+          ' timbrature NON importate: ' +
+          errori.slice(0, 3).join('; ') +
+          (errori.length > 3 ? '...' : ''),
+        12000,
+      );
     caricaConfrontoTimbrature();
   } catch (e) {
     console.error(e);
@@ -437,8 +456,7 @@ async function _pianoAggregatiAnno(anno) {
     } else if (gw === 6) tot.weekend++;
   });
   const nomiSettore = tot.collab;
-  const timb =
-    (await secGet('piano_timbrature?data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31&limit=20000')) || [];
+  const timb = (await secGet('piano_timbrature?data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31')) || [];
   timb.forEach((t) => {
     if (nomiSettore.has(t.collaboratore)) tot.oreTimb += parseFloat(t.ore) || 0;
   });
@@ -549,19 +567,11 @@ async function caricaStatisticheAnnoPiano(forza) {
     await _pianoCaricaFestivita(parseInt(anno));
     await _pianoCaricaCgfRiporto(anno); // riporto CGF dall'anno prima, per il saldo
     const rg =
-      (await secGet(
-        'piano?data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31&reparto_dip=eq.' + rep + '&limit=20000',
-      )) || [];
+      (await secGet('piano?data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31&reparto_dip=eq.' + rep + '')) || [];
     _pianoRegistraGiorniTurno(rg);
     const fb =
       (await secGet(
-        'piano_fabbisogni?data=gte.' +
-          anno +
-          '-01-01&data=lte.' +
-          anno +
-          '-12-31&reparto_dip=eq.' +
-          rep +
-          '&limit=5000',
+        'piano_fabbisogni?data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31&reparto_dip=eq.' + rep + '',
       )) || [];
     const rc =
       (await secGet(
@@ -571,10 +581,9 @@ async function caricaStatisticheAnnoPiano(forza) {
           anno +
           '-12-31&reparto_dip=eq.' +
           _pianoReparto() +
-          '&limit=20000',
+          '',
       )) || [];
-    const rt =
-      (await secGet('piano_ore_mese?anno_mese=gte.' + anno + '-01&anno_mese=lte.' + anno + '-12&limit=5000')) || [];
+    const rt = (await secGet('piano_ore_mese?anno_mese=gte.' + anno + '-01&anno_mese=lte.' + anno + '-12')) || [];
     window._pianoStatCache = { anno: anno, reparto: rep, righe: rg, fabb: fb, rec: rc, rett: rt };
   }
   const cache = window._pianoStatCache;
@@ -895,7 +904,7 @@ async function _pianoVacDirittoCard(anno) {
         anno +
         '-12-31&reparto_dip=eq.' +
         _pianoReparto() +
-        '&select=collaboratore,data&limit=20000',
+        '&select=collaboratore,data',
     )) || []
   ).forEach((r) => (vCal[r.collaboratore] = (vCal[r.collaboratore] || 0) + 1));
   // vacanze restituite: giorni V coperti da una malattia (M con "Ex V" o, nelle note vecchie, "era V")
@@ -1341,12 +1350,10 @@ async function _pianoSaldoAnnoCalcola(anno) {
         anno +
         '-12-31&reparto_dip=eq.' +
         _pianoReparto() +
-        '&limit=20000',
+        '',
     )) || [];
-  const rett =
-    (await secGet('piano_ore_mese?anno_mese=gte.' + anno + '-01&anno_mese=lte.' + anno + '-12&limit=5000')) || [];
-  const timb =
-    (await secGet('piano_timbrature?data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31&limit=20000')) || [];
+  const rett = (await secGet('piano_ore_mese?anno_mese=gte.' + anno + '-01&anno_mese=lte.' + anno + '-12')) || [];
+  const timb = (await secGet('piano_timbrature?data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31')) || [];
   const perMese = {}; // 'nome|MM' -> ore piano
   righe.forEach((r) => {
     const info = _pianoCollabInfo(r.collaboratore) || {};
@@ -1553,7 +1560,7 @@ async function _renderPianoSaldoTab() {
   // come Turnivo: ore LAVORATE = timbrate del mese se presenti, altrimenti piano
   const da = ym + '-01';
   const aFine = ym + '-' + String(nGiorni).padStart(2, '0');
-  const timbrateMese = (await secGet('piano_timbrature?data=gte.' + da + '&data=lte.' + aFine + '&limit=5000')) || [];
+  const timbrateMese = (await secGet('piano_timbrature?data=gte.' + da + '&data=lte.' + aFine + '')) || [];
   const timbNome = {};
   timbrateMese.forEach(
     (t) => (timbNome[t.collaboratore] = (timbNome[t.collaboratore] || 0) + (parseFloat(t.ore) || 0)),
@@ -1753,8 +1760,7 @@ async function pianoStoricoRiporta(quando, esatto) {
       (await _rpcSicura('piano_storico_al', { p_token: getOpToken(), p_reparto: rep, p_ym: ym, p_quando: istante })) ||
       [];
     const fine = ym + '-' + String(_pianoUltimoGiorno(ym)).padStart(2, '0');
-    cur =
-      (await secGet('piano?data=gte.' + ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + rep + '&limit=8000')) || [];
+    cur = (await secGet('piano?data=gte.' + ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + rep + '')) || [];
   } catch (e) {
     toastErrore('Storico non letto: ' + ((e && e.message) || e));
     return;
@@ -2160,7 +2166,7 @@ async function confermaScambioSettimane() {
             String(nG).padStart(2, '0') +
             '&reparto_dip=eq.' +
             _pianoReparto() +
-            '&limit=5000',
+            '',
         )) || [];
       if (!righeMese.length) continue; // mese non ancora pianificato: le V arriveranno con Applica/Genera
       for (const nome of [vA.collaboratore, vB.collaboratore]) {
@@ -2186,7 +2192,7 @@ async function confermaScambioSettimane() {
             String(nG).padStart(2, '0') +
             '&reparto_dip=eq.' +
             _pianoReparto() +
-            '&limit=5000',
+            '',
         )) || [];
       await _applicaVacanzeMese(false);
     }
@@ -2589,11 +2595,7 @@ async function _vacRestituiteNellAnno(anno) {
   const out = {};
   (
     (await secGet(
-      'piano?codice=eq.M&data=gte.' +
-        anno +
-        '-01-01&data=lte.' +
-        anno +
-        '-12-31&select=collaboratore,data,commento&limit=8000',
+      'piano?codice=eq.M&data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31&select=collaboratore,data,commento',
     )) || []
   ).forEach((r) => {
     if (/(?:era|^Ex) V1?\b/.test(String(r.commento || ''))) out[r.collaboratore] = (out[r.collaboratore] || 0) + 1;
@@ -2711,7 +2713,7 @@ async function _applicaVacanzeMese(interattivo, opz) {
         ym +
         '-' +
         String(nGiorni).padStart(2, '0') +
-        '&codice=in.(M,M1,I,I1)&select=collaboratore,data&limit=5000',
+        '&codice=in.(M,M1,I,I1)&select=collaboratore,data',
     )) || []
   ).forEach((r) => (malato[String(r.collaboratore).toLowerCase() + '|' + parseInt(r.data.split('-')[2])] = true));
   const eMalato = (nome, g) => !!malato[String(nome).toLowerCase() + '|' + g];
@@ -2990,9 +2992,7 @@ async function _applicaVacanzeMese(interattivo, opz) {
   let nRestituiti = 0;
   if (vacInMalattia.length) {
     const righeMal =
-      (await secGet(
-        'piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&limit=5000',
-      )) || [];
+      (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '')) || [];
     const perCellaMal = {};
     righeMal.forEach((r) => (perCellaMal[r.collaboratore + '|' + parseInt(r.data.split('-')[2])] = r));
     const opM = getOperatore();
@@ -3032,9 +3032,7 @@ async function _applicaVacanzeMese(interattivo, opz) {
   let nAltre = 0;
   {
     const righeMese =
-      (await secGet(
-        'piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&limit=5000',
-      )) || [];
+      (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '')) || [];
     // le V hanno il loro giro (sopra e sotto): qui solo le altre assenze
     const giaScritte = righeMese.filter((r) => r.codice !== 'V' && daVacanze(r));
     for (const r of giaScritte) {
@@ -3100,8 +3098,7 @@ async function _applicaVacanzeMese(interattivo, opz) {
     return { v: 0, c: 0, wd: 0, orfane: nOrfane, altre: nAltre, vSenzaFile: vSenzaFile, restituiti: nRestituiti };
   }
   const righe =
-    (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&limit=5000')) ||
-    [];
+    (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '')) || [];
   const perCella = {}; // nome|g -> riga
   righe.forEach((r) => (perCella[r.collaboratore + '|' + parseInt(r.data.split('-')[2])] = r));
   const dstrDi = (g) => ym + '-' + String(g).padStart(2, '0');

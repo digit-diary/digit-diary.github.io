@@ -2600,7 +2600,7 @@ async function unisciCompetenzaCfg(rep, idx) {
   // fine avrebbero spuntato la chiave tolta, senza alzare il livello)
   let tutti;
   try {
-    tutti = (await secGet('collaboratori?select=id,nome,competenze,attivo&limit=5000')) || [];
+    tutti = (await secGet('collaboratori?select=id,nome,competenze,attivo')) || [];
   } catch (e) {
     toastErrore('Unione non possibile: elenco dei collaboratori non letto');
     return;
@@ -2612,9 +2612,7 @@ async function unisciCompetenzaCfg(rep, idx) {
   try {
     formazioni = (
       (await secGet(
-        'moduli?tipo=eq.' +
-          encodeURIComponent(typeof FORM_TIPO !== 'undefined' ? FORM_TIPO : 'formazione_piano') +
-          '&limit=5000',
+        'moduli?tipo=eq.' + encodeURIComponent(typeof FORM_TIPO !== 'undefined' ? FORM_TIPO : 'formazione_piano') + '',
       )) || []
     ).filter((m) => m.dati && m.dati.comp && chiavi.includes(m.dati.comp.key));
   } catch (e) {}
@@ -3431,7 +3429,7 @@ async function formLivelliDaTurni() {
           encodeURIComponent(rep) +
           '&data=gte.' +
           dataLocaleISO(da) +
-          '&limit=30000&select=collaboratore,codice,commento,data,generato',
+          '&select=collaboratore,codice,commento,data,generato',
       )) || []
     )
       // i turni gia fatti, e quelli futuri scritti a mano o importati (il piano ufficiale);

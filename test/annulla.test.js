@@ -375,6 +375,51 @@ function canaleSicuro(c, A) {
     eq(chiamate, ['Rossi Marco>Rossi Mario', 'Rossi Mario>Rossi Marco'], 'Ripristina rinomina di nuovo');
   }
 
+  console.log('\n== annulla fermo a meta: niente ripetizioni (09.10) ==');
+  {
+    const c = canaleFinto();
+    const A = creaAnnulla(c);
+    const S = canaleSicuro(c, A);
+    c.db.piano_vacanze.push(
+      { id: 1, collaboratore: 'Rossi', settimana: 10, confermata: false },
+      { id: 2, collaboratore: 'Rossi', settimana: 11, confermata: false },
+    );
+    await S.patch('piano_vacanze', 'id=eq.1', { confermata: true });
+    await S.patch('piano_vacanze', 'id=eq.2', { confermata: true });
+    A.chiudiGruppo('Vacanze confermate');
+    // la prima scrittura dell annullamento (riga 2) riesce, la seconda (riga 1) si ferma
+    const patchVera = c.patch;
+    let n = 0;
+    c.patch = async (t, f, d) => {
+      if (++n === 2) throw new Error('rete caduta');
+      return patchVera(t, f, d);
+    };
+    let errore = null;
+    try {
+      await A.annulla();
+    } catch (e) {
+      errore = e;
+    }
+    ok(errore && errore.annullaParziale === 1, 'errore con il numero di passi gia annullati');
+    eq(
+      [c.db.piano_vacanze[0].confermata, c.db.piano_vacanze[1].confermata],
+      [true, false],
+      'riga 2 annullata, riga 1 no',
+    );
+    eq(
+      [A.stato().annulla, A.stato().ripristina],
+      [1, 1],
+      'resta da annullare solo la riga 1, la 2 si puo ripristinare',
+    );
+    c.patch = patchVera;
+    await A.annulla();
+    eq(
+      [c.db.piano_vacanze[0].confermata, c.db.piano_vacanze[1].confermata],
+      [false, false],
+      'nuovo Annulla finisce il lavoro',
+    );
+  }
+
   console.log(
     '\n=======================================\n  ' +
       passati +

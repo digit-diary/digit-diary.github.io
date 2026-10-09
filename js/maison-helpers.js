@@ -2117,7 +2117,11 @@ async function _insertHrEvento(nome, tipo, descrizione, dataEvento) {
       reparto_dip: currentReparto,
     });
     if (r && r[0]) hrEventiCache.unshift(r[0]);
-  } catch (e) {}
+  } catch (e) {
+    // lo storico HR e un registro: una riga mancante si deve sapere
+    console.error('Storico HR', tipo, nome, e);
+    toastErrore('Storico HR NON aggiornato (' + nome + ': ' + tipo + '): ' + ((e && e.message) || e), 8000);
+  }
 }
 
 // === ALLEGATI STORICO HR: schede originali (PDF/Excel/immagine, max 2 MB) ===

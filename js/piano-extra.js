@@ -140,8 +140,7 @@ async function _pianoRipristinaStato(st, opz) {
   // sessione valida PRIMA di cancellare qualsiasi cella
   await _rpcSicura('piano_bulk_upsert', { p_token: getOpToken(), p_rows: [] });
   const cur =
-    (await secGet('piano?data=gte.' + st.ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + st.rep + '&limit=8000')) ||
-    [];
+    (await secGet('piano?data=gte.' + st.ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + st.rep + '')) || [];
   const CAMPI = [
     'codice',
     'protetto',
@@ -287,9 +286,7 @@ async function pianoAnnulla() {
   try {
     const fine = st.ym + '-' + String(_pianoUltimoGiorno(st.ym)).padStart(2, '0');
     const cur =
-      (await secGet(
-        'piano?data=gte.' + st.ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + st.rep + '&limit=8000',
-      )) || [];
+      (await secGet('piano?data=gte.' + st.ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + st.rep + '')) || [];
     window._pianoRedo = window._pianoRedo || [];
     window._pianoRedo.push({
       ym: st.ym,
@@ -336,9 +333,7 @@ async function pianoAnnullaTutto() {
   try {
     const fine = snap.ym + '-' + String(_pianoUltimoGiorno(snap.ym)).padStart(2, '0');
     const cur =
-      (await secGet(
-        'piano?data=gte.' + snap.ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + snap.rep + '&limit=8000',
-      )) || [];
+      (await secGet('piano?data=gte.' + snap.ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + snap.rep + '')) || [];
     window._pianoRedo = window._pianoRedo || [];
     window._pianoRedo.push({
       ym: snap.ym,
@@ -379,9 +374,7 @@ async function pianoRipristina() {
   try {
     const fine = st.ym + '-' + String(_pianoUltimoGiorno(st.ym)).padStart(2, '0');
     const cur =
-      (await secGet(
-        'piano?data=gte.' + st.ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + st.rep + '&limit=8000',
-      )) || [];
+      (await secGet('piano?data=gte.' + st.ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + st.rep + '')) || [];
     window._pianoUndo = window._pianoUndo || [];
     window._pianoUndo.push({
       ym: st.ym,
@@ -2295,17 +2288,17 @@ async function fabbIncollaDaClipboard(targetDato, testoDato) {
     for (let i = 0; i < ops.length; i += 10)
       await Promise.all(
         ops.slice(i, i + 10).map(async (op) => {
-          await secDel(
+          // cella per cella in un colpo solo (vecchio valore tolto e nuovo scritto insieme)
+          await secSostituisci(
             'piano_fabbisogni',
-            'data=eq.' + op.data + '&turno_codice=eq.' + op.codice + '&reparto_dip=eq.' + _pianoReparto(),
+            'data=eq.' +
+              op.data +
+              '&turno_codice=eq.' +
+              encodeURIComponent(op.codice) +
+              '&reparto_dip=eq.' +
+              _pianoReparto(),
+            op.q > 0 ? [{ data: op.data, turno_codice: op.codice, quantita: op.q, reparto_dip: _pianoReparto() }] : [],
           );
-          if (op.q > 0)
-            await secPost('piano_fabbisogni', {
-              data: op.data,
-              turno_codice: op.codice,
-              quantita: op.q,
-              reparto_dip: _pianoReparto(),
-            });
         }),
       );
     logAzione('Incolla fabbisogno', target.codice + ' g' + g0 + ' · ' + ops.length + ' celle');
@@ -2334,7 +2327,7 @@ async function miglioraOrePiano() {
   const a = ym + '-' + String(nGiorni).padStart(2, '0');
   let righe;
   {
-    const tutteRighe = (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&limit=8000')) || [];
+    const tutteRighe = (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '')) || [];
     const repM = _pianoReparto();
     righe = tutteRighe.filter((r) => {
       if ((r.reparto_dip || 'slots') === repM) return true;
@@ -2359,14 +2352,19 @@ async function miglioraOrePiano() {
     bDa.setDate(bDa.getDate() - 14);
     const bAl = new Date(primo);
     bAl.setDate(bAl.getDate() + nGiorni + 13);
-    const bordo = (await secGet('piano?data=gte.' + dataLocaleISO(bDa) + '&data=lt.' + da + '&limit=8000')) || [];
-    const bordo2 = (await secGet('piano?data=gt.' + a + '&data=lte.' + dataLocaleISO(bAl) + '&limit=8000')) || [];
+    const bordo = (await secGet('piano?data=gte.' + dataLocaleISO(bDa) + '&data=lt.' + da + '')) || [];
+    const bordo2 = (await secGet('piano?data=gt.' + a + '&data=lte.' + dataLocaleISO(bAl) + '')) || [];
     [...bordo, ...bordo2].forEach((r) => {
       const idx = Math.round((new Date(String(r.data).substring(0, 10) + 'T12:00:00') - primo) / 86400000) + 1;
       if (_pianoTurnoInfo(r.codice) || !cella[r.collaboratore + '|' + idx])
         cella[r.collaboratore + '|' + idx] = r.codice;
     });
-  } catch (e) {}
+  } catch (e) {
+    // senza i giorni a cavallo del mese i riposi e i giorni di fila non si controllano:
+    // meglio fermarsi che proporre spostamenti sbagliati
+    toastErrore('Migliora ore fermato: non riesco a leggere i giorni prima e dopo il mese. Riprova.', 8000);
+    return;
+  }
   const infoDi = {};
   nomi.forEach((n) => (infoDi[n] = _pianoCollabInfo(n) || {}));
   const ore = {};
@@ -2787,7 +2785,7 @@ async function controllaFormazioniCompletate(silenzioso) {
   const pattern = ['%ormazion%', '%ORMAZION%', '%ffianc%', '%FFIANC%'];
   const tutte = [];
   for (const p of pattern) {
-    const r = (await secGet('piano?commento=like.' + p + '&reparto_dip=eq.' + rep + '&limit=5000')) || [];
+    const r = (await secGet('piano?commento=like.' + p + '&reparto_dip=eq.' + rep + '')) || [];
     r.forEach((x) => tutte.push(x));
   }
   const perId = {};
@@ -3424,9 +3422,7 @@ async function _pianoAvvisiLenti(forza) {
     const dI = _pianoIsoData(da);
     const dF = _pianoIsoData(a);
     const fabb =
-      (await secGet(
-        'piano_fabbisogni?data=gte.' + dI + '&data=lte.' + dF + '&reparto_dip=eq.' + rep + '&limit=5000',
-      )) || [];
+      (await secGet('piano_fabbisogni?data=gte.' + dI + '&data=lte.' + dF + '&reparto_dip=eq.' + rep + '')) || [];
     // tutte le celle con le sigle richieste, in qualunque piano siano scritte:
     // copre chi fa un turno di QUESTO settore (anche dal foglio Valet)
     const sigle = [...new Set(fabb.map((f) => f.turno_codice))];
@@ -4017,8 +4013,7 @@ async function _pianoAvvisiConteggioHome(rep) {
   dm.setDate(dm.getDate() + ((7 - dm.getDay()) % 7));
   const iso = (x) => x.toISOString().substring(0, 10);
   const righe =
-    (await secGet('piano?data=gte.' + iso(l) + '&data=lte.' + iso(dm) + '&reparto_dip=eq.' + rep + '&limit=20000')) ||
-    [];
+    (await secGet('piano?data=gte.' + iso(l) + '&data=lte.' + iso(dm) + '&reparto_dip=eq.' + rep + '')) || [];
   const max = _pianoOreSettimanaMax();
   return _pianoSettimaneOltre(righe, max).filter((s) => s.giorni.some((d) => d.startsWith(ym))).length;
 }
@@ -4036,14 +4031,13 @@ async function _pianoAnalisiScoperti(ym) {
   const da = ym + '-01';
   const a = ym + '-' + String(nG).padStart(2, '0');
   const fabb =
-    (await secGet('piano_fabbisogni?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + rep + '&limit=5000')) ||
-    [];
+    (await secGet('piano_fabbisogni?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + rep + '')) || [];
   const vuole = {};
   fabb.forEach((f) => {
     const k = String(f.data).substring(0, 10) + '|' + String(f.turno_codice).toUpperCase();
     vuole[k] = (vuole[k] || 0) + (parseInt(f.quantita) || 0);
   });
-  const righe = (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&limit=8000')) || [];
+  const righe = (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '')) || [];
   const ha = {};
   righe.forEach((r) => {
     if (!_pianoCopreQui(r) || !_pianoTurnoInfo(r.codice)) return;
@@ -4078,15 +4072,17 @@ async function _pianoAnalisiScoperti(ym) {
     const bAl = new Date(primo);
     bAl.setDate(bAl.getDate() + nG + 13);
     const bordo = [
-      ...((await secGet('piano?data=gte.' + dataLocaleISO(bDa) + '&data=lt.' + da + '&limit=8000')) || []),
-      ...((await secGet('piano?data=gt.' + a + '&data=lte.' + dataLocaleISO(bAl) + '&limit=8000')) || []),
+      ...((await secGet('piano?data=gte.' + dataLocaleISO(bDa) + '&data=lt.' + da + '')) || []),
+      ...((await secGet('piano?data=gt.' + a + '&data=lte.' + dataLocaleISO(bAl) + '')) || []),
     ];
     bordo.forEach((r) => {
       const idx = Math.round((new Date(String(r.data).substring(0, 10) + 'T12:00:00') - primo) / 86400000) + 1;
       if (_pianoTurnoInfo(r.codice) || !cella[r.collaboratore + '|' + idx])
         cella[r.collaboratore + '|' + idx] = r.codice;
     });
-  } catch (e) {}
+  } catch (e) {
+    throw new Error('non riesco a leggere i giorni prima e dopo il mese (riposi e giorni di fila). Riprova.');
+  }
   const persone = collaboratoriCache.filter(
     (c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && !c.turni_solo_a_mano,
   );
@@ -4544,7 +4540,14 @@ async function pianoAssegnaEccezione(nome, dstr, codice, regola) {
         commento: ('Eccezione: ' + regola + ' - ' + getOperatore()).substring(0, 400),
         generato: false,
       });
-  } catch (e) {}
+  } catch (e) {
+    toastErrore(
+      'Turno scritto, ma la nota "Eccezione" NON e stata salvata: scrivila nel commento della cella (' +
+        ((e && e.message) || e) +
+        ')',
+      10000,
+    );
+  }
   logAzione('Piano: eccezione alla regola', nome + ' ' + codice + ' ' + dstr + ' · ' + regola);
   await renderPiano();
   await pianoPercheScoperti();

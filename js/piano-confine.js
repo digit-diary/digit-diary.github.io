@@ -52,7 +52,7 @@ async function _pianoConfineCalcola(ymA, rep) {
         daA +
         '&data=lte.' +
         aB +
-        '&limit=5000',
+        '',
     )) || [];
   const diB = (r) => String(r.data).substring(0, 10) >= inizioB;
   const pianificato = righe.some((r) => diB(r) && (r.reparto_dip || 'slots') === rep && _pianoIsLavoro(r.codice));

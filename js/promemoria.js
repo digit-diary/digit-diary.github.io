@@ -1054,6 +1054,7 @@ async function caricaMaisonFile(input, forzaSostituisci) {
       warnings = [],
       giorniNuovi = 0,
       giorniSaltati = [],
+      giorniFalliti = [],
       giorniSostituiti = 0,
       sevenCount = 0,
       dupCount = 0;
@@ -1095,10 +1096,11 @@ async function caricaMaisonFile(input, forzaSostituisci) {
       } else {
         giorniNuovi++;
       }
-      // Cancella dati esistenti per questa data (solo reparto corrente, comprese righe senza settore)
-      await _secDelReparto('costi_maison', 'data_giornata=eq.' + dataGiornata);
-      // Cancella anche spese_extra Seven di questa data (evita duplicati su reimport)
-      await _secDelReparto('spese_extra', 'data_spesa=eq.' + dataGiornata + '&luogo=eq.Ristorante%20Seven');
+      // Le righe del giorno si raccolgono e poi SOSTITUISCONO quelle del giorno in un colpo
+      // solo (secSostituisci): prima si cancellava il giorno e si inseriva riga per riga, e
+      // con la rete caduta a meta il giorno restava vuoto o a meta con "N righe importate"
+      const righeCosti = [];
+      const righeSeven = [];
       // Parsing righe
       const _giornoDuplicati = new Set();
       for (let i = startRow; i < data.length; i++) {
@@ -1150,11 +1152,7 @@ async function caricaMaisonFile(input, forzaSostituisci) {
               operatore: getOperatore(),
               reparto_dip: currentReparto,
             };
-            try {
-              await secPost('spese_extra', seRec);
-              totalRows++;
-              sevenCount++;
-            } catch (e) {}
+            righeSeven.push(seRec);
             continue;
           }
           // Disambiguazione: se il cognome è stato scelto dall'utente, usa quello
@@ -1221,10 +1219,7 @@ async function caricaMaisonFile(input, forzaSostituisci) {
                 operatore: getOperatore(),
                 reparto_dip: currentReparto,
               };
-              try {
-                await secPost('costi_maison', rec);
-                totalRows++;
-              } catch (e) {}
+              righeCosti.push(rec);
             }
           } else {
             const rec = {
@@ -1238,12 +1233,36 @@ async function caricaMaisonFile(input, forzaSostituisci) {
               operatore: getOperatore(),
               reparto_dip: currentReparto,
             };
-            try {
-              await secPost('costi_maison', rec);
-              totalRows++;
-            } catch (e) {}
+            righeCosti.push(rec);
           }
         }
+      }
+      try {
+        const fatti = await secSostituisci(
+          'costi_maison',
+          'data_giornata=eq.' + dataGiornata + '&reparto_dip=eq.' + currentReparto,
+          righeCosti,
+        );
+        const seven = await secSostituisci(
+          'spese_extra',
+          'data_spesa=eq.' + dataGiornata + '&luogo=eq.Ristorante%20Seven&reparto_dip=eq.' + currentReparto,
+          righeSeven,
+        );
+        // righe vecchie senza settore (prima del settore nelle Slots): tolte dopo
+        if (currentReparto === 'slots') {
+          await secDel('costi_maison', 'data_giornata=eq.' + dataGiornata + '&reparto_dip=is.null');
+          await secDel(
+            'spese_extra',
+            'data_spesa=eq.' + dataGiornata + '&luogo=eq.Ristorante%20Seven&reparto_dip=is.null',
+          );
+        }
+        totalRows += fatti.length + seven.length;
+        sevenCount += seven.length;
+      } catch (e) {
+        console.error('import Maison ' + dataGiornata, e);
+        giorniFalliti.push(
+          new Date(dataGiornata + 'T12:00:00').toLocaleDateString('it-IT') + ' (' + ((e && e.message) || e) + ')',
+        );
       }
     }
     maisonCache = await secGet('costi_maison?order=data_giornata.desc');
@@ -1266,7 +1285,13 @@ async function caricaMaisonFile(input, forzaSostituisci) {
       msg +=
         ' <button onclick="caricaMaisonFile(document.getElementById(\'maison-file-input\'),true)" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;cursor:pointer;border:1px solid var(--accent);color:var(--accent);background:none;border-radius:2px;font-family:Source Sans 3,sans-serif;font-weight:600;margin-left:6px">Sostituisci tutto</button>';
     }
-    if (!totalRows && !giorniSaltati.length) msg = '<span style="color:var(--muted)">Nessun dato nuovo trovato</span>';
+    if (!totalRows && !giorniSaltati.length && !giorniFalliti.length)
+      msg = '<span style="color:var(--muted)">Nessun dato nuovo trovato</span>';
+    if (giorniFalliti.length)
+      msg +=
+        '<br><span style="color:var(--c-rosso,#c0392b);font-weight:600"><i class="icx icx-avviso"></i> Giorni NON importati (restano com erano): ' +
+        escP(giorniFalliti.join(', ')) +
+        '</span>';
     if (dupCount) {
       msg +=
         '<br><span style="color:var(--c-rosso,#c0392b);font-size:var(--fs-sm,.8125rem);font-weight:600"><i class="icx icx-avviso"></i> ' +

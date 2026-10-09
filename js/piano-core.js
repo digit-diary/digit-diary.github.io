@@ -697,7 +697,7 @@ async function _pianoCaricaCfg() {
   pianoRegoleCache = regole || [];
   pianoMappatureCache = mappature || [];
   try {
-    _pianoCongediNp = (await secGet('collab_congedi_np?order=dal.desc&limit=5000')) || [];
+    _pianoCongediNp = (await secGet('collab_congedi_np?order=dal.desc')) || [];
   } catch (e) {
     _pianoCongediNp = [];
   }
@@ -963,9 +963,9 @@ async function _pianoCaricaMalattieAnno(anno, rep) {
   const righe = [];
   const lette = await Promise.all(
     ['M', 'M1'].map((cod) =>
-      secGet(
-        'piano?codice=eq.' + cod + '&data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + rep + '&limit=20000',
-      ).catch(() => []),
+      secGet('piano?codice=eq.' + cod + '&data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + rep + '').catch(
+        () => [],
+      ),
     ),
   );
   lette.forEach((l) => (l || []).forEach((r) => righe.push(r)));
@@ -1720,7 +1720,7 @@ async function _pianoAggiornaYtd(nomi) {
   // ore reali scritte a mano nei mesi passati: hanno la precedenza su tutto,
   // perche' sono il totale verificato da chi gestisce il piano
   const rettMese = {}; // nome|m -> ore reali
-  const rett = (await secGet('piano_ore_mese?anno_mese=gte.' + anno + '-01&anno_mese=lt.' + ym + '&limit=5000')) || [];
+  const rett = (await secGet('piano_ore_mese?anno_mese=gte.' + anno + '-01&anno_mese=lt.' + ym + '')) || [];
   rett.forEach((x) => {
     const m = parseInt(String(x.anno_mese).split('-')[1]);
     rettMese[x.collaboratore + '|' + m] = parseFloat(x.ore_reali) || 0;
@@ -1729,13 +1729,7 @@ async function _pianoAggiornaYtd(nomi) {
   const recMese = {}; // nome|m -> ore in piu'/in meno
   const recAnno =
     (await secGet(
-      'piano_recupero_ore?data=gte.' +
-        _daA +
-        '&data=lt.' +
-        fine +
-        '&reparto_dip=eq.' +
-        _pianoReparto() +
-        '&limit=20000',
+      'piano_recupero_ore?data=gte.' + _daA + '&data=lt.' + fine + '&reparto_dip=eq.' + _pianoReparto() + '',
     )) || [];
   recAnno.forEach((x) => {
     const m = parseInt(String(x.data).split('-')[1]);
@@ -1812,9 +1806,17 @@ async function pianoScriviOreMese(nome) {
         toast('Salvato \u00b7 rettifica tolta: ' + nome + ' torna alle ore del piano');
       }
     } else {
-      const ore = parseFloat(testo);
+      // ore decimali (160.5 o 160,5) oppure ore e minuti (160:30): prima "160:30" valeva 160
+      const mHm = String(testo)
+        .trim()
+        .match(/^(\d{1,3}):([0-5]\d)$/);
+      const ore = mHm
+        ? parseInt(mHm[1]) + parseInt(mHm[2]) / 60
+        : /^\d{1,3}([.,]\d+)?$/.test(String(testo).trim())
+          ? parseFloat(String(testo).trim().replace(',', '.'))
+          : NaN;
       if (isNaN(ore) || ore < 0 || ore > 400) {
-        toast('Valore non valido');
+        toastErrore('Valore non valido: scrivi le ore come 160.5 oppure 160:30');
         return;
       }
       const nota = await chiediTesto(
@@ -1936,7 +1938,7 @@ async function _pianoCaricaMeseSettore(da, a, rep) {
   const periodo = '&reparto_dip=neq.' + rep + '&data=gte.' + dalB + '&data=lte.' + alB;
   const bordoNulla = (pr) => pr.catch(() => []);
   const [righeLette, , prima, dopo, loro, conSigleQui] = await Promise.all([
-    secGet('piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + rep + '&limit=20000'),
+    secGet('piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + rep + ''),
     // malattie dell anno: servono per le ore di malattia (giorno 1-14 o dal 15.)
     _pianoCaricaMalattieAnno(parseInt(String(da).substring(0, 4)), rep),
     dalB < da

@@ -45,13 +45,16 @@ async function fetchRapportiMese(a, m) {
     _rapportoCacheSet(r.data_rapporto, r.turno, r);
   });
 }
+// salva subito quello che aspetta il ritardo dell autosalvataggio (cambio pagina, uscita):
+// ritorna la promessa, cosi chi esce puo aspettarla
 function flushRapportoSave() {
-  if (!window._rappPending) return;
-  Object.entries(window._rappPending).forEach(([cls, turno]) => {
+  if (!window._rappPending) return Promise.resolve();
+  const salvataggi = Object.entries(window._rappPending).map(([cls, turno]) => {
     clearTimeout(window._rappTimers[cls]);
-    salvaRapportoTurno(window._rappDs, turno, cls);
+    return salvaRapportoTurno(window._rappDs, turno, cls);
   });
   window._rappPending = {};
+  return Promise.allSettled(salvataggi);
 }
 async function renderRapporto() {
   if (rapportoGiornoAperto) {
@@ -244,13 +247,15 @@ async function apriGiorno(ds) {
     if (st) st.textContent = 'Salvando...';
     window._rappTimers[cls] = setTimeout(() => {
       delete window._rappPending[cls];
-      salvaRapportoTurno(ds, turno, cls).then(() => {
-        if (st) {
+      salvaRapportoTurno(ds, turno, cls).then((esito) => {
+        if (!st) return;
+        // "Salvato" solo se il database ha confermato (prima compariva sempre)
+        if (esito === true) {
           st.textContent = 'Salvato';
           setTimeout(() => {
-            if (st) st.textContent = '';
+            if (st && st.textContent === 'Salvato') st.textContent = '';
           }, 2000);
-        }
+        } else st.textContent = 'Non salvato: riprova';
       });
     }, 1200);
   }
@@ -965,8 +970,28 @@ async function _processaAssenzeRapporto(assenzeText, ds, turno) {
 }
 // =================================================================================
 // un salvataggio alla volta: il doppio click creava righe doppie (unaVoltaSola in utils.js)
+// Un salvataggio alla volta per giorno e turno. Se si scrive mentre il precedente e in
+// corso (o aspetta una conferma), le modifiche nuove si salvano SUBITO DOPO: prima venivano
+// scartate e la scritta diceva comunque "Salvato".
+const _rappDaRisalvare = {};
 function salvaRapportoTurno(ds, turno, cls) {
-  return unaVoltaSola('rapporto-salva|' + ds + '|' + turno, () => _salvaRapportoTurnoEsegui(ds, turno, cls));
+  const k = 'rapporto-salva|' + ds + '|' + turno;
+  if (_salvataggiInCorso.has(k)) {
+    _rappDaRisalvare[k] = cls;
+    return new Promise((ok) => {
+      const aspetta = () => (_salvataggiInCorso.has(k) || _rappDaRisalvare[k] ? setTimeout(aspetta, 300) : ok(true));
+      setTimeout(aspetta, 300);
+    });
+  }
+  return unaVoltaSola(k, async () => {
+    let esito = await _salvaRapportoTurnoEsegui(ds, turno, cls);
+    while (_rappDaRisalvare[k]) {
+      const c = _rappDaRisalvare[k];
+      delete _rappDaRisalvare[k];
+      esito = await _salvaRapportoTurnoEsegui(ds, turno, c);
+    }
+    return esito;
+  });
 }
 async function _salvaRapportoTurnoEsegui(ds, turno, cls) {
   const campi = getCampiRapporto();
@@ -996,7 +1021,29 @@ async function _salvaRapportoTurnoEsegui(ds, turno, cls) {
       try {
         await secPost('rapporti_giornalieri', data);
       } catch (e2) {
+        if (!/duplicate key|already exists|23505/i.test((e2 && e2.message) || '')) throw e2;
+        // un collega ha creato lo stesso rapporto nello stesso momento: si UNISCONO i testi
+        // invece di sovrascrivere il suo (prima il suo spariva)
+        const suo = ((await secGet('rapporti_giornalieri?' + filtro)) || [])[0] || {};
+        const unisci = (a, b) => {
+          const x = a === 0 ? '' : String(a == null ? '' : a).trim();
+          const y = b === 0 ? '' : String(b == null ? '' : b).trim();
+          if (!x) return b;
+          if (!y || x === y) return a;
+          return typeof a === 'number' && typeof b === 'number' ? a : x + '\n' + y;
+        };
+        Object.keys(data).forEach((k) => {
+          if (['data_rapporto', 'turno', 'reparto_dip', 'operatore', 'updated_at', 'note_extra'].includes(k)) return;
+          data[k] = unisci(suo[k], data[k]);
+        });
+        let extraSuo = {};
+        try {
+          extraSuo = JSON.parse(suo.note_extra || '{}') || {};
+        } catch (e3) {}
+        Object.keys(extra).forEach((k) => (extra[k] = unisci(extraSuo[k], extra[k])));
+        data.note_extra = JSON.stringify(Object.assign({}, extraSuo, extra));
         await secPatch('rapporti_giornalieri', filtro, data);
+        toast('Un collega stava scrivendo lo stesso rapporto: i testi sono stati uniti', 6000);
       }
     }
     _rapportoCacheSet(ds, turno, data);
@@ -1012,9 +1059,11 @@ async function _salvaRapportoTurnoEsegui(ds, turno, cls) {
       renderRischioAlerts();
       renderAmmonimentiAlerts();
     }
+    return true;
   } catch (e) {
     console.error(e);
-    toast('Errore salvataggio');
+    toastErrore('Rapporto NON salvato: ' + ((e && e.message) || e) + '. Riprova.', 8000);
+    return false;
   }
 }
 
