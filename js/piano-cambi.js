@@ -1211,43 +1211,31 @@ function _pianoGiornoDiIndice(g) {
 }
 // dstr (facoltativo): il giorno del turno, per la preferenza dei giorni di lavoro
 function _pianoIdoneoPerTurno(nome, turno, dstr) {
-  // idoneita' per le PROPOSTE del programma (cerca cambio, copertura malattia e ND,
-  // Migliora ore, finestra copertura del Diario): stesse regole della bozza (anche la
-  // storia dei gruppi per chi non ha settori: _pianoCaricaStoriaGruppi), compresi i
-  // giorni (giorni di lavoro, funzione per giorno: SUP solo Z* da lunedi a giovedi). Le
-  // funzioni che "fanno tutto" (SUP, RESP) lo fanno a mano (_pianoIdoneoAMano), non nelle
-  // proposte automatiche. La logica vive nel motore puro PianoRegole.
-  const info = _pianoCollabInfo(nome) || {};
-  if (info.turni_solo_a_mano) return false; // fuori rotazione (es. ufficio): mai proposto
-  return PianoRegole.idoneoPerTurno(info, turno, {
-    dow: dstr ? new Date(String(dstr).substring(0, 10) + 'T12:00:00').getDay() : null,
-    storiaDi: () => _pianoStoriaGruppiDi(nome, dstr),
-    settoriDi: (i) => _pianoSettoriEffettivi(i),
-    regoleGruppoDi: (gr) => _pianoRegoleGruppoDi(gr),
-    campoOk: (i, v) => _pianoCampoOk(i, v),
-    mappFunzione: (fz) => _pianoMappFunzione(fz),
-    regolaVal: (n) => _pianoRegolaVal(n),
-    regoleTurnoFunzione: () => _pianoRegoleTurnoFunzione(),
-    livelloDi: (i) => _pianoLivelloNelSettore(i),
-  });
+  // idoneita per le PROPOSTE del programma (cerca cambio, copertura malattia e ND,
+  // Migliora ore, finestra copertura del Diario): lo stesso motore della bozza
+  // (PianoRegole.idoneita), con il giorno del turno e la storia del settore aperto; chi
+  // viene da un altro settore solo nell area della sua copertura
+  return PianoRegole.idoneita(
+    _pianoCollabInfo(nome) || {},
+    turno,
+    _pianoCtxIdoneita({
+      dow: dstr ? new Date(String(dstr).substring(0, 10) + 'T12:00:00').getDay() : null,
+      storiaDi: () => _pianoStoriaGruppiDi(nome, dstr),
+      coperturaDi: (i) => _pianoCoperturaCfg(i),
+    }),
+  ).ok;
 }
-// IDONEITA PER LE SCELTE A MANO: come _pianoIdoneoPerTurno ma senza i turni bloccati
-// della persona (es. S1 e S3 a chi non copre sala, reception e cassa). I turni bloccati
-// non vengono mai PROPOSTI (bozza, ricerca, cerca cambio, coperture, formazioni), ma chi
-// li scrive o li scambia a mano non riceve l avviso "non formato": restano turni del
-// suo reparto. L avviso resta per un reparto davvero non formato.
+// IDONEITA PER LE SCELTE A MANO: lo stesso motore in modo "mano", piu largo per scelta:
+// niente turni bloccati (S1 e S3 a chi non copre sala, reception e cassa: non vengono mai
+// PROPOSTI, ma chi li scrive a mano non riceve l avviso "non formato"), niente "solo a
+// mano", e le funzioni che fanno tutto (SUP, RESP) possono ogni turno. L avviso resta
+// per un area davvero non abilitata.
 function _pianoIdoneoAMano(nome, turno) {
-  const info = Object.assign({}, _pianoCollabInfo(nome) || {}, { turni_bloccati: '' });
-  return PianoRegole.idoneoPerTurno(info, turno, {
-    settoriDi: (i) => _pianoSettoriEffettivi(i),
-    regoleGruppoDi: (gr) => _pianoRegoleGruppoDi(gr),
-    campoOk: (i, v) => _pianoCampoOk(i, v),
-    mappFunzione: (fz) => _pianoMappFunzione(fz),
-    regolaVal: (n) => _pianoRegolaVal(n),
-    regoleTurnoFunzione: () => _pianoRegoleTurnoFunzione(),
-    fannoTutto: (fz) => _pianoFunzioniFannoTutto().has(fz),
-    livelloDi: (i) => _pianoLivelloNelSettore(i),
-  });
+  return PianoRegole.idoneita(
+    _pianoCollabInfo(nome) || {},
+    turno,
+    _pianoCtxIdoneita({ modo: 'mano', storiaDi: () => _pianoStoriaGruppiDi(nome) }),
+  ).ok;
 }
 // COPERTURA DI UNA NON DISPONIBILITA dal Diario: la stessa ricerca dei sostituti della
 // malattia, gia compilata, che alla conferma scrive ND (non M) con la nota del Diario

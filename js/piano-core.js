@@ -408,19 +408,32 @@ async function _pianoCaricaStoriaGruppi(rep) {
 }
 // gruppi fatti da una persona fino alla fine del mese di dstr; null = storia non letta
 // (allora vale la regola di prima: idoneo se non ha settori)
-function _pianoStoriaGruppiDi(nome, dstr) {
-  const reps = Object.keys(_pianoStoriaGruppiCache);
-  if (!reps.length) return null;
+// solo il settore aperto (o quello indicato), come la bozza: prima si univano tutti i
+// settori gia letti e un area con lo stesso nome in un altro settore valeva anche qui
+function _pianoStoriaGruppiDi(nome, dstr, rep) {
+  const c = _pianoStoriaGruppiCache[rep || _pianoReparto()];
+  if (!c) return null;
   const ym = String(dstr || _pianoMeseSel || '').substring(0, 7);
   const fine = ym ? ym + '-31' : '9999-12-31';
-  const out = new Set();
-  reps.forEach((rep) => {
-    const per = _pianoStoriaGruppiCache[rep].primo[nome] || {};
-    Object.keys(per).forEach((g) => {
-      if (per[g] <= fine) out.add(g);
-    });
-  });
-  return out;
+  const per = c.primo[nome] || {};
+  return new Set(Object.keys(per).filter((g) => per[g] <= fine));
+}
+// IDONEITA: contesto comune del motore unico (PianoRegole.idoneita) per bozza, proposte,
+// scrittura a mano e "Chi puo fare cosa". extra: dow, storiaDi, modo, coperturaDi...
+function _pianoCtxIdoneita(extra) {
+  return Object.assign(
+    {
+      settoriDi: (i) => _pianoSettoriEffettivi(i),
+      regoleGruppoDi: (gr) => _pianoRegoleGruppoDi(gr),
+      campoOk: (i, v) => _pianoCampoOk(i, v),
+      mappFunzione: (fz) => _pianoMappFunzione(fz),
+      regoleTurnoFunzione: () => _pianoRegoleTurnoFunzione(),
+      livelloDi: (i) => _pianoLivelloNelSettore(i),
+      fannoTutto: (fz) => _pianoFunzioniFannoTutto().has(fz),
+      accompagnamentoDi: (i) => _pianoAccompagnamentoDi(i),
+    },
+    extra || {},
+  );
 }
 function _pianoLivelloNelSettore(info, rep) {
   if (!info || typeof getCompetenzeConfigAll !== 'function') return null;

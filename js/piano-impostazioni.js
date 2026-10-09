@@ -24,7 +24,7 @@ function _renderPianoMappatureCard() {
     ' i turni normali della funzione: la bozza li da per primi.</div>' +
     '<div>' +
     pill('#b39b00', 'AMMESSO') +
-    ' permessi ma non abituali: la bozza li assegna, preferendo i principali.</div>' +
+    ' solo se serve: la bozza li usa dopo tutti gli altri e solo per chi e sotto le sue ore.</div>' +
     '<div>' +
     pill('#1a4a7a', 'PREFERITO') +
     ' solo una preferenza: non limita niente.</div></div>' +
@@ -790,6 +790,8 @@ const _REGOLE_GRUPPO_TIPI = {
   limite_funzione_giorno: 'Al massimo quante persone di una funzione nello stesso giorno',
   limite_funzione_mese: 'Al massimo quante persone diverse di una funzione nel mese',
   minimo_funzione_mese: 'Almeno quante persone di una funzione nel mese',
+  turni_persona_area_mese:
+    'Ogni persona di una funzione fa almeno quanti turni in quest area nel mese, SE POSSIBILE (per esempio ogni Supervisor un turno al BO, per non dimenticarlo): la bozza ci prova, non e un obbligo',
   minimo_funzione_giorno: 'Almeno quante persone di una funzione al giorno, anche solo certi giorni o certi turni',
   turni_solo_funzioni:
     'I turni scelti li fanno solo le funzioni scelte (per esempio L1 e 9 solo Back Office e Supervisor)',
@@ -815,6 +817,7 @@ const _REGOLE_GRUPPO_ETICHETTE = {
   limite_funzione_giorno: 'Massimo di una funzione al giorno',
   limite_funzione_mese: 'Massimo persone di una funzione al mese',
   minimo_funzione_mese: 'Minimo di una funzione al mese',
+  turni_persona_area_mese: 'Turni al mese nell area per persona (se possibile)',
   minimo_funzione_giorno: 'Minimo di una funzione al giorno',
   turni_solo_funzioni: 'Turni riservati a certe funzioni',
   funzione_turni_giorni: 'Una funzione fa solo certi turni (per giorno)',
@@ -852,6 +855,7 @@ const _RG_SCHEMI = {
   limite_funzione_giorno: { campi: ['fz', 'n'] },
   limite_funzione_mese: { campi: ['fz', 'n'] },
   minimo_funzione_mese: { campi: ['fz', 'n'] },
+  turni_persona_area_mese: { campi: ['fz', 'n'] },
   minimo_funzione_giorno: { campi: ['fz', 'n', 'tipo', 'gg'] },
   minimo_livello_giorno: { campi: ['lv', 'n', 'tipo', 'gg'] },
   turni_solo_funzioni: {
@@ -871,10 +875,12 @@ const _RG_SCHEMI = {
     },
   },
   minimo_competenza_giorno: {
-    campi: ['comp', 'n', 'tipo', 'gg', 'fascia'],
+    campi: ['comp', 'n', 'tipo', 'gg', 'fascia', 'turni'],
     componi: (c) =>
       c.comp && parseInt(c.n) >= 1
-        ? [c.comp, parseInt(c.n), c.tipo || '', c.gg.join(','), c.fascia || ''].join('|').replace(/\|+$/, '')
+        ? [c.comp, parseInt(c.n), c.tipo || '', c.gg.join(','), c.fascia || '', c.turni || '']
+            .join('|')
+            .replace(/\|+$/, '')
         : '',
     leggi: (v) => {
       const p = v.split('|');
@@ -884,6 +890,7 @@ const _RG_SCHEMI = {
         tipo: p[2] || '',
         gg: (p[3] || '').split(',').filter((x) => x !== ''),
         fascia: p[4] || '',
+        turni: p[5] || '',
       };
     },
   },
@@ -1043,6 +1050,10 @@ function _rgFrase(r) {
         ' nel mese ' +
         gr
       );
+    case 'turni_persona_area_mese':
+      return (
+        'Ogni ' + c.fz + ' fa almeno ' + c.n + (c.n === '1' ? ' turno ' : ' turni ') + gr + ' al mese, se possibile'
+      );
     case 'minimo_funzione_mese':
       return (
         'Almeno ' + c.n + (c.n === '1' ? ' persona' : ' persone diverse') + ' con funzione ' + c.fz + ' nel mese ' + gr
@@ -1078,6 +1089,7 @@ function _rgFrase(r) {
         ' con ' +
         (typeof _pianoEtichettaCompetenza === 'function' ? _pianoEtichettaCompetenza(c.comp) : c.comp) +
         tipoTxt +
+        (c.turni ? ' su ' + _rgSigleInParole(c.turni).replace(/^i turni /, '') : '') +
         fasciaT +
         ' ' +
         gr +
@@ -2170,7 +2182,12 @@ function _pianoValidaRegolaGruppo(gruppo, tipo, valore, settore) {
       return 'Scrivi campo, confronto e valore, per esempio ACCOGLIENZA>0 oppure LINGUE=EN';
     return null;
   }
-  if (t === 'limite_funzione_giorno' || t === 'limite_funzione_mese' || t === 'minimo_funzione_mese') {
+  if (
+    t === 'limite_funzione_giorno' ||
+    t === 'limite_funzione_mese' ||
+    t === 'minimo_funzione_mese' ||
+    t === 'turni_persona_area_mese'
+  ) {
     const m = v.match(/^([A-Z0-9_]+):(\d+)$/);
     if (!m) return 'Formato atteso FUNZIONE:NUMERO, per esempio SUP:1';
     if (!fzOk(m[1])) return 'Funzione sconosciuta in ' + ctx.label + ': ' + m[1];
@@ -2259,6 +2276,14 @@ function _pianoValidaRegolaGruppo(gruppo, tipo, valore, settore) {
     if (p[2] && !/^(DIURNO|NOTTURNO)$/.test(p[2])) return 'Tipo di turno: diurni, notturni o tutti';
     if (p[3] && !/^[0-6](,[0-6])*$/.test(p[3])) return 'Giorni da 0 (lunedi) a 6 (domenica)';
     if (p[4] && !_pianoFasciaDaTesto(p[4])) return 'Fascia oraria da scrivere come 22:00-02:00 oppure 22-02';
+    if (p[5]) {
+      const sigle = new Set(_pianoTurniReparto().map((x) => String(x.codice).toUpperCase()));
+      const ignote = String(p[5])
+        .split(',')
+        .map((x) => x.trim())
+        .filter((x) => x && !sigle.has(x.replace(/\*$/, '')) && !x.endsWith('*'));
+      if (ignote.length) return 'Turni sconosciuti in questo settore: ' + ignote.join(', ');
+    }
     return null;
   }
   if (t === 'equilibrio_livelli') {

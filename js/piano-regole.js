@@ -346,6 +346,138 @@
     return true;
   }
 
+  // ===== IDONEITA: UN SOLO MOTORE (controllo completo del 09-10/10/2026) =====
+  // "Puo questa persona fare questo turno?" per TUTTO il programma: bozza, ricerca,
+  // proposte (cerca cambio, coperture, Migliora ore), scrittura a mano, Valida e la card
+  // "Chi puo fare cosa". Prima c erano quattro copie dello stesso controllo, scritte in
+  // modo diverso. I passi, sempre nello stesso ordine:
+  //   1 preferenze della persona (solo a mano, solo diurni/notturni, giorni di lavoro,
+  //     turni bloccati)   2 scelto per nome   3 regole "chi fa cosa" della funzione
+  //   4 area di lavoro (Formazione / settori, o la storia dei turni) e regole di gruppo
+  //   5 turni per funzione (PRINCIPALE, AMMESSO, PREFERITO)
+  // ctx.modo: 'bozza' (anche proposte e ricerca) oppure 'mano' (scrivere la cella a mano:
+  // piu largo per scelta: niente turni bloccati, niente "solo a mano", le funzioni che
+  // fanno tutto - SUP, RESP - possono ogni turno; il giorno solo se passato).
+  // ctx: settoriDi(info) -> elenco o null; storiaDi(info) -> Set dei gruppi gia fatti, o
+  // null se la storia non e letta (allora l area non ferma); regoleGruppoDi(gruppo);
+  // campoOk(info, valore); mappFunzione(funzione); regoleTurnoFunzione(); livelloDi(info);
+  // fannoTutto(funzione); accompagnamentoDi(info) -> elenco aree; coperturaDi(info) ->
+  // {gruppi} se viene da un altro settore; dow (giorno JS) o null.
+  // Ritorna { ok, esito: 'si' | 'serve' | 'no', passo, ... dati per spiegarlo }.
+  function idoneita(info, turno, ctx) {
+    info = info || {};
+    ctx = ctx || {};
+    const mano = ctx.modo === 'mano';
+    const cod = String(turno.codice || '').toUpperCase();
+    const gruppoT = String(turno.gruppo || '').toUpperCase();
+    const fzU = String(info.funzione || '').toUpperCase();
+    const no = (passo, dati) => Object.assign({ ok: false, esito: 'no', passo: passo }, dati || {});
+    const si = (passo, dati) => Object.assign({ ok: true, esito: 'si', passo: passo }, dati || {});
+    // 1 preferenze
+    if (!mano && info.turni_solo_a_mano) return no('solo_a_mano');
+    if (info.solo_diurni && turno.tipo === 'NOTTURNO') return no('solo_diurni');
+    if (info.solo_notti && turno.tipo !== 'NOTTURNO') return no('solo_notti');
+    if (ctx.dow != null && !lavoraNelGiorno(info, ctx.dow)) return no('giorno');
+    if (
+      !mano &&
+      String(info.turni_bloccati || '')
+        .split(',')
+        .map((x) => x.trim().toUpperCase())
+        .includes(cod)
+    )
+      return no('bloccato');
+    // 2 scelto per nome
+    const regTF = typeof ctx.regoleTurnoFunzione === 'function' ? ctx.regoleTurnoFunzione() : [];
+    if (sceltoPerTurno(info, turno, regTF)) return si('scelto');
+    if (mano && fzU && typeof ctx.fannoTutto === 'function' && ctx.fannoTutto(fzU))
+      return si('fa_tutto', { funzione: fzU });
+    // 3 regole "chi fa cosa" della funzione (turni riservati, per giorno, per livello)
+    const settoriC = typeof ctx.settoriDi === 'function' ? ctx.settoriDi(info) : null;
+    const infoS = Object.assign({}, info, {
+      _settori: settoriC || [],
+      _livello: typeof ctx.livelloDi === 'function' ? ctx.livelloDi(info) : info._livello,
+    });
+    const vf = violazioneFunzioneTurno(infoS, turno, ctx.dow != null ? ctx.dow : null, regTF);
+    if (vf)
+      return no('funzione_turno', {
+        motivo: vf,
+        regole: regTF
+          .filter((r) => violazioneFunzioneTurno(infoS, turno, ctx.dow != null ? ctx.dow : null, [r]))
+          .map((r) => r.id),
+      });
+    // 4 area di lavoro. AFFIANCAMENTO (decisione del titolare 09/10/2026): chi lavora
+    // affiancato in un area la puo fare, MAI da solo (il controllo "mai da solo" e nella
+    // bozza e in Valida); prima l affiancamento non abilitava e la bozza non gli dava mai
+    // quei turni, anche se li faceva da mesi
+    const affiancato = (typeof ctx.accompagnamentoDi === 'function' ? ctx.accompagnamentoDi(info) : []).includes(
+      gruppoT,
+    );
+    const storia = !settoriC && typeof ctx.storiaDi === 'function' ? ctx.storiaDi(info) : null;
+    const haAreaPropria = settoriC
+      ? settoriC.includes(gruppoT)
+      : storia
+        ? storia.has(gruppoT) || storia.has(turno.gruppo)
+        : !!(storia === null && (mano || ctx.storiaSconosciutaPassa !== false));
+    const haArea = haAreaPropria || affiancato;
+    let lasciapassare = null;
+    for (const rg of typeof ctx.regoleGruppoDi === 'function' ? ctx.regoleGruppoDi(gruppoT) : []) {
+      const tipoR = String(rg.tipo_regola || '').toLowerCase();
+      if (tipoR === 'richiede_funzione') {
+        const ammesse = String(rg.valore || '')
+          .split(',')
+          .map((x) => x.trim().toUpperCase());
+        if (ammesse.includes(fzU)) lasciapassare = { via: 'funzione', regola: rg.id, ammesse: ammesse };
+        else if (!haArea) return no('area_funzioni', { regola: rg.id, ammesse: ammesse, gruppo: gruppoT });
+      } else if (tipoR === 'blocca_tipo_turno') {
+        const tipi = String(rg.valore || '')
+          .split(',')
+          .map((x) => x.trim().toUpperCase());
+        if (tipi.includes(String(turno.tipo || '').toUpperCase()))
+          return no('tipo_vietato', { regola: rg.id, gruppo: gruppoT });
+      } else if (tipoR === 'richiede_campo') {
+        if (typeof ctx.campoOk === 'function' && !ctx.campoOk(info, rg.valore))
+          return no('campo', { regola: rg.id, valore: rg.valore });
+        lasciapassare = { via: 'campo', regola: rg.id, valore: rg.valore };
+      }
+    }
+    // 5 turni per funzione: con almeno un PRINCIPALE o AMMESSO la funzione fa solo quelli
+    const mapp = (typeof ctx.mappFunzione === 'function' ? ctx.mappFunzione(info.funzione) : null) || [];
+    const voci = mapp.filter((m) => m.tipo === 'PRINCIPALE' || m.tipo === 'AMMESSO');
+    const preferito = mapp.some((m) => m.tipo === 'PREFERITO' && String(m.turno_codice).toUpperCase() === cod);
+    const comuni = { gruppo: gruppoT, funzione: fzU, affiancato: affiancato, preferito: preferito };
+    if (voci.length) {
+      const m = voci.find((x) => x.turno_codice === turno.codice);
+      if (!m) return no('mapp_fuori', Object.assign({ voci: voci.map((x) => x.turno_codice) }, comuni));
+      const cop = typeof ctx.coperturaDi === 'function' ? ctx.coperturaDi(info) : null;
+      if (cop && cop.gruppi && String(cop.gruppi).toUpperCase() !== gruppoT)
+        return no('copertura_area', { gruppi: String(cop.gruppi).toUpperCase() });
+      return Object.assign(
+        {
+          ok: true,
+          esito: m.tipo === 'AMMESSO' ? 'serve' : 'si',
+          passo: m.tipo === 'AMMESSO' ? 'mapp_ammesso' : 'mapp_principale',
+        },
+        comuni,
+      );
+    }
+    if (!haArea && !lasciapassare) return no('area', Object.assign({ conSettori: !!settoriC }, comuni));
+    const cop = typeof ctx.coperturaDi === 'function' ? ctx.coperturaDi(info) : null;
+    if (cop && cop.gruppi && String(cop.gruppi).toUpperCase() !== gruppoT)
+      return no('copertura_area', { gruppi: String(cop.gruppi).toUpperCase() });
+    return si(
+      lasciapassare
+        ? 'area_' + lasciapassare.via
+        : !haAreaPropria && affiancato
+          ? 'area_affiancamento'
+          : settoriC
+            ? 'area_settori'
+            : storia
+              ? 'area_storia'
+              : 'area_sconosciuta',
+      Object.assign({ lasciapassare: lasciapassare }, comuni),
+    );
+  }
+
   // ===== INDICE DI BENESSERE =====
   // Misura, su dati oggettivi del piano, quanto e' sostenibile il carico di una
   // persona. Non giudica la persona: fotografa come e' distribuito il lavoro.
@@ -703,6 +835,7 @@
     violazioniCella,
     violazioniAccompagnamento,
     idoneoPerTurno,
+    idoneita,
     lavoraNelGiorno,
     violazioneFunzioneTurno,
     sceltoPerTurno,

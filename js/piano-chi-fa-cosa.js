@@ -85,138 +85,145 @@ function _pcfcStoria(nome, rep) {
   return new Set(Object.keys(per).filter((g) => per[g] <= fine));
 }
 
-// PERCHE: stessi passi e stesso ordine di _pianoIdoneoStatico (piano-genera.js).
-// Esito: si | serve (ammesso: la bozza preferisce i principali) | no. dove = posto dove si
-// cambia; rif = id delle regole di gruppo coinvolte; comps = competenze da evidenziare.
+// PERCHE: il risultato del motore unico (PianoRegole.idoneita, lo stesso della bozza)
+// tradotto in parole, con il posto dove si cambia. Esito: si | serve (ammesso: la bozza
+// preferisce i principali) | no. dove = posto dove si cambia; rif = id delle regole di
+// gruppo coinvolte; comps = competenze da evidenziare; campo = preferenza da cambiare.
 function _pcfcSpiega(nome, t, dowG, idoneita) {
   const info = _pianoCollabInfo(nome) || {};
+  const r = PianoRegole.idoneita(
+    info,
+    t,
+    _pianoCtxIdoneita({
+      dow: dowG,
+      storiaDi: () => (idoneita ? idoneita[nome] || new Set() : null),
+      storiaSconosciutaPassa: false,
+    }),
+  );
   const cod = String(t.codice).toUpperCase();
   const gruppoT = String(t.gruppo || '').toUpperCase();
   const fz = String(info.funzione || '').toUpperCase();
+  const regola = (id) => pianoRegoleGruppoCache.find((x) => x.id === id);
+  const frase = (id) => {
+    const rg = regola(id);
+    return rg ? (typeof _rgFrase === 'function' ? _rgFrase(rg) : String(rg.valore).toLowerCase()) : '';
+  };
   const no = (motivo, dove, extra) => Object.assign({ esito: 'no', motivo: motivo, dove: dove }, extra || {});
-  if (info.turni_solo_a_mano)
-    return no('"Turni solo a mano": fuori rotazione, la bozza non gli assegna turni', 'pref', {
-      campo: 'Turni solo a mano',
-    });
-  if (info.solo_diurni && t.tipo === 'NOTTURNO') return no('fa solo turni diurni', 'pref', { campo: 'Solo diurni' });
-  if (info.solo_notti && t.tipo !== 'NOTTURNO') return no('fa solo turni notturni', 'pref', { campo: 'Solo notturni' });
-  if (dowG != null && !PianoRegole.lavoraNelGiorno(info, dowG))
-    return no('non lavora di ' + _PCFC_GIORNI[dowG], 'pref', { campo: 'Giorni di lavoro' });
-  if (_pcfcLista(info.turni_bloccati).includes(cod))
-    return no('turno bloccato nelle sue preferenze', 'pref', { campo: 'Turni bloccati' });
-  const regTF = _pianoRegoleTurnoFunzione();
-  if (PianoRegole.sceltoPerTurno(info, t, regTF))
-    return {
-      esito: 'si',
-      motivo: 'scelto per nome (Turni riservati a collaboratori scelti)',
-      dove: 'regole',
-      rif: _pcfcRegoleCheCitano(cod)
-        .filter((r) => String(r.tipo_regola).toLowerCase() === 'turni_solo_collaboratori')
-        .map((r) => r.id),
-    };
-  const vf = _pianoViolazioneFunzioneTurno(nome, t, dowG, true);
-  if (vf) {
-    // la regola che lo ferma: provata una per una
-    const infoS = Object.assign({}, info, {
-      _settori: _pianoSettoriEffettivi(info) || [],
-      _livello: _pianoLivelloNelSettore(info),
-    });
-    const colpa = regTF.filter((r) => PianoRegole.violazioneFunzioneTurno(infoS, t, dowG, [r])).map((r) => r.id);
-    return no(String(vf).replace(/ \(Regole di gruppo\)$/, ''), 'regole', { rif: colpa });
-  }
-  // abilitazione all area di lavoro
-  const settoriC = _pianoSettoriEffettivi(info);
-  const haArea = settoriC
-    ? settoriC.includes(gruppoT)
-    : !!(idoneita[nome] && (idoneita[nome].has(t.gruppo) || idoneita[nome].has(gruppoT)));
-  let lasciapassare = '';
-  let rifLascia = [];
-  for (const rg of _pianoRegoleGruppoDi(gruppoT)) {
-    const tipoR = String(rg.tipo_regola || '').toLowerCase();
-    if (tipoR === 'richiede_funzione') {
-      const ammesse = rg.valore.split(',').map((x) => x.trim().toUpperCase());
-      if (ammesse.includes(fz)) {
-        lasciapassare = 'la funzione ' + fz + ' entra nell area ' + gruppoT + ' senza abilitazione';
-        rifLascia = [rg.id];
-      } else if (!haArea)
-        return no(
-          'l area ' + gruppoT + ' e aperta alle funzioni ' + ammesse.join(', ') + ' e lui non vi e abilitato',
-          'regole',
-          { rif: [rg.id] },
-        );
-    } else if (tipoR === 'blocca_tipo_turno') {
-      const tipi = rg.valore.split(',').map((x) => x.trim().toUpperCase());
-      if (tipi.includes(String(t.tipo || '').toUpperCase()))
-        return no('turni ' + String(t.tipo).toLowerCase() + ' vietati nell area ' + gruppoT, 'regole', {
-          rif: [rg.id],
-        });
-    } else if (tipoR === 'richiede_campo') {
-      const frase = typeof _rgFrase === 'function' ? _rgFrase(rg) : String(rg.valore).toLowerCase();
-      if (!_pianoCampoOk(info, rg.valore))
-        return no('requisito sulla scheda non soddisfatto: ' + frase, 'regole', { rif: [rg.id] });
-      lasciapassare = 'requisito sulla scheda soddisfatto: ' + frase;
-      rifLascia = [rg.id];
-    }
-  }
-  const mapp = _pianoMappFunzione(info.funzione) || [];
-  const voci = mapp.filter((m) => m.tipo === 'PRINCIPALE' || m.tipo === 'AMMESSO');
-  const preferito = mapp.some((m) => m.tipo === 'PREFERITO' && String(m.turno_codice).toUpperCase() === cod);
-  const affiancato = (typeof _pianoAccompagnamentoDi === 'function' ? _pianoAccompagnamentoDi(info) : []).includes(
-    gruppoT,
-  );
-  const conAffianc = affiancato ? ' · affiancato: mai da solo in ' + gruppoT : '';
-  if (voci.length) {
-    const m = voci.find((x) => x.turno_codice === t.codice);
-    if (!m)
-      return no(
-        'la funzione ' + fz + ' fa solo ' + voci.map((x) => x.turno_codice).join(', ') + ' (Turni per funzione)',
-        'mapp',
-      );
-    return m.tipo === 'AMMESSO'
-      ? {
-          esito: 'serve',
-          motivo: 'turno ammesso per la funzione ' + fz + ': la bozza preferisce i suoi turni principali' + conAffianc,
-          dove: 'mapp',
-        }
-      : { esito: 'si', motivo: 'turno principale della funzione ' + fz + conAffianc, dove: 'mapp' };
-  }
+  const coda =
+    (r.preferito ? ' · turno preferito della funzione ' + fz : '') +
+    (r.affiancato ? ' · affiancato: mai da solo in ' + gruppoT : '');
   const compsGr = _pcfcCompetenzeDelGruppo(gruppoT);
-  if (!haArea && !lasciapassare) {
-    if (settoriC && compsGr.length)
+  switch (r.passo) {
+    case 'solo_a_mano':
+      return no('"Turni solo a mano": fuori rotazione, la bozza non gli assegna turni', 'pref', {
+        campo: 'Turni solo a mano',
+      });
+    case 'solo_diurni':
+      return no('fa solo turni diurni', 'pref', { campo: 'Solo diurni' });
+    case 'solo_notti':
+      return no('fa solo turni notturni', 'pref', { campo: 'Solo notturni' });
+    case 'giorno':
+      return no('non lavora di ' + _PCFC_GIORNI[dowG], 'pref', { campo: 'Giorni di lavoro' });
+    case 'bloccato':
+      return no('turno bloccato nelle sue preferenze', 'pref', { campo: 'Turni bloccati' });
+    case 'scelto':
+      return {
+        esito: 'si',
+        motivo: 'scelto per nome (Turni riservati a collaboratori scelti)',
+        dove: 'regole',
+        rif: _pcfcRegoleCheCitano(cod)
+          .filter((x) => String(x.tipo_regola).toLowerCase() === 'turni_solo_collaboratori')
+          .map((x) => x.id),
+      };
+    case 'funzione_turno':
+      return no(String(r.motivo).replace(/ \(Regole di gruppo\)$/, ''), 'regole', { rif: r.regole || [] });
+    case 'area_funzioni':
       return no(
-        'area ' +
-          gruppoT +
-          ' non abilitata: competenza ' +
-          compsGr.map((c) => c.label).join(' o ') +
-          ' non certificata in Formazione',
-        'formazione',
+        'l area ' + gruppoT + ' e aperta alle funzioni ' + r.ammesse.join(', ') + ' e lui non vi e abilitato',
+        'regole',
+        { rif: [r.regola] },
+      );
+    case 'tipo_vietato':
+      return no('turni ' + String(t.tipo).toLowerCase() + ' vietati nell area ' + gruppoT, 'regole', {
+        rif: [r.regola],
+      });
+    case 'campo':
+      return no('requisito sulla scheda non soddisfatto: ' + frase(r.regola), 'regole', { rif: [r.regola] });
+    case 'mapp_fuori':
+      return no('la funzione ' + fz + ' fa solo ' + r.voci.join(', ') + ' (Turni per funzione)', 'mapp');
+    case 'mapp_ammesso':
+      return {
+        esito: 'serve',
+        motivo: 'turno ammesso per la funzione ' + fz + ': la bozza lo da solo se serve e se e sotto le sue ore' + coda,
+        dove: 'mapp',
+      };
+    case 'mapp_principale':
+      return { esito: 'si', motivo: 'turno principale della funzione ' + fz + coda, dove: 'mapp' };
+    case 'area':
+      if (r.conSettori && compsGr.length)
+        return no(
+          'area ' +
+            gruppoT +
+            ' non abilitata: competenza ' +
+            compsGr.map((c) => c.label).join(' o ') +
+            ' non certificata in Formazione',
+          'formazione',
+          { comps: compsGr.map((c) => c.key) },
+        );
+      if (r.conSettori)
+        return no(
+          'area ' + gruppoT + ' non abilitata: nessuna competenza di Formazione collegata a quest area',
+          'impo',
+        );
+      return no(
+        'nessuna abilitazione all area ' + gruppoT + ' (nessuna competenza certificata) e non ci ha mai lavorato',
+        compsGr.length ? 'formazione' : 'impo',
         { comps: compsGr.map((c) => c.key) },
       );
-    if (settoriC)
-      return no('area ' + gruppoT + ' non abilitata: nessuna competenza di Formazione collegata a quest area', 'impo');
-    return no(
-      'nessuna abilitazione all area ' + gruppoT + ' (nessuna competenza certificata) e non ci ha mai lavorato',
-      compsGr.length ? 'formazione' : 'impo',
-      { comps: compsGr.map((c) => c.key) },
-    );
+    case 'area_funzione':
+      return {
+        esito: 'si',
+        motivo: 'la funzione ' + fz + ' entra nell area ' + gruppoT + ' senza abilitazione' + coda,
+        dove: 'regole',
+        rif: [r.lasciapassare.regola],
+      };
+    case 'area_campo':
+      return {
+        esito: 'si',
+        motivo: 'requisito sulla scheda soddisfatto: ' + frase(r.lasciapassare.regola) + coda,
+        dove: 'regole',
+        rif: [r.lasciapassare.regola],
+      };
+    case 'area_affiancamento':
+      return {
+        esito: 'si',
+        motivo:
+          'affiancato in ' +
+          gruppoT +
+          ': fa questi turni ma mai da solo' +
+          (r.preferito ? ' · turno preferito della funzione ' + fz : ''),
+        dove: 'pref',
+        campo: 'Affiancato in',
+      };
+    case 'area_settori': {
+      const certif = compsGr.filter((c) => (info.competenze || {})[c.key] === true);
+      return {
+        esito: 'si',
+        motivo:
+          (certif.length
+            ? 'competenza ' + certif.map((c) => c.label).join(', ') + ' certificata in Formazione'
+            : 'area ' + gruppoT + ' fra le sue aree abilitate') + coda,
+        dove: 'formazione',
+        comps: certif.map((c) => c.key),
+      };
+    }
+    default:
+      return {
+        esito: 'si',
+        motivo: 'ha gia lavorato nell area ' + gruppoT + ' (storia dei turni)' + coda,
+        dove: 'formazione',
+      };
   }
-  let perche = lasciapassare;
-  let comps = [];
-  if (!perche) {
-    const certif = compsGr.filter((c) => (info.competenze || {})[c.key] === true);
-    if (settoriC && certif.length) {
-      perche = 'competenza ' + certif.map((c) => c.label).join(', ') + ' certificata in Formazione';
-      comps = certif.map((c) => c.key);
-    } else if (settoriC) perche = 'area ' + gruppoT + ' fra le sue aree abilitate';
-    else perche = 'ha gia lavorato nell area ' + gruppoT + ' (storia dei turni)';
-  }
-  return {
-    esito: 'si',
-    motivo: perche + (preferito ? ' · turno preferito della funzione ' + fz : '') + conAffianc,
-    dove: lasciapassare ? 'regole' : 'formazione',
-    rif: rifLascia,
-    comps: comps,
-  };
 }
 
 // COPERTURA da un altro settore (scheda del collaboratore): la bozza la usa solo nel
@@ -245,10 +252,7 @@ function _pcfcCopertura(nome, t, sp) {
 
 // scritto a mano: la cella si scrive sempre; il controllo da un avviso o no
 function _pcfcAManoOk(nome, t, dowG) {
-  return (
-    (typeof _pianoIdoneoAMano === 'function' ? _pianoIdoneoAMano(nome, t) : true) &&
-    !_pianoViolazioneFunzioneTurno(nome, t, dowG, false)
-  );
+  return _pianoIdoneoAMano(nome, t) && !_pianoViolazioneFunzioneTurno(nome, t, dowG, false);
 }
 function _pcfcPercheAMano(nome, t, dowG, bozzaOk, manoOk) {
   if (bozzaOk === manoOk) return '';
@@ -567,7 +571,7 @@ async function _pcfcRender() {
     _pcfcChip('si') +
     ' la bozza puo darglielo &nbsp; ' +
     _pcfcChip('serve') +
-    ' puo darglielo, ma la bozza preferisce altri turni o altre persone &nbsp; ' +
+    ' solo se serve: dopo tutti gli altri e se e sotto le sue ore &nbsp; ' +
     _pcfcChip('no') +
     ' la bozza non glielo da mai. <b>A mano</b>: la cella si scrive sempre, la colonna dice se compare un avviso.</p>';
 

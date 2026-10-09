@@ -622,6 +622,80 @@ eq(
   'scelto per nome ma turno bloccato nelle preferenze: resta bloccato',
 );
 
+console.log('\n== idoneita: motore unico (10.10) ==');
+{
+  const tZ = { codice: 'Z0', gruppo: 'SUP', tipo: 'DIURNO' };
+  const tS = { codice: 'S5', gruppo: 'SALA', tipo: 'NOTTURNO' };
+  const tR = { codice: 'R22', gruppo: 'REC', tipo: 'DIURNO' };
+  const mapp = {
+    SUP: [
+      { turno_codice: 'Z0', tipo: 'PRINCIPALE' },
+      { turno_codice: 'S5', tipo: 'AMMESSO' },
+    ],
+  };
+  const ctx = (extra) =>
+    Object.assign(
+      {
+        settoriDi: (i) => i.settori || null,
+        regoleGruppoDi: () => [],
+        campoOk: () => true,
+        mappFunzione: (fz) => mapp[String(fz || '').toUpperCase()] || null,
+        regoleTurnoFunzione: () => [],
+        fannoTutto: (fz) => fz === 'SUP',
+        accompagnamentoDi: (i) => (i.affiancato ? [i.affiancato] : []),
+      },
+      extra || {},
+    );
+  const sup = { nome: 'S', funzione: 'SUP', settori: ['SUP', 'SALA'] };
+  eq(R.idoneita(sup, tZ, ctx()).passo, 'mapp_principale', 'SUP su Z0: turno principale');
+  eq(R.idoneita(sup, tS, ctx()).esito, 'serve', 'SUP su S5: ammesso = solo se serve');
+  eq(R.idoneita(sup, tR, ctx()).passo, 'mapp_fuori', 'SUP su R22: fuori dai suoi turni (bozza)');
+  eq(R.idoneita(sup, tR, ctx({ modo: 'mano' })).passo, 'fa_tutto', 'SUP su R22 a mano: fa tutto');
+  const host = { nome: 'H', funzione: 'HOST', settori: ['SALA'], turni_bloccati: 'S5' };
+  eq(R.idoneita(host, tS, ctx()).passo, 'bloccato', 'turno bloccato: la bozza non lo da');
+  eq(R.idoneita(host, tS, ctx({ modo: 'mano' })).ok, true, 'turno bloccato: a mano nessun avviso');
+  eq(R.idoneita(host, tR, ctx()).passo, 'area', 'area non abilitata');
+  eq(
+    R.idoneita(Object.assign({}, host, { affiancato: 'REC' }), tR, ctx()).passo,
+    'area_affiancamento',
+    'affiancato in REC: puo fare il turno (mai da solo)',
+  );
+  eq(R.idoneita({ turni_solo_a_mano: true }, tS, ctx()).passo, 'solo_a_mano', 'solo a mano: mai dalla bozza');
+  const senza = { nome: 'N', funzione: 'CR' };
+  eq(R.idoneita(senza, tR, ctx({ storiaDi: () => null })).ok, true, 'storia non letta: l area non ferma');
+  eq(
+    R.idoneita(senza, tR, ctx({ storiaDi: () => new Set(), storiaSconosciutaPassa: false })).passo,
+    'area',
+    'storia letta e vuota: non ci ha mai lavorato',
+  );
+  eq(R.idoneita(senza, tR, ctx({ storiaDi: () => new Set(['REC']) })).passo, 'area_storia', 'storia: ha gia fatto REC');
+  eq(
+    R.idoneita(sup, tS, ctx({ coperturaDi: () => ({ gruppi: 'REC' }) })).passo,
+    'copertura_area',
+    'chi copre da un altro settore solo nell area della copertura',
+  );
+  eq(
+    R.idoneita(
+      { funzione: 'SUP' },
+      { codice: 'X1', gruppo: 'ACCOGLIENZA', tipo: 'DIURNO' },
+      ctx({
+        mappFunzione: () => null,
+        regoleGruppoDi: () => [{ id: 7, tipo_regola: 'richiede_campo', valore: 'accoglienza>0' }],
+        campoOk: () => true,
+        settoriDi: () => [],
+      }),
+    ).passo,
+    'area_campo',
+    'requisito sulla scheda soddisfatto = lasciapassare per l area',
+  );
+  eq(R.idoneita(host, tS, ctx({ dow: 1 })).passo === 'bloccato', true, 'il giorno non cambia un blocco');
+  eq(
+    R.idoneita(Object.assign({}, host, { turni_bloccati: '', giorni_lavoro: '5,6' }), tS, ctx({ dow: 1 })).passo,
+    'giorno',
+    'giorni di lavoro: lunedi no',
+  );
+}
+
 console.log('\n=======================================');
 console.log('  ' + passati + ' passati, ' + falliti + ' falliti');
 console.log('=======================================\n');
