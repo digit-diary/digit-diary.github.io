@@ -1305,7 +1305,7 @@ async function renderCollaboratoriUI() {
           _coperturaChipHtml(c) +
           '<button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2)" onclick="rinominaCollaboratore(\'' +
           _jsArg(c.nome) +
-          '\')">Rinomina</button><button class="btn-del-tipo" onclick="disattivaCollaboratore(\'' +
+          '\')">Rinomina</button><button class="btn-del-tipo pericolo" onclick="disattivaCollaboratore(\'' +
           _jsArg(c.nome) +
           '\')">Disattiva</button>' +
           (c.data_fine_rapporto
@@ -2941,7 +2941,7 @@ function render() {
           e.id +
           ')">Modifica</button>' +
           (e.tipo === nomeCorrente('Malattia') && typeof apriPopupCopertura === 'function'
-            ? '<button class="btn-act" style="color:var(--c-verdeacqua,#1a7a6d);border-color:var(--c-verdeacqua,#1a7a6d)" onclick="apriPopupCopertura(\'' +
+            ? '<button class="btn-act" onclick="apriPopupCopertura(\'' +
               _jsArg(e.nome) +
               "','" +
               _dataRifCopertura(e) +

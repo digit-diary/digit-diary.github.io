@@ -177,6 +177,15 @@ function erroreInChiaro(m) {
   _ERRORI_IN_CHIARO.forEach(([re, it]) => (t = t.replace(re, it)));
   return t;
 }
+// true la prima volta del giorno per questa chiave, su questo browser (poi false fino a domani)
+function _unaVoltaAlGiorno(chiave) {
+  const oggi = new Date().toISOString().slice(0, 10);
+  try {
+    if (localStorage.getItem('giorno_' + chiave) === oggi) return false;
+    localStorage.setItem('giorno_' + chiave, oggi);
+  } catch (e) {}
+  return true;
+}
 function toast(m, durata, tipo) {
   const t = document.getElementById('toast');
   const originale = String(m == null ? '' : m);
@@ -547,7 +556,7 @@ async function _verificaNome(nome) {
       b.innerHTML =
         '<h3>Nome simile trovato</h3><p style="margin-bottom:16px">Hai scritto <strong>"' +
         escP(nome) +
-        '"</strong> ma esiste già un collaboratore simile:</p><div style="text-align:center;margin-bottom:20px"><button class="btn-salva" data-verify-usa="best" style="background:#2c6e49;padding:12px 24px;font-size:var(--fs-lg,1.0625rem)">Usa "' +
+        '"</strong> ma esiste già un collaboratore simile:</p><div style="text-align:center;margin-bottom:20px"><button class="btn-salva" data-verify-usa="best" style="padding:12px 24px;font-size:var(--fs-lg,1.0625rem)">Usa "' +
         escP(best) +
         '"</button></div><div style="text-align:center"><button class="btn-salva" data-verify-usa="nome" style="background:var(--paper2);color:var(--muted);border:1px solid var(--line);padding:10px 20px;font-size:var(--fs-md,.875rem);box-shadow:none">No, usa "' +
         escP(nome) +
@@ -568,7 +577,7 @@ async function _verificaNome(nome) {
     b.innerHTML =
       '<h3>Collaboratore non trovato</h3><p style="margin-bottom:16px"><strong>"' +
       escP(nome) +
-      '"</strong> non e nella lista collaboratori.</p><div style="text-align:center;margin-bottom:16px"><button class="btn-salva" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\');document.querySelector(\'[data-verify-resolve]\').dataset.result=\'add\';document.querySelector(\'[data-verify-resolve]\').click()" style="background:#2c6e49;padding:12px 24px;font-size:var(--fs-base,.9375rem)">Aggiungi "' +
+      '"</strong> non e nella lista collaboratori.</p><div style="text-align:center;margin-bottom:16px"><button class="btn-salva" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\');document.querySelector(\'[data-verify-resolve]\').dataset.result=\'add\';document.querySelector(\'[data-verify-resolve]\').click()" style="padding:12px 24px;font-size:var(--fs-base,.9375rem)">Aggiungi "' +
       escP(nome) +
       "\" alla lista</button></div><div style=\"text-align:center\"><button class=\"btn-salva\" onclick=\"document.getElementById('pwd-modal').classList.add('hidden');document.querySelector('[data-verify-resolve]').dataset.result='use';document.querySelector('[data-verify-resolve]').click()\" style=\"background:var(--paper2);color:var(--muted);border:1px solid var(--line);padding:10px 20px;font-size:var(--fs-md,.875rem);box-shadow:none\">Usa senza aggiungere</button></div>";
     const resolver = document.createElement('button');
@@ -850,14 +859,14 @@ function repartoLettera(key) {
 function _repBadge(rep, piccolo) {
   if (!rep || rep === 'entrambi' || !getRepartoInfo(rep)) return '';
   return piccolo
-    ? '<span style="font-size:var(--fs-sm,.8125rem);color:' +
+    ? '<span style="font-size:var(--fs-sm,.8125rem);--cat:' +
         repartoColore(rep) +
-        ';font-weight:700;margin-left:4px">' +
+        ';color:var(--cat);font-weight:700;margin-left:4px">' +
         repartoLettera(rep) +
         '</span>'
-    : ' <span style="font-size:var(--fs-sm,.8125rem);color:' +
+    : ' <span style="font-size:var(--fs-sm,.8125rem);--cat:' +
         repartoColore(rep) +
-        ';font-weight:700">' +
+        ';color:var(--cat);font-weight:700">' +
         repartoLettera(rep) +
         '</span>';
 }

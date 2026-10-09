@@ -104,9 +104,9 @@ const PIANO_REGOLE_GUIDA = {
   },
   tolleranza_ore: {
     g: 'Ore e saldo',
-    n: 'Scarto accettato dalle ore dovute del mese (più o meno)',
+    n: 'Scarto accettato dalle ore dovute del mese (più o meno): vale solo se le due regole "sopra" e "sotto" sono vuote',
     t: 'numero',
-    d: 'Valida regole, bozza, Migliora ore',
+    d: 'Valida regole, bozza, Migliora ore (se sopra e sotto sono vuote)',
   },
   tolleranza_ore_sopra: {
     g: 'Ore e saldo',
@@ -294,7 +294,12 @@ const PIANO_REGOLE_GUIDA = {
     t: 'numero',
     d: 'Scheda Vacanze (diritto)',
   },
-  vacanze_giorni_anno: { g: 'Vacanze', n: 'Giorni di vacanza per l indice di benessere', t: 'numero', d: 'Benessere' },
+  vacanze_giorni_anno: {
+    g: 'Vacanze',
+    n: 'Giorni di vacanza per l indice di benessere, solo per chi non ha la data di assunzione (gli altri: il loro diritto)',
+    t: 'numero',
+    d: 'Benessere',
+  },
   c_prima_dopo_vacanza: {
     g: 'Vacanze',
     n: 'Metti i congedi C attorno alle settimane di vacanza',
@@ -599,7 +604,7 @@ function _renderPianoRegoleCard() {
   });
   let h =
     '<div class="main-card" style="margin-top:16px"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Regole del piano' +
-    '<select onchange="window._pianoRegoleSettoreVista=this.value;renderPiano()" style="padding:4px 8px;font-size:var(--fs-sm,.8125rem);border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a"><option value=""' +
+    '<select onchange="window._pianoRegoleSettoreVista=this.value;renderPiano()" style="padding:4px 8px;font-size:var(--fs-sm,.8125rem);border:1px solid var(--line-forte);border-radius:var(--r-1);background:var(--paper);color:var(--ink)"><option value=""' +
     (vista ? '' : ' selected') +
     '>Tutti i settori (valori generali)</option>' +
     settori
@@ -688,7 +693,7 @@ function _renderPianoRegoleCard() {
         let colSett = '';
         if (vista) {
           colSett = spec
-            ? '<span style="color:var(--c-oro,#8b6914);font-weight:700">eccezione</span> <button class="btn-del-tipo" style="font-size:var(--fs-sm,.8125rem);padding:1px 6px" onclick="eliminaPianoRegolaSettore(' +
+            ? '<span style="color:var(--c-oro,#8b6914);font-weight:700">eccezione</span> <button class="btn-del-tipo pericolo" style="font-size:var(--fs-sm,.8125rem);padding:1px 6px" onclick="eliminaPianoRegolaSettore(' +
               spec.id +
               ')">Torna al generale</button>'
             : '<span style="color:var(--muted)">valore generale</span>';
@@ -731,7 +736,7 @@ function _renderPianoRegoleCard() {
         escP(r.descrizione || '') +
         '</span></td><td>' +
         escP(r.valore || '') +
-        '</td><td colspan="2" style="text-align:left;font-size:var(--fs-sm,.8125rem);color:var(--muted)">nessun effetto</td><td style="font-size:var(--fs-sm,.8125rem);text-align:left"><button class="btn-del-tipo" onclick="eliminaPianoRegola(' +
+        '</td><td colspan="2" style="text-align:left;font-size:var(--fs-sm,.8125rem);color:var(--muted)">nessun effetto</td><td style="font-size:var(--fs-sm,.8125rem);text-align:left"><button class="btn-del-tipo pericolo" onclick="eliminaPianoRegola(' +
         r.id +
         ')">Elimina</button></td></tr>';
     });
@@ -2886,7 +2891,7 @@ async function pianoVerificaDurateNotte() {
         ' <span style="font-weight:400;color:var(--muted)">(' +
         p.attesa +
         ')</span></td><td style="font-weight:700;color:' +
-        (p.diff > 0 ? '#c0392b' : '#8b6914') +
+        (p.diff > 0 ? 'var(--c-rosso,#c0392b)' : 'var(--c-oro,#8b6914)') +
         '">' +
         (p.diff > 0 ? '+' : '') +
         Math.round(p.diff * 60) +

@@ -130,7 +130,7 @@ function _renderPianoDomenicheBody() {
       visto = true;
       cols +=
         '<td style="color:' +
-        (lib ? '#2c6e49' : lav ? '#c0392b' : 'var(--muted)') +
+        (lib ? 'var(--c-verde,#2c6e49)' : lav ? 'var(--c-rosso,#c0392b)' : 'var(--muted)') +
         (lav && !lib ? ';font-weight:700' : '') +
         '" title="' +
         escP(lib + ' libere' + (lav ? ', ' + lav + ' lavorate' : '') + (dett.length ? '\n' + dett.join('\n') : '')) +
@@ -158,17 +158,17 @@ function _renderPianoDomenicheBody() {
       '</td>' +
       cols +
       '<td style="font-weight:700;color:' +
-      (libere >= diritto ? '#2c6e49' : '#8b6914') +
+      (libere >= diritto ? 'var(--c-verde,#2c6e49)' : 'var(--c-oro,#8b6914)') +
       '">' +
       libere +
       '</td><td style="color:' +
-      (lavorate ? '#c0392b' : 'var(--muted)') +
+      (lavorate ? 'var(--c-rosso,#c0392b)' : 'var(--muted)') +
       '">' +
       (lavorate || '') +
       '</td><td>' +
       diritto +
       '</td><td style="font-weight:700;color:' +
-      (restano === 0 ? '#2c6e49' : critico ? '#c0392b' : '#8b6914') +
+      (restano === 0 ? 'var(--c-verde,#2c6e49)' : critico ? 'var(--c-rosso,#c0392b)' : 'var(--c-oro,#8b6914)') +
       '"' +
       (critico
         ? ' title="Restano ' + restano + ' da dare ma nell anno ci sono solo ' + domFuture + ' domeniche future"'
@@ -342,6 +342,21 @@ async function caricaBenesserePiano() {
       .map((n) => {
         const p = per[n];
         const info = _pianoCollabInfo(n) || {};
+        // vacanze: il diritto vero della persona (28 o 35 giorni secondo l anzianita, ridotto
+        // dai congedi), come nella scheda Vacanze; il valore fisso della regola solo se manca
+        // la data di assunzione (prima valeva 20 per tutti)
+        let sogliePers = soglie;
+        try {
+          if (info.data_assunzione && typeof _pianoVacCfg === 'function') {
+            const eff = _pianoCongedoNpEffetti(n, anno);
+            const d = PianoRegole.giorniVacanzaSpettanti(String(info.data_assunzione).substring(0, 10), anno, {
+              ..._pianoVacCfg(),
+              giorniCongedo: eff.giorniVacanze,
+              giorniAnzianita: eff.giorniAnzianita,
+            });
+            if (d && d.giorni > 0) sogliePers = Object.assign({}, soglie, { vacanzeAnno: d.giorni });
+          }
+        } catch (e) {}
         const res = PianoRegole.indiceBenessere(
           {
             domenicheLibere: p.domLib,
@@ -353,7 +368,7 @@ async function caricaBenesserePiano() {
             serieMax: p.serieMax,
             vacanzeGiorni: p.vac,
           },
-          soglie,
+          sogliePers,
         );
         return { nome: n, jolly: !!(info.is_jolly || info.impiego === 'jolly'), p: p, res: res };
       })
@@ -371,7 +386,8 @@ async function caricaBenesserePiano() {
       el.innerHTML = '<p style="font-size:var(--fs-md,.875rem)">Nessun piano nel ' + anno + ' per questo settore.</p>';
       return;
     }
-    const colore = (v) => (v >= 75 ? '#2c6e49' : v >= 55 ? '#b8860b' : '#c0392b');
+    const colore = (v) =>
+      v >= 75 ? 'var(--c-verde,#2c6e49)' : v >= 55 ? 'var(--c-oro,#b8860b)' : 'var(--c-rosso,#c0392b)';
     const etichetta = (v) => (v >= 75 ? 'buono' : v >= 55 ? "da tenere d'occhio" : 'critico');
     const tabella = (lista, titolo) => {
       if (!lista.length) return '';
@@ -760,7 +776,7 @@ function _renderPianoTurniCard() {
         (t.attivo !== false ? ' checked' : '') +
         ' onchange="salvaPianoTurno(' +
         t.id +
-        ',\'attivo\',this.checked)"></td><td><button class="btn-del-tipo" onclick="eliminaPianoTurno(' +
+        ',\'attivo\',this.checked)"></td><td><button class="btn-del-tipo pericolo" onclick="eliminaPianoTurno(' +
         t.id +
         ')">Elimina</button></td></tr>';
     });
@@ -1243,7 +1259,7 @@ function _renderPianoCodiciCard() {
         (c.attivo !== false ? ' checked' : '') +
         ' onchange="salvaPianoCodice(' +
         c.id +
-        ',\'attivo\',this.checked)"></td><td><button class="btn-del-tipo" onclick="eliminaPianoCodice(' +
+        ',\'attivo\',this.checked)"></td><td><button class="btn-del-tipo pericolo" onclick="eliminaPianoCodice(' +
         c.id +
         ')">Elimina</button></td></tr>';
     });
@@ -1494,7 +1510,7 @@ async function pianoElencoCgfDaDare() {
         '</td><td>' +
         (r.persi || '') +
         '</td><td style="font-weight:700;color:' +
-        (r.resta > 0 ? '#c0392b' : r.resta < 0 ? '#8b6914' : '#2c6e49') +
+        (r.resta > 0 ? 'var(--c-rosso,#c0392b)' : r.resta < 0 ? 'var(--c-oro,#8b6914)' : 'var(--c-verde,#2c6e49)') +
         '">' +
         (r.resta > 0 ? r.resta : r.resta < 0 ? r.resta + ' (in più)' : '0') +
         '</td></tr>';
@@ -1682,7 +1698,7 @@ function _renderPianoFestiviCard() {
     visibili.length +
     ')';
   h +=
-    '<select onchange="window._pianoFestiviAnnoSel=parseInt(this.value);renderPiano()" style="padding:4px 8px;font-size:var(--fs-sm,.8125rem);border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a">';
+    '<select onchange="window._pianoFestiviAnnoSel=parseInt(this.value);renderPiano()" style="padding:4px 8px;font-size:var(--fs-sm,.8125rem);border:1px solid var(--line-forte);border-radius:var(--r-1);background:var(--paper);color:var(--ink)">';
   for (let a = 2024; a <= 2032; a++)
     h +=
       '<option value="' +
@@ -1729,7 +1745,7 @@ function _renderPianoFestiviCard() {
             : f.cgf
               ? ' <span class="tipo-item-default" title="Cade di domenica: nessun recupero">(domenica)</span>'
               : '') +
-        '</div><button class="btn-del-tipo" onclick="eliminaPianoFestivo(' +
+        '</div><button class="btn-del-tipo pericolo" onclick="eliminaPianoFestivo(' +
         f.id +
         ')">Rimuovi</button></div>';
     });

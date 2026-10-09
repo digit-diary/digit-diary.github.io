@@ -39,62 +39,98 @@
   --avviso-bg-forte: #fff3c4;
   --avviso-bordo: #b8860b;
   --errore-bg: #fdecea;
-  /* testo dei comandi dentro le barre dei titoli (sempre scure) */
-  --testata-testo: #f3ede3;
+
+  /* ===== SISTEMA DI STILE (v440) ===== */
+  /* spaziature: multipli di 4 */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  /* raggi */
+  --r-1: 4px;
+  --r-2: 6px;
+  --r-3: 10px;
+  --r-pill: 999px;
+  /* ombre: 1 = appoggiato sul foglio, 2 = sollevato (menu, finestre) */
+  --ombra-1: 0 1px 2px rgba(26, 18, 8, 0.06), 0 1px 3px rgba(26, 18, 8, 0.08);
+  --ombra-2: 0 6px 16px rgba(26, 18, 8, 0.12), 0 2px 4px rgba(26, 18, 8, 0.06);
+  /* linee piu marcate (contorno dei pulsanti) e fondo al passaggio del mouse */
+  --line-forte: #d6cab6;
+  --hover: rgba(26, 18, 8, 0.045);
+  /* pulsanti: due misure */
+  --btn-h: 2.125rem; /* 34px */
+  --btn-h-sm: 1.75rem; /* 28px */
+  /* anello di fuoco per chi usa la tastiera */
+  --fuoco: 0 0 0 3px rgba(139, 105, 20, 0.35);
+  /* griglia del calendario del Piano (stile Excel) */
+  --griglia-linea: #b5ab9b;
+  --griglia-testa: #ece4d6;
+  /* fondi pieni sotto testo bianco (etichette, contatori): uguali nei due temi */
+  --pieno-rosso: #c0392b;
+  --pieno-azzurro: #1f6fa3;
+  --pieno-verde: #2c6e49;
+}
+/* TEMA SCURO CALDO (v440): marrone caffe come il tema chiaro, non piu blu notte.
+   Contrasti misurati sul fondo dei riquadri (--paper): testo 13:1, testo secondario 7:1, verde 9:1, rosso 7:1 */
+/* colori che dipendono da altri: stanno su body (non su :root), cosi seguono il tema scuro */
+body {
+  /* testo dei comandi dentro i titoli dei riquadri (dalla v440 su carta) */
+  --testata-testo: var(--ink);
+  --testata-accento: var(--c-oro);
+  /* pulsante principale (pieno) */
+  --btn-pri-bg: var(--ink);
+  --btn-pri-fg: var(--paper);
 }
 body.dark-theme {
-  --c-verde: #6cc594;
-  --c-rosso: #ff7d70;
-  --c-azzurro-bg: #1b2c3a;
-  --c-rosso-bg: #3a2220;
-  --c-blu: #8ab8e8;
-  --c-azzurro: #72b6e4;
-  --c-arancio: #f0a35a;
-  --c-oro: #e0b54a;
-  --c-verdeacqua: #5cc8b6;
-  --c-viola: #c9a2dc;
-  --ink: #e0d8c8;
-  --paper: #1a1a2e;
-  --paper2: #16213e;
-  --line: #2a2a44;
-  --accent: #e74c3c;
-  --accent2: #d4a017;
-  --muted: #9a9aaa;
-  --shadow: rgba(0, 0, 0, 0.3);
-  --sfondo-pagina: #0f0f1a;
-  --avviso-bg: #3a3020;
-  --avviso-bg-forte: #4a3c1c;
-  --avviso-bordo: #d4a017;
-  --errore-bg: #3a2220;
-  background: #0f0f1a;
+  --c-verde: #7fcf9f;
+  --c-rosso: #ff8a7a;
+  --c-azzurro-bg: #1e2a30;
+  --c-rosso-bg: #3a221d;
+  --c-blu: #93bde6;
+  --c-azzurro: #7cbde6;
+  --c-arancio: #f0a860;
+  --c-oro: #e3bc5c;
+  --c-verdeacqua: #67cbb9;
+  --c-viola: #cfaadf;
+  --ink: #ede4d3;
+  --paper: #241d17;
+  --paper2: #2e261e;
+  --line: #3d3329;
+  --line-forte: #54473a;
+  --hover: rgba(255, 240, 220, 0.05);
+  --accent: #e8705f;
+  --accent2: #d9b25a;
+  --muted: #b8a993;
+  --shadow: rgba(0, 0, 0, 0.35);
+  --ombra-1: 0 1px 2px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.25);
+  --ombra-2: 0 8px 20px rgba(0, 0, 0, 0.45), 0 2px 4px rgba(0, 0, 0, 0.3);
+  --fuoco: 0 0 0 3px rgba(217, 178, 90, 0.4);
+  --sfondo-pagina: #17120e;
+  --avviso-bg: #3a2f1c;
+  --avviso-bg-forte: #4a3a1a;
+  --avviso-bordo: #d9b25a;
+  --errore-bg: #3a221d;
+  --griglia-linea: #4e4236;
+  --griglia-testa: #2e261e;
+  background: #17120e;
   background-image: repeating-linear-gradient(
     45deg,
     transparent,
     transparent 40px,
-    rgba(255, 255, 255, 0.015) 40px,
-    rgba(255, 255, 255, 0.015) 41px
+    rgba(255, 240, 220, 0.012) 40px,
+    rgba(255, 240, 220, 0.012) 41px
   );
 }
-body.dark-theme .stat,
-body.dark-theme .main-card,
-body.dark-theme .chart-card,
-body.dark-theme .settings-section,
-body.dark-theme .login-box,
-body.dark-theme .modal-box,
-body.dark-theme .pwd-modal-box {
-  box-shadow: 2px 2px 0 #0d0d1a;
-}
 body.dark-theme .entry:hover {
-  background: #1e1e36;
-}
-body.dark-theme .card-header {
-  background: #0d0d1a;
+  background: var(--hover);
 }
 body.dark-theme input,
 body.dark-theme textarea,
 body.dark-theme select {
   color: var(--ink);
-  background: var(--paper2);
+  background-color: var(--paper2); /* solo il colore: le caselle di ricerca tengono la lente */
   border-color: var(--line);
 }
 html {
@@ -158,7 +194,7 @@ body {
   background: var(--paper);
   padding: 40px 48px;
   border-radius: 3px;
-  box-shadow: 6px 6px 0 #b8aa95;
+  box-shadow: var(--ombra-2);
   text-align: center;
   min-width: 320px;
   max-width: 420px;
@@ -265,7 +301,7 @@ body {
   background: var(--paper);
   padding: 32px 36px;
   border-radius: 3px;
-  box-shadow: 6px 6px 0 #b8aa95;
+  box-shadow: var(--ombra-2);
   min-width: 340px;
   max-width: 420px;
 }
@@ -419,8 +455,6 @@ header h1 .casino {
   padding: 6px 14px;
   font-size: var(--fs-sm);
   font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   cursor: pointer;
   border-radius: 2px;
   font-family: 'Source Sans 3', sans-serif;
@@ -460,7 +494,7 @@ header h1 .casino {
   position: absolute;
   top: -4px;
   right: -4px;
-  background: var(--accent);
+  background: var(--pieno-rosso);
   color: white;
   font-size: var(--fs-sm);
   font-weight: 700;
@@ -617,7 +651,7 @@ header h1 .casino {
   max-width: 1280px;
   background: var(--paper);
   border-radius: 3px;
-  box-shadow: 2px 2px 0 #b8aa95;
+  box-shadow: var(--ombra-1);
   margin-bottom: 12px;
   padding: 16px;
   font-size: var(--fs-md);
@@ -739,7 +773,7 @@ header h1 .casino {
   max-width: 1280px;
   background: var(--paper);
   border-radius: 3px;
-  box-shadow: 2px 2px 0 #b8aa95;
+  box-shadow: var(--ombra-1);
   margin-bottom: 12px;
   padding: 16px;
   font-size: var(--fs-md);
@@ -857,12 +891,11 @@ header h1 .casino {
   gap: 0;
   margin-bottom: 16px;
 }
+/* aspetto completo nel blocco "BARRA DELLE PAGINE E SETTORI" in fondo al file */
 .reparto-btn {
   padding: 10px 28px;
   font-size: var(--fs-md);
   font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
   cursor: pointer;
   border: 2px solid var(--line);
   background: var(--paper2);
@@ -875,26 +908,6 @@ header h1 .casino {
 }
 .reparto-btn:last-child {
   border-radius: 0 3px 3px 0;
-}
-.reparto-btn.active-slots {
-  background: #1a4a7a;
-  color: white;
-  border-color: var(--c-blu);
-}
-.reparto-btn.active-tavoli {
-  background: #8e44ad;
-  color: white;
-  border-color: var(--c-viola);
-}
-.reparto-btn.active-valet {
-  background: #1a7a6d;
-  color: white;
-  border-color: var(--c-verdeacqua);
-}
-.reparto-btn.active-cleaning {
-  background: #5d6d7e;
-  color: white;
-  border-color: #5d6d7e;
 }
 .reparto-switch.hidden {
   display: none;
@@ -978,7 +991,7 @@ header h1 .casino {
   background: var(--paper2);
 }
 .mobile-nav-item .nav-badge {
-  background: var(--accent);
+  background: var(--pieno-rosso);
   color: white;
   border-radius: 9px;
   font-size: var(--fs-sm);
@@ -1023,8 +1036,6 @@ header h1 .casino {
   text-align: center;
   font-size: var(--fs-sm);
   font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
   cursor: pointer;
   border: none;
   font-family: 'Source Sans 3', sans-serif;
@@ -1068,7 +1079,7 @@ header h1 .casino {
   background: var(--paper);
   border-radius: 3px;
   padding: 14px 12px;
-  box-shadow: 2px 2px 0 #b8aa95;
+  box-shadow: var(--ombra-1);
   text-align: center;
 }
 .stat-num {
@@ -1101,21 +1112,22 @@ header h1 .casino {
 .main-card {
   width: 100%;
   background: var(--paper);
-  border-radius: 3px;
-  box-shadow:
-    4px 4px 0 #b8aa95,
-    0 8px 32px var(--shadow);
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  box-shadow: var(--ombra-1);
   overflow: hidden;
   margin-bottom: 24px;
 }
+/* titolo del riquadro: su carta con filetto (v440; prima era una barra nera) */
 .card-header {
-  background: var(--ink);
-  color: var(--paper);
-  padding: 16px 24px;
-  font-size: var(--fs-md);
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  font-weight: 600;
+  background: transparent;
+  color: var(--ink);
+  font-family: 'Playfair Display', serif;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  letter-spacing: 0;
+  padding: var(--sp-4) var(--sp-5) var(--sp-3);
+  border-bottom: 1px solid var(--line);
 }
 .form-area {
   padding: 24px;
@@ -1194,8 +1206,6 @@ header h1 .casino {
   font-family: 'Source Sans 3', sans-serif;
   font-size: var(--fs-md);
   font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
   cursor: pointer;
   border-radius: 2px;
   margin-top: 6px;
@@ -1288,8 +1298,6 @@ header h1 .casino {
   padding: 8px 17px;
   font-size: var(--fs-md);
   font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
   cursor: pointer;
   border-radius: 3px;
   font-family: 'Source Sans 3', sans-serif;
@@ -1474,7 +1482,6 @@ header h1 .casino {
   font-weight: 600;
   cursor: pointer;
   font-family: 'Source Sans 3', sans-serif;
-  letter-spacing: 0.02em;
   transition: opacity 0.2s;
   margin-top: 4px;
 }
@@ -1543,8 +1550,6 @@ header h1 .casino {
   cursor: pointer;
   font-size: var(--fs-sm);
   font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
   padding: 5px 11px;
   font-family: 'Source Sans 3', sans-serif;
   transition:
@@ -1647,7 +1652,7 @@ header h1 .casino {
   background: var(--paper);
   padding: 32px 36px;
   border-radius: 3px;
-  box-shadow: 6px 6px 0 #b8aa95;
+  box-shadow: var(--ombra-2);
   min-width: 320px;
   text-align: center;
   max-height: 90vh;
@@ -1695,8 +1700,6 @@ header h1 .casino {
   font-family: 'Source Sans 3', sans-serif;
   font-size: var(--fs-md);
   font-weight: 600;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
   cursor: pointer;
   min-height: 40px;
   transition:
@@ -1731,7 +1734,7 @@ header h1 .casino {
   background: var(--paper);
   padding: 32px;
   border-radius: 3px;
-  box-shadow: 6px 6px 0 #b8aa95;
+  box-shadow: var(--ombra-2);
   width: 94%;
   max-width: 960px;
   max-height: 85vh;
@@ -1928,7 +1931,7 @@ header h1 .casino {
   background: var(--paper);
   padding: 24px;
   border-radius: 3px;
-  box-shadow: 2px 2px 0 #b8aa95;
+  box-shadow: var(--ombra-1);
   max-width: 820px;
   margin: 0 auto;
 }
@@ -1986,7 +1989,7 @@ header h1 .casino {
   background: var(--paper);
   padding: 24px;
   border-radius: 3px;
-  box-shadow: 2px 2px 0 #b8aa95;
+  box-shadow: var(--ombra-1);
 }
 .rapporto-detail h3 {
   font-family: 'Playfair Display', serif;
@@ -2090,8 +2093,6 @@ header h1 .casino {
   border-radius: 2px;
   font-size: var(--fs-sm);
   font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
   cursor: pointer;
   margin-top: 10px;
   font-family: 'Source Sans 3', sans-serif;
@@ -2110,7 +2111,7 @@ header h1 .casino {
   background: var(--paper);
   border-radius: 3px;
   padding: 20px;
-  box-shadow: 2px 2px 0 #b8aa95;
+  box-shadow: var(--ombra-1);
 }
 .chart-card.full {
   grid-column: 1/-1;
@@ -2177,7 +2178,7 @@ header h1 .casino {
   background: var(--paper);
   border-radius: 3px;
   padding: 24px;
-  box-shadow: 2px 2px 0 #b8aa95;
+  box-shadow: var(--ombra-1);
   margin-bottom: 20px;
 }
 .settings-section h4 {
@@ -2295,8 +2296,6 @@ header h1 .casino {
   padding: 10px 21px;
   font-size: var(--fs-md);
   font-weight: 600;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
   cursor: pointer;
   border-radius: 3px;
   font-family: 'Source Sans 3', sans-serif;
@@ -2354,8 +2353,6 @@ header h1 .casino {
   padding: 10px 20px;
   font-size: var(--fs-sm);
   font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
   cursor: pointer;
   border-radius: 2px;
   font-family: 'Source Sans 3', sans-serif;
@@ -2675,8 +2672,8 @@ header h1 .casino {
     justify-content: center;
   }
   .card-header {
-    padding: 12px 16px;
-    font-size: var(--fs-sm);
+    padding: 12px 16px 10px;
+    font-size: var(--fs-base);
   }
   .form-area {
     padding: 16px;
@@ -3763,30 +3760,21 @@ button:focus-visible,
 }
 
 /* ===== PIANO DI LAVORO (griglia mensile turni) ===== */
-/* Barra tab della sezione Piano (navbar scura stile Turnivo) */
+/* Barra delle schede del Piano: vedi SISTEMA GRAFICO UNICO in fondo al file */
 .piano-tabs {
   display: flex;
-  gap: 2px;
   flex-wrap: wrap;
-  background: #1a1208; /* stessi toni caldi delle altre barre del programma */
-  padding: 6px 10px 7px;
-  border-radius: 3px;
   margin-bottom: 10px;
   align-items: stretch;
 }
-/* tab raggruppate in famiglie: etichetta piccola sopra ogni gruppo */
 .piano-tabgroup {
   display: flex;
   flex-direction: column;
   gap: 1px;
 }
 .piano-tabgroup-label {
-  font-size: var(--fs-xs);
-  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #a89880;
   font-weight: 700;
-  padding: 1px 6px 0;
   user-select: none;
 }
 .piano-tabgroup-tabs {
@@ -3796,8 +3784,6 @@ button:focus-visible,
 }
 .piano-tabsep {
   width: 1px;
-  background: rgba(255, 255, 255, 0.15);
-  margin: 4px 8px;
   align-self: stretch;
 }
 .piano-tab svg {
@@ -3805,21 +3791,9 @@ button:focus-visible,
   margin-right: 2px;
 }
 .piano-tab {
-  color: #cfc3ad;
-  padding: 7px 16px;
   cursor: pointer;
-  font-size: var(--fs-md);
   font-weight: 600;
-  border-radius: 3px;
   user-select: none;
-}
-.piano-tab:hover {
-  color: #fff;
-}
-.piano-tab.attiva {
-  background: rgba(212, 184, 106, 0.18);
-  color: #fff;
-  box-shadow: inset 0 -2px 0 #d4b86a;
 }
 /* La sezione Piano usa quasi tutta la larghezza dello schermo (le altre
    pagine restano a 1280px) */
@@ -3987,6 +3961,10 @@ button:focus-visible,
 }
 body.dark-theme .piano-dom-valida {
   color: #ff6b5b !important;
+}
+/* sulla cella colorata (attenuata) la lettera resta rosso scuro */
+body.dark-theme td.piano-dom-valida[style*='background:#'] {
+  color: #a8281b !important;
 }
 /* malattia su giorno di CONGEDO (MC): si vede che è malattia ma conta 0 ore */
 .piano-malattia-c {
@@ -4351,50 +4329,10 @@ div[style*='overflow-y:auto']::-webkit-scrollbar-thumb {
   border-color: var(--accent2);
   color: var(--accent2);
 }
-/* Barra comandi del calendario: gruppi ordinati e stile uniforme */
-.pbar-btn {
-  font-size: var(--fs-sm);
-  padding: 5px 13px;
-  border-radius: 3px;
-  border-color: #b8a98a;
-  color: #cfc3ad;
-  letter-spacing: 0.05em;
-}
-.pbar-btn:hover {
-  color: #fff;
-  border-color: #fff;
-}
-.pbar-btn.pbar-ok {
-  border-color: #4caf7d;
-  color: #6fd39e;
-  font-weight: 700;
-}
-.pbar-btn.pbar-ok:hover {
-  background: #2c6e49;
-  color: #fff;
-  border-color: var(--c-verde);
-}
-.pbar-btn.pbar-warn {
-  border-color: var(--c-rosso);
-  color: #e07b6d;
-}
-.pbar-btn.pbar-warn:hover {
-  background: #c0392b;
-  color: #fff;
-}
-.pbar-btn.pbar-soft {
-  border-color: #8a7d6b;
-  color: #b8a98a;
-}
-.pbar-btn.pbar-color {
-  /* il pulsante ha fondo carta (mostra il colore scelto): testo arancio leggibile */
-  border-color: var(--c-arancio);
-  color: var(--c-arancio);
-}
+/* Barra comandi del calendario: vedi SISTEMA GRAFICO UNICO in fondo al file */
 .pbar-sep {
   width: 1px;
   align-self: stretch;
-  background: rgba(255, 255, 255, 0.18);
   margin: 2px 4px;
 }
 /* transizione morbida al cambio pagina */
@@ -4660,17 +4598,11 @@ tr[data-nome] > td:first-child:not(.piano-nome):hover {
 .filters .filter-cerca .ac-wrap .campo-cerca {
   width: 100%;
 }
-/* nelle barre scure (titoli di sezione, barra del Piano) */
+/* nei titoli dei riquadri (dalla v440 su carta): stessa casella delle altre pagine */
 .card-header .campo-cerca {
   width: 240px;
-  background: rgba(255, 255, 255, 0.06)
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d4b86a' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E")
-    no-repeat 0.65rem center / 0.9rem;
-  border-color: #d4b86a;
-  color: #f3ede3;
-}
-.card-header .campo-cerca::placeholder {
-  color: #b39a55;
+  font-family: 'Source Sans 3', sans-serif;
+  font-weight: 400;
 }
 
 /* RECUPERO ORE: griglia giornaliera. Rosso = ore in meno, verde = ore in piu.
@@ -4781,25 +4713,6 @@ body.dark-theme .piano-fisse3 th:nth-child(-n + 3),
 body.dark-theme .piano-fisse3 td:nth-child(-n + 3) {
   background: var(--paper);
 }
-body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
-  background: #0d0d1a;
-}
-
-/* BOTTONI DENTRO UN'INTESTAZIONE SCURA (es. frecce del mese nel Recupero ore):
-   il bottone normale ha contorno e testo del colore dell'inchiostro, che sul
-   fondo scuro dell'intestazione risultava quasi invisibile finche' non ci si
-   passava sopra. Qui prendono i colori chiari. */
-.card-header .btn-export,
-.card-header .btn-act {
-  border-color: var(--paper);
-  color: var(--paper);
-  background: transparent;
-}
-.card-header .btn-export:hover,
-.card-header .btn-act:hover {
-  background: var(--paper);
-  color: var(--ink);
-}
 /* cella del piano bloccata con motivo: lucchetto rosso in alto a destra */
 .piano-bloccata {
   position: relative;
@@ -4827,7 +4740,7 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 3px;
-  box-shadow: 2px 2px 0 #b8aa95;
+  box-shadow: var(--ombra-1);
   padding: 10px 14px;
   margin-bottom: 20px;
   display: flex;
@@ -4843,24 +4756,18 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
   padding: 0 0 10px;
   overflow: hidden;
 }
+/* schede delle Impostazioni: colori nel SISTEMA GRAFICO UNICO in fondo al file */
 .settings-tabs {
   display: flex;
   flex-wrap: wrap;
-  background: var(--ink);
 }
 .settings-tab {
   flex: 1 1 auto;
   font: inherit;
   font-family: 'Source Sans 3', sans-serif;
-  font-size: var(--fs-sm);
   font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   padding: 12px 14px;
   border: 0;
-  border-right: 1px solid rgba(255, 255, 255, 0.12);
-  background: transparent;
-  color: #cfc3ad;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -4871,23 +4778,11 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
 .settings-tab:last-child {
   border-right: 0;
 }
-.settings-tab:hover {
-  color: #fff;
-}
-.settings-tab.attiva {
-  background: var(--paper);
-  color: var(--ink);
-}
 .settings-tab-n {
   font-size: var(--fs-xs);
   font-weight: 700;
   padding: 1px 6px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.14);
-  color: inherit;
-}
-.settings-tab.attiva .settings-tab-n {
-  background: var(--paper2);
 }
 .settings-indice-gruppo {
   display: flex;
@@ -4949,7 +4844,7 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
   }
   100% {
     border-left-color: var(--line);
-    box-shadow: 2px 2px 0 #b8aa95;
+    box-shadow: var(--ombra-1);
   }
 }
 .settings-evidenzia {
@@ -5090,60 +4985,7 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
   background: var(--paper);
   cursor: pointer;
 }
-/* tre soli pulsanti: principale, secondario, pericolo */
-#page-impostazioni .btn-add-tipo,
-#page-impostazioni .btn-salva,
-#page-impostazioni .btn.btn-primary {
-  background: var(--ink);
-  color: var(--paper);
-  border: 1.5px solid var(--ink);
-  padding: 9px 18px;
-  font-size: var(--fs-sm);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  border-radius: 2px;
-  cursor: pointer;
-  font-family: 'Source Sans 3', sans-serif;
-  margin: 0;
-  white-space: nowrap;
-}
-#page-impostazioni .btn-secondario,
-#page-impostazioni .btn-settings {
-  background: var(--paper);
-  color: var(--ink);
-  border: 1.5px solid var(--ink);
-  padding: 9px 16px;
-  font-size: var(--fs-sm);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  border-radius: 2px;
-  cursor: pointer;
-  font-family: 'Source Sans 3', sans-serif;
-  white-space: nowrap;
-}
-#page-impostazioni .btn-del-tipo {
-  background: var(--paper);
-  border: 1px solid var(--line);
-  color: var(--ink);
-  padding: 4px 10px;
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  border-radius: 2px;
-  margin: 0;
-}
-#page-impostazioni .btn-del-tipo:hover {
-  border-color: var(--ink);
-}
-#page-impostazioni .btn-del-tipo.pericolo {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-#page-impostazioni .btn-ord {
-  border-color: var(--line);
-  background: var(--paper);
-}
+/* pulsanti delle Impostazioni: dal sistema unico in fondo al file (v440) */
 /* righe degli elenchi */
 #page-impostazioni .tipo-list {
   gap: 6px;
@@ -5453,14 +5295,14 @@ body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
   background: var(--paper);
   color: var(--ink);
   border-radius: 3px;
-  box-shadow: 6px 6px 0 #b8aa95;
+  box-shadow: var(--ombra-2);
   width: min(480px, 100%);
   max-height: calc(100vh - 32px);
   overflow: auto;
   padding: 26px 28px 22px;
 }
 body.dark-theme .finestra-box {
-  box-shadow: 6px 6px 0 #0d0d1a;
+  box-shadow: var(--ombra-2);
 }
 .finestra-box h3 {
   font-family: 'Playfair Display', serif;
@@ -5502,8 +5344,6 @@ body.dark-theme .finestra-box {
   font-family: 'Source Sans 3', sans-serif;
   font-size: var(--fs-sm);
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   border-radius: 2px;
   cursor: pointer;
 }
@@ -5532,144 +5372,15 @@ body.dark-theme .finestra-box {
 
 /* ===== CONTRASTI (misurati testo per testo, 28/09/2026) ===== */
 /* tema scuro: barre dei titoli e comandi al loro interno */
-body.dark-theme .card-header {
-  color: var(--ink);
-}
-body.dark-theme .card-header .sec-chev,
-body.dark-theme .card-header .btn-act.pin,
-body.dark-theme .card-header .btn-export:not([style*='color']),
-body.dark-theme .pbar-btn {
-  color: var(--ink);
-  border-color: #55557a;
-}
-body.dark-theme .settings-tab {
-  color: #b8b8c8;
-  background: transparent;
-}
-body.dark-theme .settings-tab.attiva {
-  color: #fff;
-}
 /* celle del Piano senza colore: testo chiaro sul fondo scuro (quelle colorate
    restano col testo scuro, regola gia presente sopra) */
 body.dark-theme .piano-cella:not([style*='background']) {
   color: var(--ink);
 }
 
-/* tema scuro: i colori di significato scritti direttamente nello stile di un
-   elemento (anche quelli composti nelle formule) diventano la versione chiara.
-   Solo il colore del testo: bordi, sfondi, grafici e PDF non sono toccati. */
-body.dark-theme [style^='color:#2c6e49'],
-body.dark-theme [style*=';color:#2c6e49'],
-body.dark-theme [style*='; color:#2c6e49'],
-body.dark-theme [style^='color: #2c6e49'],
-body.dark-theme [style*=';color: #2c6e49'],
-body.dark-theme [style*='; color: #2c6e49'] {
-  color: var(--c-verde) !important;
-}
-body.dark-theme [style^='color:#2e7d32'],
-body.dark-theme [style*=';color:#2e7d32'],
-body.dark-theme [style*='; color:#2e7d32'],
-body.dark-theme [style^='color: #2e7d32'],
-body.dark-theme [style*=';color: #2e7d32'],
-body.dark-theme [style*='; color: #2e7d32'] {
-  color: var(--c-verde) !important;
-}
-body.dark-theme [style^='color:#27ae60'],
-body.dark-theme [style*=';color:#27ae60'],
-body.dark-theme [style*='; color:#27ae60'],
-body.dark-theme [style^='color: #27ae60'],
-body.dark-theme [style*=';color: #27ae60'],
-body.dark-theme [style*='; color: #27ae60'] {
-  color: var(--c-verde) !important;
-}
-body.dark-theme [style^='color:#c0392b'],
-body.dark-theme [style*=';color:#c0392b'],
-body.dark-theme [style*='; color:#c0392b'],
-body.dark-theme [style^='color: #c0392b'],
-body.dark-theme [style*=';color: #c0392b'],
-body.dark-theme [style*='; color: #c0392b'] {
-  color: var(--c-rosso) !important;
-}
-body.dark-theme [style^='color:#c62828'],
-body.dark-theme [style*=';color:#c62828'],
-body.dark-theme [style*='; color:#c62828'],
-body.dark-theme [style^='color: #c62828'],
-body.dark-theme [style*=';color: #c62828'],
-body.dark-theme [style*='; color: #c62828'] {
-  color: var(--c-rosso) !important;
-}
-body.dark-theme [style^='color:#e74c3c'],
-body.dark-theme [style*=';color:#e74c3c'],
-body.dark-theme [style*='; color:#e74c3c'],
-body.dark-theme [style^='color: #e74c3c'],
-body.dark-theme [style*=';color: #e74c3c'],
-body.dark-theme [style*='; color: #e74c3c'] {
-  color: var(--c-rosso) !important;
-}
-body.dark-theme [style^='color:#1a4a7a'],
-body.dark-theme [style*=';color:#1a4a7a'],
-body.dark-theme [style*='; color:#1a4a7a'],
-body.dark-theme [style^='color: #1a4a7a'],
-body.dark-theme [style*=';color: #1a4a7a'],
-body.dark-theme [style*='; color: #1a4a7a'] {
-  color: var(--c-blu) !important;
-}
-body.dark-theme [style^='color:#2980b9'],
-body.dark-theme [style*=';color:#2980b9'],
-body.dark-theme [style*='; color:#2980b9'],
-body.dark-theme [style^='color: #2980b9'],
-body.dark-theme [style*=';color: #2980b9'],
-body.dark-theme [style*='; color: #2980b9'] {
-  color: var(--c-azzurro) !important;
-}
-body.dark-theme [style^='color:#e67e22'],
-body.dark-theme [style*=';color:#e67e22'],
-body.dark-theme [style*='; color:#e67e22'],
-body.dark-theme [style^='color: #e67e22'],
-body.dark-theme [style*=';color: #e67e22'],
-body.dark-theme [style*='; color: #e67e22'] {
-  color: var(--c-arancio) !important;
-}
-body.dark-theme [style^='color:#b8860b'],
-body.dark-theme [style*=';color:#b8860b'],
-body.dark-theme [style*='; color:#b8860b'],
-body.dark-theme [style^='color: #b8860b'],
-body.dark-theme [style*=';color: #b8860b'],
-body.dark-theme [style*='; color: #b8860b'] {
-  color: var(--c-oro) !important;
-}
-body.dark-theme [style^='color:#8b6914'],
-body.dark-theme [style*=';color:#8b6914'],
-body.dark-theme [style*='; color:#8b6914'],
-body.dark-theme [style^='color: #8b6914'],
-body.dark-theme [style*=';color: #8b6914'],
-body.dark-theme [style*='; color: #8b6914'] {
-  color: var(--c-oro) !important;
-}
-body.dark-theme [style^='color:#1a7a6d'],
-body.dark-theme [style*=';color:#1a7a6d'],
-body.dark-theme [style*='; color:#1a7a6d'],
-body.dark-theme [style^='color: #1a7a6d'],
-body.dark-theme [style*=';color: #1a7a6d'],
-body.dark-theme [style*='; color: #1a7a6d'] {
-  color: var(--c-verdeacqua) !important;
-}
-body.dark-theme [style^='color:#8e44ad'],
-body.dark-theme [style*=';color:#8e44ad'],
-body.dark-theme [style*='; color:#8e44ad'],
-body.dark-theme [style^='color: #8e44ad'],
-body.dark-theme [style*=';color: #8e44ad'],
-body.dark-theme [style*='; color: #8e44ad'] {
-  color: var(--c-viola) !important;
-}
-body.dark-theme [style^='color:#7b2d8b'],
-body.dark-theme [style*=';color:#7b2d8b'],
-body.dark-theme [style*='; color:#7b2d8b'],
-body.dark-theme [style^='color: #7b2d8b'],
-body.dark-theme [style*=';color: #7b2d8b'],
-body.dark-theme [style*='; color: #7b2d8b'] {
-  color: var(--c-viola) !important;
-}
+/* tema scuro: dalla v440 i colori di significato scritti nel programma usano le
+   variabili (var(--c-verde,#2c6e49)...) e i colori di categoria passano da --cat:
+   le vecchie regole-toppa per ogni colore fisso non servono piu */
 /* tema scuro: testo delle voci del Diario */
 body.dark-theme .entry-text {
   color: var(--ink);
@@ -5681,14 +5392,10 @@ body.dark-theme .piano-table td[style*='background:#'],
 body.dark-theme .piano-table td[style*='background: #'] {
   color: #14100a;
 }
-/* tema scuro: barra delle schede delle Impostazioni */
-body.dark-theme .settings-tabs {
-  background: #0d0d1a;
-}
 /* tema scuro: etichette con fondo grigio o oro e testo bianco */
 body.dark-theme [style*='background:var(--muted)'],
 body.dark-theme [style*='background: var(--muted)'] {
-  background: #5d5d78 !important;
+  background: #6b5d4e !important;
 }
 body.dark-theme [style*='background:var(--accent2)'],
 body.dark-theme [style*='background: var(--accent2)'] {
@@ -5770,9 +5477,6 @@ body.dark-theme .piano-cella.piano-malattia-c {
 }
 .card-header > .sec-chev {
   margin-left: auto;
-}
-body.dark-theme .piano-tabs {
-  background: #0d0d1a;
 }
 
 /* campi data dei filtri (calendario al clic): larghezza fissa e cursore a mano */
@@ -6285,11 +5989,11 @@ html {
   font-size: var(--fs-xs);
 }
 .settings-tab-n.avv-n-on {
-  background: var(--c-rosso, #c0392b);
+  background: var(--pieno-rosso);
   color: #fff;
 }
 .settings-tab.attiva .settings-tab-n.avv-n-on {
-  background: var(--c-rosso, #c0392b);
+  background: var(--pieno-rosso);
   color: #fff;
 }
 .avv-badge {
@@ -6298,7 +6002,7 @@ html {
   margin-left: 6px;
   padding: 0 5px;
   border-radius: 9px;
-  background: var(--c-rosso, #c0392b);
+  background: var(--pieno-rosso);
   color: #fff;
   font-size: 11px;
   font-weight: 700;
@@ -7034,12 +6738,6 @@ tr.nav-evidenza > td {
   cursor: pointer;
 }
 
-/* comandi dentro le barre dei titoli (v436): sempre chiari sulla barra scura, in entrambi i temi */
-.card-header .btn-testata {
-  color: var(--testata-testo);
-  border: 1px solid currentColor;
-  background: none;
-}
 
 /* ===== TELEFONO (v436, controllo grafico del 09/10/2026) ===== */
 /* righe di moduli a tre colonne (Maison, Consegna): una colonna sotto i 700px; prima lo
@@ -7066,4 +6764,740 @@ tr.nav-evidenza > td {
   .add-tipo-row .field {
     flex: 0 0 auto;
   }
+}
+
+/* =====================================================================
+   SISTEMA GRAFICO UNICO (v440, fase 6)
+   Un solo aspetto per pulsanti, tabelle, riquadri e titoli in tutto il
+   programma. Le misure e i colori vengono dalle variabili in :root.
+   Solo aspetto: nessuna classe usata dal programma e stata rinominata.
+   ===================================================================== */
+
+/* ---------- PULSANTI: base comune ---------- */
+.btn-salva,
+.btn-add-tipo,
+.btn-modal-ok,
+.btn-salva-rapporto,
+.btn-login,
+.btn-export,
+.btn-settings,
+.btn-secondario,
+.btn-modal-cancel,
+.btn-back,
+.btn-ai,
+.btn-act,
+.btn-del-tipo,
+.modal-btns button,
+.finestra-pulsanti button {
+  font-family: 'Source Sans 3', sans-serif;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  line-height: 1.2;
+  border-radius: var(--r-1);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.05s ease;
+}
+/* misura normale */
+.btn-salva,
+.btn-add-tipo,
+.btn-modal-ok,
+.btn-salva-rapporto,
+.btn-login,
+.btn-export,
+.btn-settings,
+.btn-secondario,
+.btn-modal-cancel,
+.btn-back,
+.modal-btns button,
+.finestra-pulsanti button {
+  min-height: var(--btn-h);
+  padding: 0 var(--sp-4);
+  font-size: var(--fs-md);
+}
+/* misura piccola: comandi dentro le righe degli elenchi */
+.btn-act,
+.btn-del-tipo,
+.btn-ai,
+.btn-sm {
+  min-height: var(--btn-h-sm);
+  padding: 0 10px;
+  font-size: var(--fs-sm);
+}
+
+/* ---------- 1. PRINCIPALE: pieno, uno per riquadro ---------- */
+.btn-salva,
+.btn-add-tipo,
+.btn-modal-ok,
+.btn-salva-rapporto,
+.btn-login,
+.finestra-ok {
+  background: var(--btn-pri-bg);
+  color: var(--btn-pri-fg);
+  border: 1px solid transparent;
+  box-shadow: var(--ombra-1);
+  opacity: 1;
+}
+.btn-salva:hover,
+.btn-add-tipo:hover,
+.btn-modal-ok:hover,
+.btn-salva-rapporto:hover,
+.btn-login:hover,
+.finestra-ok:hover {
+  filter: brightness(1.18);
+  opacity: 1;
+  box-shadow: var(--ombra-2);
+}
+body.dark-theme .btn-salva:hover,
+body.dark-theme .btn-add-tipo:hover,
+body.dark-theme .btn-modal-ok:hover,
+body.dark-theme .btn-salva-rapporto:hover,
+body.dark-theme .btn-login:hover,
+body.dark-theme .finestra-ok:hover {
+  filter: brightness(0.92);
+}
+#page-impostazioni .btn-salva,
+#page-impostazioni .btn-add-tipo {
+  margin: 0;
+}
+
+/* ---------- 2. SECONDARIO: neutro con bordo ---------- */
+.btn-export,
+.btn-settings,
+.btn-secondario,
+.btn-modal-cancel,
+.btn-back,
+.btn-ai,
+.btn-act,
+.btn-del-tipo,
+.finestra-no {
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line-forte);
+  box-shadow: none;
+}
+.btn-export:hover,
+.btn-settings:hover,
+.btn-secondario:hover,
+.btn-modal-cancel:hover,
+.btn-back:hover,
+.btn-ai:hover,
+.btn-act:hover,
+.btn-act.tipo:hover,
+.btn-act.edit:hover,
+.btn-act.pin:hover,
+.btn-act.scad:hover,
+.btn-del-tipo:hover,
+.btn-export-pdf:hover,
+.finestra-no:hover {
+  background: var(--paper2);
+  color: var(--ink);
+  border-color: var(--muted);
+  box-shadow: none;
+  opacity: 1;
+  filter: none;
+}
+/* le varianti colorate di una volta diventano neutre: il colore resta solo dove ha un significato */
+.btn-act.tipo,
+.btn-act.edit,
+.btn-act.pin,
+.btn-act.scad,
+.btn-export-pdf {
+  color: var(--ink);
+  border-color: var(--line-forte);
+}
+.btn-ord {
+  background: var(--paper);
+  border: 1px solid var(--line-forte);
+  color: var(--muted);
+  border-radius: var(--r-1);
+}
+.btn-ord:hover:not(:disabled) {
+  background: var(--paper2);
+  border-color: var(--muted);
+  color: var(--ink);
+}
+
+/* ---------- 3. PERICOLO: grigio, diventa rosso solo al passaggio del mouse ---------- */
+.btn-act.del,
+.btn-del-tipo.pericolo,
+.btn-pericolo,
+.btn-secondario.btn-pericolo,
+.btn-export.btn-pericolo,
+#page-impostazioni .btn-del-tipo.pericolo {
+  background: var(--paper);
+  color: var(--muted);
+  border-color: var(--line-forte);
+}
+.btn-act.del:hover,
+.btn-del-tipo.pericolo:hover,
+.btn-pericolo:hover,
+.btn-secondario.btn-pericolo:hover,
+.btn-export.btn-pericolo:hover {
+  background: var(--c-rosso-bg);
+  color: var(--c-rosso);
+  border-color: var(--c-rosso);
+}
+/* conferma di un'azione che cancella (finestre del programma) */
+.finestra-ok.finestra-pericolo {
+  background: var(--c-rosso);
+  color: #fff;
+}
+
+/* pressione, tastiera, spento: uguali per tutti */
+.btn-salva:active,
+.btn-add-tipo:active,
+.btn-modal-ok:active,
+.btn-export:active,
+.btn-settings:active,
+.btn-secondario:active,
+.btn-modal-cancel:active,
+.btn-act:active,
+.btn-del-tipo:active {
+  transform: translateY(1px);
+}
+.btn-salva:focus-visible,
+.btn-add-tipo:focus-visible,
+.btn-modal-ok:focus-visible,
+.btn-export:focus-visible,
+.btn-settings:focus-visible,
+.btn-secondario:focus-visible,
+.btn-modal-cancel:focus-visible,
+.btn-act:focus-visible,
+.btn-del-tipo:focus-visible,
+.finestra-pulsanti button:focus-visible {
+  outline: none;
+  box-shadow: var(--fuoco);
+}
+.btn-salva:disabled,
+.btn-add-tipo:disabled,
+.btn-export:disabled,
+.btn-secondario:disabled,
+.btn-act:disabled,
+.btn-del-tipo:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+/* pulsanti in alto (A-, Tema scuro, Stampa, Esci) */
+.btn-header {
+  text-transform: none;
+  letter-spacing: 0;
+  border-radius: var(--r-1);
+  font-size: var(--fs-md);
+}
+.btn-header:hover {
+  background: var(--paper);
+  color: var(--ink);
+  border-color: var(--muted);
+}
+.testo-dim {
+  border-radius: var(--r-1);
+}
+
+/* ---------- RIQUADRI E TITOLI ---------- */
+.main-card,
+.chart-card {
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  box-shadow: var(--ombra-1);
+}
+body.dark-theme .stat,
+body.dark-theme .main-card,
+body.dark-theme .chart-card,
+body.dark-theme .settings-section,
+body.dark-theme .modal-box {
+  box-shadow: var(--ombra-1);
+}
+/* tutto quello che sta dentro al titolo (comandi, note, campi) torna al carattere normale */
+.card-header :is(button, select, input, label, small, .pbar-info, .pbar-grp-lbl, span[style*='font-size'], div[style*='font-size']) {
+  font-family: 'Source Sans 3', sans-serif;
+}
+.card-header select,
+.card-header input:not([type='checkbox']):not([type='radio']) {
+  font-size: var(--fs-sm);
+  letter-spacing: 0;
+  text-transform: none;
+}
+.card-header option {
+  color: var(--ink);
+  background: var(--paper);
+}
+.main-card > .card-header .sec-chev,
+.card-header > .sec-chev {
+  color: var(--muted);
+  opacity: 1;
+}
+
+/* barra comandi del calendario: chiara, a gruppi */
+.card-header.pbar {
+  background: var(--paper2);
+  font-family: 'Source Sans 3', sans-serif;
+  font-size: var(--fs-md);
+  letter-spacing: 0;
+  padding: var(--sp-3) var(--sp-4);
+  gap: var(--sp-2);
+}
+.card-header.pbar .pbar-riga > span:not(.pbar-grp):not(.pbar-info):not(#piano-autosave) {
+  font-family: 'Playfair Display', serif;
+  font-size: var(--fs-lg);
+}
+.card-header.pbar .pbar-grp {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  border-radius: var(--r-2);
+  padding: 4px 6px 4px 10px;
+}
+.card-header.pbar .pbar-grp-lbl {
+  color: var(--muted);
+  letter-spacing: 0.08em;
+}
+.pbar-btn,
+body.dark-theme .pbar-btn,
+.card-header.pbar .pbar-btn {
+  min-height: var(--btn-h-sm);
+  padding: 0 10px;
+  font-size: var(--fs-sm);
+  letter-spacing: 0;
+  color: var(--ink);
+  border-color: var(--line-forte);
+}
+.pbar-btn:hover {
+  color: var(--ink);
+  border-color: var(--muted);
+}
+.pbar-btn.pbar-ok {
+  color: var(--c-verde);
+  border-color: color-mix(in srgb, var(--c-verde) 55%, var(--line-forte));
+  font-weight: 700;
+}
+.pbar-btn.pbar-ok:hover {
+  background: var(--c-verde);
+  border-color: var(--c-verde);
+  color: var(--paper);
+}
+.pbar-btn.pbar-warn {
+  color: var(--muted);
+  border-color: var(--line-forte);
+}
+.pbar-btn.pbar-warn:hover {
+  background: var(--c-rosso-bg);
+  color: var(--c-rosso);
+  border-color: var(--c-rosso);
+}
+.pbar-btn.pbar-soft {
+  color: var(--muted);
+  border-color: var(--line);
+}
+.pbar-sep {
+  background: var(--line);
+}
+#piano-autosave {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.04em;
+}
+
+/* barra delle schede del Piano: chiara e compatta */
+.piano-tabs,
+body.dark-theme .piano-tabs {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  box-shadow: var(--ombra-1);
+  padding: 6px 8px;
+  gap: 2px 4px;
+}
+.piano-tabgroup-label {
+  color: var(--muted);
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+  padding: 2px 8px 0;
+}
+.piano-tabsep {
+  background: var(--line);
+  margin: 4px 6px;
+}
+.piano-tab {
+  color: var(--muted);
+  padding: 5px 10px;
+  font-size: var(--fs-md);
+  border-radius: var(--r-1);
+  white-space: nowrap;
+}
+.piano-tab:hover {
+  color: var(--ink);
+  background: var(--hover);
+}
+.piano-tab.attiva {
+  color: var(--ink);
+  background: var(--paper2);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+/* al telefono la barra delle schede scorre di lato invece di occupare mezzo schermo */
+@media (max-width: 700px) {
+  .piano-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    padding: 4px 6px;
+  }
+  .piano-tabgroup {
+    flex: 0 0 auto;
+  }
+  .piano-tabgroup-tabs {
+    flex-wrap: nowrap;
+  }
+  .piano-tab {
+    padding: 6px 10px;
+  }
+}
+
+/* schede delle Impostazioni: stessa barra chiara */
+.settings-tabs,
+body.dark-theme .settings-tabs {
+  background: var(--paper2);
+  border-bottom: 1px solid var(--line);
+}
+.settings-tab,
+body.dark-theme .settings-tab {
+  color: var(--muted);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--fs-md);
+  border-right: 1px solid var(--line);
+  background: transparent;
+}
+.settings-tab:hover {
+  color: var(--ink);
+  background: var(--hover);
+}
+.settings-tab.attiva,
+body.dark-theme .settings-tab.attiva {
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+.settings-tab-n {
+  background: var(--line);
+  color: var(--ink);
+}
+
+/* ---------- TABELLE: un aspetto unico ---------- */
+.collab-table,
+.piano-table:not(.piano-fixed),
+.fzp-tab,
+.fzi-tab,
+.pcfc-tab,
+.avv-tabella,
+.tbl-semplice {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.collab-table th,
+.collab-table thead th,
+.piano-table:not(.piano-fixed) thead th,
+.fzp-tab th,
+.fzi-tab th,
+.pcfc-tab th,
+.avv-tabella th,
+.tbl-semplice th {
+  background: var(--paper2);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 7px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--line-forte);
+  vertical-align: bottom;
+}
+.collab-table td,
+.piano-table:not(.piano-fixed) td,
+.fzp-tab td,
+.fzi-tab td,
+.pcfc-tab td,
+.avv-tabella td,
+.tbl-semplice td {
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 6px 10px;
+}
+/* le tabelle-griglia del Piano (saldo, vacanze, statistiche) tengono una riga verticale leggera */
+.piano-table:not(.piano-fixed) th + th,
+.piano-table:not(.piano-fixed) td + td {
+  border-left: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+}
+/* niente righe a zebra: basta la linea; al passaggio del mouse la riga si accende appena */
+.collab-table tbody tr:nth-child(even) {
+  background: transparent;
+}
+.collab-table tbody tr:hover td,
+.piano-table:not(.piano-fixed) tbody tr:hover td,
+.fzp-tab tbody tr:hover td,
+.fzi-tab tbody tr:hover td,
+.pcfc-tab tbody tr:hover td,
+.avv-tabella tbody tr:hover td,
+.tbl-semplice tbody tr:hover td,
+#piano-content .piano-table:not(.piano-fixed) tbody tr:hover td {
+  background: var(--hover);
+}
+/* le intestazioni colorate dei giorni (sabato, domenica, festivi) restano come sono */
+.piano-table:not(.piano-fixed) th.piano-weekend,
+.piano-table:not(.piano-fixed) th.piano-domenica,
+.piano-table:not(.piano-fixed) th.piano-festivo {
+  color: #1a1208;
+}
+.piano-fisse3 thead th:nth-child(-n + 3),
+body.dark-theme .piano-fisse3 thead th:nth-child(-n + 3) {
+  background: var(--paper2);
+}
+
+/* griglia del calendario del Piano: resta un foglio Excel, ma con intestazione chiara */
+.piano-table.piano-fixed th,
+.piano-table.piano-fixed td {
+  border-color: var(--griglia-linea);
+}
+.piano-table.piano-fixed thead th,
+.piano-table.piano-fixed thead .piano-nome,
+.piano-table.piano-fixed thead .piano-fun {
+  background: var(--griglia-testa);
+  color: var(--ink);
+}
+.piano-table .piano-sep-left {
+  border-left: 2px solid var(--ink) !important;
+}
+
+/* ---------- DIARIO: comandi della registrazione ---------- */
+/* al computer i comandi compaiono al passaggio del mouse, sopra la riga, senza lasciare
+   il vuoto dei pulsanti invisibili sotto ogni registrazione */
+.entry {
+  position: relative;
+}
+.entry:hover {
+  background: var(--hover);
+}
+@media (hover: hover) and (min-width: 701px) {
+  .entry-actions {
+    position: absolute;
+    top: 10px;
+    right: 14px;
+    padding: 4px;
+    gap: 4px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--r-2);
+    box-shadow: var(--ombra-2);
+    pointer-events: none;
+    z-index: 2;
+  }
+  .entry:hover .entry-actions,
+  .entry:focus-within .entry-actions {
+    pointer-events: auto;
+  }
+  .entry-actions .btn-act {
+    border-color: transparent;
+  }
+  .entry-actions .btn-act:hover {
+    border-color: var(--line-forte);
+  }
+  .entry-actions .btn-act.del:hover {
+    border-color: var(--c-rosso);
+  }
+}
+/* al telefono (e sugli schermi a tocco) restano sempre visibili, piccoli e neutri */
+@media (hover: none), (max-width: 700px) {
+  .entry-actions {
+    opacity: 1;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    padding: 0 12px 10px;
+    gap: 4px;
+  }
+  .entry-actions .btn-act {
+    min-height: 1.625rem;
+    padding: 0 8px;
+  }
+}
+/* riquadro chiuso: il solo titolo, senza doppia linea */
+.main-card.card-collapsed > .card-header {
+  border-bottom: 0;
+}
+/* colori di categoria scritti dal programma (livelli, categorie Maison): il colore arriva come
+   --cat; nel tema scuro si schiarisce da solo, cosi resta leggibile senza regole-toppa */
+.testo-cat,
+[style*='--cat:'] {
+  /* un filo piu scuro sulla carta: i toni chiari della tavolozza (arancio, giallo) restano leggibili */
+  color: color-mix(in srgb, var(--cat) 80%, #000) !important;
+}
+body.dark-theme .testo-cat,
+body.dark-theme [style*='--cat:'] {
+  color: color-mix(in srgb, var(--cat) 45%, #fff) !important;
+}
+/* tema scuro: nel calendario i colori dei turni si attenuano (velo scuro sotto al testo),
+   il testo resta scuro e leggibile; le selezioni (con !important) restano sopra */
+body.dark-theme .piano-table.piano-fixed td[style*='background'],
+body.dark-theme .piano-table.piano-fixed tr.piano-row-sup td,
+body.dark-theme .piano-table.piano-fixed tr.piano-row-bo td,
+body.dark-theme .piano-table th.piano-weekend,
+body.dark-theme .piano-table th.piano-domenica,
+body.dark-theme .piano-table th.piano-festivo {
+  box-shadow: inset 0 0 0 100px rgba(20, 14, 8, 0.24);
+}
+/* intestazioni colorate dei giorni nel calendario: testo sempre scuro (anche nel tema scuro) */
+.piano-table.piano-fixed thead th.piano-weekend,
+.piano-table.piano-fixed thead th.piano-domenica,
+.piano-table.piano-fixed thead th.piano-festivo {
+  color: #1a1208;
+}
+/* collegamenti senza stile proprio: leggibili anche nel tema scuro */
+body.dark-theme a:not([class]):not([style*='color']) {
+  color: var(--c-azzurro);
+}
+
+/* ---------- BARRA DELLE PAGINE E SETTORI (v440) ---------- */
+/* pagine: carta chiara, scritte normali, scheda attiva con filetto */
+.nav-tabs {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  padding: 4px;
+  gap: 2px;
+  box-shadow:
+    var(--ombra-1),
+    0 0 0 100vmax var(--sfondo-pagina, #d4c9b5);
+}
+.nav-tab,
+.nav-tab:first-child,
+.nav-tab:last-child {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border-radius: var(--r-1);
+  border-bottom: 0;
+  padding: 8px 10px;
+  min-width: 104px;
+}
+.nav-tab:hover {
+  color: var(--ink);
+  background: var(--hover);
+}
+.nav-tab.active {
+  color: var(--ink);
+  background: var(--paper2);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+/* settori: interruttore a segmenti; il colore del settore resta nel filetto */
+.reparto-switch {
+  width: auto;
+  align-self: center;
+  background: var(--paper2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  padding: 3px;
+  gap: 2px;
+}
+.reparto-btn,
+.reparto-btn:first-child,
+.reparto-btn:last-child {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-1);
+  padding: 6px 22px;
+}
+.reparto-btn:hover {
+  color: var(--ink);
+  background: var(--hover);
+}
+.reparto-btn.attivo {
+  color: var(--ink);
+  background: var(--paper);
+  box-shadow:
+    var(--ombra-1),
+    inset 0 -2px 0 var(--rep, var(--accent));
+}
+@media (max-width: 600px) {
+  .reparto-switch {
+    width: 100%;
+  }
+  .reparto-btn,
+  .reparto-btn:first-child,
+  .reparto-btn:last-child {
+    flex: 1 1 0;
+    padding: 6px 4px;
+  }
+}
+
+/* ---------- PAGINA DI ACCESSO (v440) ---------- */
+.login-box {
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  padding: 36px 40px 28px;
+}
+.login-box input,
+.login-box select {
+  border: 1px solid var(--line-forte) !important;
+  border-radius: var(--r-1) !important;
+  letter-spacing: 0;
+  text-align: left;
+}
+.login-box input:focus,
+.login-box select:focus {
+  border-color: var(--accent2) !important;
+  box-shadow: var(--fuoco);
+  outline: none;
+}
+.login-box .btn-login {
+  text-transform: none;
+  letter-spacing: 0;
+  min-height: 2.75rem;
+  border-radius: var(--r-1);
+  font-size: var(--fs-base);
+  margin-top: 4px;
+}
+.btn-recupero {
+  background: none;
+  border: 0;
+  padding: 4px;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.btn-recupero:hover {
+  color: var(--ink);
+}
+@media (max-width: 480px) {
+  .login-box {
+    padding: 28px 20px 22px;
+    min-width: 0;
+    width: calc(100vw - 32px);
+  }
+}
+/* pulsanti principali con un colore proprio scritto nel programma (categorie Maison,
+   carico inventario): testo sempre bianco, in entrambi i temi */
+:is(.btn-salva, .btn-modal-ok, .btn-add-tipo):is([style*='background:#'], [style*='background: #']) {
+  color: #fff;
 }

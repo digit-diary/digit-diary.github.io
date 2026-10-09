@@ -77,7 +77,7 @@ function _renderPianoTimbratureCard() {
     '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">' +
     '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px" onclick="caricaConfrontoTimbrature()">Carica confronto del mese</button>' +
     (puoAzioniAutoPiano('import')
-      ? '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="document.getElementById(\'timb-file\').click()">Importa file timbratrice</button>' +
+      ? '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px" onclick="document.getElementById(\'timb-file\').click()">Importa file timbratrice</button>' +
         '<input type="file" id="timb-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="importaTimbrature(this)">'
       : '') +
     '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">CSV o Excel con colonne nome / data / entrata / uscita (riconosciute in automatico)</span></div>';
@@ -316,7 +316,7 @@ async function caricaConfrontoTimbrature() {
       '</td><td>' +
       (pianOre[n] || 0).toFixed(1) +
       '</td><td style="font-weight:700;color:' +
-      (diff > 0 ? '#2c6e49' : diff < 0 ? '#c0392b' : 'var(--muted)') +
+      (diff > 0 ? 'var(--c-verde,#2c6e49)' : diff < 0 ? 'var(--c-rosso,#c0392b)' : 'var(--muted)') +
       '">' +
       (diff > 0 ? '+' : '') +
       diff.toFixed(1) +
@@ -344,11 +344,11 @@ async function caricaConfrontoTimbrature() {
           '</td><td>' +
           (p ? p.ore.toFixed(2) : '') +
           '</td><td style="color:' +
-          (dg > 0 ? '#2c6e49' : dg < 0 ? '#c0392b' : 'var(--muted)') +
+          (dg > 0 ? 'var(--c-verde,#2c6e49)' : dg < 0 ? 'var(--c-rosso,#c0392b)' : 'var(--muted)') +
           '">' +
           (dg > 0 ? '+' : '') +
           dg.toFixed(2) +
-          '</td><td><button class="btn-del-tipo" onclick="eliminaTimbratura(' +
+          '</td><td><button class="btn-del-tipo pericolo" onclick="eliminaTimbratura(' +
           t.id +
           ')">Elimina</button></td></tr>';
       });
@@ -397,9 +397,9 @@ function _pianoConfrontoSelHtml() {
     return s;
   };
   return (
-    '<label style="font-size:var(--fs-sm,.8125rem);font-weight:400">confronta <select onchange="window._pianoConfrontoAnnoB=parseInt(this.value);caricaConfrontoAnniPiano()" style="padding:3px 6px;font-size:var(--fs-sm,.8125rem);border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a">' +
+    '<label style="font-size:var(--fs-sm,.8125rem);font-weight:400">confronta <select onchange="window._pianoConfrontoAnnoB=parseInt(this.value);caricaConfrontoAnniPiano()" style="padding:3px 6px;font-size:var(--fs-sm,.8125rem);border:1px solid var(--line-forte);border-radius:var(--r-1);background:var(--paper);color:var(--ink)">' +
     opt(b) +
-    '</select> con <select onchange="window._pianoConfrontoAnno=parseInt(this.value);caricaConfrontoAnniPiano()" style="padding:3px 6px;font-size:var(--fs-sm,.8125rem);border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a">' +
+    '</select> con <select onchange="window._pianoConfrontoAnno=parseInt(this.value);caricaConfrontoAnniPiano()" style="padding:3px 6px;font-size:var(--fs-sm,.8125rem);border:1px solid var(--line-forte);border-radius:var(--r-1);background:var(--paper);color:var(--ink)">' +
     opt(a) +
     '</select></label>'
   );
@@ -509,7 +509,8 @@ async function caricaConfrontoAnniPiano() {
       '</th><th>Differenza</th></tr></thead><tbody>';
     voci.forEach(([label, a, b, verso, fmt]) => {
       const d = Math.round((b - a) * 10) / 10;
-      const colD = d === 0 || verso === 0 ? 'var(--muted)' : d * verso > 0 ? '#2c6e49' : '#c0392b';
+      const colD =
+        d === 0 || verso === 0 ? 'var(--muted)' : d * verso > 0 ? 'var(--c-verde,#2c6e49)' : 'var(--c-rosso,#c0392b)';
       const pct = a > 0 ? Math.round((d / a) * 100) : null;
       h +=
         '<tr><td style="text-align:left;font-weight:600">' +
@@ -613,11 +614,7 @@ async function caricaStatisticheAnnoPiano(forza) {
     const sel = meseFiltro === anno + '-' + mm;
     h +=
       '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;' +
-      (sel
-        ? _attivo
-        : ha
-          ? 'border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49);font-weight:700'
-          : 'color:var(--muted)') +
+      (sel ? _attivo : ha ? ';font-weight:700' : 'color:var(--muted)') +
       '" onclick="pianoStatMese(\'' +
       anno +
       '-' +
@@ -625,7 +622,7 @@ async function caricaStatisticheAnnoPiano(forza) {
       '\')">' +
       (MESI[m - 1] || mm) +
       (ha ? ' (' + ha + ')' : '') +
-      (mesiFabb[mm] ? ' <span style="color:#d4b86a">F</span>' : '') +
+      (mesiFabb[mm] ? ' <span style="color:var(--c-oro)">F</span>' : '') +
       '</button>';
   }
   if (meseFiltro)
@@ -817,17 +814,17 @@ async function caricaStatisticheAnnoPiano(forza) {
           ' in malattia</span>'
         : '') +
       '</td><td style="font-weight:700;color:' +
-      (o.cgfSaldo > 0 ? '#2c6e49' : o.cgfSaldo < 0 ? '#c0392b' : 'var(--muted)') +
+      (o.cgfSaldo > 0 ? 'var(--c-verde,#2c6e49)' : o.cgfSaldo < 0 ? 'var(--c-rosso,#c0392b)' : 'var(--muted)') +
       '"' +
       (o.cgfRip ? ' title="Riporto dall anno prima: ' + o.cgfRip + '"' : '') +
       '>' +
       (o.cgfMat || o.cgfGod || o.cgfRip ? o.cgfSaldo : '') +
       '</td><td style="font-weight:700;color:' +
-      (o.sup50 ? '#8b6914' : 'var(--muted)') +
+      (o.sup50 ? 'var(--c-oro,#8b6914)' : 'var(--muted)') +
       '" title="Festivi parificati lavorati come personale ausiliario">' +
       (o.sup50 || '') +
       '</td><td style="font-weight:700;color:' +
-      (o.oreNotte ? '#1a4a7a' : 'var(--muted)') +
+      (o.oreNotte ? 'var(--c-blu,#1a4a7a)' : 'var(--muted)') +
       '" title="' +
       (o.oreNotte
         ? Math.round(o.oreNotte * 10) / 10 +
@@ -838,7 +835,7 @@ async function caricaStatisticheAnnoPiano(forza) {
       '">' +
       (o.oreNotte ? Math.round(o.oreNotte * 10) / 10 + 'h' : '') +
       '</td><td style="font-weight:700;color:' +
-      (!_pianoMaturaCgf(info) && o.oreLav ? '#8b6914' : 'var(--muted)') +
+      (!_pianoMaturaCgf(info) && o.oreLav ? 'var(--c-oro,#8b6914)' : 'var(--muted)') +
       '" title="' +
       (!_pianoMaturaCgf(info) && o.oreLav ? _pianoIndennitaJolly(o.oreLav) : '') +
       '">' +
@@ -989,7 +986,7 @@ async function _pianoVacDirittoCard(anno) {
       '</td><td>' +
       (pian || '') +
       '</td><td style="color:' +
-      (pian && inCal !== pian ? '#8b6914' : 'var(--muted)') +
+      (pian && inCal !== pian ? 'var(--c-oro,#8b6914)' : 'var(--muted)') +
       '" title="' +
       (pian && inCal !== pian ? 'Registrate ' + pian + ' giornate, nel calendario ce ne sono ' + inCal : '') +
       '">' +
@@ -999,7 +996,7 @@ async function _pianoVacDirittoCard(anno) {
       '">' +
       (rest || '') +
       '</td><td style="font-weight:700;color:' +
-      (resta > 0 ? '#8b6914' : resta < 0 ? '#c0392b' : '#2c6e49') +
+      (resta > 0 ? 'var(--c-oro,#8b6914)' : resta < 0 ? 'var(--c-rosso,#c0392b)' : 'var(--c-verde,#2c6e49)') +
       '">' +
       resta +
       '</td></tr>';
@@ -1088,41 +1085,41 @@ async function _renderPianoVacanzeTab() {
     vac.length +
     ')';
   h +=
-    '<select onchange="window._pianoVacAnno=parseInt(this.value);renderPiano()" style="padding:4px 8px;font-size:var(--fs-sm,.8125rem);border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a">';
+    '<select onchange="window._pianoVacAnno=parseInt(this.value);renderPiano()" style="padding:4px 8px;font-size:var(--fs-sm,.8125rem);border:1px solid var(--line-forte);border-radius:var(--r-1);background:var(--paper);color:var(--ink)">';
   for (let a = 2025; a <= 2031; a++)
     h += '<option value="' + a + '"' + (a === anno ? ' selected' : '') + '>' + a + '</option>';
   h += '</select>';
   h +=
-    '<select onchange="window._pianoVacFiltro=this.value;renderPiano()" style="padding:4px 8px;font-size:var(--fs-sm,.8125rem);border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a;max-width:220px"><option value="">Tutti i collaboratori</option>' +
+    '<select onchange="window._pianoVacFiltro=this.value;renderPiano()" style="padding:4px 8px;font-size:var(--fs-sm,.8125rem);border:1px solid var(--line-forte);border-radius:var(--r-1);background:var(--paper);color:var(--ink);max-width:220px"><option value="">Tutti i collaboratori</option>' +
     nomiRep
       .map((n) => '<option value="' + escP(n) + '"' + (filtro === n ? ' selected' : '') + '>' + escP(n) + '</option>')
       .join('') +
     '</select>';
   if (puoMod) {
     h +=
-      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="apriNuovaVacanza()">Nuova vacanza</button>';
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px" onclick="apriNuovaVacanza()">Nuova vacanza</button>';
     // importa, applica al piano ed elimina tutte: azioni automatiche (permesso apposito)
     const _auto = puoAzioniAutoPiano('vacanze');
     const _cancella = puoAzioniAutoPiano('cancella');
     h +=
       (_auto
-        ? '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:#d4b86a;color:#d4b86a" onclick="document.getElementById(\'vac-file\').click()">Importa (Excel o PDF)</button>' +
+        ? '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px" onclick="document.getElementById(\'vac-file\').click()">Importa (Excel o PDF)</button>' +
           '<input type="file" id="vac-file" accept=".xlsx,.xls,.pdf" style="display:none" onchange="importaVacanzePiano(this)">'
         : '') +
-      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" title="Scarica il piano vacanze del settore nello stesso formato del file HR" onclick="esportaVacanzeExcel()">Scarica Excel</button>' +
-      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--c-blu,#1a4a7a);color:#7ea8d8" onclick="esportaVacanzePdf()">Scarica PDF</button>';
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px" title="Scarica il piano vacanze del settore nello stesso formato del file HR" onclick="esportaVacanzeExcel()">Scarica Excel</button>' +
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px" onclick="esportaVacanzePdf()">Scarica PDF</button>';
     if (_auto)
       h +=
-        '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--c-blu,#1a4a7a);color:#7ea8d8" onclick="applicaVacanzePiano()">Applica al piano · ' +
+        '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px" onclick="applicaVacanzePiano()">Applica al piano · ' +
         escP(meseLbl) +
         '</button>';
     h +=
-      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--c-viola,#7b2d8b);color:#b07cc7" onclick="apriScambioSettimane()">Scambia settimane</button>';
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px" onclick="apriScambioSettimane()">Scambia settimane</button>';
     h +=
-      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--c-viola,#7b2d8b);color:#b07cc7" onclick="pdfCambioVacanza()">Formulario cambio vacanza</button>';
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px" onclick="pdfCambioVacanza()">Formulario cambio vacanza</button>';
     if (_cancella)
       h +=
-        '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--accent);color:var(--accent)" onclick="eliminaTutteVacanze()">Elimina tutte</button>';
+        '<button class="btn-export btn-pericolo" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px" onclick="eliminaTutteVacanze()">Elimina tutte</button>';
   }
   h += '</div>';
   h +=
@@ -1190,9 +1187,9 @@ async function _renderPianoVacanzeTab() {
         '</td>';
       if (puoMod)
         h +=
-          '<td><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;border-color:var(--c-blu,#1a4a7a);color:var(--c-blu,#1a4a7a);margin-right:6px" onclick="modificaVacanza(' +
+          '<td><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;margin-right:6px" onclick="modificaVacanza(' +
           v.id +
-          ')">Modifica</button><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;border-color:var(--accent);color:var(--accent)" onclick="eliminaVacanza(' +
+          ')">Modifica</button><button class="btn-export btn-pericolo" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px" onclick="eliminaVacanza(' +
           v.id +
           ')">Elimina</button></td>';
       h += '</tr>';
@@ -1421,7 +1418,7 @@ function _renderPianoSaldoAnnoCard() {
   if (!dati || dati.anno !== anno) {
     h +=
       '<p style="font-size:var(--fs-md,.875rem);color:var(--muted);margin-bottom:8px">Riporto di inizio anno più il saldo di ogni mese, come il foglio Saldo Ore del piano. I mesi già pianificati contano anche se sono nel futuro, così si vede in anticipo chi andra fuori dalla banda e chi deve recuperare.</p>' +
-      '<button class="btn-export" style="font-size:var(--fs-md,.875rem);padding:6px 14px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="pianoCaricaSaldoAnno()">Calcola l anno ' +
+      '<button class="btn-export" style="font-size:var(--fs-md,.875rem);padding:6px 14px" onclick="pianoCaricaSaldoAnno()">Calcola l anno ' +
       anno +
       '</button></div></div>';
     return h;
@@ -1470,7 +1467,7 @@ function _renderPianoSaldoAnnoCard() {
     // gli ausiliari non hanno ore dovute: per loro il saldo non vuol dire nulla
     const jolly = !!info.is_jolly;
     const dentro = tot <= banda.max && tot >= banda.min;
-    const col = (v) => (v > 0 ? '#2c6e49' : v < 0 ? '#c0392b' : 'var(--muted)');
+    const col = (v) => (v > 0 ? 'var(--c-verde,#2c6e49)' : v < 0 ? 'var(--c-rosso,#c0392b)' : 'var(--muted)');
     const rec = _pianoSaldoIniz[nome + '|' + anno];
     h +=
       '<tr data-nome="' +
@@ -1609,7 +1606,7 @@ async function _renderPianoSaldoTab() {
     totD += od;
     totP += op;
     if (!info.is_jolly) totS += sm;
-    const col = (v) => (v > 0 ? '#2c6e49' : v < 0 ? '#c0392b' : 'var(--muted)');
+    const col = (v) => (v > 0 ? 'var(--c-verde,#2c6e49)' : v < 0 ? 'var(--c-rosso,#c0392b)' : 'var(--muted)');
     h +=
       '<tr data-nome="' +
       escP(nome) +
@@ -1649,7 +1646,7 @@ async function _renderPianoSaldoTab() {
     '</td><td style="font-weight:700">' +
     totP.toFixed(1) +
     '</td><td style="font-weight:700;color:' +
-    (totS > 0 ? '#2c6e49' : totS < 0 ? '#c0392b' : 'inherit') +
+    (totS > 0 ? 'var(--c-verde,#2c6e49)' : totS < 0 ? 'var(--c-rosso,#c0392b)' : 'inherit') +
     '">' +
     (totS > 0 ? '+' : '') +
     totS.toFixed(1) +
@@ -1861,7 +1858,7 @@ async function _renderPianoStoricoTab() {
     visibili.length +
     ')';
   h +=
-    '<select onchange="window._pianoStoricoFiltro=this.value;renderPiano()" style="padding:4px 8px;font-size:var(--fs-sm,.8125rem);border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a"><option value="">Tutte le azioni</option>' +
+    '<select onchange="window._pianoStoricoFiltro=this.value;renderPiano()" style="padding:4px 8px;font-size:var(--fs-sm,.8125rem);border:1px solid var(--line-forte);border-radius:var(--r-1);background:var(--paper);color:var(--ink)"><option value="">Tutte le azioni</option>' +
     azioni
       .map((a) => '<option value="' + escP(a) + '"' + (filtro === a ? ' selected' : '') + '>' + escP(a) + '</option>')
       .join('') +
@@ -3104,6 +3101,15 @@ async function _applicaVacanzeMese(interattivo, opz) {
     (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '')) || [];
   const perCella = {}; // nome|g -> riga
   righe.forEach((r) => (perCella[r.collaboratore + '|' + parseInt(r.data.split('-')[2])] = r));
+  // celle della stessa persona in un ALTRO settore (es. uno delle Slots che quel giorno lavora al
+  // Valet): quel giorno e occupato. Prima sembrava vuoto, si provava a scrivere il WD e il
+  // database lo rifiutava (riga doppia) senza avviso, a ogni bozza
+  const altroSettore = new Set();
+  try {
+    ((await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=neq.' + _pianoReparto())) || []).forEach(
+      (r) => altroSettore.add(r.collaboratore + '|' + parseInt(r.data.split('-')[2])),
+    );
+  } catch (e) {}
   const dstrDi = (g) => ym + '-' + String(g).padStart(2, '0');
   let nV = 0;
   let nC = 0;
@@ -3113,6 +3119,8 @@ async function _applicaVacanzeMese(interattivo, opz) {
     const r = perCella[nome + '|' + g];
     // prima dell assunzione o dopo la fine del rapporto non si scrive niente (C, WD)
     if (!_pianoOperativoIl(nome, dstrDi(g))) return false;
+    if (!r && altroSettore.has(nome + '|' + g)) return false; // lavora in un altro settore
+
     // in malattia niente C o WD attorno alle vacanze: il giorno resta malattia
     if (eMalato(nome, g)) return false;
     if (g < primoAperto) {

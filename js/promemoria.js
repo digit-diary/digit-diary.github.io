@@ -327,7 +327,7 @@ function renderPromemoria() {
         '">' +
         escP(p.titolo) +
         '</strong><span style="font-size:var(--fs-sm,.8125rem);padding:2px 8px;border-radius:2px;background:' +
-        (p.assegnato_a === 'tutti' ? 'var(--accent2)' : 'var(--c-azzurro)') +
+        (p.assegnato_a === 'tutti' ? 'var(--accent2)' : 'var(--pieno-azzurro)') +
         ';color:white;font-weight:600" title="' +
         escP(String(p.assegnato_a || '').replace(/,\s*/g, ', ')) +
         '">' +
@@ -472,7 +472,7 @@ function mostraPromemoriaLogin() {
         '"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><strong>' +
         escP(p.titolo) +
         '</strong><span style="font-size:var(--fs-sm,.8125rem);color:' +
-        (scaduto ? 'var(--accent)' : '#e67e22') +
+        (scaduto ? 'var(--accent)' : 'var(--c-arancio,#e67e22)') +
         ';font-weight:600">' +
         new Date(p.data_scadenza + 'T12:00:00').toLocaleDateString('it-IT') +
         '</span></div>' +

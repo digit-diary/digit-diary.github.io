@@ -4589,7 +4589,7 @@ function _briefRenderPauseSlots(c) {
   }
   if (puo)
     h +=
-      '<div style="margin-top:16px"><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;border-color:var(--c-rosso,#c0392b);color:var(--c-rosso,#c0392b)" onclick="briefEliminaPause()">Elimina pause</button></div>';
+      '<div style="margin-top:16px"><button class="btn-export btn-pericolo" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px" onclick="briefEliminaPause()">Elimina pause</button></div>';
   return h;
 }
 function _briefParseIntv(s) {
@@ -4737,7 +4737,7 @@ function _briefRenderPauseValet(c) {
       '</p>';
   if (puo)
     h +=
-      '<div style="margin-top:8px"><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;border-color:var(--c-rosso,#c0392b);color:var(--c-rosso,#c0392b)" onclick="briefEliminaPause()">Elimina pause</button></div>';
+      '<div style="margin-top:8px"><button class="btn-export btn-pericolo" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px" onclick="briefEliminaPause()">Elimina pause</button></div>';
   return h;
 }
 

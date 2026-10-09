@@ -1100,9 +1100,9 @@ function apriAccessiExtra(nome) {
       '<div style="border:1px solid var(--line);border-left:4px solid ' +
       repartoColore(r.key) +
       ';border-radius:3px;padding:10px 12px;margin-bottom:10px">' +
-      '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><b style="min-width:80px;color:' +
+      '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><b style="min-width:80px;--cat:' +
       repartoColore(r.key) +
-      '">' +
+      ';color:var(--cat)">' +
       escP(r.label) +
       '</b>' +
       '<select id="ae-mod-sel-' +

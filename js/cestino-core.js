@@ -87,7 +87,7 @@ function renderCestino() {
         escP(r.eliminato_da || '') +
         ' il ' +
         delAt +
-        '</div></div><button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;background:#2c6e49" onclick="ripristinaCestino(\'registrazioni\',' +
+        '</div></div><button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px" onclick="ripristinaCestino(\'registrazioni\',' +
         r.id +
         ')">Ripristina</button><button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;background:var(--accent)" onclick="eliminaDefinitivo(\'registrazioni\',' +
         r.id +
@@ -115,7 +115,7 @@ function renderCestino() {
         escP(m.eliminato_da || '') +
         ' il ' +
         delAt +
-        '</div></div><button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;background:#2c6e49" onclick="ripristinaCestino(\'moduli\',' +
+        '</div></div><button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px" onclick="ripristinaCestino(\'moduli\',' +
         m.id +
         ')">Ripristina</button><button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;background:var(--accent)" onclick="eliminaDefinitivo(\'moduli\',' +
         m.id +
@@ -720,7 +720,7 @@ async function apriFixOrfani() {
     }
     h +=
       '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">' +
-      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="orfanoCreaScheda(\'' +
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px" onclick="orfanoCreaScheda(\'' +
       nomeJs +
       "','" +
       o.rep +
@@ -735,7 +735,7 @@ async function apriFixOrfani() {
       "'," +
       i +
       ')">Sposta</button>' +
-      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;border-color:var(--c-rosso,#c0392b);color:var(--c-rosso,#c0392b)" onclick="orfanoElimina(\'' +
+      '<button class="btn-export btn-pericolo" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px" onclick="orfanoElimina(\'' +
       nomeJs +
       "'," +
       o.n +
@@ -1053,7 +1053,7 @@ async function controlloSalute() {
         '</span>' +
         (e.azione
           ? e.azione.indexOf('FIX:') === 0
-            ? '<br><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;margin-top:5px;border-color:var(--c-blu,#1a4a7a);color:var(--c-blu,#1a4a7a)" onclick="' +
+            ? '<br><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;margin-top:5px" onclick="' +
               e.azione.split('|')[0].substring(4) +
               '">' +
               escP(e.azione.split('|')[1] || 'Sistema') +
@@ -1105,22 +1105,26 @@ async function caricaDbStats() {
     if (sizeMatch[2] === 'GB') usedMB *= 1024;
     if (sizeMatch[2] === 'kB') usedMB /= 1024;
   }
-  const pct = Math.min(Math.round((usedMB / 500) * 100), 100);
-  const barColor = pct >= 90 ? 'var(--accent)' : pct >= 70 ? '#e67e22' : '#2c6e49';
+  // il tetto di 500 MB vale solo per il database in cloud (piano gratuito); sul server
+  // interno dell IT lo spazio e quello del disco: si mostra solo quanto occupa
+  const inCloud = typeof SB_URL === 'string' && /supabase\.co/i.test(SB_URL);
+  const pct = inCloud ? Math.min(Math.round((usedMB / 500) * 100), 100) : 0;
+  const barColor = pct >= 90 ? 'var(--accent)' : pct >= 70 ? 'var(--c-arancio)' : 'var(--c-verde)';
   let h =
     '<div style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><strong>' +
     r.db_size +
-    ' / 500 MB</strong><span style="color:' +
-    barColor +
-    ';font-weight:700">' +
-    pct +
-    '%</span></div>';
-  h +=
-    '<div style="background:var(--line);border-radius:4px;height:8px;overflow:hidden"><div style="background:' +
-    barColor +
-    ';height:100%;width:' +
-    pct +
-    '%;border-radius:4px;transition:width .5s"></div></div></div>';
+    (inCloud ? ' / 500 MB' : ' occupati') +
+    '</strong>' +
+    (inCloud ? '<span style="color:' + barColor + ';font-weight:700">' + pct + '%</span>' : '') +
+    '</div>';
+  if (inCloud)
+    h +=
+      '<div style="background:var(--line);border-radius:4px;height:8px;overflow:hidden"><div style="background:' +
+      barColor +
+      ';height:100%;width:' +
+      pct +
+      '%;border-radius:4px;transition:width .5s"></div></div>';
+  h += '</div>';
   const tables = r.tables || [];
   const labelMap = {
     registrazioni: 'Registrazioni',
@@ -1186,7 +1190,8 @@ async function _healthCheck() {
   if (!window.Chart) problems.push('Libreria grafici (Chart.js) non caricata');
   if (!window.flatpickr) problems.push('Libreria calendario (Flatpickr) non caricata');
   // 3. Intelligenza artificiale (solo se configurata): prova il fornitore in uso
-  if (typeof aiPronta === 'function' && aiPronta()) {
+  // una vera domanda al modello: una volta al giorno (prima a ogni accesso, anche degli operatori)
+  if (typeof aiPronta === 'function' && aiPronta() && _unaVoltaAlGiorno('prova_ai')) {
     const f = aiFornitoreAttivo();
     const e = await aiProva(f.id);
     if (!e.ok) problems.push('Intelligenza artificiale (' + f.nome + ') non risponde: ' + e.errore);

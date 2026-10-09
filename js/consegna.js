@@ -463,7 +463,7 @@ function renderDashboard() {
     const isScaduto = p.data_scadenza < oggi;
     todoH +=
       '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="color:' +
-      (isScaduto ? 'var(--accent)' : '#e67e22') +
+      (isScaduto ? 'var(--accent)' : 'var(--c-arancio,#e67e22)') +
       ';font-weight:700;font-size:var(--fs-lg,1.0625rem)">' +
       (isScaduto ? '!' : '&#9679;') +
       '</span><span style="flex:1;cursor:pointer" onclick="switchPage(\'promemoria\')"><strong>' +

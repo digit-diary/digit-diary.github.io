@@ -519,7 +519,7 @@ async function _renderPianoBriefingTab() {
         '<div style="margin-top:7px;padding-top:6px;border-top:1px solid var(--line)">' +
         '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;vertical-align:middle" title="Memorizza il formato della prima cella marcata" onclick="briefCopiaFormato()">Copia formato</button> ' +
         '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;vertical-align:middle" title="Applica il formato memorizzato alle celle marcate" onclick="briefIncollaFormato()">Incolla formato</button> ' +
-        '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;vertical-align:middle;border-color:var(--c-rosso,#c0392b);color:var(--c-rosso,#c0392b)" title="Toglie colori e formato dalle celle o righe marcate" onclick="briefCancellaFormato()">Cancella formato</button>' +
+        '<button class="btn-export btn-pericolo" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;vertical-align:middle" title="Toglie colori e formato dalle celle o righe marcate" onclick="briefCancellaFormato()">Cancella formato</button>' +
         '</div>' +
         '</div></span></span>'
       : '') +
@@ -1553,7 +1553,7 @@ function _briefPauseBodyHtml() {
     const viol = typeof _peVerificaRegolePause === 'function' ? _peVerificaRegolePause(p.contenuto, _briefData) : [];
     if (viol.length)
       h +=
-        '<div style="margin:8px 0;padding:6px 10px;font-size:var(--fs-sm,.8125rem);background:var(--avviso-bg-forte);border-left:3px solid #d4b86a"><b>Regole pause non rispettate (' +
+        '<div style="margin:8px 0;padding:6px 10px;font-size:var(--fs-sm,.8125rem);background:var(--avviso-bg-forte);border-left:3px solid var(--avviso-bordo)"><b>Regole pause non rispettate (' +
         viol.length +
         ')</b>: ' +
         escP(viol.slice(0, 8).join(' · ')) +
@@ -1746,7 +1746,7 @@ function _renderPianoCorsiCard() {
   });
   h += '</div>';
   h +=
-    '<button class="btn-export" style="font-size:var(--fs-md,.875rem);padding:6px 16px;margin-top:10px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="pianoInserisciCorso()">Inserisci nel piano</button>';
+    '<button class="btn-export" style="font-size:var(--fs-md,.875rem);padding:6px 16px;margin-top:10px" onclick="pianoInserisciCorso()">Inserisci nel piano</button>';
   // gestione della LISTA corsi (admin): aggiungi sigla, rinomina, rimuovi
   if (isAdmin()) {
     h +=

@@ -301,6 +301,9 @@ async function pianoAnnulla() {
     const esito = await _pianoRipristinaStato(st, { memoria: memoria });
     logAzione('Piano: annullato', st.label + ' (' + st.ym + ') · ' + esito.cambiate + ' celle');
     toast('Annullato: ' + st.label + ' (' + esito.cambiate + ' celle)');
+    // la copertura aveva registrato la malattia anche nel Diario: si propone di toglierla
+    if (st.malattiaDiario && typeof _pianoMalattiaViaDiario === 'function')
+      await _pianoMalattiaViaDiario(st.malattiaDiario.nome, st.malattiaDiario.giorni);
   } catch (e) {
     u.push(st);
     if (redoAggiunto) (window._pianoRedo || []).pop(); // lo stato messo in Ripristina non vale
@@ -680,7 +683,7 @@ function _pianoColoriBarHtml() {
     '<div style="margin-top:7px;padding-top:6px;border-top:1px solid var(--line)">' +
     '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;vertical-align:middle" title="Memorizza colore e formato della prima cella selezionata" onclick="pianoCopiaFormato()">Copia formato</button> ' +
     '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;vertical-align:middle" title="Applica il formato memorizzato alle celle selezionate" onclick="pianoIncollaFormato()">Incolla formato</button> ' +
-    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;vertical-align:middle;border-color:var(--c-rosso,#c0392b);color:var(--c-rosso,#c0392b)" title="Toglie colori, grassetto e corsivo dalle celle selezionate (i turni non cambiano)" onclick="pianoCancellaFormato()">Cancella formato</button>' +
+    '<button class="btn-export btn-pericolo" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px;vertical-align:middle" title="Toglie colori, grassetto e corsivo dalle celle selezionate (i turni non cambiano)" onclick="pianoCancellaFormato()">Cancella formato</button>' +
     '</div>' +
     '</div></span>'
   );
@@ -1623,9 +1626,9 @@ function _pianoSparseBar() {
     document.body.appendChild(bar);
   }
   const b = (label, onclick, rosso) =>
-    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px' +
-    (rosso ? ';border-color:var(--c-rosso,#c0392b);color:var(--c-rosso,#c0392b)' : '') +
-    '" onclick="' +
+    '<button class="btn-export' +
+    (rosso ? ' btn-pericolo' : '') +
+    '" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px" onclick="' +
     onclick +
     '">' +
     label +
@@ -1966,7 +1969,7 @@ async function _pianoTestoAppunti() {
     mc.innerHTML =
       '<h3 style="margin-bottom:8px">Incolla</h3><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Premi Ctrl+V (Cmd+V su Mac) nel riquadro: puoi incollare celle copiate da Excel o dal Diario.</p>' +
       '<textarea id="incolla-txt" style="width:100%;height:140px;font-family:monospace;font-size:var(--fs-md,.875rem);padding:8px"></textarea>' +
-      '<div style="margin-top:10px;display:flex;gap:10px"><button class="btn-export" onclick="window._incollaOk()">Incolla</button><button class="btn-export" style="border-color:var(--c-rosso,#c0392b);color:var(--c-rosso,#c0392b)" onclick="window._incollaAnnulla()">Annulla</button></div>';
+      '<div style="margin-top:10px;display:flex;gap:10px"><button class="btn-export" onclick="window._incollaOk()">Incolla</button><button class="btn-export" onclick="window._incollaAnnulla()">Annulla</button></div>';
     m.classList.remove('hidden');
     setTimeout(() => document.getElementById('incolla-txt').focus(), 100);
     window._incollaOk = () => {
@@ -2967,7 +2970,13 @@ async function _pianoCreditiDati(anno, soloNomi) {
 }
 function _pianoCreditiNum(v, unita, colore, info) {
   if (v == null) return '<td style="color:var(--muted)">-</td>';
-  const c = colore ? (v > 0 ? '#8b6914' : v < 0 ? '#c0392b' : '#2c6e49') : 'inherit';
+  const c = colore
+    ? v > 0
+      ? 'var(--c-oro,#8b6914)'
+      : v < 0
+        ? 'var(--c-rosso,#c0392b)'
+        : 'var(--c-verde,#2c6e49)'
+    : 'inherit';
   return (
     '<td style="font-weight:' +
     (colore ? 700 : 400) +

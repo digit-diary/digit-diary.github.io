@@ -170,7 +170,7 @@ function _renderValutazioneSezione(nome) {
       (v ? ',' + v.anno + ",'" + _jsArg(v.tipo) + "'" : '') +
       ')" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px">+ Nuova / Modifica</button>';
     html +=
-      '<button class="btn-export" onclick="document.getElementById(\'val-import-file\').click()" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)">Importa Excel</button>' +
+      '<button class="btn-export" onclick="document.getElementById(\'val-import-file\').click()" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px">Importa Excel</button>' +
       '<input type="file" id="val-import-file" accept=".xlsx,.xls" style="display:none" onchange="importaValutazioneExcel(this,\'' +
       ne +
       '\')">';
@@ -226,7 +226,7 @@ function _renderValutazioneSezione(nome) {
       return '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted);min-width:34px;text-align:right">=</span>';
     return (
       '<span style="font-size:var(--fs-sm,.8125rem);font-weight:700;min-width:34px;text-align:right;color:' +
-      (d > 0 ? '#2c6e49' : 'var(--accent)') +
+      (d > 0 ? 'var(--c-verde,#2c6e49)' : 'var(--accent)') +
       '">' +
       (d > 0 ? '&#9650; +' : '&#9660; ') +
       d +
@@ -255,7 +255,7 @@ function _renderValutazioneSezione(nome) {
     ')</span>' +
     (mediaPrec != null
       ? ' <span style="font-size:var(--fs-sm,.8125rem);font-weight:700;color:' +
-        (media - mediaPrec > 0 ? '#2c6e49' : media - mediaPrec < 0 ? 'var(--accent)' : 'var(--muted)') +
+        (media - mediaPrec > 0 ? 'var(--c-verde,#2c6e49)' : media - mediaPrec < 0 ? 'var(--accent)' : 'var(--muted)') +
         '">' +
         (media - mediaPrec > 0 ? '▲ +' : media - mediaPrec < 0 ? '▼ ' : '= ') +
         (media - mediaPrec !== 0 ? media - mediaPrec + '%' : '') +
@@ -315,10 +315,10 @@ function _mediaValutazione(aree) {
 // Fasce colore ufficiali della scheda HR: 90-100 verde, 70-89 azzurro, 50-69 giallo, 0-49 rosso
 function _coloreValore(v) {
   if (v == null) return 'var(--muted)';
-  if (v >= 90) return '#2c6e49';
-  if (v >= 70) return '#1a7aa8';
-  if (v >= 50) return '#b39b00';
-  return '#c0392b';
+  if (v >= 90) return 'var(--c-verde,#2c6e49)';
+  if (v >= 70) return 'var(--c-azzurro,#1a7aa8)';
+  if (v >= 50) return 'var(--c-oro,#b39b00)';
+  return 'var(--c-rosso,#c0392b)';
 }
 // Riempimento celle PDF (stessi colori del foglio Excel)
 function _fasciaFillPdf(n) {

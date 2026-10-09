@@ -499,7 +499,11 @@ async function pianoAutoRenderCard() {
       const msg = (x.esito && x.esito.messaggio) || '';
       h +=
         '<div style="font-size:var(--fs-sm,.8125rem);border-left:3px solid ' +
-        (x.stato === 'fatta' ? '#2e7d32' : x.stato === 'errore' ? '#c62828' : '#b8860b') +
+        (x.stato === 'fatta'
+          ? 'var(--c-verde,#2e7d32)'
+          : x.stato === 'errore'
+            ? 'var(--c-rosso,#c62828)'
+            : 'var(--c-oro,#b8860b)') +
         ';padding:2px 8px"><b>' +
         escP(_pianoAutoMeseLabel(x.mese)) +
         ' · ' +

@@ -343,7 +343,7 @@ function _renderRiallineaUI() {
     html += '</span>';
     html += '<div style="margin-left:auto;display:flex;gap:6px;flex-shrink:0">';
     html +=
-      '<button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px;background:#2c6e49" onclick="confermaRiallinea(' +
+      '<button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px" onclick="confermaRiallinea(' +
       idx +
       ')">Conferma</button>';
     html +=
@@ -599,7 +599,7 @@ function _renderUnisciUI() {
       '</div>';
     html += '<div style="display:flex;gap:6px;justify-content:flex-end">';
     html +=
-      '<button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px;background:#2c6e49" onclick="confermaUnisci(' +
+      '<button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:5px 12px" onclick="confermaUnisci(' +
       idx +
       ')">Conferma</button>';
     html +=
@@ -1933,9 +1933,9 @@ function _aggiornaBottoniReparto() {
     var btn = document.getElementById('btn-rep-' + r.key);
     if (!btn) return;
     var attivo = currentReparto === r.key;
-    btn.style.background = attivo ? r.colore : '';
-    btn.style.borderColor = attivo ? r.colore : '';
-    btn.style.color = attivo ? 'white' : '';
+    // aspetto (v440): il settore attivo e una scheda chiara con il filetto nel colore del settore
+    btn.classList.toggle('attivo', attivo);
+    btn.style.setProperty('--rep', r.colore || 'var(--accent)');
   });
 }
 function applicaRepartoVisibilita() {
@@ -2198,7 +2198,7 @@ async function caricaAllegatiCollab(nome) {
           a.id +
           ')">Apri</button>' +
           (isAdmin()
-            ? '<button class="btn-del-tipo" style="margin-left:4px" onclick="eliminaHrAllegato(' +
+            ? '<button class="btn-del-tipo pericolo" style="margin-left:4px" onclick="eliminaHrAllegato(' +
               a.id +
               ",'" +
               _jsArg(nome) +
@@ -2617,9 +2617,9 @@ function _invAggiornaTitoli() {
       comandi =
         '<span><button onclick="rinominaCategoriaBase(\'' +
         k +
-        '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:none;border:1px solid currentColor;color:var(--testata-testo);border-radius:2px;cursor:pointer">Rinomina</button> <button onclick="nascondiCategoriaBase(\'' +
+        '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:var(--paper);border:1px solid var(--line-forte);color:var(--ink);border-radius:var(--r-1);cursor:pointer">Rinomina</button> <button onclick="nascondiCategoriaBase(\'' +
         k +
-        '\',true)" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:none;border:1px solid currentColor;color:var(--testata-testo);border-radius:2px;cursor:pointer">Nascondi in questo settore</button></span>';
+        '\',true)" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:var(--paper);border:1px solid var(--line-forte);color:var(--ink);border-radius:var(--r-1);cursor:pointer">Nascondi in questo settore</button></span>';
     if (comandi) {
       el.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap';
       el.innerHTML = '<span>' + escP(testo) + '</span>' + comandi;
@@ -2811,7 +2811,7 @@ function renderInventarioCustom(cat) {
     (adm
       ? '<span><button onclick="rinominaCategoriaInventario(\'' +
         cat.key +
-        '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:none;border:1px solid currentColor;color:var(--testata-testo);border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif">Rinomina</button> <button onclick="rimuoviCategoriaInventario(\'' +
+        '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:var(--paper);border:1px solid var(--line-forte);color:var(--ink);border-radius:var(--r-1);cursor:pointer;font-family:Source Sans 3,sans-serif">Rinomina</button> <button onclick="rimuoviCategoriaInventario(\'' +
         cat.key +
         '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:none;border:1px solid #e74c3c;color:var(--c-rosso,#c0392b);border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif">Rimuovi categoria</button></span>'
       : '') +
@@ -2882,12 +2882,12 @@ function renderInventarioCustom(cat) {
         '</td><td style="padding:6px 8px;font-weight:600">' +
         escP(r.tipo) +
         '</td><td style="padding:6px 8px;font-weight:700;color:' +
-        (isIn ? '#2c6e49' : '#c0392b') +
+        (isIn ? 'var(--c-verde,#2c6e49)' : 'var(--c-rosso,#c0392b)') +
         '">' +
         (isIn ? '+' : '-') +
         r.quantita +
         '</td><td style="padding:6px 8px;color:' +
-        (isIn ? '#2c6e49' : '#c0392b') +
+        (isIn ? 'var(--c-verde,#2c6e49)' : 'var(--c-rosso,#c0392b)') +
         '">' +
         (isIn ? '&#9650; Carico' : '&#9660; Uscita') +
         '</td><td style="padding:6px 8px">' +
@@ -2975,7 +2975,7 @@ function renderInventarioBuoni() {
       _tipiKpi
         .map((t) => {
           const v = giacenze[t] || 0;
-          const col = v <= 0 ? 'var(--accent)' : v <= 10 ? '#e67e22' : '#2c6e49';
+          const col = v <= 0 ? 'var(--accent)' : v <= 10 ? 'var(--c-arancio,#e67e22)' : 'var(--c-verde,#2c6e49)';
           return (
             '<div class="mini-stat"><div class="mini-stat-num" style="color:' +
             col +
@@ -3102,9 +3102,9 @@ function renderInventarioBuoniTable() {
     auto: '&#9660; Da Maison',
   };
   const movColors = {
-    entrata: '#2c6e49',
-    uscita: '#c0392b',
-    preassegno: '#e67e22',
+    entrata: 'var(--c-verde,#2c6e49)',
+    uscita: 'var(--c-rosso,#c0392b)',
+    preassegno: 'var(--c-arancio,#e67e22)',
     auto: '#8a7d6b',
   };
   const tipColors = {
@@ -3238,12 +3238,12 @@ function renderInventarioSigTable() {
       '</td><td style="padding:6px 8px;font-weight:600">' +
       escP(r.tipo) +
       '</td><td style="padding:6px 8px;font-weight:700;color:' +
-      (isIn ? '#2c6e49' : '#c0392b') +
+      (isIn ? 'var(--c-verde,#2c6e49)' : 'var(--c-rosso,#c0392b)') +
       '">' +
       (isIn ? '+' : '-') +
       r.quantita +
       '</td><td style="padding:6px 8px;color:' +
-      (isIn ? '#2c6e49' : '#c0392b') +
+      (isIn ? 'var(--c-verde,#2c6e49)' : 'var(--c-rosso,#c0392b)') +
       '">' +
       (isIn ? '&#9650; Sbagliata' : '&#9660; Data a cliente') +
       '</td><td style="padding:6px 8px">' +

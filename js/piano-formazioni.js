@@ -317,7 +317,7 @@ async function _renderPianoFormazioniTab() {
   let h =
     '<div class="main-card" style="margin-bottom:14px"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Formazioni' +
     (puo
-      ? ' <button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 12px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="formazioneNuova()">Nuova formazione</button>'
+      ? ' <button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 12px" onclick="formazioneNuova()">Nuova formazione</button>'
       : '') +
     '</div><div style="padding:12px 14px">';
   h +=
@@ -335,7 +335,7 @@ async function _renderPianoFormazioniTab() {
           (d.svolta && d.svolta.certificata ? ', certificata' : '') +
           '</span>'
         : fine < oggi
-          ? '<span style="color:#b8860b">finita, da certificare</span>'
+          ? '<span style="color:var(--c-oro,#b8860b)">finita, da certificare</span>'
           : (d.giorni || []).some((g) => g.data <= oggi)
             ? 'in corso'
             : 'pianificata';
@@ -479,7 +479,9 @@ function _formModelliHtml(puo) {
       '"' +
       dis +
       ' style="width:150px;padding:4px 6px">' +
-      (c.gruppo ? '' : '<span style="color:#b8860b;font-size:var(--fs-sm,.8125rem)">scegli il gruppo</span>') +
+      (c.gruppo
+        ? ''
+        : '<span style="color:var(--c-oro,#b8860b);font-size:var(--fs-sm,.8125rem)">scegli il gruppo</span>') +
       '</div>';
   });
   if (puo)
@@ -1227,7 +1229,7 @@ function _formMostraProposte() {
     h +=
       '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn-export" onclick="formazioneStampaProposta(' +
       i +
-      ')">Stampa</button><button class="btn-export" style="border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="formazioneApplicaProposta(' +
+      ')">Stampa</button><button class="btn-export" onclick="formazioneApplicaProposta(' +
       i +
       ')">Applica questa proposta</button></div></div>';
   });

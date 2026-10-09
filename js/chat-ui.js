@@ -470,9 +470,9 @@ function toggleConvNewDropdown(ev) {
     h +=
       '<div onclick="event.stopPropagation();apriConversazioneGruppo(\'' +
       r.key +
-      '\')" style="font-weight:700;color:' +
+      '\')" style="font-weight:700;--cat:' +
       r.colore +
-      '">Tutti ' +
+      ';color:var(--cat)">Tutti ' +
       escP(r.label) +
       '</div>';
   });
@@ -1121,7 +1121,8 @@ function renderNoteChat(partner) {
             minute: '2-digit',
           });
       }
-      const _lsColor = _diffMin < 5 ? '#2c6e49' : _diffMin < 60 ? '#e67e22' : 'var(--muted)';
+      const _lsColor =
+        _diffMin < 5 ? 'var(--c-verde,#2c6e49)' : _diffMin < 60 ? 'var(--c-arancio,#e67e22)' : 'var(--muted)';
       const _lsDot =
         _diffMin < 5
           ? ' <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#2c6e49;vertical-align:middle"></span>'
@@ -2371,7 +2372,8 @@ function apriSchedaCollaboratore(nome) {
   html +=
     '<button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\');_destroySchedaCharts()" style="padding:6px 12px;font-size:var(--fs-sm,.8125rem)">Chiudi</button></div></div>';
 
-  const _malColor = totMal >= 5 ? 'var(--accent)' : totMal >= 3 ? '#e67e22' : '#1a7a6d';
+  const _malColor =
+    totMal >= 5 ? 'var(--accent)' : totMal >= 3 ? 'var(--c-arancio,#e67e22)' : 'var(--c-verdeacqua,#1a7a6d)';
   // Ultima registrazione
   const _lastEntry = entries.length ? entries.sort((a, b) => (b.data || '').localeCompare(a.data || ''))[0] : null;
   const _lastDateStr = _lastEntry ? new Date(_lastEntry.data).toLocaleDateString('it-IT') : '-';
@@ -2461,7 +2463,7 @@ function apriSchedaCollaboratore(nome) {
       apprezzamenti +
       '</div><div class="kpi-lbl">Apprezzamenti</div></div>';
   if (apprezzamenti && totNeg) {
-    const ratioColor = ratio >= 1 ? '#2c6e49' : 'var(--accent)';
+    const ratioColor = ratio >= 1 ? 'var(--c-verde,#2c6e49)' : 'var(--accent)';
     html +=
       '<div class="scheda-kpi"><div class="kpi-val" style="color:' +
       ratioColor +
@@ -3311,7 +3313,7 @@ function _renderStoricoHrSezione(nome) {
             fmtCHF(g.importo) +
             ' CHF</span>' +
             (_hrMod
-              ? '<button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;background:#8b6914" onclick="registraGiubileo(\'' +
+              ? '<button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px" onclick="registraGiubileo(\'' +
                 _jsArg(nome) +
                 "'," +
                 g.anni +
@@ -3376,7 +3378,7 @@ function _renderStoricoHrSezione(nome) {
       '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px" onclick="caricaAllegatiCollab(\'' +
       neS +
       '\')">Mostra</button>' +
-      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="document.getElementById(\'hr-allegato-file\').click()">+ Carica file</button>' +
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px" onclick="document.getElementById(\'hr-allegato-file\').click()">+ Carica file</button>' +
       '<input type="file" id="hr-allegato-file" accept=".pdf,.xlsx,.xls,.jpg,.jpeg,.png" style="display:none" onchange="caricaNuovoAllegatoScheda(this,\'' +
       neS +
       '\')">' +

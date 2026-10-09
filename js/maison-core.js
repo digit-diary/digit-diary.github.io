@@ -500,7 +500,7 @@ function renderMaisonDashboard() {
   let confrontoHtml = '';
   if (costoMesePrec > 0) {
     const delta = (((costoMeseCorr - costoMesePrec) / costoMesePrec) * 100).toFixed(1);
-    const colore = delta > 0 ? 'var(--accent)' : delta < 0 ? '#2c6e49' : 'var(--muted)';
+    const colore = delta > 0 ? 'var(--accent)' : delta < 0 ? 'var(--c-verde,#2c6e49)' : 'var(--muted)';
     confrontoHtml =
       '<div style="text-align:center;margin-bottom:10px;font-size:var(--fs-md,.875rem);color:' +
       colore +
@@ -827,9 +827,9 @@ function renderMaisonGdOggi() {
     _gdB.map(([c, n]) => ' &middot; ' + n + ' ' + escP(c)).join('') +
     '</span>';
   h +=
-    '<button onclick="esportaGdOggiCSV()" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;background:none;border:1px solid white;color:white;border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif;font-weight:600">CSV</button>';
+    '<button class="btn-export" onclick="esportaGdOggiCSV()" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px">CSV</button>';
   h +=
-    '<button onclick="esportaGdOggiPDF()" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;background:none;border:1px solid #c0392b;color:var(--c-rosso,#c0392b);border-radius:2px;cursor:pointer;font-family:Source Sans 3,sans-serif;font-weight:600">PDF</button></div></div>';
+    '<button class="btn-export" onclick="esportaGdOggiPDF()" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px">PDF</button></div></div>';
   h +=
     '<div style="padding:0 16px 16px;overflow-x:auto"><table class="collab-table"><thead><tr><th style="background:var(--paper)">Cliente</th><th style="background:var(--paper)">Tipo</th><th class="num" style="background:var(--paper)">PX</th><th class="num" style="background:var(--paper)">Costo CHF</th><th style="background:var(--paper)"></th></tr></thead><tbody>';
   // Raggruppa righe con stesso gruppo (es. Bonomelli/Grignani)
@@ -1559,8 +1559,8 @@ function apriDettaglioMaison(nome) {
         (_spesoMeseD >= budget.budget_chf
           ? 'var(--accent)'
           : _spesoMeseD >= budget.budget_chf * 0.8
-            ? '#e67e22'
-            : '#2c6e49') +
+            ? 'var(--c-arancio,#e67e22)'
+            : 'var(--c-verde,#2c6e49)') +
         ';font-weight:600">Budget questo mese: ' +
         fmtCHF(_spesoMeseD) +
         ' / ' +
@@ -1691,7 +1691,7 @@ function apriDettaglioMaison(nome) {
           const isUp = val > prev;
           deltaHtml =
             ' <span style="font-size:var(--fs-sm,.8125rem);font-weight:700;color:' +
-            (isUp ? '#c0392b' : '#27ae60') +
+            (isUp ? 'var(--c-rosso,#c0392b)' : 'var(--c-verde,#27ae60)') +
             ';background:' +
             (isUp ? '#c0392b1a' : '#27ae601a') +
             ';padding:1px 5px;border-radius:2px">' +
@@ -1920,7 +1920,7 @@ function apriDettaglioMaison(nome) {
     _jsArg(nome) +
     '\')">CSV</button><button class="btn-export btn-export-pdf" onclick="apriPdfSchedaMaison(\'' +
     _jsArg(nome) +
-    '\')">PDF</button><button class="btn-export" onclick="stampaSchedaCliente()" style="border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)">Stampa</button></div>';
+    '\')">PDF</button><button class="btn-export" onclick="stampaSchedaCliente()">Stampa</button></div>';
   var _pb = document.getElementById('profilo-content');
   _pb.className = 'profilo-box';
   _pb.innerHTML = html;
@@ -2220,7 +2220,12 @@ function eseguiConfrontoMaison() {
   var h = '<h4 style="font-family:Playfair Display,serif;color:var(--ink);margin-bottom:12px">Risultato confronto</h4>';
   h += '<div style="overflow-x:auto"><table class="collab-table"><thead><tr><th></th>';
   dati.forEach(function (d) {
-    h += '<th style="text-align:center;color:' + d.color + ';font-size:var(--fs-md,.875rem)">' + escP(d.nome) + '</th>';
+    h +=
+      '<th style="text-align:center;--cat:' +
+      d.color +
+      ';color:var(--cat);font-size:var(--fs-md,.875rem)">' +
+      escP(d.nome) +
+      '</th>';
   });
   h += '</tr></thead><tbody>';
   var righeConf = [
@@ -2316,7 +2321,12 @@ function eseguiConfrontoMaison() {
       var val = rc.fn(d);
       var numVal = parseFloat(val) || 0;
       var isMax = maxVal > 0 && numVal === maxVal && !rc.bold;
-      h += '<td class="num" style="' + (isMax ? 'color:' + d.color + ';font-weight:700' : '') + '">' + val + '</td>';
+      h +=
+        '<td class="num" style="' +
+        (isMax ? '--cat:' + d.color + ';color:var(--cat);font-weight:700' : '') +
+        '">' +
+        val +
+        '</td>';
     });
     h += '</tr>';
   });
@@ -2362,9 +2372,9 @@ function eseguiConfrontoMaison() {
     h += '<div style="display:flex;gap:14px;justify-content:center;margin-top:8px">';
     dati.forEach(function (d) {
       h +=
-        '<span style="font-size:var(--fs-sm,.8125rem);color:' +
+        '<span style="font-size:var(--fs-sm,.8125rem);--cat:' +
         d.color +
-        ';font-weight:600">&#9632; ' +
+        ';color:var(--cat);font-weight:600">&#9632; ' +
         escP(d.nome) +
         '</span>';
     });

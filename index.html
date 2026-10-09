@@ -579,25 +579,23 @@
           &#43; Nuova registrazione
         </button>
         <button
-          class="btn-salva"
+          class="btn-secondario"
           onclick="switchPage('consegna')"
           style="
             padding: 10px 20px;
             font-size: var(--fs-sm,.8125rem);
             width: auto;
-            background: #2c3e50;
           "
         >
           <i class="icx icx-modifica"></i> Scrivi consegna
         </button>
         <button
-          class="btn-salva"
+          class="btn-secondario"
           onclick="switchPage('promemoria')"
           style="
             padding: 10px 20px;
             font-size: var(--fs-sm,.8125rem);
             width: auto;
-            background: #8e44ad;
           "
         >
           <i class="icx icx-clipboard"></i> Nuovo promemoria
@@ -3665,7 +3663,7 @@
         <div class="sez-head"><div><h4>Stato del sistema</h4><p class="sez-desc">Controllo dei dati (schede incomplete, turni senza scheda, festivi mancanti) e spazio occupato. Solo lettura.</p></div></div>
         <div class="sez-azioni-riga"><button class="btn-add-tipo" onclick="controlloSalute()">Controlla il sistema</button></div>
         <div id="salute-content"></div>
-        <p class="sez-sottotitolo">Spazio database (500 MB disponibili)</p>
+        <p class="sez-sottotitolo">Spazio occupato dal database</p>
         <div id="db-stats-content"><button class="btn-secondario" onclick="caricaDbStats()">Verifica spazio</button></div>
       </div>
       <div class="settings-section" data-gruppo="Sistema" id="cestino-section" style="display: none">

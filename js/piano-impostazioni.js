@@ -23,7 +23,7 @@ function _renderPianoMappatureCard() {
     pill('#2c6e49', 'PRINCIPALE') +
     ' i turni normali della funzione: la bozza li da per primi.</div>' +
     '<div>' +
-    pill('#b39b00', 'AMMESSO') +
+    pill('#8b6914', 'AMMESSO') +
     ' solo se serve: la bozza li usa dopo tutti gli altri e solo per chi e sotto le sue ore.</div>' +
     '<div>' +
     pill('#1a4a7a', 'PREFERITO') +
@@ -67,7 +67,7 @@ function _renderPianoMappatureCard() {
       perFz[fz]
         .sort((a, b) => (ordine[a.tipo] || 9) - (ordine[b.tipo] || 9) || a.turno_codice.localeCompare(b.turno_codice))
         .forEach((m) => {
-          const col = m.tipo === 'PRINCIPALE' ? '#2c6e49' : m.tipo === 'AMMESSO' ? '#b39b00' : '#1a4a7a';
+          const col = m.tipo === 'PRINCIPALE' ? '#2c6e49' : m.tipo === 'AMMESSO' ? '#8b6914' : '#1a4a7a';
           h +=
             '<span class="mini-badge" style="background:' +
             col +
@@ -749,11 +749,8 @@ function scaricaTemplatePiano(tipo) {
 function _renderPianoImportExportCard() {
   if (!puoGestirePiano()) return '';
   const btn = (testo, onclick, colore) =>
-    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:' +
-    (colore || '#b8a98a') +
-    ';color:' +
-    (colore || '#b8a98a') +
-    '" onclick="' +
+    // pulsanti neutri (v440): il colore resta solo dove ha un significato
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px" onclick="' +
     onclick +
     '">' +
     testo +
@@ -1708,7 +1705,7 @@ async function _renderPianoFormulariTab() {
     '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--line)"><div style="flex:1;min-width:260px"><b>' +
     titolo +
     '</b><br><span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">Modulo ufficiale Word da stampare/compilare. In alternativa, la versione Excel si compila al computer e si reimporta in Formazione per la certificazione automatica.</span></div>' +
-    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 14px;border-color:var(--c-blu,#1a4a7a);color:var(--c-blu,#1a4a7a)" onclick="apriFormularioPerNome(\'' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:5px 14px" onclick="apriFormularioPerNome(\'' +
     _jsArg(nomeOriginale) +
     '\')">Scarica Word (originale)</button>' +
     '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px" onclick="pianoScaricaProtocollo(\'' +
@@ -1736,7 +1733,7 @@ async function _renderPianoFormulariTab() {
     ')';
   if (puoMod)
     h +=
-      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="document.getElementById(\'form-arch-file\').click()">Carica formulario</button>' +
+      '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px" onclick="document.getElementById(\'form-arch-file\').click()">Carica formulario</button>' +
       '<input type="file" id="form-arch-file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv" style="display:none" onchange="caricaFormulario(this)">';
   h += '</div><div style="padding:6px 16px 14px">';
   h +=
@@ -1772,9 +1769,9 @@ async function _renderPianoFormulariTab() {
           (f.mime === 'application/pdf' ? 'Apri / Stampa' : 'Scarica') +
           '</button>' +
           (puoMod
-            ? '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:var(--c-blu,#1a4a7a);color:var(--c-blu,#1a4a7a)" onclick="rinominaFormulario(' +
+            ? '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px" onclick="rinominaFormulario(' +
               f.id +
-              ')">Rinomina/Sposta</button><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:var(--accent);color:var(--accent)" onclick="eliminaFormulario(' +
+              ')">Rinomina/Sposta</button><button class="btn-export btn-pericolo" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px" onclick="eliminaFormulario(' +
               f.id +
               ')">Elimina</button>'
             : '') +
@@ -2040,7 +2037,7 @@ function _renderPianoRegoleGruppoCard() {
         r.id +
         ',\'attivo\',this.checked)"></td><td style="white-space:nowrap"><button class="btn-act" onclick="pianoModificaRegolaGruppo(' +
         r.id +
-        ')">Modifica</button> <button class="btn-del-tipo" onclick="eliminaRegolaGruppo(' +
+        ')">Modifica</button> <button class="btn-del-tipo pericolo" onclick="eliminaRegolaGruppo(' +
         r.id +
         ')">Elimina</button></td></tr>';
     });
@@ -2106,7 +2103,7 @@ function _pianoRegolaLivelloChi(r) {
   const max = tipo === 'livello_turni' ? _pianoLivelloDaTesto(ma) : 0;
   const persone = collaboratoriCache.filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c));
   if (!persone.some((c) => _pianoLivelloNelSettore(c) != null))
-    return '<div style="font-size:var(--fs-xs,.75rem);color:#c0392b">Il settore non ha livelli in Formazione: la regola non si applica</div>';
+    return '<div style="font-size:var(--fs-xs,.75rem);color:var(--c-rosso,#c0392b)">Il settore non ha livelli in Formazione: la regola non si applica</div>';
   const ok = persone.filter((c) => {
     const lv = _pianoLivelloNelSettore(c) || 0;
     return lv >= min && (!max || lv <= max);
@@ -2127,7 +2124,7 @@ function _pianoRegolaLivelloChi(r) {
   const poche = ok.length < nMin;
   return (
     '<div style="font-size:var(--fs-xs,.75rem);color:' +
-    (poche ? '#c0392b' : 'var(--muted)') +
+    (poche ? 'var(--c-rosso,#c0392b)' : 'var(--muted)') +
     '" title="' +
     escP(ok.map((c) => c.nome).join(', ')) +
     '">' +
@@ -2610,7 +2607,9 @@ function _renderPianoCongediNpCard() {
         '</td><td style="text-align:left;font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
         escP(eff.join(', ')) +
         '</td><td>' +
-        (puoModCnp ? '<button class="btn-del-tipo" onclick="eliminaCongedoNp(' + c.id + ')">Elimina</button>' : '') +
+        (puoModCnp
+          ? '<button class="btn-del-tipo pericolo" onclick="eliminaCongedoNp(' + c.id + ')">Elimina</button>'
+          : '') +
         '</td></tr>';
     });
     h += '</tbody></table></div>';

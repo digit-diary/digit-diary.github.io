@@ -2098,7 +2098,7 @@ async function _renderPianoCore() {
         escP(label) +
         '</span><button class="btn-act pin" onclick="pianoCambiaMese(1)">&rarr;</button>';
       h +=
-        '<select onchange="pianoCambiaReparto(this.value)" style="padding:4px 8px;font-size:var(--fs-sm,.8125rem);border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a">';
+        '<select onchange="pianoCambiaReparto(this.value)" style="padding:4px 8px;font-size:var(--fs-sm,.8125rem);border:1px solid var(--line-forte);border-radius:var(--r-1);background:var(--paper);color:var(--ink)">';
       const ammessiRep = _pianoRepartiAmmessi();
       getReparti()
         .filter((rp) => ammessiRep.includes(rp.key))
@@ -2123,7 +2123,7 @@ async function _renderPianoCore() {
         const ssnap = (window._pianoSessSnap || {})[_pianoMeseSel + '|' + _pianoReparto()];
         if (ssnap)
           h +=
-            '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 9px;border-color:var(--c-rosso,#c0392b);color:var(--c-rosso,#c0392b)" title="Riporta questo mese a com\'era quando hai iniziato a modificarlo in questa sessione (' +
+            '<button class="btn-export btn-pericolo" style="font-size:var(--fs-sm,.8125rem);padding:3px 9px" title="Riporta questo mese a com\'era quando hai iniziato a modificarlo in questa sessione (' +
             ssnap.n +
             ' operazioni tue)" onclick="pianoAnnullaTutto()">Annulla tutto (' +
             ssnap.n +
@@ -2158,7 +2158,7 @@ async function _renderPianoCore() {
           );
         if (puoAuto && window._pianoSolverUrl)
           g += pbtn(
-            'Genera con il solver',
+            'Genera con il motore avanzato',
             'generaConSolver()',
             'pbar-ok',
             'Motore avanzato sul server interno: cerca il piano migliore del mese, distribuendo il lavoro in modo equo. Usa le stesse regole del settore e non tocca le celle esistenti',
@@ -2270,7 +2270,7 @@ async function _renderPianoCore() {
           const inTempo = oggi.getDate() <= gLim;
           h +=
             '<div style="margin:6px 0;padding:4px 10px;font-size:var(--fs-sm,.8125rem);color:var(--muted);border-left:3px solid ' +
-            (inTempo ? '#d4b86a' : '#c0392b') +
+            (inTempo ? 'var(--c-oro)' : 'var(--c-rosso)') +
             '">Non disponibilità ' +
             escP(lblNext) +
             ' (termine: il ' +
@@ -2670,13 +2670,13 @@ async function _renderPianoCore() {
               '. Doppio clic per scrivere le ore realmente fatte',
           ) +
           '" style="color:' +
-          (saldo > 0 ? '#2c6e49' : saldo < 0 ? '#c0392b' : 'var(--muted)') +
+          (saldo > 0 ? 'var(--c-verde,#2c6e49)' : saldo < 0 ? 'var(--c-rosso,#c0392b)' : 'var(--muted)') +
           '">' +
           (orePiano || dovute ? (saldo > 0 ? '+' : '') + saldo.toFixed(1) : '') +
           '</td><td class="piano-tot" data-tot="6" title="' +
           escP(_pianoTestoYtd(nome, saldo, ytd, orePiano)) +
           '" style="font-weight:700;color:' +
-          (ytd > 0 ? '#2c6e49' : ytd < 0 ? '#c0392b' : 'var(--muted)') +
+          (ytd > 0 ? 'var(--c-verde,#2c6e49)' : ytd < 0 ? 'var(--c-rosso,#c0392b)' : 'var(--muted)') +
           '">' +
           (orePiano || _pianoYtdMap[nome] ? (ytd > 0 ? '+' : '') + ytd.toFixed(1) : '') +
           '</td></tr>';
@@ -2726,15 +2726,15 @@ async function _renderPianoCore() {
         const puoFabb = puoMod && puoAzioniAutoPiano('fabbisogno');
         if (puoFabb)
           hFabb +=
-            '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:#d4b86a;color:#d4b86a" onclick="copiaFabbisognoMese()">Copia dal mese precedente</button>' +
+            '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px" onclick="copiaFabbisognoMese()">Copia dal mese precedente</button>' +
             (puoAzioniAutoPiano('import')
-              ? '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="document.getElementById(\'fabb-file\').click()">Importa da Excel</button>' +
+              ? '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px" onclick="document.getElementById(\'fabb-file\').click()">Importa da Excel</button>' +
                 '<input type="file" id="fabb-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="importaFabbisognoExcel(this)">'
               : '') +
             (puoAzioniAutoPiano('cancella')
-              ? '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:var(--accent);color:var(--accent)" onclick="eliminaFabbisognoMese()">Svuota mese</button>'
+              ? '<button class="btn-export btn-pericolo" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px" onclick="eliminaFabbisognoMese()">Svuota mese</button>'
               : '') +
-            '<span style="font-size:var(--fs-sm,.8125rem);color:#b8a98a;font-weight:400">clicca una cella per impostare le persone necessarie</span>';
+            '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted);font-weight:400">clicca una cella per impostare le persone necessarie</span>';
         hFabb += '</div>';
         // testata giorni con sigla settimana (D/L/M...), festivi e weekend:
         // usata da fabbisogno, differenze ed effettivi
@@ -2819,7 +2819,7 @@ async function _renderPianoCore() {
               if (req) {
                 const bg = dow === 0 || _pianoGiorniWeekend().includes(dow) ? '#92D050' : '#FFFF00';
                 stile =
-                  'background:' + bg + ' !important;font-weight:bold;color:' + (ass >= req ? '#000' : '#c0392b') + ';';
+                  'background:' + bg + ' !important;font-weight:bold;color:' + (ass >= req ? '#000' : '#a01f12') + ';';
               }
               hFabb +=
                 '<td class="' +
@@ -2878,7 +2878,7 @@ async function _renderPianoCore() {
         h +=
           '<div class="main-card" style="margin-top:16px"><div class="card-header">Differenze · ' +
           escP(label) +
-          ' <span style="font-size:var(--fs-sm,.8125rem);color:#b8a98a;font-weight:400">(effettivi − pianificazione)</span></div>';
+          ' <span style="font-size:var(--fs-sm,.8125rem);color:var(--muted);font-weight:400">(effettivi − pianificazione)</span></div>';
         h +=
           '<div class="piano-wrap"><table data-seltab="diff" class="piano-table piano-fixed" style="width:' +
           (_pianoLC().tot + 37 * nGiorni) +

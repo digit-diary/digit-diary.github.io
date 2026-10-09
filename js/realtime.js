@@ -358,7 +358,10 @@ function getOpToken() {
   return sessionStorage.getItem('op_token') || '';
 }
 function setOpToken(t) {
-  if (t) sessionStorage.setItem('op_token', t);
+  if (t) {
+    sessionStorage.setItem('op_token', t);
+    window._sessioneFinita = false; // sessione nuova (accesso o rinnovo): si riparte
+  }
 }
 // RINNOVO DELLA SESSIONE: si passa il token che si ha (anche scaduto da
 // poco) e il server ne rilascia uno nuovo. Prima bastava il nome
@@ -388,6 +391,9 @@ window.addEventListener('pageshow', () => (_paginaInChiusura = false));
 let _rinnovoInCorso = null;
 function _renewToken(tkUsato) {
   if (tkUsato && getOpToken() && getOpToken() !== tkUsato) return Promise.resolve(true);
+  // sessione chiusa dal server: non si riprova a ogni lettura (prima decine di tentativi e
+  // centinaia di letture rifiutate in pochi minuti); si rientra con la password
+  if (window._sessioneFinita) return Promise.resolve(false);
   if (!_rinnovoInCorso)
     _rinnovoInCorso = _renewTokenUnaVolta().finally(() => {
       _rinnovoInCorso = null;
@@ -433,6 +439,21 @@ async function _renewTokenUnaVolta() {
         setOpToken(r.session_token);
         window._sessioneScadutaAvvisata = false; // una scadenza vera piu avanti si avvisa di nuovo
         return true;
+      }
+      // il server ha risposto che la sessione non vale piu (non e la rete): fine
+      if (
+        _sbUltimoErrore &&
+        _sbUltimoErrore.fn === 'renew_op_session' &&
+        /Sessione non valida/i.test(_sbUltimoErrore.testo || '')
+      ) {
+        window._sessioneFinita = true;
+        if (typeof chiediConferma === 'function')
+          chiediConferma('La sessione è scaduta. Rientra con la password per continuare a salvare: rientrare adesso?', {
+            titolo: 'Sessione scaduta',
+            ok: 'Rientra',
+            annulla: 'Più tardi',
+          }).then((si) => si && typeof esci === 'function' && esci());
+        return false;
       }
     }
     // la biometria NON rinnova piu la sessione in silenzio (v407): serve un gesto della

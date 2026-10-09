@@ -81,14 +81,14 @@ function renderStatistiche() {
   function _trendBadge(curr, prev, label) {
     const d = curr - prev;
     if (d === 0) return '';
-    const col = d > 0 ? 'var(--accent)' : '#2c6e49';
+    const col = d > 0 ? 'var(--accent)' : 'var(--c-verde,#2c6e49)';
     const sign = d > 0 ? '+' : '';
     return (
       ' <span style="font-size:var(--fs-sm,.8125rem);font-weight:600;color:' +
       col +
-      ';background:' +
+      ';background:color-mix(in srgb, ' +
       col +
-      '15;padding:1px 6px;border-radius:8px">' +
+      ' 9%, transparent);padding:1px 6px;border-radius:8px">' +
       sign +
       d +
       ' vs ' +

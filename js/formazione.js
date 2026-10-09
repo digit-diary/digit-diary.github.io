@@ -543,7 +543,7 @@ function _renderProtocolliCard() {
         '</b><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px" onclick="scaricaProtocolloExcel(\'' +
         k +
         '\')">Scarica registro Excel</button>' +
-        '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;border-color:var(--c-verde,#2c6e49);color:var(--c-verde,#2c6e49)" onclick="document.getElementById(\'prot-file-' +
+        '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px" onclick="document.getElementById(\'prot-file-' +
         k +
         '\').click()">Importa registro compilato</button><input type="file" id="prot-file-' +
         k +
@@ -890,7 +890,7 @@ function renderFormazione() {
     '</div><div class="stat-label">Collaboratori</div></div>';
   for (let l = 1; l <= lvMax; l++) {
     html +=
-      '<div class="stat"><div class="stat-num" style="color:' +
+      '<div class="stat"><div class="stat-num testo-cat" style="--cat:' +
       _lvColore(l) +
       '">' +
       (perLivello[l] || 0) +
@@ -917,10 +917,10 @@ function renderFormazione() {
     '<div class="main-card"><div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><span>Matrice competenze · chi sa fare cosa</span>' +
     '<span style="display:flex;gap:6px;flex-wrap:wrap">' +
     (isAdmin() || (typeof puoModificare === 'function' && puoModificare('gestione_formazioni'))
-      ? '<button onclick="formLivelliDaTurni()" title="Chi fa turni di un settore per cui non risulta formato riceve il livello (con l avviso prima e l incentivo)" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:none;border:1px solid currentColor;color:var(--testata-testo);border-radius:2px;cursor:pointer">Livelli dai turni del piano</button>'
+      ? '<button onclick="formLivelliDaTurni()" title="Chi fa turni di un settore per cui non risulta formato riceve il livello (con l avviso prima e l incentivo)" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:var(--paper);border:1px solid var(--line-forte);color:var(--ink);border-radius:var(--r-1);cursor:pointer">Livelli dai turni del piano</button>'
       : '') +
     (isAdmin()
-      ? '<button onclick="apriRiordinoCompetenze()" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:none;border:1px solid currentColor;color:var(--testata-testo);border-radius:2px;cursor:pointer">Riordina competenze</button>'
+      ? '<button onclick="apriRiordinoCompetenze()" style="font-size:var(--fs-sm,.8125rem);padding:3px 10px;background:var(--paper);border:1px solid var(--line-forte);color:var(--ink);border-radius:var(--r-1);cursor:pointer">Riordina competenze</button>'
       : '') +
     '</span></div>';
   html +=
@@ -1096,7 +1096,7 @@ function renderFormazione() {
         '</td><td><strong>' +
         escP(p.collaboratore) +
         '</strong></td><td class="num"><strong style="color:' +
-        (p.punti < 0 ? 'var(--accent)' : p.punti > 0 ? '#2c6e49' : 'var(--muted)') +
+        (p.punti < 0 ? 'var(--accent)' : p.punti > 0 ? 'var(--c-verde,#2c6e49)' : 'var(--muted)') +
         '">' +
         (p.punti > 0 ? '+' : '') +
         p.punti +
@@ -1160,7 +1160,7 @@ function renderFormazione() {
             return (
               escP(s.premio) +
               ' <strong style="color:' +
-              (pieno ? 'var(--accent)' : '#2c6e49') +
+              (pieno ? 'var(--accent)' : 'var(--c-verde,#2c6e49)') +
               '">' +
               usati +
               '/' +
@@ -2277,7 +2277,7 @@ function _renderFormazioneConfig() {
           rep +
           "'," +
           i +
-          ')">Rinomina</button><button class="btn-del-tipo" style="margin-left:4px" onclick="rimuoviCompetenzaCfg(\'' +
+          ')">Rinomina</button><button class="btn-del-tipo pericolo" style="margin-left:4px" onclick="rimuoviCompetenzaCfg(\'' +
           rep +
           "'," +
           i +
@@ -2326,7 +2326,7 @@ function _renderFormazioneConfig() {
       i +
       ',this.value)" style="width:70px;padding:5px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);text-align:center"><button class="btn-del-tipo" style="margin-left:6px;color:var(--accent2);border-color:var(--accent2)" onclick="rinominaAzioneCfg(' +
       i +
-      ')">Rinomina</button><button class="btn-del-tipo" style="margin-left:4px" onclick="rimuoviAzioneCfg(' +
+      ')">Rinomina</button><button class="btn-del-tipo pericolo" style="margin-left:4px" onclick="rimuoviAzioneCfg(' +
       i +
       ')">Rimuovi</button></div>';
   });
@@ -2369,7 +2369,7 @@ function _renderFormazioneConfig() {
             '</option>',
         )
         .join('') +
-      '</select><button class="btn-del-tipo" onclick="rimuoviSoglia(' +
+      '</select><button class="btn-del-tipo pericolo" onclick="rimuoviSoglia(' +
       i +
       ')">Rimuovi</button></div>';
   });
@@ -2392,7 +2392,7 @@ function _renderFormazioneConfig() {
       _escAttr(it.note || '') +
       '" placeholder="note" onchange="modificaInvIncentivo(' +
       i +
-      ',\'note\',this.value)" style="width:160px;padding:5px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><button class="btn-del-tipo" onclick="rimuoviInvIncentivo(' +
+      ',\'note\',this.value)" style="width:160px;padding:5px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><button class="btn-del-tipo pericolo" onclick="rimuoviInvIncentivo(' +
       i +
       ')">Rimuovi</button></div>';
   });
@@ -3116,7 +3116,7 @@ function _renderPopupCopertura() {
             '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:var(--fs-md,.875rem)"><strong>' +
             escP(p.collaboratore) +
             '</strong><span style="color:' +
-            (p.punti < 0 ? 'var(--accent)' : '#1a7a6d') +
+            (p.punti < 0 ? 'var(--accent)' : 'var(--c-verdeacqua,#1a7a6d)') +
             ';font-weight:700">' +
             (p.punti > 0 ? '+' : '') +
             p.punti +
@@ -3408,13 +3408,13 @@ function _renderPanoramicaHrCard(collabs) {
     lbl +
     '</div></div>';
   html += kpi(collabs.length, 'Collaboratori');
-  html += kpi(fissi, 'Fissi', '#1a7a6d');
-  html += kpi(jolly, 'Jolly', '#e67e22');
+  html += kpi(fissi, 'Fissi', 'var(--c-verdeacqua,#1a7a6d)');
+  html += kpi(jolly, 'Jolly', 'var(--c-arancio,#e67e22)');
   if (senza) html += kpi(senza, 'Senza inquadramento', 'var(--muted)');
-  html += kpi(premiAnno, 'Premi consegnati ' + anno, '#b8860b');
-  if (senzaVal && puoVedereValutazioni()) html += kpi(senzaVal, 'Senza valutazione', '#8a1c1c');
-  html += kpi(fmtCHF(spesaGiubAnno) + ' CHF', 'Giubilei erogati ' + anno, '#8b6914');
-  html += kpi(fmtCHF(spesaGiubTot) + ' CHF', 'Giubilei totali storici', '#8b6914');
+  html += kpi(premiAnno, 'Premi consegnati ' + anno, 'var(--c-oro,#b8860b)');
+  if (senzaVal && puoVedereValutazioni()) html += kpi(senzaVal, 'Senza valutazione', 'var(--c-rosso,#8a1c1c)');
+  html += kpi(fmtCHF(spesaGiubAnno) + ' CHF', 'Giubilei erogati ' + anno, 'var(--c-oro,#8b6914)');
+  html += kpi(fmtCHF(spesaGiubTot) + ' CHF', 'Giubilei totali storici', 'var(--c-oro,#8b6914)');
   html += '</div>';
   const righe = [];
   const catStr = [5, 4, 3, 2, 1]

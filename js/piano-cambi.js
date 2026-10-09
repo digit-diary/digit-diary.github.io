@@ -903,7 +903,7 @@ async function apriScambioTurno() {
     ') scambia con:</p>' +
     (maxCambi > 0
       ? '<p style="font-size:var(--fs-sm,.8125rem);color:' +
-        (mieiCambi >= maxCambi ? '#c0392b' : 'var(--muted)') +
+        (mieiCambi >= maxCambi ? 'var(--c-rosso,#c0392b)' : 'var(--muted)') +
         ';margin-bottom:6px">Cambi richiesti da ' +
         escP(sel.nome.split(' ')[0]) +
         ' questo mese: ' +
@@ -2155,6 +2155,13 @@ async function confermaCoperturaMalattia() {
       giorniM.map((d) => ({ data: dstrDi(d.g), codice: d.codice })),
     );
     const nDiario = await _pianoMalattiaNelDiario(m.nome, dstrDi(m.da), dstrDi(m.al), false, primo ? primo.codice : '');
+    // Annulla di questa copertura: rimette le celle E propone di togliere la malattia dal
+    // Diario (prima restava nel Diario: "malato" nel Diario, non nel piano)
+    if (ass.codice === 'M' && window._pianoUndo && window._pianoUndo.length) {
+      const ultimo = window._pianoUndo[window._pianoUndo.length - 1];
+      if (ultimo && /^copertura malattia/.test(ultimo.label || ''))
+        ultimo.malattiaDiario = { nome: m.nome, giorni: giorniM.map((d) => dstrDi(d.g)) };
+    }
     toast(
       'Copertura registrata: ' +
         nM +
@@ -2588,7 +2595,7 @@ function _renderPianoCambiTab() {
     escP(repartoLabel(rep)) +
     ' (' +
     lista.length +
-    ')<select onchange="window._pianoCambiMese=this.value;renderPiano()" style="padding:4px 8px;font-size:var(--fs-sm,.8125rem);border:1px solid #d4b86a;border-radius:2px;background:transparent;color:#d4b86a;letter-spacing:0;text-transform:none"><option value="" style="color:#000">Tutti i mesi</option>' +
+    ')<select onchange="window._pianoCambiMese=this.value;renderPiano()" style="padding:4px 8px;font-size:var(--fs-sm,.8125rem);border:1px solid var(--line-forte);border-radius:var(--r-1);background:var(--paper);color:var(--ink);letter-spacing:0;text-transform:none"><option value="" style="color:#000">Tutti i mesi</option>' +
     mesi
       .map(
         (m) =>
@@ -2601,7 +2608,7 @@ function _renderPianoCambiTab() {
           '</option>',
       )
       .join('') +
-    '</select><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;border-color:#d4b86a;color:#d4b86a" onclick="pdfCambioTurnoVuoto()">Formulario vuoto</button>' +
+    '</select><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px" onclick="pdfCambioTurnoVuoto()">Formulario vuoto</button>' +
     '<input type="text" class="piano-cerca campo-cerca" placeholder="Cerca nei cambi turno..." title="Cerca per collaboratore, motivo o chi l ha fatto" aria-label="Cerca nei cambi turno" oninput="pianoTabellaFiltra(this.value,\'piano-cambi-table\')"></div>';
   h +=
     '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);padding:10px 14px 0">Ogni cambio fatto dal Piano (scambio, cerca cambio, esigenze operative) crea un foglio che resta archiviato qui. Apri PDF lo mostra per la stampa o la firma.</p>';

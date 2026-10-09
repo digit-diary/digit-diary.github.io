@@ -1526,7 +1526,7 @@ function _organicoCalcoloHtml(s) {
       r.quante +
       '" style="width:56px" onchange="organicoCalcRiga(' +
       i +
-      ',\'quante\',this.value)"></td><td><button class="btn-del-tipo" onclick="organicoCalcTogli(' +
+      ',\'quante\',this.value)"></td><td><button class="btn-del-tipo pericolo" onclick="organicoCalcTogli(' +
       i +
       ')">Togli</button></td></tr>';
   });

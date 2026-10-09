@@ -90,7 +90,7 @@ function renderMaisonBudgetUI() {
   ];
   function renderClientRow(c, idx) {
     const pct = c.b && c.b.budget_chf ? Math.round((c.spent / c.b.budget_chf) * 100) : 0;
-    const pctColor = pct >= 100 ? 'var(--accent)' : pct >= 80 ? '#e67e22' : '#2c6e49';
+    const pctColor = pct >= 100 ? 'var(--accent)' : pct >= 80 ? 'var(--c-arancio,#e67e22)' : 'var(--c-verde,#2c6e49)';
     const borderColor =
       c.cat === 'full_maison'
         ? '#b8860b'
@@ -176,7 +176,7 @@ function renderMaisonBudgetUI() {
           ne +
           '\')">Assegna</button>') +
       (c.b
-        ? '<button class="btn-del-tipo" style="font-size:var(--fs-sm,.8125rem)" onclick="rimuoviMaisonBudget(' +
+        ? '<button class="btn-del-tipo pericolo" style="font-size:var(--fs-sm,.8125rem)" onclick="rimuoviMaisonBudget(' +
           c.b.id +
           ')">Rimuovi</button>'
         : '') +
@@ -190,9 +190,7 @@ function renderMaisonBudgetUI() {
       const group = filtered.filter((c) => c.cat === cd.key);
       if (!group.length) return;
       html +=
-        '<div class="cat-group-header" style="color:' +
-        cd.color +
-        ';border-bottom-color:' +
+        '<div class="cat-group-header testo-cat" style="--cat:' +
         cd.color +
         '">' +
         cd.label +
@@ -414,9 +412,9 @@ function apriListaClientiMaison() {
   function renderCatBlock(items, label, color) {
     if (!items.length) return '';
     let h =
-      '<div style="margin-bottom:16px"><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.1em;text-transform:uppercase;color:' +
+      '<div style="margin-bottom:16px"><div style="font-size:var(--fs-sm,.8125rem);letter-spacing:.1em;text-transform:uppercase;--cat:' +
       color +
-      ';font-weight:700;margin-bottom:8px;border-bottom:2px solid ' +
+      ';color:var(--cat);font-weight:700;margin-bottom:8px;border-bottom:2px solid ' +
       color +
       ';padding-bottom:4px">' +
       label +
@@ -1061,9 +1059,9 @@ async function importaCompleanniMaison(input) {
           border +
           '30;display:inline-flex;align-items:center;gap:4px"' +
           fuzzyNote +
-          '><strong style="color:' +
+          '><strong style="--cat:' +
           border +
-          '">' +
+          ';color:var(--cat)">' +
           giorno +
           '</strong> ' +
           escP(m.nome) +
