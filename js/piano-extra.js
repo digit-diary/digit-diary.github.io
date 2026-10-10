@@ -304,6 +304,9 @@ async function pianoAnnulla() {
     // la copertura aveva registrato la malattia anche nel Diario: si propone di toglierla
     if (st.malattiaDiario && typeof _pianoMalattiaViaDiario === 'function')
       await _pianoMalattiaViaDiario(st.malattiaDiario.nome, st.malattiaDiario.giorni);
+    // e i punti incentivo dati per la stessa copertura
+    if (st.malattiaDiario && typeof _pianoPuntiCoperturaVia === 'function')
+      await _pianoPuntiCoperturaVia(st.malattiaDiario.nome, st.malattiaDiario.giorni);
   } catch (e) {
     u.push(st);
     if (redoAggiunto) (window._pianoRedo || []).pop(); // lo stato messo in Ripristina non vale

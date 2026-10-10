@@ -1852,6 +1852,48 @@ async function _pianoMalattiaNelDiario(nome, dal, al, chiedi, codiceSostituito) 
 // PIANO → DIARIO anche in rimozione: se una M sparisce dal piano (tolta o
 // sovrascritta con un turno), il programma propone di togliere quei giorni
 // anche dal Diario. Le registrazioni finiscono nel Cestino, recuperabili.
+// Annulla di una copertura malattia: i punti incentivo dati per quella copertura
+// (copertura e rifiuti segnati nel popup) restavano. Si elencano e si chiede se toglierli:
+// mai in automatico, i punti potrebbero valere anche se il piano si rifa a mano.
+async function _pianoPuntiCoperturaVia(nome, giorniDstr) {
+  if (typeof eventiCopertura !== 'function' || !giorniDstr || !giorniDstr.length) return 0;
+  const ord = giorniDstr.slice().sort();
+  const eventi = eventiCopertura(nome, ord[0], ord[ord.length - 1]);
+  if (!eventi.length) return 0;
+  const elenco = eventi
+    .map(
+      (p) =>
+        p.collaboratore +
+        ' ' +
+        (p.punti > 0 ? '+' : '') +
+        p.punti +
+        (p.azione === 'copertura' ? ' (copertura)' : ' (rifiuto)'),
+    )
+    .join(', ');
+  if (
+    !(await chiediConferma(
+      'Per questa copertura erano stati dati dei punti incentivo: ' +
+        elenco +
+        '.\n\nTogliere anche questi punti?\nAnnulla = i punti restano (si possono togliere dopo da Formazione).',
+    ))
+  )
+    return 0;
+  let tolti = 0;
+  for (const p of eventi) {
+    try {
+      await secDel('punti_eventi', 'id=eq.' + p.id);
+      puntiEventiCache = puntiEventiCache.filter((x) => x.id !== p.id);
+      tolti++;
+    } catch (e) {
+      toastErrore('Punti di ' + p.collaboratore + ' non tolti: ' + ((e && e.message) || e));
+    }
+  }
+  if (tolti) {
+    logAzione('Punti tolti', 'Annulla copertura malattia di ' + nome + ': ' + tolti + ' registrazioni');
+    toast('Punti incentivo tolti: ' + tolti);
+  }
+  return tolti;
+}
 async function _pianoMalattiaViaDiario(nome, giorniDstr) {
   if (typeof datiCache === 'undefined' || typeof secPatch !== 'function') return 0;
   const tipoMal = typeof nomeCorrente === 'function' ? nomeCorrente('Malattia') : 'Malattia';

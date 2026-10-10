@@ -4862,7 +4862,7 @@ async function pdfBriefingGiorno() {
       if (d.section === 'head') {
         d.cell.styles.fillColor =
           d.column.index === 0 ? [0, 176, 80] : d.column.index === 1 ? [255, 0, 0] : [255, 255, 0];
-        if (d.column.index <= 1) d.cell.styles.textColor = [255, 255, 255];
+        if (d.column.index === 1) d.cell.styles.textColor = [255, 255, 255]; // E nero sul verde, come a video
         return;
       }
       // stile della cella singola + formato riga + regole fisse delle colonne

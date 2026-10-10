@@ -542,7 +542,8 @@ async function _renderPianoBriefingTab() {
       : ['E', 'U', 'COLLABORATORE', 'T', 'USCITA', 'FIRMA'];
   cols.forEach((c) => {
     const bg = c === 'E' ? '#00B050' : c === 'U' ? '#FF0000' : '#FFFF00';
-    const fg = c === 'E' || c === 'U' ? '#fff' : '#000';
+    // E: nero sul verde (bianco era 2,9:1, poco leggibile); U: bianco sul rosso
+    const fg = c === 'U' ? '#fff' : '#000';
     h +=
       '<th style="border:1px solid #999;background:' +
       bg +
