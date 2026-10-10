@@ -6,7 +6,7 @@
  * standard (chat/completions): Groq, Ollama o LM Studio sul server interno (Llama,
  * Qwen, Mistral...), altri servizi compatibili. Uno e attivo, uno puo fare da
  * riserva se il primo non risponde. Tutto si configura da Impostazioni >
- * Persone e accessi > Intelligenza artificiale (solo amministratore).
+ * Settori e moduli > Intelligenza artificiale (solo amministratore).
  *
  * Privacy invariata: chi chiama sostituisce i nomi con segnaposto prima dell invio
  * e non invia fotografie. Le chiavi stanno nella tabella ai_chiavi del database,
@@ -60,9 +60,6 @@ function aiModello(compito) {
   const f = aiFornitoreAttivo();
   if (!f) return '';
   return (f.modelli && f.modelli[compito]) || (f.modelli && f.modelli.testo) || '';
-}
-function groqModel(compito) {
-  return aiModello(compito);
 }
 function _aiUrl(f) {
   let u = String(f.url || '')
@@ -198,10 +195,6 @@ async function aiChat(body, compito) {
     console.warn('AI: ' + e.message + ' -> provo la riserva ' + ris.nome);
     return _aiChiamaUno(ris, body, c);
   }
-}
-// vecchio nome
-async function _groqChat(body) {
-  return aiChat(body);
 }
 
 // PROVA COLLEGAMENTO: elenco modelli + una domanda brevissima

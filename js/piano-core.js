@@ -1547,26 +1547,13 @@ function pianoCambiaTab(t) {
 }
 // Le 13 tab raggruppate in 3 famiglie: si trova tutto a colpo d'occhio
 const PIANO_TAB_GRUPPI = [
+  // sei gruppi brevi invece di tre lunghi (controllo del 09/10/2026): si trova tutto a colpo d occhio
   ['Giornata', ['calendario', 'briefing', 'avvisi']],
-  [
-    'Gestione',
-    [
-      'crediti',
-      'vacanze',
-      'saldo',
-      'recupero',
-      'congedi',
-      'timbrature',
-      'statistiche',
-      'organico',
-      'formazioni',
-      'benessere',
-      'storico',
-      'cambi',
-      'formulari',
-    ],
-  ],
-  ['Configurazione', ['turni', 'regole', 'festivi', 'impostazioni', 'guida']],
+  ['Assenze', ['vacanze', 'congedi', 'festivi']],
+  ['Ore', ['saldo', 'crediti', 'recupero', 'timbrature']],
+  ['Persone', ['formazioni', 'benessere', 'organico', 'cambi']],
+  ['Archivio', ['storico', 'statistiche', 'formulari']],
+  ['Configurazione', ['turni', 'regole', 'impostazioni', 'guida']],
 ];
 function _pianoTabBar() {
   const tabHtml = (k) => {

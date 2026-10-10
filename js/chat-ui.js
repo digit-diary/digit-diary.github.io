@@ -3,25 +3,6 @@
  * File: chat-ui.js
  */
 
-// ================================================================
-// SEZIONE 7: NOTE COLLEGHI (interfaccia chat)
-// Lista conversazioni, renderNoteCollega, renderNoteChat
-// ================================================================
-// NOTE COLLEGHI
-function toggleTuttiDest() {
-  const c = document.getElementById('nota-tutti').checked;
-  document
-    .querySelectorAll('#nota-dest-box input[type=checkbox]:not(#nota-tutti):not(.nota-gruppo)')
-    .forEach((cb) => (cb.checked = c));
-}
-function toggleGruppoDest(reparto) {
-  const c = document.querySelector('#nota-dest-box .nota-gruppo[data-rep="' + reparto + '"]');
-  if (!c) return;
-  document.querySelectorAll('#nota-dest-box input[type=checkbox]:not(#nota-tutti):not(.nota-gruppo)').forEach((cb) => {
-    const rep = operatoriRepartoMap[cb.value] || 'entrambi';
-    if (rep === reparto || rep === 'entrambi') cb.checked = c.checked;
-  });
-}
 function getDestinatariSelezionati() {
   return [...document.querySelectorAll('#nota-dest-box input[type=checkbox]:not(#nota-tutti)')]
     .filter((cb) => cb.checked)
@@ -215,37 +196,6 @@ async function eliminaNotaSmart(id) {
       toast('Messaggio eliminato dalla tua vista');
     } catch (e) {
       toastErrore('Messaggio NON nascosto: ' + ((e && e.message) || e) + '. Riprova.', 8000);
-    }
-  }
-}
-async function annullaInvioNota(id) {
-  const cm = _chatFindMsg(id);
-  if (!cm) return;
-  const letti = _chatLetti(id).filter((l) => l.operatore !== cm.da_operatore);
-  const qualcunoHaLetto = letti.length > 0;
-  if (qualcunoHaLetto) {
-    if (
-      !(await chiediConferma('Qualcuno ha già letto questo messaggio. Eliminare solo dalla tua vista?', {
-        pericolo: true,
-        ok: 'Elimina per me',
-      }))
-    )
-      return;
-    try {
-      await _chatPatchMessage(id, { nascosta_mitt: true });
-      renderNoteCollega();
-      toast('Messaggio nascosto per te');
-    } catch (e) {
-      toastErrore('Messaggio NON nascosto: ' + ((e && e.message) || e) + '. Riprova.', 8000);
-    }
-  } else {
-    if (!(await chiediConferma("Nessuno ha ancora letto. Annullare l'invio per tutti?"))) return;
-    try {
-      await _chatDeleteMessage(id);
-      renderNoteCollega();
-      toast('Invio annullato per tutti');
-    } catch (e) {
-      toast('Errore annullamento invio');
     }
   }
 }
@@ -2051,9 +2001,6 @@ let _noteFpInit = false;
 function initNoteFlatpickr() {
   _noteFpInit = true;
 }
-function resetNoteFiltri(tipo) {
-  renderNoteCollega();
-}
 let _consFpInit = false;
 function initConsFlatpickr() {
   if (_consFpInit || !window.flatpickr) return;
@@ -3619,20 +3566,6 @@ function schedaMostraTab(id) {
   });
   var tabs = box.querySelector('.scheda-tabs');
   if (tabs && box.scrollTop > tabs.offsetTop) box.scrollTop = tabs.offsetTop;
-}
-// Porta alla sezione con quel titolo, aprendo prima la pagina che la contiene
-function schedaVaiA(sezione) {
-  var h = [...document.querySelectorAll('#profilo-content .scheda-section h4')].find(function (x) {
-    return x.textContent.indexOf(sezione) !== -1;
-  });
-  var p = h && h.closest('.scheda-pannello');
-  if (p) schedaMostraTab(p.getAttribute('data-pannello'));
-  if (h)
-    try {
-      h.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } catch (e) {
-      h.scrollIntoView();
-    }
 }
 
 function _schedaFilterTimeline(nome) {

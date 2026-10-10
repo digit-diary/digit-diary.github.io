@@ -573,10 +573,6 @@ const PIANO_REGOLE_GRUPPI_ORDINE = [
   'Giorni chiusi',
   'Congedi non pagati',
 ];
-function _pianoRegoleDove(nome) {
-  const g = PIANO_REGOLE_GUIDA[nome];
-  return g ? g.d : 'Non usata dal programma';
-}
 function _renderPianoRegoleCard() {
   if (!puoGestireRegole()) return _pianoSchedaRiservata('Regole del piano', 'Regole del piano');
   // VISTA PER SETTORE: si sceglie il settore in alto e si cambiano i numeri
@@ -835,78 +831,6 @@ async function eliminaPianoRegola(id) {
     renderPiano();
   } catch (e) {
     toastErrore('Errore: ' + (e.message || ''));
-  }
-}
-// Crea una regola SPECIFICA per uno o piu' settori a partire da quella
-// generale: la generale resta e continua a valere ovunque, la nuova vince nei
-// settori indicati. Non si duplicano tutte le regole, solo l'eccezione.
-async function pianoRegolaEccezione(nome) {
-  if (!isAdmin()) return;
-  const gen = pianoRegoleCache.find((x) => x.nome === nome && !_pianoRegolaSettori(x).length);
-  if (!gen) return;
-  const elenco = (typeof getReparti === 'function' ? getReparti() : []).map((r) => r.key).join(', ');
-  const sett = await chiediTesto(
-    'Per quali settori vale l\'eccezione a "' +
-      nome +
-      '"?\n\nScrivi i settori separati da virgola.' +
-      (elenco ? '\nDisponibili: ' + elenco : ''),
-    typeof _pianoReparto === 'function' ? _pianoReparto() : '',
-  );
-  if (sett === null) return;
-  const pulito = String(sett)
-    .split(',')
-    .map((x) => x.trim().toLowerCase())
-    .filter(Boolean)
-    .join(',');
-  if (!pulito) return;
-  const val = await chiediTesto('Valore di "' + nome + '" per ' + pulito + ':', gen.valore || '');
-  if (val === null) return;
-  const erroreV = _pianoValidaRegola(nome, val, pulito.split(',').length === 1 ? pulito : '');
-  if (erroreV) {
-    toastErrore(erroreV, 9000);
-    return;
-  }
-  try {
-    const nuova = await secPost('piano_regole', {
-      nome: nome,
-      valore: String(val).trim(),
-      tipo: gen.tipo,
-      peso: gen.peso,
-      attivo: true,
-      descrizione: gen.descrizione,
-      settori: pulito,
-    });
-    if (nuova && nuova[0]) pianoRegoleCache.push(nuova[0]);
-    logAzione('Regola per settore', nome + ' = ' + val + ' per ' + pulito);
-    toast('Eccezione creata: ' + nome + ' = ' + val + ' per ' + pulito);
-    renderPiano();
-  } catch (e) {
-    toast('Errore: esiste già una regola "' + nome + '" per quei settori');
-  }
-}
-// Cambia i settori di una regola specifica (vuoto = torna generale)
-async function pianoRegolaSettoriEdit(id) {
-  if (!isAdmin()) return;
-  const r = pianoRegoleCache.find((x) => x.id === id);
-  if (!r) return;
-  const sett = await chiediTesto(
-    'Settori per la regola "' + r.nome + '" (vuoto = vale per tutti i settori):',
-    _pianoRegolaSettori(r).join(','),
-  );
-  if (sett === null) return;
-  const pulito = String(sett)
-    .split(',')
-    .map((x) => x.trim().toLowerCase())
-    .filter(Boolean)
-    .join(',');
-  try {
-    await secPatch('piano_regole', 'id=eq.' + id, { settori: pulito || null });
-    r.settori = pulito || null;
-    logAzione('Regola per settore', r.nome + ' -> ' + (pulito || 'tutti i settori'));
-    toast(pulito ? 'Ora vale per: ' + pulito : 'Ora vale per tutti i settori');
-    renderPiano();
-  } catch (e) {
-    toast('Errore aggiornamento settori');
   }
 }
 async function salvaPianoRegola(id, campo, valore) {

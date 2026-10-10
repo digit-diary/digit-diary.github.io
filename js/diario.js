@@ -1006,11 +1006,6 @@ async function chiediOmonimo(testo, nomi, contesto, chiave) {
   if (chiave) _omonimiRisposte[chiave] = scelto;
   return scelto;
 }
-// Compatibilita: ritorna il nome solo se la scelta e sicura (altrimenti null).
-function matchCollaboratore(cognome) {
-  const r = scegliCollaboratore(cognome);
-  return r && r.nome ? r.nome : null;
-}
 async function parseDifferenzeCassa(text, ds, turno) {
   if (!text || !text.trim()) return;
   const entries = text

@@ -728,40 +728,6 @@ async function generaModuloPDF(tipo) {
     );
   }
 }
-function drawFieldLine(doc, x, y, label, value, pw) {
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(0);
-  doc.text(label + ':', x, y);
-  const lw = doc.getTextWidth(label + ':  ');
-  doc.setFont('helvetica', 'normal');
-  doc.text(value, x + lw, y);
-  doc.setDrawColor(200);
-  doc.line(x + lw, y + 1, pw - x, y + 1);
-}
-function drawBlockField(doc, x, y, label, value, pw) {
-  const maxW = pw - x * 2;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(0);
-  const labelLines = doc.splitTextToSize(label + ':', maxW);
-  doc.text(labelLines, x, y);
-  y += labelLines.length * 5 + 4;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.setTextColor(30);
-  if (value) {
-    const lines = doc.splitTextToSize(value, maxW);
-    doc.text(lines, x, y);
-    y += lines.length * 5 + 3;
-  } else {
-    y += 8;
-  }
-  doc.setDrawColor(180);
-  doc.line(x, y, pw - x, y);
-  y += 2;
-  return y;
-}
 function drawFirmePro(doc, x, y, pw, isRdi, firmaRespB64, firmaCollabB64) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
@@ -2289,7 +2255,7 @@ async function miglioraTesto(fieldId, contesto) {
     return;
   }
   if (!aiPronta()) {
-    toast('Intelligenza artificiale non configurata: Impostazioni > Persone e accessi > Intelligenza artificiale');
+    toast('Intelligenza artificiale non configurata: Impostazioni > Settori e moduli > Intelligenza artificiale');
     return;
   }
   const btn = el.parentElement.querySelector('.btn-ai');
@@ -2358,7 +2324,7 @@ async function generaModuloAI(tipo) {
     return;
   }
   if (!aiPronta()) {
-    toast('Intelligenza artificiale non configurata: Impostazioni > Persone e accessi > Intelligenza artificiale');
+    toast('Intelligenza artificiale non configurata: Impostazioni > Settori e moduli > Intelligenza artificiale');
     return;
   }
   const btn = document.getElementById('btn-ai-gen');
@@ -2493,7 +2459,7 @@ async function assistenteGenera() {
     return;
   }
   if (!aiPronta()) {
-    toast('Intelligenza artificiale non configurata: Impostazioni > Persone e accessi > Intelligenza artificiale');
+    toast('Intelligenza artificiale non configurata: Impostazioni > Settori e moduli > Intelligenza artificiale');
     return;
   }
   const tipo = document.getElementById('assist-tipo').value;

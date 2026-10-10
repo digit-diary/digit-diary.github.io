@@ -718,16 +718,6 @@ async function secGet(path) {
   }
   return sbGet(path);
 }
-// Un errore che arriva DAL DATABASE (riga doppia, vincolo, permesso) non e' un
-// guasto del canale protetto: ripiegare sulla scrittura anonima non lo risolve,
-// perche' le regole di sicurezza la bloccano comunque, e trasforma un problema
-// spiegabile ("riga gia' presente") in un errore oscuro che ferma tutto.
-// Il ripiego serve solo quando la funzione protetta non e' raggiungibile.
-function _erroreDalDatabase(e) {
-  const t = (e && (e.message || e.toString())) || '';
-  if (/"code"\s*:\s*"[0-9A-Z]{5}"/.test(t)) return true;
-  return /duplicate key|violates|already exists|row-level security/i.test(t);
-}
 async function _secPostRaw(table, data) {
   const tk = getOpToken();
   if (!tk) return sbPost(table, data);

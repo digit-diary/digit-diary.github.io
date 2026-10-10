@@ -80,11 +80,3 @@ async function decryptNota(data) {
     return data.substring(4);
   }
 }
-async function decryptNoteCache() {
-  for (const n of noteColleghiCache) {
-    if (n.messaggio && n.messaggio.startsWith('ENC:') && !n._decrypted) {
-      n.messaggio = await decryptNota(n.messaggio);
-      n._decrypted = true;
-    }
-  }
-}

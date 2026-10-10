@@ -1269,14 +1269,6 @@ async function eseguiCambioPwdOp() {
     err.textContent = 'Errore salvataggio';
   }
 }
-function selezionaOperatore(n) {
-  localStorage.setItem('operatore_corrente', n);
-  sessionStorage.removeItem('bio_verified');
-  chiudiTuttiModali();
-  document.getElementById('operatore-display').textContent = 'Operatore: ' + n;
-  renderOperatoriUI();
-  toast('Operatore: ' + n);
-}
 function renderOperatoriUI() {
   const el = document.getElementById('operatori-list');
   if (!el) return;
@@ -2446,13 +2438,14 @@ function initCardRichiudibili(rootId, aperteDefault) {
 
 // ===== INDICE DELLE IMPOSTAZIONI =====
 // La pagina ha molte sezioni: in cima compare un indice a gruppi (Registrazioni,
-// Persone e accessi, Maison, Personale, Sistema) costruito dai titoli delle
+// Persone, Accessi, Settori e moduli, Dati) costruito dai titoli delle
 // sezioni visibili, e prima di ogni gruppo un'etichetta. Niente da mantenere a
 // mano: aggiungendo una sezione con data-gruppo compare da sola.
 // SOTTO MENU DELLE IMPOSTAZIONI · cinque schede (Registrazioni, Persone e
 // accessi, Maison, Personale, Sistema): si vede solo il gruppo scelto, con
 // dentro le chip delle sue sezioni. L ultimo gruppo aperto viene ricordato.
-const SETTINGS_GRUPPI = ['Registrazioni', 'Persone e accessi', 'Maison', 'Personale', 'Sistema', 'Altro'];
+// quattro schede (controllo del 09/10/2026; prima sei, con Altro): persone, accessi, configurazione, dati
+const SETTINGS_GRUPPI = ['Persone', 'Accessi', 'Settori e moduli', 'Dati', 'Altro'];
 function _settingsGruppiVisibili() {
   const page = document.getElementById('page-impostazioni');
   const perGruppo = {};

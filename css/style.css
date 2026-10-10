@@ -1013,6 +1013,26 @@ header h1 .casino {
   border-bottom: 1px solid var(--line);
   margin-bottom: 8px;
 }
+/* titolo di gruppo nel menu del telefono (Oggi, Persone, Comunicare, Locale, Strumenti) */
+.mobile-nav-gruppo {
+  padding: 14px 24px 4px;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.mobile-nav-gruppo:first-of-type {
+  padding-top: 4px;
+}
+/* NAV */
+/* separatore sottile tra i gruppi di pagine nel menu del computer */
+.nav-sep {
+  flex: 0 0 1px;
+  align-self: stretch;
+  background: var(--line);
+  margin: 8px 2px;
+}
 /* NAV */
 .nav-tabs {
   width: 100%;
@@ -6738,7 +6758,6 @@ tr.nav-evidenza > td {
   cursor: pointer;
 }
 
-
 /* ===== TELEFONO (v436, controllo grafico del 09/10/2026) ===== */
 /* righe di moduli a tre colonne (Maison, Consegna): una colonna sotto i 700px; prima lo
    stile scritto nella pagina vinceva e il campo Data usciva dallo schermo */
@@ -7020,7 +7039,18 @@ body.dark-theme .modal-box {
   box-shadow: var(--ombra-1);
 }
 /* tutto quello che sta dentro al titolo (comandi, note, campi) torna al carattere normale */
-.card-header :is(button, select, input, label, small, .pbar-info, .pbar-grp-lbl, span[style*='font-size'], div[style*='font-size']) {
+.card-header
+  :is(
+    button,
+    select,
+    input,
+    label,
+    small,
+    .pbar-info,
+    .pbar-grp-lbl,
+    span[style*='font-size'],
+    div[style*='font-size']
+  ) {
   font-family: 'Source Sans 3', sans-serif;
 }
 .card-header select,

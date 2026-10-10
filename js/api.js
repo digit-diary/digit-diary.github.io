@@ -437,7 +437,8 @@ async function loadAll() {
   // Pulizia automatica: sessioni scadute + log > 12 mesi
   // con la sessione: senza, il database la rifiuta (migrazione 20260895)
   // una volta al giorno per questo browser basta (prima a ogni accesso di chiunque)
-  if (_unaVoltaAlGiorno('pulizia_db')) sbRpc('cleanup_old_data', { p_token: getOpToken() || getAdminToken() }).catch(() => {});
+  if (_unaVoltaAlGiorno('pulizia_db'))
+    sbRpc('cleanup_old_data', { p_token: getOpToken() || getAdminToken() }).catch(() => {});
   // Maison: auto-cancellazione GD precedenti se configurata (privacy)
   if (typeof _maisonAutoCleanup === 'function') _maisonAutoCleanup().catch(() => {});
   // Giubilei in arrivo: notifica una tantum agli operatori HR (se configurato il preavviso)

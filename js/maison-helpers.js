@@ -3720,48 +3720,13 @@ function aggiornaMenuMobile() {
   try {
     const items = document.getElementById('mobile-nav-items');
     if (!items) return;
+    // in gruppi (controllo del 09/10/2026), come il menu del computer; c e anche la Guida
     const tabs = [
-      { page: 'dashboard', icon: '<i class="icx icx-home"></i>', label: 'Home' },
-      { page: 'diario', icon: '<i class="icx icx-diario"></i>', label: 'Diario' },
+      { g: 'Oggi', page: 'dashboard', icon: '<i class="icx icx-home"></i>', label: 'Home' },
+      { g: 'Oggi', page: 'diario', icon: '<i class="icx icx-diario"></i>', label: 'Diario' },
+      { g: 'Oggi', page: 'rapporto', icon: '<i class="icx icx-calendario"></i>', label: 'Rapporto', vis: 'rapporto' },
       {
-        page: 'rapporto',
-        icon: '<i class="icx icx-calendario"></i>',
-        label: 'Rapporto',
-        vis: 'rapporto',
-      },
-      {
-        page: 'note-collega',
-        icon: '<i class="icx icx-mail"></i>',
-        label: 'Note Colleghi',
-        vis: 'note_collega',
-        badgeId: 'note-badge',
-      },
-      {
-        page: 'statistiche',
-        icon: '<i class="icx icx-stats"></i>',
-        label: 'Statistiche',
-        vis: 'statistiche',
-      },
-      { page: 'moduli', icon: '<i class="icx icx-file"></i>', label: 'Moduli', vis: 'moduli' },
-      {
-        page: 'formazione',
-        icon: '<i class="icx icx-formazione"></i>',
-        label: 'Formazione',
-        vis: 'formazione',
-      },
-      {
-        page: 'piano',
-        icon: '<i class="icx icx-calendario"></i>',
-        label: 'Piano di lavoro',
-        vis: 'piano',
-      },
-      {
-        page: 'assistente',
-        icon: '<i class="icx icx-assistente"></i>',
-        label: 'Assistente',
-        vis: 'assistente',
-      },
-      {
+        g: 'Oggi',
         page: 'consegna',
         icon: '<i class="icx icx-penna"></i>',
         label: 'Consegna',
@@ -3769,32 +3734,72 @@ function aggiornaMenuMobile() {
         badgeId: 'consegna-badge',
       },
       {
+        g: 'Oggi',
         page: 'promemoria',
         icon: '<i class="icx icx-clipboard"></i>',
         label: 'Promemoria',
         vis: 'promemoria',
         badgeId: 'promemoria-badge',
       },
-      { page: 'maison', icon: '<i class="icx icx-maison"></i>', label: 'Maison', vis: 'maison' },
+      { g: 'Persone', page: 'piano', icon: '<i class="icx icx-calendario"></i>', label: 'Piano', vis: 'piano' },
       {
+        g: 'Persone',
+        page: 'formazione',
+        icon: '<i class="icx icx-formazione"></i>',
+        label: 'Formazione',
+        vis: 'formazione',
+      },
+      { g: 'Persone', page: 'moduli', icon: '<i class="icx icx-file"></i>', label: 'Moduli', vis: 'moduli' },
+      {
+        g: 'Comunicare',
+        page: 'note-collega',
+        icon: '<i class="icx icx-mail"></i>',
+        label: 'Note Colleghi',
+        vis: 'note_collega',
+        badgeId: 'note-badge',
+      },
+      {
+        g: 'Comunicare',
+        page: 'assistente',
+        icon: '<i class="icx icx-assistente"></i>',
+        label: 'Assistente',
+        vis: 'assistente',
+      },
+      { g: 'Locale', page: 'maison', icon: '<i class="icx icx-maison"></i>', label: 'Maison', vis: 'maison' },
+      {
+        g: 'Locale',
         page: 'inventario',
         icon: '<i class="icx icx-inventario"></i>',
         label: 'Inventario',
         vis: 'inventario',
       },
       {
+        g: 'Strumenti',
+        page: 'statistiche',
+        icon: '<i class="icx icx-stats"></i>',
+        label: 'Statistiche',
+        vis: 'statistiche',
+      },
+      {
+        g: 'Strumenti',
         page: 'registro',
         icon: '<i class="icx icx-clipboard"></i>',
         label: 'Registro',
         adminOnly: true,
       },
-      { page: 'impostazioni', icon: '<i class="icx icx-settings"></i>', label: 'Impostazioni' },
+      { g: 'Strumenti', page: 'guida', icon: '<i class="icx icx-clipboard"></i>', label: 'Guida' },
+      { g: 'Strumenti', page: 'impostazioni', icon: '<i class="icx icx-settings"></i>', label: 'Impostazioni' },
     ];
     const cur = localStorage.getItem('pagina_corrente') || 'dashboard';
     let html = '';
+    let gruppoPrima = '';
     tabs.forEach(function (t) {
       if (t.adminOnly && !isAdmin()) return;
       if (t.vis && typeof isVis === 'function' && !isVis(t.vis)) return;
+      if (t.g !== gruppoPrima) {
+        html += '<div class="mobile-nav-gruppo">' + t.g + '</div>';
+        gruppoPrima = t.g;
+      }
       var badge = t.badgeId ? document.getElementById(t.badgeId) : null;
       var badgeHtml =
         badge && badge.style.display !== 'none' ? '<span class="nav-badge">' + badge.textContent + '</span>' : '';

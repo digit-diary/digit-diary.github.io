@@ -160,7 +160,7 @@ function GUIDA_CAPITOLI() {
       titolo: 'Intelligenza artificiale: quale usare',
       vis: () => _guidaAdmin(),
       righe: [
-        'In <b>Impostazioni > Persone e accessi > Intelligenza artificiale</b> c e l elenco dei fornitori. Uno e <b>In uso</b>; un altro può fare da <b>Riserva</b>, usata da sola se il primo non risponde.',
+        'In <b>Impostazioni > Settori e moduli > Intelligenza artificiale</b> c e l elenco dei fornitori. Uno e <b>In uso</b>; un altro può fare da <b>Riserva</b>, usata da sola se il primo non risponde.',
         '<b>Aggiungi fornitore</b>: si sceglie il tipo (Groq, Ollama o LM Studio sul server interno, altro servizio compatibile), l indirizzo, il modello per i testi e quello per i moduli, e la chiave se serve. Con un modello sul server interno (per esempio Llama con Ollama, indirizzo <b>/ai/v1</b>) i testi non escono dal casino.',
         '<b>Prova</b> manda una domanda brevissima e mostra il tempo di risposta e i modelli disponibili; <b>Usa</b> rende attivo quel fornitore per tutti.',
         'In ogni caso i nomi dei collaboratori vengono sostituiti prima dell invio e le fotografie non escono dal programma.',
@@ -191,7 +191,7 @@ function GUIDA_CAPITOLI() {
       titolo: 'Piano: le schede una per una',
       vis: () => _guidaVis('piano'),
       righe: [
-        'Il Piano è il calendario dei turni del mese, settore per settore. In alto si sceglie il settore e il mese; le schede sono in tre gruppi: quelle di ogni giorno, quelle per ore e assenze, quelle di configurazione. Ognuno vede solo le schede che gli sono permesse.',
+        'Il Piano è il calendario dei turni del mese, settore per settore. In alto si sceglie il settore e il mese; le schede sono in sei gruppi: Giornata, Assenze, Ore, Persone, Archivio e Configurazione. Ognuno vede solo le schede che gli sono permesse.',
         '<b>Calendario</b>: la griglia del mese, una riga per persona e una colonna per giorno. Si scrive come in Excel (clic, sigla, Invio; trascinando si scrive su più celle). Da qui Genera bozza, Migliora, Valida regole e Svuota piano.',
         '<b>Briefing</b>: il foglio del giorno con chi lavora, orari, pause e note, compilato partendo dal piano.',
         '<b>Avvisi</b>: tutto quello che richiede attenzione (ore della settimana, riposi, regole del mese, chiusura dell anno, posti scoperti, malattie lunghe, vacanze non nel piano); il numero rosso dice quante cose ci sono da guardare.',
@@ -713,7 +713,7 @@ function GUIDA_CAPITOLI() {
         '<b>Stampa scheda permessi</b> (in Visibilità e permessi): produce il foglio con lo stato REALE dei permessi, operatore per operatore, con profilo, settori e accessi extra, pronto per la stampa o il PDF. Serve per farlo controllare a chi decide chi può vedere e fare cosa.',
         '<b>Sessioni</b>: ogni dispositivo ha la sua sessione, che si rinnova da sola con il token che possiede; aprire il programma sul telefono non fa più uscire dal PC. Se il rinnovo non e possibile compare un avviso e si rientra con la password. Lo <b>sblocco biometrico</b> va riattivato una volta dalle Impostazioni: il dispositivo ha un segreto che il server verifica, quindi nessuno può ottenere una sessione con il solo nome dell operatore.',
         'Le impostazioni di configurazione (visibilità, profili, settori, punti, soglie, moduli, opzioni del piano) le salva solo una sessione amministratore: il server lo verifica, non basta l interfaccia. Ogni salvataggio fallito viene segnalato con un avviso rosso, mai in silenzio.',
-        'La pagina Impostazioni è divisa in sei schede (Registrazioni, Persone e accessi, Maison, Personale, Sistema, Altro): si vede solo il gruppo scelto, con le chip delle sue sezioni sotto le schede; il programma ricorda l ultima scheda aperta.',
+        'La pagina Impostazioni è divisa in quattro schede (Persone, Accessi, Settori e moduli, Dati): si vede solo il gruppo scelto, con le chip delle sue sezioni sotto le schede; il programma ricorda l ultima scheda aperta.',
         '<b>Settori</b>: si creano, rinominano e si scelgono le pagine attive per ognuno.',
         '<b>Nome nei documenti</b> (in Settori): il nome ufficiale del settore che compare nei documenti stampati, per esempio <b>FoBoSlot</b> per Slots. Nei menu resta il nome breve. Vale per i fogli di cambio turno (anche quelli già archiviati), il formulario vuoto, la stampa del Piano, il briefing, le coperture, i crediti, le vacanze e le valutazioni. Vuoto = nome breve.',
         '<b>Profili personalizzati</b> (Visibilità e permessi): oltre ai cinque profili fissi del documento firmato si creano altre figure, per esempio Compliance o Segretariato: si parte da una copia di un profilo esistente, si decide voce per voce Modifica, Vede o No, si salva. Il profilo compare nel menu accanto agli altri, "Applica i profili" lo tratta allo stesso modo e la scheda permessi stampata lo mostra con il suo nome. I cinque profili fissi non si possono modificare.',

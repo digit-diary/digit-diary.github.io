@@ -131,13 +131,6 @@ async function checkPwd() {
     setTimeout(() => (err.textContent = ''), 2500);
   }
 }
-function mostraForzaCambio() {
-  const b = document.getElementById('pwd-modal-content');
-  b.innerHTML =
-    '<h3>Cambia la password</h3><p>Password predefinita. Impostane una nuova.</p><div class="pwd-field"><label>Nuova password (min 4 car.)</label><input type="password" id="new-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="eseguiPrimoCambio()">Imposta</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';
-  document.getElementById('pwd-modal').classList.remove('hidden');
-  setTimeout(() => document.getElementById('new-pwd-1').focus(), 100);
-}
 async function eseguiPrimoCambio() {
   const p1 = document.getElementById('new-pwd-1').value,
     p2 = document.getElementById('new-pwd-2').value,
@@ -290,9 +283,6 @@ function chiudiTuttiModali() {
     const el = document.getElementById(id);
     if (el) el.classList.add('hidden');
   });
-}
-function cambiaOperatore() {
-  chiediOperatore();
 }
 function forzaCambioPwdOperatore(nome) {
   const b = document.getElementById('pwd-modal-content');

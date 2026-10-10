@@ -125,11 +125,6 @@ function _pePauseParse(txt) {
     .map((x) => parseInt(x))
     .filter((x) => x > 0);
 }
-function _pePauseDaTotale(tot) {
-  if (tot <= 30) return '15+15';
-  if (tot <= 45) return '30+15';
-  return '30+15+15';
-}
 function _peSettoreCorrente() {
   return typeof _pianoReparto === 'function' ? _pianoReparto() : 'slots';
 }
@@ -2194,20 +2189,6 @@ function _peGeneraVenSab(sh, ctx, dataStr) {
   }
 }
 
-// ---------- pause extra + blocchi automatici ----------
-function _peSlotInTurno(ctx, oraCell, turno) {
-  if (!oraCell) return false;
-  const o = ctx.orari[turno];
-  if (!o) return true;
-  const p = String(oraCell).indexOf(' - ');
-  if (p < 0) return false;
-  let slotMin = _peOraMin(String(oraCell).substring(0, p).trim());
-  if (slotMin == null) return false;
-  let tIni = o.ini;
-  let tFin = o.fin;
-  if (slotMin < 720 && tIni >= 720) slotMin += 1440;
-  return slotMin >= tIni && slotMin < tFin;
-}
 function _peGeneraExtra(sh, ctx, tipoGiorno) {
   const dictCoperti = {};
   ['S1', 'S22', 'S3', 'S7', 'S7C', 'R7C', 'S8C', 'S31', 'S5', 'R8', 'C8', 'R4', 'C20'].forEach(
@@ -4188,45 +4169,6 @@ function _pauseGrigliaCollega() {
   });
   GrigliaExcel.ripristina('pause');
 }
-function briefPausaSposta(base, r, dir) {
-  if (!puoGestireBriefing() || !_briefState || !_briefState.pause) return;
-  const c = _briefState.pause.contenuto;
-  _pbLegami(c);
-  _briefRicorda();
-  const prima = _pbBlocchi(c);
-  // vicino a una riga libera (SALA, REC, CASSA) la riga si sposta di un quarto d ora
-  // alla volta, nel primo orario in cui la sala resta coperta; altrimenti scambio
-  const copia = JSON.stringify({ celle: c.celle, nR: c.nR });
-  let quarto = c.tipo === 'slots' ? _pbSpostaQuarto(c, base, r, dir) : null;
-  let msg = null;
-  if (quarto === 'fatto') {
-    msg = _pbSincronizza(c, prima, base);
-    // la pausa collegata non riesce a seguire il quarto d ora: si torna indietro e si
-    // fa lo scambio intero (con cui la pausa collegata segue)
-    if (msg.some((x) => /non spostat/.test(x))) {
-      const o = JSON.parse(copia);
-      c.celle = o.celle;
-      c.nR = o.nR;
-      quarto = null;
-      msg = null;
-    }
-  }
-  if (quarto && quarto !== 'fatto') {
-    _briefDimentica();
-    toast(quarto);
-    return;
-  }
-  if (!quarto && !_pbScambia(c, base, r, dir)) {
-    _briefDimentica();
-    toast('Questa riga non si può scambiare (serve una riga di copertura adiacente)');
-    return;
-  }
-  if (!msg) msg = _pbSincronizza(c, prima, base);
-  window._briefPauseAvviso = msg.length ? msg.join(' · ') : null;
-  if (msg.length) toast(msg.join(' · '), 5000);
-  _briefSalvaPauseDebounce();
-  _briefRefreshPause();
-}
 // elimina un intera colonna del foglio pause (intestazione, orario e righe fino
 // alla colonna successiva nella stessa pila); si annulla con Annulla del briefing
 async function briefPausaEliminaColonna(base, r) {
@@ -5377,33 +5319,6 @@ function _pcFormazioneHtml(c) {
         escP(t) +
         '</div>'
     : '';
-}
-// colonne facoltative in stampa: una casella per ciascuna (spenta di partenza)
-function _pcStampaOpzHtml(c) {
-  if (!c || !puoGestireBriefing()) return '';
-  const l = (window.PauseControlli ? window.PauseControlli.blocchi(c).filter((b) => b.opz) : []).concat(
-    (c.biglietti || []).map((bg) => ({ post: bg.turno || 'C4', nome: bg.nome, opz: 'bigliettino del mattino' })),
-  );
-  if (!l.length) return '';
-  const scelte = c.stampaOpz || {};
-  return (
-    '<div class="pb-stampaopz" style="margin:0 0 8px;font-size:var(--fs-sm,.8125rem);display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center"><b>In stampa anche:</b>' +
-    l
-      .map(
-        (b) =>
-          '<label style="display:inline-flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" data-nome="' +
-          escP(b.nome) +
-          '" onchange="briefPauseStampaOpz(this.dataset.nome,this.checked)"' +
-          (scelte[b.nome] ? ' checked' : '') +
-          '> ' +
-          escP(b.post + ' ' + b.nome) +
-          ' <span style="color:var(--muted)">(' +
-          escP(b.opz) +
-          ')</span></label>',
-      )
-      .join('') +
-    '</div>'
-  );
 }
 function briefPauseStampaOpz(nome, si) {
   if (!puoGestireBriefing() || !_briefState || !_briefState.pause) return;

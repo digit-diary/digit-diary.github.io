@@ -66,12 +66,6 @@ function _briefColoreDaPiano(colorePiano) {
   // (il colore del piano arriva tale e quale); gli altri settori no
   return _pianoReparto() === 'valet' ? colorePiano : '';
 }
-function _briefEtichettaColore(coloreBriefing) {
-  if (!coloreBriefing) return '';
-  const su = String(coloreBriefing).toUpperCase();
-  const reg = _briefEvidenziazioni().find((x) => String(x.a || '').toUpperCase() === su);
-  return reg && reg.label ? reg.label : '';
-}
 function _briefComponi(pianoRighe) {
   const righe = [];
   // coordinatori del giorno (regola di gruppo "coordinatori"): rossi anche sul foglio
@@ -766,18 +760,6 @@ function _briefDimentica() {
   if (u && u.passi.length) u.passi.pop();
   _briefAggiornaAnnulla();
 }
-function _briefAnnullaBottoni() {
-  const u = _briefUndoCorrente() || { passi: [], rifatti: [] };
-  return (
-    '<span id="brief-annulla-box" style="display:inline-flex;gap:6px;margin-right:10px">' +
-    '<button class="btn-export" id="brief-btn-annulla" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px" onclick="briefAnnulla()" title="Annulla l ultima modifica del briefing o delle pause (Ctrl+Z)"' +
-    (u.passi.length ? '' : ' disabled') +
-    '>Annulla</button>' +
-    '<button class="btn-export" id="brief-btn-ripristina" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px" onclick="briefRipristina()" title="Rimette la modifica annullata (Ctrl+Y)"' +
-    (u.rifatti.length ? '' : ' disabled') +
-    '>Ripristina</button></span>'
-  );
-}
 // fotografia con l istante, per l Annulla unico (l azione piu recente del programma)
 function _briefFotoQuando() {
   try {
@@ -1374,18 +1356,6 @@ function _briefGrigliaCollega() {
   });
   GrigliaExcel.ripristina('brief');
   if (typeof _pauseGrigliaCollega === 'function') _pauseGrigliaCollega();
-}
-async function briefMuoviRiga(i, delta) {
-  if (!_briefState || !puoGestireBriefing()) return;
-  const j = i + delta;
-  if (j < 0 || j >= _briefState.righe.length) return;
-  _briefRicorda();
-  const tmp = _briefState.righe[i];
-  _briefState.righe[i] = _briefState.righe[j];
-  _briefState.righe[j] = tmp;
-  clearTimeout(_briefSaveTimer);
-  await briefSalvaBriefing();
-  renderPiano();
 }
 async function briefEliminaRiga(i) {
   if (!_briefState || !puoGestireBriefing()) return;
