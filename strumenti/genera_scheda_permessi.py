@@ -4,20 +4,44 @@
 import json, html, datetime, sys, os
 import psycopg2
 E = html.escape
-c = psycopg2.connect(f"host=aws-0-eu-central-1.pooler.supabase.com port=5432 user=postgres.brdhxzgegxhjbcgxcnfd password={os.environ['PW']} dbname=postgres sslmode=require")
+# DB_LOCALE=1: database di prova locale (per provare il generatore senza toccare il cloud)
+if os.environ.get('DB_LOCALE'):
+    c = psycopg2.connect("host=127.0.0.1 port=55432 user=postgres dbname=diario2")
+else:
+    c = psycopg2.connect(f"host=aws-0-eu-central-1.pooler.supabase.com port=5432 user=postgres.brdhxzgegxhjbcgxcnfd password={os.environ['PW']} dbname=postgres sslmode=require")
 cur = c.cursor(); cur.execute("select chiave, valore from impostazioni where chiave in ('visibilita','profili_operatori','operatori_reparto','operatori_accessi_extra','reparti_pagine','profili_custom')")
 imp = {k: json.loads(v) for k, v in cur.fetchall()}
 cur.execute("select nome from operatori_auth order by nome"); ops = [r[0] for r in cur.fetchall()]
 vis = imp.get('visibilita', {}); prof = imp.get('profili_operatori', {}); rep = imp.get('operatori_reparto', {}); extra = imp.get('operatori_accessi_extra', {}); rpag = imp.get('reparti_pagine', {})
 PROF = {'direzione': 'Direzione', 'resp': 'Responsabile FoBoSlot', 'sost': 'Sostituto Responsabile', 'sup': 'Supervisor', 'hr': 'HR'}
 for _k, _v in (imp.get('profili_custom') or {}).items(): PROF[_k] = _v.get('nome', _k) + ' (personalizzato)'
-voci = [('Pagine', [('rapporto','Rapporto'),('note_collega','Note Colleghi (chat)'),('statistiche','Statistiche'),('moduli','Moduli disciplinari'),('formazione','Formazione'),('piano','Piano di lavoro'),('assistente','Assistente AI'),('consegna','Consegna Turno'),('promemoria','Promemoria'),('maison','Costi Maison'),('inventario','Inventario'),('registro','Registro attivita (solo amministratore)')]),
- ('Funzioni', [('ricerca_globale','Ricerca globale'),('alert_cassa','Alert cassa'),('alert_rischio','Alert rischio'),('alert_compleanni','Compleanni Maison'),('template_rapidi','Template rapidi'),('firma_digitale','Firma digitale'),('qr_code','QR Code su PDF'),('ai_moduli','AI (genera e migliora testo)')]),
- ('Piano: schede visibili', [('ptab_'+k, 'Piano · '+l) for k, l in [('crediti','Crediti (vacanze, CGF, saldo, recupero)'),('calendario','Calendario'),('briefing','Briefing'),('avvisi','Avvisi (ore settimanali, regole del mese)'),('vacanze','Vacanze'),('saldo','Saldo'),('recupero','Recupero ore'),('timbrature','Timbrature'),('statistiche','Statistiche'),('organico','Organico'),('benessere','Benessere'),('storico','Storico'),('formulari','Formulari'),('turni','Turni'),('regole','Regole'),('festivi','Festivi'),('impostazioni','Impostazioni'),('guida','Guida')]]),
- ('Piano: schede modificabili', [('ptabmod_'+k, 'Piano · '+l) for k, l in [('calendario','Calendario (modifica turni)'),('briefing','Briefing (compilazione)'),('vacanze','Vacanze (import e applica)'),('saldo','Saldo (ore reali)'),('recupero','Recupero ore'),('timbrature','Timbrature'),('turni','Turni (durate e orari)'),('regole','Regole (valori)'),('festivi','Festivi'),('impostazioni','Impostazioni')]]),
- ('Permessi delegabili', [('gestione_punti','Punti e premi'),('gestione_impiego','Impiego Jolly/Fisso'),('gestione_categorie','Assegnare la categoria'),('vista_categorie','Vedere la categoria'),('gestione_competenze','Certificare competenze'),('gestione_valutazioni','Valutazioni'),('gestione_formazioni','Registrare formazioni'),('gestione_piano','Modificare il piano'),('piano_auto_genera','Piano: genera'),('piano_auto_vacanze','Piano: vacanze e CGF automatici'),('piano_auto_import','Piano: import da file'),('piano_auto_cancella','Piano: cancellazioni di massa'),('gestione_corsi','Corsi nel piano'),('gestione_briefing','Compilare briefing'),('storico_hr','Storico HR: vedere'),('storico_hr_modifica','Storico HR: modificare'),('vista_valutazioni','Valutazioni: vedere'),('gestione_regole','Regole del piano'),('gestione_festivi','Festivi e CGF'),('sblocco_piano_chiuso','Sbloccare giorni chiusi'),('vista_malattie_pct','Pattern malattie')])]
+# VOCI lette dal programma (js/settings.js, VIS_ITEMS): la lista non resta indietro
+# quando si aggiunge una scheda o un permesso
+import subprocess
+_QUI = os.path.dirname(os.path.abspath(__file__))
+_JS = r"""
+const src=require('fs').readFileSync(process.argv[1],'utf8');
+const a=src.indexOf('const VIS_ITEMS = {'); const b=src.indexOf('\n};',a);
+const V=eval('('+src.slice(a+'const VIS_ITEMS = '.length,b+2)+')');
+const m=src.match(/const PIANO_AUTO_EREDITATI = \[([^\]]*)\]/);
+console.log(JSON.stringify({V, ered:(m?m[1]:'').match(/[a-z_]+/g)||[]}));
+"""
+_d = json.loads(subprocess.check_output(['node', '-e', _JS, os.path.join(_QUI, '..', 'js', 'settings.js')]))
+VIS_ITEMS, EREDITATI = _d['V'], _d['ered']
+voci = [('Pagine', list(VIS_ITEMS['pagine'].items())), ('Funzioni', list(VIS_ITEMS['funzioni'].items())),
+        ('Permessi', list(VIS_ITEMS['permessi'].items())),
+        ('Piano: schede visibili', list(VIS_ITEMS['piano_schede'].items())),
+        ('Piano: schede modificabili', list(VIS_ITEMS['piano_modifica'].items()))]
+# stesse regole del programma: permessi di modifica non impostati = solo amministratore
+# (puoModificare), azioni automatiche del Piano dal permesso piano_azioni_auto,
+# pagine, funzioni e schede del Piano non impostate = tutti
+def valore(key):
+    if key in vis: return vis[key]
+    if key in EREDITATI: return vis.get('piano_azioni_auto', 'admin')
+    if key == 'piano' or key in VIS_ITEMS['permessi']: return 'admin'
+    return 'tutti'
 def concesso(key, op):
-    v = vis.get(key, 'admin' if key == 'piano' else 'tutti')
+    v = valore(key)
     if v in ('nascosto', 'admin'): return False
     if isinstance(v, dict) and v.get('tipo') == 'selezionati': return op in (v.get('operatori') or [])
     return True
@@ -50,7 +74,7 @@ h.append('<h2>Cosa puo vedere e fare ognuno (cambia le caselle sbagliate)</h2><t
 for gt, lista in voci:
     h.append(f'<tr class="g"><td colspan="{len(ops)+3}">{E(gt)}</td></tr>')
     for k, l in lista:
-        v = vis.get(k, 'admin' if k == 'piano' else 'tutti'); vt = 'tutti' if v == 'tutti' else 'solo admin' if v == 'admin' else 'nascosta' if v == 'nascosto' else 'per nome' if isinstance(v, dict) else str(v)
+        v = valore(k); vt = 'tutti' if v == 'tutti' else 'solo admin' if v == 'admin' else 'nascosta' if v == 'nascosto' else 'per nome' if isinstance(v, dict) else str(v)
         celle = ''.join(f'<td><select class="c" data-orig="{"si" if concesso(k,o) else ""}" data-sel="{k}|{E(o)}"><option value="">no</option><option value="si">Si</option></select></td>' for o in ops)
         h.append(f'<tr data-r="{k}"><td class="l">{E(l)} <span style="color:#888;font-size:9.5px">({k})</span></td><td style="font-size:10px;color:#555">{E(vt)}</td>{celle}<td><textarea data-nota="{k}" placeholder="Nota"></textarea></td></tr>')
 h.append('</table>')
@@ -85,4 +109,4 @@ function salvaCopia(){const s=stato();s.salvatoIl=new Date().toISOString();const
 function azzera(){if(!confirm('Togliere tutte le modifiche e tornare allo stato attuale?'))return;localStorage.removeItem(CH);document.querySelectorAll('select.c').forEach(x=>x.value=x.dataset.orig);document.querySelectorAll('textarea').forEach(t=>t.value='');colora()}
 init();firmaInit();if(window.__RISPOSTE){applica(window.__RISPOSTE)}else{try{applica(JSON.parse(localStorage.getItem(CH)||'null'))}catch(e){}}colora();
 </script></body></html>''')
-open('SCHEDA_PERMESSI_ATTUALI.html', 'w').write('\n'.join(h)); print('scheda ok', len(ops), 'operatori')
+open(os.environ.get('USCITA', 'SCHEDA_PERMESSI_ATTUALI.html'), 'w').write('\n'.join(h)); print('scheda ok', len(ops), 'operatori')

@@ -2550,14 +2550,23 @@ function stampaSchedaPermessi() {
   const extra = window._operatoriAccessiExtra || {};
   const nomiProf = Object.assign({}, typeof PROFILI !== 'undefined' ? PROFILI : {});
   Object.keys(_profiliCustom()).forEach((id) => (nomiProf[id] = _profiliCustom()[id].nome));
+  // stesse regole del programma: i permessi di modifica non impostati valgono solo per
+  // l amministratore (puoModificare), le azioni automatiche del Piano seguono
+  // piano_azioni_auto; pagine, funzioni e schede del Piano non impostate valgono per tutti
+  const _vDi = (key) => {
+    if (visibilitaConfig[key] != null) return visibilitaConfig[key];
+    if (PIANO_AUTO_EREDITATI.includes(key)) return visibilitaConfig.piano_azioni_auto || 'admin';
+    if (key === 'piano' || key in VIS_ITEMS.permessi) return 'admin';
+    return 'tutti';
+  };
   const concesso = (key, op) => {
-    const v = visibilitaConfig[key] != null ? visibilitaConfig[key] : key === 'piano' ? 'admin' : 'tutti';
+    const v = _vDi(key);
     if (v === 'nascosto' || v === 'admin') return false;
     if (typeof v === 'object' && v.tipo === 'selezionati') return !!(v.operatori && v.operatori.includes(op));
     return true;
   };
   const impostazione = (key) => {
-    const v = visibilitaConfig[key] != null ? visibilitaConfig[key] : key === 'piano' ? 'admin' : 'tutti';
+    const v = _vDi(key);
     return v === 'tutti'
       ? 'tutti'
       : v === 'admin'
@@ -2569,7 +2578,9 @@ function stampaSchedaPermessi() {
   const gruppi = [
     ['Pagine', VIS_ITEMS.pagine],
     ['Funzioni', VIS_ITEMS.funzioni],
-    ['Permessi e schede del Piano', VIS_ITEMS.permessi],
+    ['Permessi', VIS_ITEMS.permessi],
+    ['Piano: schede visibili', VIS_ITEMS.piano_schede],
+    ['Piano: schede modificabili', VIS_ITEMS.piano_modifica],
   ];
   const oggi = new Date().toLocaleDateString('it-IT');
   let h =
