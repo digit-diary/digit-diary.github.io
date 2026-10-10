@@ -2531,12 +2531,9 @@ function _settingsVai(id) {
 // Lo stato REALE dei permessi (non la matrice dei profili): per ogni
 // operatore, cosa vede e cosa puo fare, con profilo, settori e accessi
 // extra. Si apre in una finestra pronta per la stampa o il PDF.
-function stampaSchedaPermessi() {
-  if (!isAdmin()) {
-    toast('Riservato all amministratore');
-    return;
-  }
-  const ops = [
+// operatori della scheda dei permessi (stampa e scheda da compilare)
+function _schedaPermessiOperatori() {
+  return [
     ...new Set(
       (typeof operatoriSalvati !== 'undefined' ? operatoriSalvati : []).concat(
         (typeof operatoriAuthCache !== 'undefined' ? operatoriAuthCache : []).map((o) => o.nome),
@@ -2545,26 +2542,53 @@ function stampaSchedaPermessi() {
   ]
     .filter(Boolean)
     .sort();
+}
+// SCHEDA DA COMPILARE: file HTML gia spuntato con i permessi di adesso (caselle Si/no
+// modificabili, note, firme, Salva copia compilata), dal modello unico js/scheda-permessi.js
+function scaricaSchedaPermessiCompilabile() {
+  if (!isAdmin()) {
+    toast('Riservato all amministratore');
+    return;
+  }
+  const nomiProf = Object.assign({}, PROFILI);
+  Object.keys(_profiliCustom()).forEach((id) => (nomiProf[id] = _profiliCustom()[id].nome + ' (personalizzato)'));
+  const ops = _schedaPermessiOperatori();
+  const oggi = new Date()
+    .toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    .replace(/\//g, '.');
+  const pagina = SchedaPermessi.html({
+    ops: ops,
+    nomiProfili: nomiProf,
+    profili: typeof profiliOperatori !== 'undefined' && profiliOperatori ? profiliOperatori : {},
+    settori: typeof operatoriRepartoMap !== 'undefined' && operatoriRepartoMap ? operatoriRepartoMap : {},
+    extra: window._operatoriAccessiExtra || {},
+    vis: visibilitaConfig,
+    voci: VIS_ITEMS,
+    ereditati: PIANO_AUTO_EREDITATI,
+    oggi: oggi,
+  });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([pagina], { type: 'text/html;charset=utf-8' }));
+  a.download = 'SCHEDA_PERMESSI_' + oggi.split('.').reverse().join('-') + '.html';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  logAzione('Scheda permessi scaricata', ops.length + ' operatori');
+  toast('Scheda scaricata: aprila, controlla le caselle e usa Salva copia compilata');
+}
+function stampaSchedaPermessi() {
+  if (!isAdmin()) {
+    toast('Riservato all amministratore');
+    return;
+  }
+  const ops = _schedaPermessiOperatori();
   const prof = typeof profiliOperatori !== 'undefined' && profiliOperatori ? profiliOperatori : {};
   const rep = typeof operatoriRepartoMap !== 'undefined' && operatoriRepartoMap ? operatoriRepartoMap : {};
   const extra = window._operatoriAccessiExtra || {};
   const nomiProf = Object.assign({}, typeof PROFILI !== 'undefined' ? PROFILI : {});
   Object.keys(_profiliCustom()).forEach((id) => (nomiProf[id] = _profiliCustom()[id].nome));
-  // stesse regole del programma: i permessi di modifica non impostati valgono solo per
-  // l amministratore (puoModificare), le azioni automatiche del Piano seguono
-  // piano_azioni_auto; pagine, funzioni e schede del Piano non impostate valgono per tutti
-  const _vDi = (key) => {
-    if (visibilitaConfig[key] != null) return visibilitaConfig[key];
-    if (PIANO_AUTO_EREDITATI.includes(key)) return visibilitaConfig.piano_azioni_auto || 'admin';
-    if (key === 'piano' || key in VIS_ITEMS.permessi) return 'admin';
-    return 'tutti';
-  };
-  const concesso = (key, op) => {
-    const v = _vDi(key);
-    if (v === 'nascosto' || v === 'admin') return false;
-    if (typeof v === 'object' && v.tipo === 'selezionati') return !!(v.operatori && v.operatori.includes(op));
-    return true;
-  };
+  // stesse regole del programma e della scheda da compilare (js/scheda-permessi.js)
+  const _vDi = (key) => SchedaPermessi.valore(visibilitaConfig, key, VIS_ITEMS, PIANO_AUTO_EREDITATI);
+  const concesso = (key, op) => SchedaPermessi.concesso(visibilitaConfig, key, op, VIS_ITEMS, PIANO_AUTO_EREDITATI);
   const impostazione = (key) => {
     const v = _vDi(key);
     return v === 'tutti'
