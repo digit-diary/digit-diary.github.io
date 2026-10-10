@@ -38,6 +38,11 @@
  *                 organico, non si risolvono con doppioni.
  *   pesoCambio    punti per ogni cella diversa dal piano di partenza (default 0;
  *                 per le proposte su un piano gia sistemato: meno cambi possibile)
+ *   pesoRaro      quanto puo valere al massimo un posto che possono coprire in pochi
+ *                 (default 5): un posto scoperto vale (persone che possono fare un
+ *                 turno medio del mese) / (persone che possono fare quel turno), fra 1 e
+ *                 pesoRaro. Senza, Migliora lasciava scoperto un 21 dei SUP dei Tavoli
+ *                 (5 persone) per coprire un 8 che possono fare in 40.
  *   maxScoperti   il risultato non puo lasciare piu posti scoperti di cosi
  *                 (default: quelli di partenza): la ricerca puo passarci in mezzo,
  *                 ma il piano migliore si sceglie solo fra quelli che lo rispettano
@@ -64,7 +69,10 @@
 
   function crea(problema, opzioni) {
     const P = problema;
-    const o = Object.assign({ pesoScoperto: 300, pesoEccesso: 1000000, pesoCambio: 0, seme: 1 }, opzioni || {});
+    const o = Object.assign(
+      { pesoScoperto: 300, pesoEccesso: 1000000, pesoCambio: 0, pesoRaro: 5, seme: 1 },
+      opzioni || {},
+    );
     const rnd = casuale(o.seme);
     const scegli = (arr) => arr[Math.floor(rnd() * arr.length)];
     const giorni = P.giorni.slice();
@@ -107,6 +115,38 @@
       Object.keys(f).forEach((c) => (s += Math.max(0, (f[c] || 0) - (assegnati[d][c] || 0))));
       return s;
     };
+    // POSTI RARI: quante persone possono coprire ogni turno del fabbisogno quel giorno
+    // (fra chi ha la cella libera da cambiare o ce l ha gia); il posto scoperto pesa di piu
+    // quando i possibili sono pochi rispetto a un turno medio del mese
+    const pesoPosto = {};
+    (() => {
+      const conteggi = [];
+      giorni.forEach((d) => {
+        pesoPosto[d] = {};
+        Object.keys(fab[d] || {}).forEach((c) => {
+          if (!(fab[d][c] > 0)) return;
+          const k = persone.filter((n) => stato[n][d] === c || (puo(n, d) && ammessi(n, d).includes(c))).length;
+          pesoPosto[d][c] = k;
+          conteggi.push(k);
+        });
+      });
+      conteggi.sort((a, b) => a - b);
+      const medio = conteggi.length ? conteggi[Math.floor(conteggi.length / 2)] : 1;
+      giorni.forEach((d) =>
+        Object.keys(pesoPosto[d]).forEach((c) => {
+          const k = pesoPosto[d][c];
+          pesoPosto[d][c] = Math.min(o.pesoRaro, Math.max(1, k ? medio / k : o.pesoRaro));
+        }),
+      );
+    })();
+    const scopertiPesoGiorno = (d) => {
+      let s = 0;
+      const f = fab[d] || {};
+      Object.keys(f).forEach(
+        (c) => (s += Math.max(0, (f[c] || 0) - (assegnati[d][c] || 0)) * ((pesoPosto[d] || {})[c] || 1)),
+      );
+      return s;
+    };
     // persone in piu del fabbisogno sui turni del fabbisogno di quel giorno
     const eccessoGiorno = (d) => {
       let e = 0;
@@ -130,6 +170,7 @@
     const costoP = {};
     const costoG = {};
     const scopG = {};
+    const scopW = {}; // scoperti pesati (posti rari valgono di piu): solo per il punteggio
     const eccG = {};
     // regole sul mese intero (facoltative): ricalcolate a ogni mossa
     let costoM = P.costoMese ? P.costoMese(stato) : 0;
@@ -137,10 +178,11 @@
     giorni.forEach((d) => {
       costoG[d] = P.costoGiorno ? P.costoGiorno(d, perNomeGiorno(d)) : 0;
       scopG[d] = scopertiGiorno(d);
+      scopW[d] = scopertiPesoGiorno(d);
       eccG[d] = eccessoGiorno(d);
     });
     const somma = (obj) => Object.keys(obj).reduce((t, k) => t + obj[k], 0);
-    let totale = somma(costoP) + somma(costoG) + costoM + o.pesoScoperto * somma(scopG) + o.pesoEccesso * somma(eccG);
+    let totale = somma(costoP) + somma(costoG) + costoM + o.pesoScoperto * somma(scopW) + o.pesoEccesso * somma(eccG);
     const misura = () => ({
       punteggio: totale,
       scoperti: somma(scopG),
@@ -161,7 +203,7 @@
       const gg = [...new Set(mossa.map((m) => m.d))];
       const primaP = nomi.map((n) => costoP[n]);
       const primaG = gg.map((d) => costoG[d]);
-      const primaS = gg.map((d) => scopG[d]);
+      const primaS = gg.map((d) => scopW[d]);
       const primaE = gg.map((d) => eccG[d]);
       // applica
       mossa.forEach((m, i) => {
@@ -172,7 +214,7 @@
       });
       const dopoP = nomi.map((n) => P.costoPersona(n, stato[n]) + o.pesoCambio * cambiPersona(n));
       const dopoG = gg.map((d) => (P.costoGiorno ? P.costoGiorno(d, perNomeGiorno(d)) : 0));
-      const dopoS = gg.map((d) => scopertiGiorno(d));
+      const dopoS = gg.map((d) => scopertiPesoGiorno(d));
       const dopoE = gg.map((d) => eccessoGiorno(d));
       // regole del mese: solo se la mossa tocca chi conta (es. le funzioni con un limite nel mese)
       const dopoM = P.costoMese && (!P.toccaMese || nomi.some((n) => P.toccaMese(n))) ? P.costoMese(stato) : costoM;
@@ -196,7 +238,8 @@
       costoM = dopoM;
       gg.forEach((d, i) => {
         costoG[d] = dopoG[i];
-        scopG[d] = dopoS[i];
+        scopW[d] = dopoS[i];
+        scopG[d] = scopertiGiorno(d);
         eccG[d] = dopoE[i];
       });
       totale += delta;
@@ -336,10 +379,11 @@
       giorni.forEach((d) => {
         costoG[d] = P.costoGiorno ? P.costoGiorno(d, perNomeGiorno(d)) : 0;
         scopG[d] = scopertiGiorno(d);
+        scopW[d] = scopertiPesoGiorno(d);
         eccG[d] = eccessoGiorno(d);
       });
       costoM = P.costoMese ? P.costoMese(stato) : 0;
-      totale = somma(costoP) + somma(costoG) + costoM + o.pesoScoperto * somma(scopG) + o.pesoEccesso * somma(eccG);
+      totale = somma(costoP) + somma(costoG) + costoM + o.pesoScoperto * somma(scopW) + o.pesoEccesso * somma(eccG);
     }
     // RIFINITURA: ogni cella cambiata prova a tornare com era (da sola, poi insieme a
     // un altra cella cambiata dello stesso giorno, come negli scambi): resta solo se
@@ -413,6 +457,7 @@
       let regole = P.costoMese ? P.costoMese(s) : 0;
       persone.forEach((n) => (regole += P.costoPersona(n, s[n])));
       let scop = 0;
+      let scopPeso = 0;
       let ecc = 0;
       giorni.forEach((d) => {
         const x = {};
@@ -424,7 +469,11 @@
           const c = s[n][d];
           if (c) cnt[c] = (cnt[c] || 0) + 1;
         });
-        Object.keys(f).forEach((c) => (scop += Math.max(0, (f[c] || 0) - (cnt[c] || 0))));
+        Object.keys(f).forEach((c) => {
+          const manca = Math.max(0, (f[c] || 0) - (cnt[c] || 0));
+          scop += manca;
+          scopPeso += manca * ((pesoPosto[d] || {})[c] || 1);
+        });
         Object.keys(f).forEach((c) => (ecc += Math.max(0, (cnt[c] || 0) - (f[c] || 0))));
       });
       return {
@@ -435,7 +484,7 @@
           scoperti: scop,
           eccesso: ecc,
           regole: regole,
-          punteggio: regole + o.pesoScoperto * scop + o.pesoEccesso * ecc + o.pesoCambio * cambi.length,
+          punteggio: regole + o.pesoScoperto * scopPeso + o.pesoEccesso * ecc + o.pesoCambio * cambi.length,
         },
         iterazioni: iterazioni,
         accettate: accettate,

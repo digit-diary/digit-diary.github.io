@@ -171,6 +171,29 @@ ok(
 const finti = (r7.cambi || []).filter((c) => !c.prima && !c.dopo).length;
 ok(finti === 0, 'nessun cambio finto da vuoto a vuoto (' + finti + ')');
 
+console.log('== posti rari prima dei comuni ==');
+// un giorno: il turno S lo puo fare solo Anna, il turno M Anna e Bruno. Lasciare
+// scoperto S o una M e lo stesso numero di posti: deve restare scoperta la M
+{
+  const d0 = giorni[0];
+  const pr = {
+    giorni: [d0],
+    persone: ['Anna', 'Bruno'],
+    stato: { Anna: { [d0]: 'M' }, Bruno: { [d0]: 'M' } },
+    riposo: '',
+    fabbisogno: { [d0]: { S: 1, M: 2 } },
+    modificabile: () => true,
+    ammessi: (n) => (n === 'Anna' ? ['S', 'M', ''] : ['M', '']),
+    costoPersona: () => 0,
+  };
+  const r = R.cerca(pr, { seme: 3 }, 2000);
+  ok(
+    r.stato.Anna[d0] === 'S' && r.stato.Bruno[d0] === 'M',
+    'Anna copre il turno che sa fare solo lei (' + r.stato.Anna[d0] + ')',
+  );
+  ok(r.dopo.scoperti === 1, 'resta scoperto un solo posto, quello che altri possono coprire');
+}
+
 console.log('== non peggiora mai ==');
 ok(
   r1.dopo.punteggio <= r1.prima.punteggio && r2.dopo.punteggio <= r2.prima.punteggio,
