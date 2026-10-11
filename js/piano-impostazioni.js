@@ -580,9 +580,11 @@ async function esportaPianoDati(tipo) {
           'Turni solo a mano',
         ],
       ];
-      // Preferisce L1 e Accoglienza: solo slot
-      const soloSlotsCsv = _pianoReparto() === 'slots';
-      if (!soloSlotsCsv) righe[0].splice(10, 2);
+      // Preferisce e Accoglienza: solo nei settori dove servono (_pianoColonnePreferenze)
+      const colCsv = _pianoColonnePreferenze();
+      if (colCsv.preferiti.length) righe[0][10] = 'Preferisce ' + colCsv.preferiti.join(', ');
+      if (!colCsv.accoglienza) righe[0].splice(11, 1);
+      if (!colCsv.preferiti.length) righe[0].splice(10, 1);
       collaboratoriCache
         .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c))
         .forEach((c) =>
@@ -597,7 +599,8 @@ async function esportaPianoDati(tipo) {
             c.giorni_settimana || '',
             c.turni_bloccati || '',
             c.turni_consentiti || '',
-            ...(soloSlotsCsv ? [c.prefers_l1 ? 'SI' : '', c.accoglienza || 0] : []),
+            ...(colCsv.preferiti.length ? [c.prefers_l1 ? 'SI' : ''] : []),
+            ...(colCsv.accoglienza ? [c.accoglienza || 0] : []),
             c.accompagnamento_settori || '',
             c.lingue || '',
             c.turni_solo_a_mano ? 'SI' : '',
@@ -2841,8 +2844,9 @@ function _renderPianoPreferenzeCard() {
   }
   h +=
     '<div style="display:flex;margin-bottom:8px"><input type="text" id="pref-collab-cerca" class="piano-cerca campo-cerca" placeholder="Cerca collaboratore..." oninput="_filtraPrefCollab(this.value)"></div>';
-  // Preferisce L1 e Accoglienza riguardano solo le slot (turni L1, gruppo ACCOGLIENZA)
-  const soloSlots = _pianoReparto() === 'slots';
+  // Preferisce e Accoglienza: solo nei settori dove servono (prima: solo le Slots per nome)
+  const colPref = _pianoColonnePreferenze();
+  const prefSigle = colPref.preferiti.join(', ');
   // chi vede lo Storico HR senza poterlo modificare (e senza gestire il piano) legge le
   // preferenze ma non le cambia: campi disattivati (prima li spuntava e il salvataggio
   // veniva rifiutato con la spunta che restava a schermo)
@@ -2854,8 +2858,15 @@ function _renderPianoPreferenzeCard() {
     '<fieldset' +
     (prefSolaLettura ? ' disabled' : '') +
     ' style="border:0;padding:0;margin:0;min-width:0"><div style="overflow-x:auto"><table class="piano-table" id="pref-collab-table" style="min-width:760px;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Funzione</th><th>%</th><th>Solo diurni</th><th title="Solo turni notturni">Solo notturni</th><th title="Non sta nella rotazione (es. ufficio): bozza, Migliora, coperture e cambi non le propongono mai turni e la bozza non riempie i giorni vuoti. Turni scritti a mano; le ore contano come sempre">Turni solo a mano</th><th style="text-align:left" title="Giorni in cui lavora: negli altri non viene mai proposto (bozza, Migliora, generazione automatica, cerca cambio, copertura malattia, formazioni). Nessuna spunta = tutti i giorni">Giorni di lavoro</th><th style="text-align:left">Turni bloccati (CSV)</th><th style="text-align:left" title="Eccezioni alle regole Turni per livello: questi turni li può fare anche senza il livello richiesto (CSV)">Turni consentiti</th>' +
-    (soloSlots
-      ? '<th title="La bozza le privilegia sui turni L1">Preferisce L1</th><th title="Livello accoglienza (0-2): serve per il gruppo ACCOGLIENZA">Accoglienza</th>'
+    (colPref.preferiti.length
+      ? '<th title="La bozza dà per primi a queste persone i turni ' +
+        escP(prefSigle) +
+        ' (si cambiano in Regole: Turno preferito)">Preferisce ' +
+        escP(prefSigle) +
+        '</th>'
+      : '') +
+    (colPref.accoglienza
+      ? '<th title="Livello accoglienza (0-2): serve per il gruppo ACCOGLIENZA">Accoglienza</th>'
       : '') +
     '<th style="text-align:left" title="Aree dove lavora affiancato: può fare i turni ma mai da solo (es: REC)">Affiancato in</th><th style="text-align:left" title="Altri reparti in cui lavora (CSV, es: valet): appare anche nei loro piani e le ore si sommano">Reparti extra</th><th style="text-align:left" title="Derivate dalle competenze certificate in Formazione (sola lettura: si cambiano in Formazione)">Aree abilitate</th></tr></thead><tbody>';
   collabs.forEach((c) => {
@@ -2892,12 +2903,17 @@ function _renderPianoPreferenzeCard() {
       '" placeholder="Es: 10,9" title="Turni che può fare anche senza il livello richiesto (regole Turni per livello)" onchange="salvaPreferenzaCollab(' +
       c.id +
       ',\'turni_consentiti\',this.value)" style="width:100px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td>' +
-      (soloSlots
+      (colPref.preferiti.length
         ? '<td><input type="checkbox"' +
           (c.prefers_l1 ? ' checked' : '') +
-          ' onchange="salvaPreferenzaCollab(' +
+          ' aria-label="Preferisce ' +
+          escP(prefSigle) +
+          '" onchange="salvaPreferenzaCollab(' +
           c.id +
-          ',\'prefers_l1\',this.checked)"></td><td><input type="number" min="0" max="2" value="' +
+          ",'prefers_l1',this.checked)\"></td>"
+        : '') +
+      (colPref.accoglienza
+        ? '<td><input type="number" min="0" max="2" value="' +
           (parseInt(c.accoglienza) || 0) +
           '" onchange="salvaPreferenzaCollab(' +
           c.id +
@@ -3157,6 +3173,24 @@ function _pianoGiorniLavoroTesto(v) {
     .filter((g) => set.includes(g[0]))
     .map((g) => g[2])
     .join(', ');
+}
+// COLONNE FACOLTATIVE delle Preferenze collaboratori per il settore aperto, decise dai dati
+// e non dal nome del settore (prima: solo Slots):
+// - preferiti: sigle del "turno preferito" (impostazione turno_preferito_sigle, senza: L1)
+//   che esistono fra i turni del settore; vuoto = colonna "Preferisce" nascosta
+// - accoglienza: il settore ha turni del gruppo ACCOGLIENZA o persone con un livello
+function _pianoColonnePreferenze() {
+  const turni = _pianoTurniReparto();
+  const sigle = new Set(turni.map((t) => String(t.codice).toUpperCase()));
+  const v = _pianoRegolaVal('turno_preferito_sigle');
+  const preferiti = String(v == null ? 'L1' : v)
+    .split(',')
+    .map((x) => x.trim().toUpperCase())
+    .filter((x) => x && sigle.has(x));
+  const accoglienza =
+    turni.some((t) => String(t.gruppo || '').toUpperCase() === 'ACCOGLIENZA') ||
+    collaboratoriCache.some((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && parseInt(c.accoglienza) > 0);
+  return { preferiti: [...new Set(preferiti)], accoglienza: accoglienza };
 }
 function _pianoGiorniLavoroChips(c) {
   const set = String(c.giorni_lavoro || '')

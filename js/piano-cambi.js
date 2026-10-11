@@ -610,9 +610,10 @@ function ccAggiornaRestituzioni() {
 }
 // un cambio alla volta: il doppio click su "Applica cambio" lo applicava due volte
 function confermaCercaCambioLibero() {
-  return unaVoltaSola('piano-cerca-cambio-applica', () => _confermaCercaCambioLiberoEsegui());
+  return unaVoltaSola('piano-cerca-cambio-applica', () => _pianoConScrittura(() => _confermaCercaCambioLiberoEsegui()));
 }
 async function _confermaCercaCambioLiberoEsegui() {
+  const avvisoRete = !!window._sessioneScadutaAvvisata;
   if (!_ccDati || !puoGestirePiano()) return;
   if (!(await _pianoConsentiScrittura(_ccDati.data))) return; // giorno chiuso
   const i = parseInt((document.getElementById('cc-collega') || {}).value) || 0;
@@ -669,60 +670,65 @@ async function _confermaCercaCambioLiberoEsegui() {
   if (!(await chiediConferma(msg + "\n\nConfermi? Verra' generato il formulario cambio turno da stampare e firmare.")))
     return;
   if (domPerse.length) logAzione('Piano: domenica libera persa confermata', domPerse.join(' | '));
-  _pianoUndoSnap('cerca cambio ' + _ccDati.data);
-  const scrivi = async (nome, dstr, codice, exCod, commento) => {
-    const righe =
-      (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=eq.' + dstr + '&limit=5')) || [];
-    const r0 = righe[0];
-    if (r0 && (r0.reparto_dip || 'slots') !== _pianoReparto())
-      throw new Error(nome + ' il ' + dstr + ' ha una cella nel piano ' + repartoLabel(r0.reparto_dip));
-    if (r0 && _pianoCellaRiservata(r0))
-      throw new Error(nome + ' il ' + dstr + ': cella riservata (' + _pianoCellaRiservata(r0) + ')');
-    const body = {
-      codice: codice,
-      protetto: true,
-      generato: false,
-      commento: commento.substring(0, 400),
-      operatore: op,
-    };
-    if (r0) {
-      body.updated_at = new Date().toISOString();
-      await secPatch('piano', 'id=eq.' + r0.id, body);
-      const inMem = _pianoRighe.find((x) => x.id === r0.id);
-      if (inMem) Object.assign(inMem, body);
-    } else {
-      body.collaboratore = nome;
-      body.data = dstr;
-      body.reparto_dip = _pianoReparto();
-      await _pianoInserisciCella(body);
-    }
-  };
-  try {
-    // commenti nello stesso formato dello scambio classico: Ex <vecchio> - cambio con <nome> - <operatore>
-    await scrivi(
-      _ccDati.nome,
-      _ccDati.data,
+  const passo = _pianoUndoSnap('cerca cambio ' + _ccDati.data);
+  // TUTTO O NIENTE, e solo se le celle sono ancora quelle mostrate: le 2-4 celle del
+  // cambio si scrivono in UNA scrittura (prima una alla volta, senza ritorno)
+  const celle = [
+    [_ccDati.nome, _ccDati.data, 'C', 'Ex ' + _ccDati.codice + ' - cambio con ' + cand.nome + ' - ' + op],
+    [cand.nome, _ccDati.data, _ccDati.codice, 'Ex C - cambio con ' + _ccDati.nome + ' - ' + op],
+  ];
+  // commenti nello stesso formato dello scambio classico: Ex <vecchio> - cambio con <nome> - <operatore>
+  if (rInfo) {
+    celle.push([
+      cand.nome,
+      dataRest,
       'C',
-      _ccDati.codice,
-      'Ex ' + _ccDati.codice + ' - cambio con ' + cand.nome + ' - ' + op,
+      'Ex ' + rInfo.codice + ' - restituzione cambio con ' + _ccDati.nome + ' - ' + op,
+    ]);
+    celle.push([_ccDati.nome, dataRest, rInfo.codice, 'Ex C - restituzione cambio con ' + cand.nome + ' - ' + op]);
+  }
+  let esito;
+  try {
+    const lette = await Promise.all(
+      celle.map((c) =>
+        secGet('piano?collaboratore=eq.' + encodeURIComponent(c[0]) + '&data=eq.' + c[1] + '&limit=5').then(
+          (x) => (x || [])[0] || null,
+        ),
+      ),
     );
-    await scrivi(cand.nome, _ccDati.data, _ccDati.codice, 'C', 'Ex C - cambio con ' + _ccDati.nome + ' - ' + op);
-    if (rInfo) {
-      await scrivi(
-        cand.nome,
-        dataRest,
-        'C',
-        rInfo.codice,
-        'Ex ' + rInfo.codice + ' - restituzione cambio con ' + _ccDati.nome + ' - ' + op,
-      );
-      await scrivi(
-        _ccDati.nome,
-        dataRest,
-        rInfo.codice,
-        'C',
-        'Ex C - restituzione cambio con ' + cand.nome + ' - ' + op,
-      );
-    }
+    const ops = celle.map((c, i) => {
+      const r0 = lette[i];
+      if (r0 && (r0.reparto_dip || 'slots') !== _pianoReparto())
+        throw new Error(c[0] + ' il ' + c[1] + ' ha una cella nel piano ' + repartoLabel(r0.reparto_dip));
+      if (r0 && _pianoCellaRiservata(r0))
+        throw new Error(c[0] + ' il ' + c[1] + ': cella riservata (' + _pianoCellaRiservata(r0) + ')');
+      const dati = {
+        codice: c[2],
+        protetto: true,
+        generato: false,
+        commento: c[3].substring(0, 400),
+        operatore: op,
+      };
+      if (r0) dati.updated_at = new Date().toISOString();
+      else dati.reparto_dip = _pianoReparto();
+      return { collaboratore: c[0], data: c[1], atteso: _pianoAttesoVisto(c[0], c[1], r0), dati: dati };
+    });
+    esito = await _pianoScriviCelle(ops);
+  } catch (e) {
+    _pianoUndoScarta(passo);
+    console.error(e);
+    _pianoErroreScrittura('Cambio NON applicato: ', e, avvisoRete);
+    return;
+  }
+  if (!esito.ok) {
+    _pianoUndoScarta(passo);
+    document.getElementById('pwd-modal').classList.add('hidden');
+    _ccDati = null;
+    await _pianoAvvisaConflitti(esito.conflitti, 'Cambio non applicato');
+    return;
+  }
+  _pianoMemoriaDopo(esito.ops, esito.righe);
+  try {
     logAzione(
       'Piano: scambio turno',
       _ccDati.nome +
@@ -779,8 +785,10 @@ async function _confermaCercaCambioLiberoEsegui() {
     _ccDati = null;
     renderPiano();
   } catch (e) {
+    // le celle sono scritte: qui si ferma solo il seguito (formulario, registro)
     console.error(e);
-    toast('Errore applicazione cambio');
+    toastErrore('Cambio applicato, ma il seguito non e riuscito: ' + ((e && e.message) || e));
+    renderPiano();
   }
 }
 
@@ -940,7 +948,12 @@ async function apriScambioTurno() {
     '<div class="pwd-modal-btns" style="margin-top:14px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="confermaScambioTurno()">Scambia</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
 }
-async function confermaScambioTurno() {
+// scambio in corso: la generazione automatica aspetta (anche durante le conferme)
+function confermaScambioTurno() {
+  return _pianoConScrittura(() => _confermaScambioTurnoEsegui());
+}
+async function _confermaScambioTurnoEsegui() {
+  const avvisoRete = !!window._sessioneScadutaAvvisata;
   const sel = _pianoCellaSel;
   if (sel && sel.data && !(await _pianoConsentiScrittura(sel.data))) return; // giorno chiuso
   const collega = (document.getElementById('scambio-collega') || {}).value;
@@ -1074,69 +1087,91 @@ async function confermaScambioTurno() {
       return;
     }
   }
-  _pianoUndoSnap('scambio turno ' + sel.data);
-  try {
-    await secPatch('piano', 'id=eq.' + r1.id, {
-      codice: c2,
-      protetto: true,
-      commento: (nota1 + (c1 ? 'Ex ' + c1 + ' - ' : '') + 'cambio con ' + collega + ' - ' + getOperatore()).substring(
-        0,
-        400,
-      ),
-      operatore: getOperatore(),
-      updated_at: new Date().toISOString(),
-    });
-    await secPatch('piano', 'id=eq.' + r2.id, {
-      codice: c1,
-      protetto: true,
-      commento: (nota2 + (c2 ? 'Ex ' + c2 + ' - ' : '') + 'cambio con ' + sel.nome + ' - ' + getOperatore()).substring(
-        0,
-        400,
-      ),
-      operatore: getOperatore(),
-      updated_at: new Date().toISOString(),
-    });
-    r1.codice = c2;
-    r2.codice = c1;
-    r1.protetto = r2.protetto = true;
-    // Restituzione: come Turnivo, scambio inverso applicato subito alla data indicata
-    if (dataRest) {
-      const op = getOperatore();
-      // chi quel giorno non ha cella e' libero: dopo la restituzione riceve C
-      const ca = ra ? ra.codice : 'C';
-      const cb = rb ? rb.codice : 'C';
-      const applica = async (riga, nomeC, nuovoCod, exCod, altroNome, notaR) => {
-        const commento = (notaR || '') + 'Ex ' + exCod + ' - restituzione cambio con ' + altroNome + ' - ' + op;
-        if (riga) {
-          await secPatch('piano', 'id=eq.' + riga.id, {
-            codice: nuovoCod,
-            protetto: true,
-            generato: false,
-            commento: commento,
-            operatore: op,
-            updated_at: new Date().toISOString(),
-          });
-          riga.codice = nuovoCod;
-          riga.protetto = true;
-          riga.commento = commento;
-        } else if (nuovoCod) {
-          const n = await _pianoInserisciCella({
-            collaboratore: nomeC,
-            data: dataRest,
-            codice: nuovoCod,
-            protetto: true,
-            generato: false,
-            commento: commento,
-            reparto_dip: _pianoReparto(),
-            operatore: op,
-          });
-          if (n && String(dataRest).startsWith(_pianoMeseSel)) _pianoRighe.push(Array.isArray(n) ? n[0] : n);
-        }
+  const passo = _pianoUndoSnap('scambio turno ' + sel.data);
+  // TUTTO O NIENTE, e solo se le celle sono ancora quelle mostrate: le due (o quattro,
+  // con la restituzione) celle si scrivono in UNA scrittura. Prima erano scritture in
+  // fila: un errore a meta lasciava uno solo dei due con il turno scambiato.
+  const opS = getOperatore();
+  const adesso = new Date().toISOString();
+  const ops = [
+    {
+      collaboratore: sel.nome,
+      data: sel.data,
+      atteso: _pianoAttesoDi(r1),
+      dati: {
+        codice: c2,
+        protetto: true,
+        commento: (nota1 + (c1 ? 'Ex ' + c1 + ' - ' : '') + 'cambio con ' + collega + ' - ' + opS).substring(0, 400),
+        operatore: opS,
+        updated_at: adesso,
+      },
+    },
+    {
+      collaboratore: collega,
+      data: sel.data,
+      atteso: _pianoAttesoDi(r2),
+      dati: {
+        codice: c1,
+        protetto: true,
+        commento: (nota2 + (c2 ? 'Ex ' + c2 + ' - ' : '') + 'cambio con ' + sel.nome + ' - ' + opS).substring(0, 400),
+        operatore: opS,
+        updated_at: adesso,
+      },
+    },
+  ];
+  // Restituzione: come Turnivo, scambio inverso applicato subito alla data indicata
+  if (dataRest) {
+    // chi quel giorno non ha cella e' libero: dopo la restituzione riceve C
+    const ca = ra ? ra.codice : 'C';
+    const cb = rb ? rb.codice : 'C';
+    const applica = (riga, nomeC, nuovoCod, exCod, altroNome, notaR) => {
+      const commento = (
+        (notaR || '') +
+        'Ex ' +
+        exCod +
+        ' - restituzione cambio con ' +
+        altroNome +
+        ' - ' +
+        opS
+      ).substring(0, 400);
+      if (!riga && !nuovoCod) return;
+      const dati = {
+        codice: nuovoCod,
+        protetto: true,
+        generato: false,
+        commento: commento,
+        operatore: opS,
       };
-      await applica(ra, sel.nome, cb, ca, collega, notaRa);
-      await applica(rb, collega, ca, cb, sel.nome, notaRb);
-      logAzione('Piano: restituzione programmata', sel.nome + ' <-> ' + collega + ' il ' + dataRest);
+      if (riga) dati.updated_at = adesso;
+      else dati.reparto_dip = _pianoReparto();
+      ops.push({ collaboratore: nomeC, data: dataRest, atteso: _pianoAttesoVisto(nomeC, dataRest, riga), dati: dati });
+    };
+    applica(ra, sel.nome, cb, ca, collega, notaRa);
+    applica(rb, collega, ca, cb, sel.nome, notaRb);
+  }
+  let esito;
+  try {
+    // giorno di restituzione chiuso: si chiede lo sblocco prima di scrivere
+    if (dataRest && !(await _pianoConsentiScrittura(dataRest))) {
+      _pianoUndoScarta(passo);
+      return;
     }
+    esito = await _pianoScriviCelle(ops);
+  } catch (e) {
+    _pianoUndoScarta(passo);
+    console.error(e);
+    _pianoErroreScrittura('Scambio NON fatto: ', e, avvisoRete);
+    renderPiano();
+    return;
+  }
+  if (!esito.ok) {
+    _pianoUndoScarta(passo);
+    await _pianoAvvisaConflitti(esito.conflitti, 'Scambio non fatto');
+    return;
+  }
+  _pianoMemoriaDopo(esito.ops, esito.righe);
+  try {
+    if (dataRest) logAzione('Piano: restituzione programmata', sel.nome + ' <-> ' + collega + ' il ' + dataRest);
     logAzione('Piano: scambio turno', sel.nome + ' (' + c1 + ') <-> ' + collega + ' (' + c2 + ') il ' + sel.data);
     if (window._pianoDerogaDaRegistrare) {
       logAzione('Piano: scambio autorizzato oltre limite', window._pianoDerogaDaRegistrare);
@@ -1177,8 +1212,10 @@ async function confermaScambioTurno() {
     }
     renderPiano();
   } catch (e) {
+    // le celle sono scritte: qui si ferma solo il seguito (formulario, registro)
     console.error(e);
-    toast('Errore scambio turno');
+    toastErrore('Turni scambiati, ma il seguito non e riuscito: ' + ((e && e.message) || e));
+    renderPiano();
   }
 }
 
@@ -1984,9 +2021,10 @@ async function _pianoMalattiaViaDiario(nome, giorniDstr) {
 }
 // una copertura alla volta: il doppio click su "Conferma copertura" la applicava due volte
 function confermaCoperturaMalattia() {
-  return unaVoltaSola('piano-copertura-malattia', () => _confermaCoperturaMalattiaEsegui());
+  return unaVoltaSola('piano-copertura-malattia', () => _pianoConScrittura(() => _confermaCoperturaMalattiaEsegui()));
 }
 async function _confermaCoperturaMalattiaEsegui() {
+  const avvisoRete = !!window._sessioneScadutaAvvisata;
   const m = _malattiaPiano;
   if (!m) return;
   // basta lo sblocco sul primo giorno: copre il flusso, e gli inserimenti sui
@@ -2030,132 +2068,107 @@ async function _confermaCoperturaMalattiaEsegui() {
   const dstrDi = (g) => ym + '-' + String(g).padStart(2, '0');
   const rigaDi = {};
   _pianoRighe.forEach((r) => (rigaDi[r.collaboratore + '|' + parseInt(r.data.split('-')[2])] = r));
-  _pianoUndoSnap('copertura ' + (ass.codice === 'ND' ? 'non disponibilità ' : 'malattia ') + _pianoMeseSel);
+  const passo = _pianoUndoSnap(
+    'copertura ' + (ass.codice === 'ND' ? 'non disponibilità ' : 'malattia ') + _pianoMeseSel,
+  );
   let nM = 0;
   let nSost = 0;
   const sostituti = new Set();
-  try {
-    for (const d of m.giorni) {
-      if (d.salta) continue;
-      // M al malato (protetta)
-      const rMal = rigaDi[m.nome + '|' + d.g];
-      if (rMal) {
-        await secPatch('piano', 'id=eq.' + rMal.id, {
-          codice: ass.codice,
-          protetto: true,
-          generato: false,
-          // la malattia scioglie il blocco, come negli altri percorsi
-          motivo_blocco: null,
-          commento: ('Ex ' + d.codice + ' - ' + (ass.nota ? ass.nota + ' - ' : '') + op).substring(0, 400),
-          operatore: op,
-          updated_at: new Date().toISOString(),
-        });
-      } else {
-        await _pianoInserisciCella({
-          collaboratore: m.nome,
-          data: dstrDi(d.g),
-          codice: ass.codice,
-          protetto: true,
-          generato: false,
-          reparto_dip: _pianoReparto(),
-          operatore: op,
-        });
-      }
-      nM++;
-      // turno al sostituto (protetto), SOLO se la soluzione ha la spunta
-      if (d.sostituto && selGiorni.has(d.g)) {
-        // MOSSA A CATENA sul giorno prima, se prevista dalla proposta
-        if (d.catena) {
-          const g1 = d.catena.g1;
-          const rX1 = rigaDi[d.sostituto + '|' + g1];
-          if (d.catena.tipo === 'scambio') {
-            const rZ = rigaDi[d.catena.con + '|' + g1];
-            if (rX1 && rZ) {
-              await secPatch('piano', 'id=eq.' + rX1.id, {
-                codice: d.catena.turnoCon,
-                protetto: true,
-                generato: false,
-                commento: ('Ex ' + d.catena.turnoX + ' - cambio per esigenze operative - ' + op).substring(0, 400),
-                operatore: op,
-                updated_at: new Date().toISOString(),
-              });
-              await secPatch('piano', 'id=eq.' + rZ.id, {
-                codice: d.catena.turnoX,
-                protetto: true,
-                generato: false,
-                commento: ('Ex ' + d.catena.turnoCon + ' - cambio per esigenze operative - ' + op).substring(0, 400),
-                operatore: op,
-                updated_at: new Date().toISOString(),
-              });
-            }
-          } else {
-            // riassegna: il sostituto viene liberato, il suo turno passa al terzo
-            if (rX1)
-              await secPatch('piano', 'id=eq.' + rX1.id, {
-                codice: 'C',
-                protetto: true,
-                generato: false,
-                commento: ('Ex ' + d.catena.turnoX + ' - cambio per esigenze operative - ' + op).substring(0, 400),
-                operatore: op,
-                updated_at: new Date().toISOString(),
-              });
-            const rY = rigaDi[d.catena.con + '|' + g1];
-            const commY = (
-              (d.catena.eraCon ? 'Ex ' + d.catena.eraCon + ' - ' : '') +
-              'cambio per esigenze operative - ' +
-              op
-            ).substring(0, 400);
-            if (rY) {
-              await secPatch('piano', 'id=eq.' + rY.id, {
-                codice: d.catena.turnoX,
-                protetto: true,
-                generato: false,
-                commento: commY,
-                operatore: op,
-                updated_at: new Date().toISOString(),
-              });
-            } else {
-              await _pianoInserisciCella({
-                collaboratore: d.catena.con,
-                data: dstrDi(g1),
-                codice: d.catena.turnoX,
-                protetto: true,
-                generato: false,
-                commento: commY,
-                reparto_dip: _pianoReparto(),
-                operatore: op,
-              });
-            }
-            sostituti.add(d.catena.con); // si carica un turno in piu': incentivi con conferma
+  // TUTTO O NIENTE, e solo se le celle sono ancora quelle mostrate: M al malato, catene e
+  // sostituti si scrivono in UNA scrittura. Prima erano scritture in fila: un errore a
+  // meta lasciava la M senza sostituto o una catena a meta.
+  const ops = [];
+  const adesso = new Date().toISOString();
+  // cella da scrivere: modifica (riga) o nuova (senza riga), con il controllo di come si vedeva
+  const metti = (nomeC, g, riga, dati) => {
+    const d = Object.assign({ protetto: true, generato: false, operatore: op }, dati);
+    if (riga) d.updated_at = adesso;
+    else d.reparto_dip = _pianoReparto();
+    ops.push({ collaboratore: nomeC, data: dstrDi(g), atteso: _pianoAttesoDi(riga || null), dati: d });
+  };
+  for (const d of m.giorni) {
+    if (d.salta) continue;
+    // M al malato (protetta)
+    const rMal = rigaDi[m.nome + '|' + d.g];
+    if (rMal) {
+      const dM = {
+        codice: ass.codice,
+        // la malattia scioglie il blocco, come negli altri percorsi
+        motivo_blocco: null,
+        commento: ('Ex ' + d.codice + ' - ' + (ass.nota ? ass.nota + ' - ' : '') + op).substring(0, 400),
+      };
+      // com era la cella sotto la malattia: torna tale e quale quando la malattia si toglie
+      if (ass.codice === 'M' && rMal.codice !== 'M' && rMal.prima_malattia !== undefined)
+        dM.prima_malattia = _pianoPrimaMalattiaDi(rMal);
+      metti(m.nome, d.g, rMal, dM);
+    } else metti(m.nome, d.g, null, { codice: ass.codice });
+    nM++;
+    // turno al sostituto (protetto), SOLO se la soluzione ha la spunta
+    if (d.sostituto && selGiorni.has(d.g)) {
+      // MOSSA A CATENA sul giorno prima, se prevista dalla proposta
+      if (d.catena) {
+        const g1 = d.catena.g1;
+        const rX1 = rigaDi[d.sostituto + '|' + g1];
+        if (d.catena.tipo === 'scambio') {
+          const rZ = rigaDi[d.catena.con + '|' + g1];
+          if (rX1 && rZ) {
+            metti(d.sostituto, g1, rX1, {
+              codice: d.catena.turnoCon,
+              commento: ('Ex ' + d.catena.turnoX + ' - cambio per esigenze operative - ' + op).substring(0, 400),
+            });
+            metti(d.catena.con, g1, rZ, {
+              codice: d.catena.turnoX,
+              commento: ('Ex ' + d.catena.turnoCon + ' - cambio per esigenze operative - ' + op).substring(0, 400),
+            });
           }
-        }
-        const rS = rigaDi[d.sostituto + '|' + d.g];
-        const commento = ('Ex ' + (d.era || '-') + ' - cambio per esigenze operative - ' + op).substring(0, 400);
-        if (rS) {
-          await secPatch('piano', 'id=eq.' + rS.id, {
-            codice: d.codice,
-            protetto: true,
-            generato: false,
-            commento: commento,
-            operatore: op,
-            updated_at: new Date().toISOString(),
-          });
         } else {
-          await _pianoInserisciCella({
-            collaboratore: d.sostituto,
-            data: dstrDi(d.g),
-            codice: d.codice,
-            protetto: true,
-            generato: false,
-            commento: commento,
-            reparto_dip: _pianoReparto(),
-            operatore: op,
-          });
+          // riassegna: il sostituto viene liberato, il suo turno passa al terzo
+          if (rX1)
+            metti(d.sostituto, g1, rX1, {
+              codice: 'C',
+              commento: ('Ex ' + d.catena.turnoX + ' - cambio per esigenze operative - ' + op).substring(0, 400),
+            });
+          const rY = rigaDi[d.catena.con + '|' + g1];
+          const commY = (
+            (d.catena.eraCon ? 'Ex ' + d.catena.eraCon + ' - ' : '') +
+            'cambio per esigenze operative - ' +
+            op
+          ).substring(0, 400);
+          metti(d.catena.con, g1, rY || null, { codice: d.catena.turnoX, commento: commY });
+          sostituti.add(d.catena.con); // si carica un turno in piu': incentivi con conferma
         }
-        sostituti.add(d.sostituto);
-        nSost++;
       }
+      const rS = rigaDi[d.sostituto + '|' + d.g];
+      const commento = ('Ex ' + (d.era || '-') + ' - cambio per esigenze operative - ' + op).substring(0, 400);
+      metti(d.sostituto, d.g, rS || null, { codice: d.codice, commento: commento });
+      sostituti.add(d.sostituto);
+      nSost++;
     }
+  }
+  let esito;
+  try {
+    // giorni chiusi: ogni giorno toccato passa dallo sblocco motivato (prima lo faceva
+    // l inserimento cella per cella)
+    for (const dC of [...new Set(ops.map((o) => o.data))].sort())
+      if (!(await _pianoConsentiScrittura(dC))) {
+        _pianoUndoScarta(passo);
+        return;
+      }
+    esito = await _pianoScriviCelle(ops);
+  } catch (e) {
+    _pianoUndoScarta(passo);
+    console.error(e);
+    _pianoErroreScrittura('Copertura NON registrata: ', e, avvisoRete);
+    renderPiano();
+    return;
+  }
+  if (!esito.ok) {
+    _pianoUndoScarta(passo);
+    _malattiaPiano = null;
+    await _pianoAvvisaConflitti(esito.conflitti, 'Copertura non registrata');
+    return;
+  }
+  try {
     // punti incentivo: MAI automatici, il responsabile conferma prima; e solo
     // se il sistema incentivi (e l'azione copertura) e' acceso
     let puntiDati = false;
@@ -2230,8 +2243,10 @@ async function _confermaCoperturaMalattiaEsegui() {
     _pianoViolLista = null;
     renderPiano();
   } catch (e) {
+    // le celle sono scritte: qui si ferma solo il seguito (punti, Diario, CGF)
     console.error(e);
-    toast('Errore registrazione copertura');
+    toastErrore('Copertura scritta nel piano, ma il seguito non e riuscito: ' + ((e && e.message) || e));
+    renderPiano();
   }
 }
 

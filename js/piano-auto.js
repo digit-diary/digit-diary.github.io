@@ -50,6 +50,9 @@ function _pianoAutoCfgDa(testo) {
 async function pianoAutoControlla() {
   if (_pianoAutoControllo || window._pianoAutoInCorso) return _pianoAutoControllo;
   if (!getOpToken()) return null;
+  // una scrittura a mano del piano e in corso su questo PC (magari ferma su una
+  // conferma): niente prenotazione adesso, si riprova al prossimo giro
+  if (typeof _pianoScrittureInCorso !== 'undefined' && _pianoScrittureInCorso > 0) return null;
   _pianoAutoControllo = (async () => {
     let cfg;
     try {
@@ -114,10 +117,40 @@ async function _pianoAutoEsegui(rep, ym, minuti) {
       await _pianoRenderInCorso;
     } catch (e) {}
   }
+  // SCRITTURE A MANO IN CORSO su questo PC (anche ferme su una conferma): la generazione
+  // aspetta che finiscano prima di cambiare mese, settore e celle in memoria. Prima
+  // partiva lo stesso e la cella scritta a mano finiva nel settore della generazione.
+  if (typeof _pianoAttendiScritture === 'function' && !(await _pianoAttendiScritture(15 * 60 * 1000))) {
+    try {
+      await _rpcSicura('piano_auto_chiudi', {
+        p_token: getOpToken(),
+        p_reparto: rep,
+        p_mese: ym,
+        p_stato: 'errore',
+        p_esito: {
+          mese: ym,
+          reparto: rep,
+          operatore: getOperatore(),
+          errore: 'scrittura a mano in corso su questo PC',
+        },
+      });
+    } catch (e) {}
+    return { stato: 'errore', esito: { errore: 'scrittura a mano in corso' } };
+  }
+  // ANNULLA: la pila dell utente resta com era (copia intera). Prima si tagliava per
+  // lunghezza, ma la pila ha un tetto di 15 passi: con la pila piena il passo della
+  // generazione spingeva fuori il piu vecchio dell utente e restava al suo posto.
+  // La finestra dell ultima operazione a mano si chiude qui: le scritture della
+  // generazione non entrano nel suo Annulla.
+  const pilaU = window._pianoUndo || [];
+  const ultimoU = pilaU[pilaU.length - 1];
+  if (ultimoU && ultimoU.t0 && !ultimoU.t1 && typeof _pianoOraServer === 'function') ultimoU.t1 = _pianoOraServer();
   const prima = {
     mese: _pianoMeseSel,
     rep: _pianoRepartoSel,
-    undo: (window._pianoUndo || []).length,
+    undo: pilaU.slice(),
+    redo: (window._pianoRedo || []).slice(),
+    sess: Object.fromEntries(Object.entries(window._pianoSessSnap || {}).map(([k, v]) => [k, Object.assign({}, v)])),
   };
   const auto = { rep: rep, ym: ym, inizio: Date.now(), fase: '' };
   window._pianoAutoInCorso = auto;
@@ -323,8 +356,12 @@ async function _pianoAutoEsegui(rep, ym, minuti) {
         '. Si riprova da sola fra due ore (al massimo 5 volte); oppure "Riprova" in Piano > Impostazioni.',
     );
   } finally {
-    // la fotografia per Annulla resta solo a chi la fa a mano
-    if (window._pianoUndo && window._pianoUndo.length > prima.undo) window._pianoUndo.length = prima.undo;
+    // la fotografia per Annulla resta solo a chi la fa a mano: pile e "Annulla tutto"
+    // tornano come prima della generazione
+    window._pianoUndo = prima.undo;
+    window._pianoRedo = prima.redo;
+    window._pianoSessSnap = prima.sess;
+    if (window._annullaAggiornaBarra) setTimeout(window._annullaAggiornaBarra, 0);
     _pianoMeseSel = prima.mese;
     _pianoRepartoSel = prima.rep;
     _pianoViolCelle = {};

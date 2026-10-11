@@ -1523,7 +1523,12 @@ async function pianoElencoCgfDaDare() {
   document.getElementById('pwd-modal').classList.remove('hidden');
 }
 // Assegna i CGF mancanti nei giorni liberi del mese aperto
-async function pianoAssegnaCgfMese() {
+// assegnazione in corso: la generazione automatica aspetta (anche durante le conferme)
+function pianoAssegnaCgfMese() {
+  return _pianoConScrittura(() => _pianoAssegnaCgfMeseEsegui());
+}
+async function _pianoAssegnaCgfMeseEsegui() {
+  const avvisoRete = !!window._sessioneScadutaAvvisata;
   if (!_pianoAzioneAutoConsentita('vacanze')) return; // azione automatica: permesso apposito
   if (!puoGestirePiano()) return;
   const ym = _pianoMeseSel;
@@ -1595,16 +1600,35 @@ async function pianoAssegnaCgfMese() {
           '\n\nLi trasformo in congedo C?',
       )
     ) {
-      _pianoUndoSnap('CGF in più tolti ' + ym);
-      for (const r of daTogliere) {
-        await secPatch('piano', 'id=eq.' + r.id, {
-          codice: 'C',
-          commento: ('CGF tolto: festivo non lavorato - ' + getOperatore()).substring(0, 400),
-          operatore: getOperatore(),
-          updated_at: new Date().toISOString(),
-        });
-        r.codice = 'C';
+      // in UNA scrittura e solo se le celle sono ancora quelle mostrate
+      const passoT = _pianoUndoSnap('CGF in più tolti ' + ym);
+      const adessoT = new Date().toISOString();
+      let esT;
+      try {
+        esT = await _pianoScriviCelle(
+          daTogliere.map((r) => ({
+            collaboratore: r.collaboratore,
+            data: r.data,
+            atteso: _pianoAttesoDi(r),
+            dati: {
+              codice: 'C',
+              commento: ('CGF tolto: festivo non lavorato - ' + getOperatore()).substring(0, 400),
+              operatore: getOperatore(),
+              updated_at: adessoT,
+            },
+          })),
+        );
+      } catch (e) {
+        _pianoUndoScarta(passoT);
+        _pianoErroreScrittura('CGF in più NON tolti: ', e, avvisoRete);
+        return;
       }
+      if (!esT.ok) {
+        _pianoUndoScarta(passoT);
+        await _pianoAvvisaConflitti(esT.conflitti, 'CGF in più non tolti');
+        return;
+      }
+      _pianoMemoriaDopo(esT.ops, esT.righe);
       logAzione('Piano: CGF in più tolti', ym + ' · ' + daTogliere.length);
     }
   }
@@ -1639,45 +1663,44 @@ async function pianoAssegnaCgfMese() {
     ))
   )
     return;
-  _pianoUndoSnap('assegnazione CGF ' + ym);
-  let fatti = 0;
+  // TUTTO O NIENTE, e solo se le celle sono ancora quelle mostrate (C della bozza o
+  // vuote): prima l inserimento su una cella gia presente la riscriveva qualsiasi cosa ci
+  // fosse (anche una V protetta messa nel frattempo da un collega) e un errore a meta
+  // lasciava una parte dei CGF
+  const passo = _pianoUndoSnap('assegnazione CGF ' + ym);
+  const adesso = new Date().toISOString();
+  const ops = daFare.map((x) => {
+    const rC = _pianoRighe.find((r) => r.collaboratore === x.nome && r.data === x.data && _pianoCSostituibile(r));
+    const dati = { codice: 'CGF', generato: true, protetto: false, operatore: getOperatore() };
+    if (rC) {
+      dati.commento = ('Ex C - ' + getOperatore()).substring(0, 400);
+      dati.updated_at = adesso;
+    } else dati.reparto_dip = _pianoReparto();
+    return { collaboratore: x.nome, data: x.data, atteso: _pianoAttesoDi(rC || null), dati: dati };
+  });
+  let esito;
   try {
-    for (const x of daFare) {
-      const rC = _pianoRighe.find((r) => r.collaboratore === x.nome && r.data === x.data && _pianoCSostituibile(r));
-      if (rC) {
-        const nota = ('Ex C - ' + getOperatore()).substring(0, 400);
-        await secPatch('piano', 'id=eq.' + rC.id, {
-          codice: 'CGF',
-          generato: true,
-          protetto: false,
-          commento: nota,
-          operatore: getOperatore(),
-          updated_at: new Date().toISOString(),
-        });
-        Object.assign(rC, { codice: 'CGF', commento: nota });
-      } else {
-        const nuovo = await _pianoInserisciCella({
-          collaboratore: x.nome,
-          data: x.data,
-          codice: 'CGF',
-          protetto: false,
-          generato: true,
-          reparto_dip: _pianoReparto(),
-          operatore: getOperatore(),
-        });
-        if (nuovo) _pianoRighe.push(Array.isArray(nuovo) ? nuovo[0] : nuovo);
+    for (const dC of [...new Set(ops.map((o) => o.data))].sort())
+      if (!(await _pianoConsentiScrittura(dC))) {
+        _pianoUndoScarta(passo);
+        return;
       }
-      fatti++;
-    }
-    logAzione('Piano: CGF assegnati a mano', ym + ' · ' + fatti + ' recuperi');
-    toast(fatti + ' recuperi assegnati');
-    renderPiano();
+    esito = await _pianoScriviCelle(ops);
   } catch (e) {
-    toastErrore(
-      'Assegna CGF interrotto: assegnati ' + fatti + ' su ' + daFare.length + ' (' + ((e && e.message) || e) + ')',
-    );
+    _pianoUndoScarta(passo);
+    _pianoErroreScrittura('Assegna CGF NON fatto: ', e, avvisoRete);
     renderPiano();
+    return;
   }
+  if (!esito.ok) {
+    _pianoUndoScarta(passo);
+    await _pianoAvvisaConflitti(esito.conflitti, 'Assegna CGF non fatto');
+    return;
+  }
+  _pianoMemoriaDopo(esito.ops, esito.righe);
+  logAzione('Piano: CGF assegnati a mano', ym + ' · ' + ops.length + ' recuperi');
+  toast(ops.length + ' recuperi assegnati');
+  renderPiano();
 }
 function _renderPianoFestiviCard() {
   if (!puoGestireFestivi()) return _pianoSchedaRiservata('Festivi e CGF', 'Festivi e CGF');

@@ -432,7 +432,47 @@ const PIANO_REGOLE_GUIDA = {
     t: 'numero',
     d: 'Tutto il piano',
   },
+  // IMPOSTAZIONI DEL MOTORE con un valore predefinito (p): la scheda le mostra anche se nel
+  // database la riga non c e ancora (il motore usa lo stesso valore quando manca), e al
+  // primo salvataggio nasce la riga. s = spiegazione breve sotto il nome.
+  funzioni_esenti_riposi: {
+    g: 'Domeniche',
+    n: 'Funzioni esenti dai riposi attorno alla domenica e dal conto delle domeniche libere',
+    s: 'Sigle delle funzioni separate da virgola (per esempio RESP). Vuoto = nessuna funzione esente.',
+    t: 'testo',
+    p: 'RESP',
+    d: 'Valida regole (riposo attorno alla domenica, domeniche libere), tabella Domeniche, bozza',
+  },
+  domeniche_indietro_rigido: {
+    g: 'Domeniche',
+    n: 'Chi non può più recuperare le domeniche libere nel mese non ne perde altre',
+    s: 'No: se serve a coprire un posto, la bozza può ancora fargli lavorare una domenica, per ultimo (resta segnalato). Sì: non gli toglie altre domeniche libere, anche a costo di lasciare un posto scoperto.',
+    t: 'sino',
+    p: 'FALSE',
+    d: 'Bozza',
+  },
+  turno_preferito_sigle: {
+    g: 'Funzioni e turni',
+    n: 'Turno preferito di chi ha la spunta "Preferisce" nelle Preferenze collaboratori',
+    s: 'Sigle dei turni separate da virgola (per esempio L1). La bozza dà questi turni per primi a chi ha la spunta. Vuoto = nessun turno preferito e la colonna sparisce.',
+    t: 'testo',
+    p: 'L1',
+    d: 'Bozza (ordine dei candidati), colonna "Preferisce" in Preferenze collaboratori',
+  },
+  equita_notti_peso: {
+    g: 'Riposo e giorni di lavoro',
+    n: 'Quanto "Migliora la bozza" cerca di dividere le notti in modo uguale',
+    s: 'Fra colleghi della stessa funzione. 0 = non ci bada, 3 = normale, di più = ci tiene di più. Non vale mai più di un posto coperto o di una regola rispettata.',
+    t: 'numero',
+    p: '3',
+    d: 'Migliora la bozza',
+  },
 };
+// valore predefinito di un impostazione del motore (campo p del catalogo), null se non c e
+function _pianoRegolaPredefinita(nome) {
+  const g = PIANO_REGOLE_GUIDA[nome];
+  return g && g.p !== undefined ? g.p : null;
+}
 // LIMITI DI BUON SENSO per i valori numerici: un valore fuori scala (riposo
 // di 3 ore, 40 giorni consecutivi, 300 domeniche) viene rifiutato con un
 // avviso chiaro invece di finire nei calcoli. Chi crea l'eccezione per un
@@ -444,6 +484,7 @@ const PIANO_REGOLE_LIMITI = {
   riposo_domenica_lavorata_ore: [24, 96],
   max_consecutivi: [1, 7],
   pattern_lavoro: [1, 7],
+  equita_notti_peso: [0, 20],
   domeniche_libere_anno: [0, 52],
   tolleranza_ore: [0, 60],
   tolleranza_ore_sopra: [0, 60],
@@ -550,7 +591,7 @@ function _pianoValidaRegola(nome, valore, settore) {
       return 'Scrivi i giorni della settimana come numeri da 0 (domenica) a 6 (sabato), separati da virgola: es. 5,6';
     return null;
   }
-  if (nome === 'funzioni_fanno_tutto') {
+  if (nome === 'funzioni_fanno_tutto' || nome === 'funzioni_esenti_riposi') {
     const note = new Set(_pianoFunzioniTutte());
     collaboratoriCache.forEach((c) => c.funzione && note.add(String(c.funzione).toUpperCase()));
     const ignote = v
@@ -559,6 +600,28 @@ function _pianoValidaRegola(nome, valore, settore) {
       .filter((x) => x && !note.has(x));
     if (ignote.length)
       return 'Funzioni sconosciute: ' + ignote.join(', ') + ' (Impostazioni del piano, Funzioni disponibili)';
+    return null;
+  }
+  if (nome === 'turno_preferito_sigle') {
+    // sigle dei turni del settore (o di tutti i settori per il valore generale)
+    const chiave = String(settore || '').toLowerCase();
+    const noti = new Set(
+      pianoTurniCache
+        .filter((t) => !chiave || (t.reparto_dip || 'slots') === chiave)
+        .map((t) => String(t.codice).toUpperCase()),
+    );
+    const ignoti = v
+      .split(',')
+      .map((x) => x.trim().toUpperCase())
+      .filter((x) => x && !noti.has(x));
+    if (ignoti.length)
+      return (
+        'Turni inesistenti' +
+        (chiave ? ' in ' + repartoLabel(chiave) : '') +
+        ': ' +
+        ignoti.join(', ') +
+        ' (vedi scheda Turni)'
+      );
     return null;
   }
   if (nome === 'jolly_codici_gia_pagati') {
@@ -606,6 +669,9 @@ function _renderPianoRegoleCard() {
   });
   const perGruppo = {};
   Object.keys(PIANO_REGOLE_GUIDA).forEach((nome) => {
+    // un impostazione con valore predefinito si mostra anche senza la riga nel database
+    if (!generali[nome] && _pianoRegolaPredefinita(nome) != null)
+      generali[nome] = { id: null, nome: nome, valore: _pianoRegolaPredefinita(nome), attivo: true, virtuale: true };
     if (!generali[nome] && !Object.keys(specifiche).some((k) => k.startsWith(nome + '|'))) return;
     const g = PIANO_REGOLE_GUIDA[nome];
     (perGruppo[g.g] = perGruppo[g.g] || []).push(nome);
@@ -651,7 +717,7 @@ function _renderPianoRegoleCard() {
         onch +
         '" style="padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"><option value="TRUE"' +
         (on ? ' selected' : '') +
-        '>Si</option><option value="FALSE"' +
+        '>Sì</option><option value="FALSE"' +
         (on ? '' : ' selected') +
         '>No</option></select>'
       );
@@ -695,10 +761,15 @@ function _renderPianoRegoleCard() {
           .map((k) => k.split('|')[1]);
         const onch = vista
           ? "salvaPianoRegolaSettore('" + escP(nome) + "','" + escP(vista) + "','valore',this.value)"
-          : 'salvaPianoRegola(' + r.id + ",'valore',this.value)";
+          : r.virtuale
+            ? "salvaPianoRegolaNuova('" + escP(nome) + "',this.value)"
+            : 'salvaPianoRegola(' + r.id + ",'valore',this.value)";
         const onAtt = vista
           ? "salvaPianoRegolaSettore('" + escP(nome) + "','" + escP(vista) + "','attivo',this.checked)"
           : 'salvaPianoRegola(' + r.id + ",'attivo',this.checked)";
+        // le impostazioni con valore predefinito si spengono con il valore (vuoto, 0 o No):
+        // senza riga attiva il motore torna al predefinito, non a "spento"
+        const conPred = g.p !== undefined && r.attivo !== false;
         let colSett = '';
         if (diLegge) {
           colSett = '<span style="color:var(--muted)">di legge: uguale per tutti i settori</span>';
@@ -720,18 +791,24 @@ function _renderPianoRegoleCard() {
           (r.attivo === false ? ' style="opacity:.55"' : '') +
           '><td style="text-align:left;white-space:normal;min-width:260px"><b>' +
           escP(g.n) +
-          '</b><br><span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
+          '</b>' +
+          (g.s ? '<br><span style="font-size:var(--fs-sm,.8125rem)">' + escP(g.s) + '</span>' : '') +
+          '<br><span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
           escP(nome) +
+          (r.virtuale ? ' · valore predefinito' : '') +
           (PIANO_REGOLE_FONTE[nome] ? ' · ' + escP(PIANO_REGOLE_FONTE[nome]) : '') +
           '</span></td><td>' +
           (diLegge && vista
             ? '<b>' +
-              escP(g.t === 'sino' ? (String(r.valore).toUpperCase() === 'TRUE' ? 'Si' : 'No') : r.valore || '') +
+              escP(g.t === 'sino' ? (String(r.valore).toUpperCase() === 'TRUE' ? 'Sì' : 'No') : r.valore || '') +
               '</b>'
             : valoreInput(r, g.t, onch)) +
           '</td><td style="text-align:left;font-size:var(--fs-sm,.8125rem)">' +
           colSett +
           '</td><td><input type="checkbox"' +
+          (conPred
+            ? ' disabled title="Sempre attiva: si spegne con il valore (vuoto, 0 oppure No)" aria-label="Sempre attiva"'
+            : '') +
           (diLegge && vista ? ' disabled' : '') +
           (r.attivo !== false ? ' checked' : '') +
           ' onchange="' +
@@ -780,7 +857,11 @@ async function salvaPianoRegolaSettore(nome, settore, campo, valore) {
   }
   const spec = pianoRegoleCache.find((x) => x.nome === nome && _pianoRegolaSettori(x).includes(settore));
   if (spec) return salvaPianoRegola(spec.id, campo, valore);
-  const gen = pianoRegoleCache.find((x) => x.nome === nome && !_pianoRegolaSettori(x).length);
+  const gen =
+    pianoRegoleCache.find((x) => x.nome === nome && !_pianoRegolaSettori(x).length) ||
+    (_pianoRegolaPredefinita(nome) != null
+      ? { valore: _pianoRegolaPredefinita(nome), tipo: 'SOFT', peso: 0, descrizione: PIANO_REGOLE_GUIDA[nome].n }
+      : null);
   if (!gen) return;
   try {
     const nuova = await secPost('piano_regole', {
@@ -797,6 +878,43 @@ async function salvaPianoRegolaSettore(nome, settore, campo, valore) {
     logAzione('Regola per settore', nome + ' = ' + mostra + ' per ' + settore);
     _pianoRegistraModifica('Regole', nome + ' (' + repartoLabel(settore) + ')', campo, 'valore generale', mostra);
     toast('Eccezione creata per ' + repartoLabel(settore) + ': ' + nome + ' = ' + mostra);
+    _pianoViolCelle = {};
+    _pianoViolLista = null;
+    renderPiano();
+  } catch (e) {
+    toastErrore('Errore nel salvataggio della regola: ' + (e.message || ''));
+  }
+}
+// PRIMO SALVATAGGIO del valore generale di un impostazione che nel database non c e ancora
+// (mostrata col valore predefinito): nasce la riga generale, poi vale il percorso normale
+async function salvaPianoRegolaNuova(nome, valore) {
+  if (!isAdmin()) return;
+  const g = PIANO_REGOLE_GUIDA[nome];
+  if (!g) return;
+  const esiste = pianoRegoleCache.find((x) => x.nome === nome && !_pianoRegolaSettori(x).length);
+  if (esiste) return salvaPianoRegola(esiste.id, 'valore', valore);
+  const errore = _pianoValidaRegola(nome, valore, '');
+  if (errore) {
+    toastErrore(errore + ' Resta il valore predefinito (' + String(g.p) + ').', 9000);
+    renderPiano();
+    return;
+  }
+  const nuovo = String(valore == null ? '' : valore).trim();
+  try {
+    const righe = await secPost('piano_regole', {
+      nome: nome,
+      valore: nuovo,
+      tipo: 'SOFT',
+      peso: 0,
+      attivo: true,
+      descrizione: g.n,
+      settori: null,
+    });
+    if (righe && righe[0]) pianoRegoleCache.push(righe[0]);
+    const mostra = (v) => String(v === '' ? 'vuoto' : v);
+    logAzione('Piano: regola modificata', nome + ' · valore: ' + mostra(g.p) + ' (predefinito) → ' + mostra(nuovo));
+    _pianoRegistraModifica('Regole', nome, 'valore', mostra(g.p) + ' (predefinito)', mostra(nuovo));
+    toast('Salvato · ' + nome + ': ' + mostra(g.p) + ' → ' + mostra(nuovo));
     _pianoViolCelle = {};
     _pianoViolLista = null;
     renderPiano();

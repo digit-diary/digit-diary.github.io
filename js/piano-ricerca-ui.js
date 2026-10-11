@@ -632,41 +632,50 @@ async function pianoRicercaCalcola(secondi, onPasso, opz) {
 // usabile, si puo fermare), poi si vede prima/dopo controllato con "Valida
 // regole" e si decide se applicare. Si puo annullare con Annulla del piano.
 // opz.variante: seme diverso (vedi pianoMiglioraRiprova); senza, il seme del mese e settore
+// opz.minuti: durata gia scelta (riprova): non si richiede
 async function pianoMigliora(opz) {
   opz = opz && typeof opz === 'object' ? opz : {};
   if (!_pianoAzioneAutoConsentita('genera')) return;
   if (!puoGestirePiano()) return;
-  const scelta = await chiediModulo(
-    'Il programma prova scambi e spostamenti fra le celle della bozza di ' +
-      _pianoMeseSel +
-      ' e tiene solo quelli che migliorano: prima le regole (riposi, giorni di fila, ore della settimana, domeniche), poi i posti scoperti, poi le ore di ognuno.\n\nNon tocca vacanze, malattie, celle protette o bloccate, inserimenti a mano, giorni chiusi. Più tempo ha, più combinazioni prova.',
-    [
-      {
-        titolo: 'Tempo a disposizione',
-        campi: [
-          {
-            id: 'min',
-            tipo: 'scelta',
-            valore: '3',
-            opzioni: [
-              { valore: '1', etichetta: '1 minuto' },
-              { valore: '3', etichetta: '3 minuti (consigliato)' },
-              { valore: '5', etichetta: '5 minuti' },
-              { valore: '10', etichetta: '10 minuti' },
-            ],
-          },
-        ],
-      },
-    ],
-    { titolo: 'Migliora la bozza', ok: 'Avvia' },
-  );
-  if (!scelta) return;
-  const secondi = (parseInt(scelta.min) || 3) * 60;
+  let minuti = parseInt(opz.minuti) || 0;
+  if (!minuti) {
+    // il tempo e indicativo: la ricerca conta le prove (RICERCA_ITER_MINUTO), non i secondi
+    const scelta = await chiediModulo(
+      'Il programma prova scambi e spostamenti fra le celle della bozza di ' +
+        _pianoMeseSel +
+        ' e tiene solo quelli che migliorano: prima le regole (riposi, giorni di fila, ore della settimana, domeniche), poi i posti scoperti, poi le ore di ognuno.\n\nNon tocca vacanze, malattie, celle protette o bloccate, inserimenti a mano, giorni chiusi. Più tempo ha, più combinazioni prova.\n\nIl tempo è indicativo: il programma fa sempre lo stesso numero di prove, così lo stesso piano dà sempre lo stesso risultato. Su un computer lento ci mette di più (al massimo il doppio, poi si ferma).',
+      [
+        {
+          titolo: 'Tempo a disposizione',
+          campi: [
+            {
+              id: 'min',
+              tipo: 'scelta',
+              valore: '3',
+              opzioni: [
+                { valore: '1', etichetta: 'circa 1 minuto' },
+                { valore: '3', etichetta: 'circa 3 minuti (consigliato)' },
+                { valore: '5', etichetta: 'circa 5 minuti' },
+                { valore: '10', etichetta: 'circa 10 minuti' },
+              ],
+            },
+          ],
+        },
+      ],
+      { titolo: 'Migliora la bozza', ok: 'Avvia' },
+    );
+    if (!scelta) return;
+    minuti = parseInt(scelta.min) || 3;
+  }
+  _ricercaUltimiMinuti[_pianoMeseSel + '|' + _pianoReparto()] = minuti;
+  const secondi = minuti * 60;
   // finestra di avanzamento con Ferma
   const velo = document.createElement('div');
   velo.className = 'finestra-velo';
   velo.innerHTML =
-    '<div class="finestra-box" role="dialog" aria-modal="true" style="max-width:460px"><h3>Migliora la bozza</h3>' +
+    '<div class="finestra-box" role="dialog" aria-modal="true" style="max-width:460px"><h3>Migliora la bozza' +
+    (opz.variante ? ' · tentativo ' + (opz.variante + 1) : '') +
+    '</h3>' +
     '<div class="finestra-testo" id="ric-testo">Preparo i dati del mese...</div>' +
     '<div style="height:8px;background:var(--line,#ddd);border-radius:4px;overflow:hidden;margin:10px 0"><div id="ric-barra" style="height:100%;width:0;background:var(--accent2,#1a4a7a);transition:width .3s"></div></div>' +
     '<div class="finestra-pulsanti"><button type="button" class="finestra-no" onclick="window._ricercaFerma=true;this.disabled=true;this.textContent=\'Mi fermo...\'">Ferma e mostra il risultato</button></div></div>';
@@ -701,6 +710,11 @@ async function pianoMigliora(opz) {
   const P = res.prima;
   const D = res.dopo;
   const riga = (et, a, b) => '\n• ' + et + ': ' + a + ' → ' + b;
+  // equita delle notti: stesso valore che legge pianoRicercaCalcola (equita_notti_peso)
+  const pesoNotti = parseFloat(_pianoRegolaVal('equita_notti_peso'));
+  const nottiAccese = !(pesoNotti >= 0) || pesoNotti > 0;
+  // perche la ricerca non e arrivata in fondo, in parole semplici
+  const fermataDaTe = !res.ripetibile && !res.troncata;
   const riepilogo =
     'Risultato controllato con "Valida regole":' +
     riga('Regole di legge violate (riposi, giorni di fila, ore della settimana, domenica)', P.legge, D.legge) +
@@ -710,10 +724,17 @@ async function pianoMigliora(opz) {
     riga('di cui posti riservati (es. Supervisor)', P.riservati, D.riservati) +
     riga('Persone sotto il minimo di ore', P.oreSotto, D.oreSotto) +
     riga('Turni oltre il fabbisogno (doppioni)', res.eccesso.prima, res.eccesso.dopo) +
+    (nottiAccese
+      ? riga('Squilibrio delle notti fra colleghi (più basso è meglio)', res.notti.prima, res.notti.dopo)
+      : '\n• Divisione delle notti: non considerata (impostazione nelle Regole a 0)') +
     '\n• Celle cambiate: ' +
     res.cambi.length +
     (res.variante ? ' (tentativo ' + (res.variante + 1) + ')' : '') +
-    (res.ripetibile ? '' : '\n(Ricerca interrotta prima della fine: rifacendola il risultato può cambiare.)');
+    (res.troncata
+      ? '\n\nIl computer è stato più lento del previsto: la ricerca si è fermata al limite di tempo (il doppio di quello scelto) prima di finire tutte le prove. Rifacendola il risultato può cambiare.'
+      : fermataDaTe
+        ? '\n\nHai fermato la ricerca prima della fine: rifacendola il risultato può cambiare.'
+        : '');
   logAzione(
     'Piano: ricerca sulla bozza',
     _pianoMeseSel +
@@ -733,31 +754,109 @@ async function pianoMigliora(opz) {
       res.seme +
       (res.migliore ? '' : ' · non applicabile'),
   );
+  const RIPROVA = { valore: 'riprova', testo: 'Riprova con un altro tentativo' };
+  const titoloEsito = 'Migliora la bozza' + (res.variante ? ' · tentativo ' + (res.variante + 1) : '');
   if (!res.migliore || !res.cambi.length) {
-    await mostraAvviso(
+    const esito = await _ricercaFinestraEsito(
+      titoloEsito,
       riepilogo +
-        '\n\nNessun miglioramento sicuro: il piano resta com e. (Si applica solo se nessuna regola peggiora e i posti scoperti non aumentano.)',
-      { titolo: 'Migliora la bozza', ok: 'Ho capito' },
+        "\n\nNessun miglioramento sicuro: il piano resta com'è. (Si applica solo se nessuna regola peggiora e i posti scoperti non aumentano.) Un altro tentativo parte da combinazioni diverse e può trovare di meglio.",
+      [{ valore: 'chiudi', testo: 'Ho capito', annulla: true }, Object.assign({ primario: true }, RIPROVA)],
     );
+    if (esito === 'riprova') return pianoMiglioraRiprova();
     return;
   }
-  const ok = await chiediModulo(
+  const esito = await _ricercaFinestraEsito(
+    titoloEsito,
     riepilogo +
-      '\n\nVacanze, malattie, celle protette e inserimenti a mano non sono stati toccati. Applico? Si può annullare con Annulla del piano.',
-    [],
-    { titolo: 'Migliora la bozza', ok: 'Applica', annulla: 'Lascia com e' },
+      "\n\nVacanze, malattie, celle protette e inserimenti a mano non sono stati toccati. Applico? Si può annullare con Annulla del piano. Con un altro tentativo il piano resta com'è e la ricerca riparte da combinazioni diverse.",
+    [
+      { valore: 'lascia', testo: "Lascia com'è", annulla: true },
+      RIPROVA,
+      { valore: 'applica', testo: 'Applica', primario: true },
+    ],
   );
-  if (!ok) return;
+  if (esito === 'riprova') return pianoMiglioraRiprova();
+  if (esito !== 'applica') return;
   await _ricercaScrivi(res);
+}
+
+// FINESTRA DEL RISULTATO con piu di due pulsanti (Lascia, Riprova, Applica): stesso aspetto
+// delle finestre del programma (finestre.js). pulsanti: [{ valore, testo, primario, annulla }];
+// Esc sceglie quello con annulla, Invio quello primario. Ritorna il valore scelto.
+function _ricercaFinestraEsito(titolo, testo, pulsanti) {
+  return new Promise((risolvi) => {
+    const velo = document.createElement('div');
+    velo.className = 'finestra-velo';
+    const box = document.createElement('div');
+    box.className = 'finestra-box';
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    box.setAttribute('aria-labelledby', 'ric-esito-titolo');
+    box.style.width = 'min(560px, 100%)';
+    const h = document.createElement('h3');
+    h.id = 'ric-esito-titolo';
+    h.textContent = titolo;
+    const t = document.createElement('div');
+    t.className = 'finestra-testo';
+    t.textContent = testo;
+    const puls = document.createElement('div');
+    puls.className = 'finestra-pulsanti';
+    puls.style.flexWrap = 'wrap';
+    box.appendChild(h);
+    box.appendChild(t);
+    box.appendChild(puls);
+    velo.appendChild(box);
+    const primaFocus = document.activeElement;
+    const chiudi = (v) => {
+      document.removeEventListener('keydown', tasti, true);
+      velo.remove();
+      try {
+        if (primaFocus && primaFocus.focus) primaFocus.focus();
+      } catch (e) {}
+      risolvi(v);
+    };
+    let bPrimario = null;
+    pulsanti.forEach((p) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = p.primario ? 'finestra-ok' : 'finestra-no';
+      b.textContent = p.testo;
+      b.addEventListener('click', () => chiudi(p.valore));
+      puls.appendChild(b);
+      if (p.primario) bPrimario = b;
+    });
+    const annulla = (pulsanti.find((p) => p.annulla) || {}).valore || null;
+    const tasti = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        chiudi(annulla);
+      } else if (e.key === 'Enter' && document.activeElement && document.activeElement.tagName !== 'BUTTON') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (bPrimario) bPrimario.click();
+      } else if (e.key === 'Tab') {
+        const el = [...velo.querySelectorAll('button')];
+        const i = el.indexOf(document.activeElement);
+        e.preventDefault();
+        el[(i + (e.shiftKey ? -1 : 1) + el.length) % el.length].focus();
+      }
+    };
+    document.addEventListener('keydown', tasti, true);
+    document.body.appendChild(velo);
+    (bPrimario || puls.querySelector('button')).focus();
+  });
 }
 
 // RIPROVA CON UN ALTRO SEME: stesso mese e settore, variante successiva (0, 1, 2...). Il
 // pulsante "Riprova con un altro tentativo" accanto a Migliora chiama questa funzione.
 const _ricercaVarianti = {}; // 'ym|settore' -> ultima variante usata
+const _ricercaUltimiMinuti = {}; // 'ym|settore' -> durata scelta l ultima volta (riprova non la richiede)
 async function pianoMiglioraRiprova() {
   const k = _pianoMeseSel + '|' + _pianoReparto();
   _ricercaVarianti[k] = (_ricercaVarianti[k] || 0) + 1;
-  return pianoMigliora({ variante: _ricercaVarianti[k] });
+  return pianoMigliora({ variante: _ricercaVarianti[k], minuti: _ricercaUltimiMinuti[k] });
 }
 
 // scrive le celle cambiate (solo celle generate o vuote), con la fotografia per Annulla

@@ -1028,6 +1028,36 @@ function _pianoOreMalattiaLunga(info) {
   const pct = cs && cs.scala_percentuale && !jolly ? parseFloat(info && info.percentuale) || 1 : 1;
   return Math.round(PIANO_MALATTIA_ORE_GIORNO * pct * 1000) / 1000;
 }
+// COM ERA LA CELLA SOTTO LA MALATTIA (colonna prima_malattia, migrazione 20260912): chi
+// scrive la M conserva sigla, protetto, generato, nota e blocco della cella; togliendo la
+// malattia la cella torna tale e quale (una cella della bozza resta della bozza: la
+// generazione automatica e Migliora la possono ancora spostare)
+function _pianoPrimaMalattiaDi(r) {
+  return {
+    codice: r.codice,
+    protetto: !!r.protetto,
+    generato: !!r.generato,
+    commento: r.commento || null,
+    motivo_blocco: r.motivo_blocco || null,
+  };
+}
+// i dati per riportare la cella r (M o ND con la nota "Ex <sigla>") alla sigla di prima
+function _pianoRitornoDaMalattia(r, sigla) {
+  const pm = r && r.prima_malattia;
+  if (pm && typeof pm === 'object' && pm.codice === sigla)
+    return {
+      codice: sigla,
+      protetto: !!pm.protetto,
+      generato: !!pm.generato,
+      commento: pm.commento || null,
+      motivo_blocco: pm.motivo_blocco || null,
+      prima_malattia: null,
+    };
+  // celle scritte prima della colonna: come prima (protette solo V, V1 e CGF)
+  const out = { codice: sigla, protetto: ['V', 'V1', 'CGF'].includes(sigla), commento: '' };
+  if (r && r.prima_malattia !== undefined) out.prima_malattia = null;
+  return out;
+}
 // sigla coperta dalla malattia, dalla nota della cella ("Ex R23 - Admin" o la vecchia
 // "Malattia dal Diario · era R23")
 function _pianoSiglaSottoMalattia(r) {
@@ -1253,13 +1283,16 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
         // nota "Ex C0 - operatore" (dal 30.09) o quella vecchia "Malattia dal Diario · era C0"
         const era = String(r.commento || '').match(/^(?:Malattia dal Diario \u00b7 era|Ex) ([A-Z0-9]+)\b/);
         if (era && era[1] && era[1] !== 'M') {
-          await secPatch('piano', 'id=eq.' + r.id, {
-            codice: era[1],
-            protetto: ['V', 'V1', 'CGF'].includes(era[1]),
-            commento: '',
-            operatore: getOperatore(),
-            updated_at: new Date().toISOString(),
-          });
+          // torna la cella com era (bozza o a mano, protetta, nota, blocco): prima tornava
+          // sempre "scritta a mano" e la generazione automatica non la toccava piu
+          await secPatch(
+            'piano',
+            'id=eq.' + r.id,
+            Object.assign(_pianoRitornoDaMalattia(r, era[1]), {
+              operatore: getOperatore(),
+              updated_at: new Date().toISOString(),
+            }),
+          );
         } else await secDel('piano', 'id=eq.' + r.id);
         tolte++;
       }
@@ -1282,7 +1315,7 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
       if (r && festCgf.has(d) && _pianoTurnoInfo(r.codice)) festiviPersi.push(d);
       if (r && r.codice === 'CGF') cgfPersi.push(d);
       if (r && r.codice !== 'M' && r.codice !== 'M1') {
-        await secPatch('piano', 'id=eq.' + r.id, {
+        const pM = {
           codice: 'M',
           protetto: true,
           generato: false,
@@ -1290,7 +1323,10 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
           commento: ('Ex ' + r.codice + ' - ' + getOperatore()).substring(0, 400),
           operatore: getOperatore(),
           updated_at: new Date().toISOString(),
-        });
+        };
+        // com era la cella sotto la malattia: torna tale e quale quando la malattia si toglie
+        if (r.prima_malattia !== undefined) pM.prima_malattia = _pianoPrimaMalattiaDi(r);
+        await secPatch('piano', 'id=eq.' + r.id, pM);
         messe++;
       } else if (!r && (typeof _pianoOperativoIl !== 'function' || _pianoOperativoIl(nome, d))) {
         await _pianoInserisciCella({
@@ -1869,30 +1905,280 @@ async function pianoScriviOreMese(nome) {
   }
 }
 
-// Scrive una cella del piano gestendo il caso "riga gia' presente": puo'
-// succedere quando la riga esiste in un ALTRO settore (coperture) e quindi non
-// e' tra quelle caricate in memoria. In quel caso si aggiorna invece di
-// inserire, cosi' una generazione non si ferma a meta' lavoro.
+// ============================================================
+// SCRITTURE SICURE DEL PIANO CON PIU PC SULLO STESSO MESE (11/10/2026)
+// Ogni scrittura a mano passa da piano_scrivi_celle (migrazione 20260912): il database
+// scrive SOLO se ogni cella e ancora come la vedeva chi scrive ("atteso": sigla,
+// protetto, motivo del blocco; null = cella vuota) e, con piu celle, tutto o niente.
+// Se un collega l ha cambiata nel frattempo non si scrive niente: si dice chi e cosa e
+// si ricarica. Prima la modifica per numero di riga non guardava il valore (scrittura
+// persa con "Piano modificato" nel Registro, o V protetta di un collega sovrascritta) e
+// scambi e coperture facevano 2-4 scritture in fila senza ritorno.
+// Database senza la migrazione: la strada di prima (una scrittura alla volta, con il
+// controllo letto subito prima).
+// ============================================================
+const PIANO_CAMPI_CELLA = [
+  'codice',
+  'protetto',
+  'generato',
+  'ora_inizio',
+  'ora_fine',
+  'commento',
+  'colore',
+  'motivo_blocco',
+  'fasce',
+  'reparto_dip',
+  'prima_malattia',
+];
+let _pianoScriviCelleManca = false;
+// cosa deve trovare il database perche la scrittura valga: la cella come la vede chi
+// scrive (null = vuota)
+function _pianoAttesoDi(r) {
+  if (!r) return null;
+  return { codice: r.codice, protetto: !!r.protetto, motivo_blocco: r.motivo_blocco || null };
+}
+// la cella come l ha vista chi scrive: dalla memoria se il mese e il collaboratore sono
+// caricati (assente = vuota), altrimenti dalla lettura appena fatta (rigaDb)
+function _pianoAttesoVisto(nome, dstr, rigaDb) {
+  const mem = (_pianoRighe || []).find((x) => x.collaboratore === nome && x.data === dstr);
+  if (mem) return _pianoAttesoDi(mem);
+  const info = typeof _pianoCollabInfo === 'function' ? _pianoCollabInfo(nome) : null;
+  if (String(dstr).startsWith(_pianoMeseSel + '-') && info && _pianoAppartieneAlReparto(info)) return null;
+  return _pianoAttesoDi(rigaDb || null);
+}
+// i campi di una cella (per ripristini e confronti); solo le colonne che la riga ha
+function _pianoCampiDi(r) {
+  const o = {};
+  PIANO_CAMPI_CELLA.forEach((k) => {
+    if (r && r[k] !== undefined) o[k] = r[k];
+  });
+  return o;
+}
+// valore per il confronto: vuoto, falso, null e lista vuota sono "niente" (come _piano_norm)
+function _pianoValNorm(v) {
+  if (v == null || v === false || v === '') return '';
+  if (typeof v === 'string') return v.trim() === '' ? '' : v;
+  if (typeof v === 'object') {
+    const canon = (x) =>
+      x && typeof x === 'object' && !Array.isArray(x)
+        ? Object.keys(x)
+            .sort()
+            .reduce((o, k) => ((o[k] = canon(x[k])), o), {})
+        : Array.isArray(x)
+          ? x.map(canon)
+          : x;
+    const s = JSON.stringify(canon(v));
+    return s === '[]' || s === '{}' ? '' : s;
+  }
+  return String(v);
+}
+function _pianoCelleUguali(a, b) {
+  if (!a || !b) return !a && !b;
+  return PIANO_CAMPI_CELLA.every((k) => _pianoValNorm(a[k]) === _pianoValNorm(b[k]));
+}
+// stessa cella due volte nella stessa scrittura (es. catena e sostituto nello stesso
+// giorno): resta UNA operazione, con il controllo della prima e i dati dell ultima
+function _pianoOpsUnisci(ops) {
+  const per = new Map();
+  ops.forEach((o) => {
+    const k = o.collaboratore + '|' + String(o.data).substring(0, 10);
+    const g = per.get(k);
+    if (!g) per.set(k, Object.assign({}, o));
+    else g.dati = o.dati === null ? null : Object.assign({}, g.dati || {}, o.dati);
+  });
+  return [...per.values()];
+}
+// descrizione di una cella cambiata da un collega: "Rossi Mario 03.12.2026: cambiata da
+// Bianchi in S1 (protetta)" oppure "... svuotata da un collega"
+function _pianoConflittoTesto(c) {
+  const d = String(c.data).substring(0, 10).split('-').reverse().join('.');
+  const a = c.attuale;
+  if (!a) return c.collaboratore + ' ' + d + ': svuotata da un collega';
+  return (
+    c.collaboratore +
+    ' ' +
+    d +
+    ': cambiata' +
+    (a.operatore ? ' da ' + a.operatore : '') +
+    ' in ' +
+    (a.codice || 'vuota') +
+    (a.motivo_blocco ? ' (bloccata: ' + a.motivo_blocco + ')' : a.protetto ? ' (protetta)' : '')
+  );
+}
+function _pianoErroreConflitto(conflitti) {
+  const lista = conflitti || [];
+  const e = new Error(
+    (lista.length === 1 ? 'cella cambiata mentre lavoravi: ' : lista.length + ' celle cambiate mentre lavoravi: ') +
+      lista.slice(0, 6).map(_pianoConflittoTesto).join('; ') +
+      (lista.length > 6 ? '; ...' : '') +
+      '. Niente e stato scritto: ricarico il piano.',
+  );
+  e.conflitti = lista;
+  e.pianoConflitto = true;
+  return e;
+}
+// rete caduta durante una scrittura del piano: UN solo messaggio, chiaro
+function _pianoErroreRete(e) {
+  if (!e || e.pianoConflitto || e.rete) return e;
+  if (!/Failed to fetch|NetworkError|Load failed/i.test(e.message || '')) return e;
+  const err = new Error(
+    'connessione assente: la modifica del piano non e stata salvata (controlla la rete e ricarica il piano prima di riprovare)',
+  );
+  err.rete = true;
+  return err;
+}
+// ERRORE DI UNA SCRITTURA DEL PIANO: UN messaggio. Senza rete il programma ha gia detto
+// "Connessione assente: le modifiche non vengono salvate finche la rete non torna" (una
+// lettura prima della scrittura, es. il controllo delle regole): non se ne aggiunge un
+// secondo. avvisoPrima = window._sessioneScadutaAvvisata all inizio dell operazione.
+function _pianoErroreScrittura(prefisso, e, avvisoPrima) {
+  if (e && e.rete && !avvisoPrima && window._sessioneScadutaAvvisata) return;
+  toastErrore(prefisso + ((e && e.message) || e), 9000);
+}
+// esito dopo le scritture: le celle nuove in memoria (quelle del mese aperto)
+function _pianoMemoriaDopo(ops, righe) {
+  (ops || []).forEach((o, i) => {
+    const dstr = String(o.data).substring(0, 10);
+    const nuova = righe && righe[i];
+    const k = (_pianoRighe || []).findIndex((x) => x.collaboratore === o.collaboratore && x.data === dstr);
+    if (k >= 0) {
+      if (nuova) _pianoRighe[k] = nuova;
+      else _pianoRighe.splice(k, 1);
+    } else if (nuova && dstr.startsWith(_pianoMeseSel + '-')) _pianoRighe.push(nuova);
+  });
+}
+// SCRIVE UNA O PIU CELLE: [{ collaboratore, data, atteso, dati }]
+//   atteso: assente = nessun controllo; null = la cella deve essere vuota; oggetto = la cella
+//           deve avere questi valori. dati: null = cancella; oggetto = modifica o inserisce.
+// Ritorna { ok: true, righe } oppure { ok: false, conflitti } (niente scritto). Lancia
+// solo per errori veri (permessi, rete: _pianoErroreRete).
+async function _pianoScriviCelle(ops) {
+  ops = _pianoOpsUnisci(ops || []);
+  if (!ops.length) return { ok: true, righe: [] };
+  const tk = getOpToken();
+  if (tk && !_pianoScriviCelleManca) {
+    try {
+      const r = await _conSessione(
+        (t) => _rpcSicura('piano_scrivi_celle', { p_token: t, p_ops: ops }),
+        tk,
+        true, // rete caduta: niente secondo tentativo alla cieca (la prima potrebbe essere arrivata)
+      );
+      if (!r || typeof r.ok !== 'boolean') throw new Error('il database non ha confermato la scrittura del piano');
+      r.ops = ops;
+      return r;
+    } catch (e) {
+      const manca =
+        e && (e.status === 404 || /piano_scrivi_celle|PGRST202|Could not find the function/i.test(e.message || ''));
+      if (!manca) throw _pianoErroreRete(e);
+      _pianoScriviCelleManca = true;
+      console.warn('[piano] piano_scrivi_celle assente (migrazione 20260912 da lanciare): strada di prima');
+    }
+  }
+  try {
+    return await _pianoScriviCelleVecchio(ops);
+  } catch (e) {
+    throw _pianoErroreRete(e);
+  }
+}
+// database non aggiornato: controllo letto subito prima e scritture una alla volta
+async function _pianoScriviCelleVecchio(ops) {
+  const filtro = (o) =>
+    'collaboratore=eq.' + encodeURIComponent(o.collaboratore) + '&data=eq.' + String(o.data).substring(0, 10);
+  const attuali = await Promise.all(ops.map((o) => secGet('piano?' + filtro(o) + '&limit=1').then((x) => x[0])));
+  const conflitti = [];
+  ops.forEach((o, i) => {
+    if (!('atteso' in o)) return;
+    const cur = attuali[i] || null;
+    const ok =
+      o.atteso === null
+        ? !cur
+        : !!cur && Object.keys(o.atteso).every((k) => _pianoValNorm(cur[k]) === _pianoValNorm(o.atteso[k]));
+    if (!ok) conflitti.push({ collaboratore: o.collaboratore, data: String(o.data).substring(0, 10), attuale: cur });
+  });
+  if (conflitti.length) return { ok: false, conflitti: conflitti, ops: ops };
+  for (let i = 0; i < ops.length; i++) {
+    const o = ops[i];
+    const cur = attuali[i];
+    if (o.dati === null) {
+      if (cur) await secDel('piano', 'id=eq.' + cur.id);
+    } else if (cur) await secPatch('piano', 'id=eq.' + cur.id, o.dati);
+    else
+      await secPost(
+        'piano',
+        Object.assign({}, o.dati, { collaboratore: o.collaboratore, data: String(o.data).substring(0, 10) }),
+      );
+  }
+  const righe = await Promise.all(ops.map((o) => secGet('piano?' + filtro(o) + '&limit=1').then((x) => x[0] || null)));
+  return { ok: true, righe: righe, ops: ops };
+}
+// celle cambiate da un collega: un solo avviso con chi e cosa, poi si ricarica
+async function _pianoAvvisaConflitti(conflitti, titolo) {
+  const err = _pianoErroreConflitto(conflitti);
+  if ((conflitti || []).length <= 1) toastErrore((titolo ? titolo + ': ' : '') + err.message, 9000);
+  else
+    await mostraAvviso(
+      (titolo ? titolo + '\n\n' : '') +
+        'Mentre lavoravi un collega ha cambiato ' +
+        conflitti.length +
+        ' celle:\n\n• ' +
+        conflitti.slice(0, 15).map(_pianoConflittoTesto).join('\n• ') +
+        (conflitti.length > 15 ? '\n... e altre ' + (conflitti.length - 15) : '') +
+        '\n\nNon ho scritto niente: ricarico il piano, controlla e riprova.',
+      { titolo: 'Piano cambiato da un collega' },
+    );
+  if (typeof renderPiano === 'function') await renderPiano();
+}
+
+// INSERISCE una cella che chi scrive vede VUOTA. Se nel database c e gia (messa nel
+// frattempo da un collega o di un altro settore): una cella scritta dal programma
+// (bozza, non protetta, senza blocco) si aggiorna, se e ancora quella; una cella scritta a
+// mano, protetta o bloccata NON si sovrascrive (errore con chi e cosa). Prima si
+// riscriveva per collaboratore e giorno qualsiasi cosa ci fosse: una V protetta messa da
+// un collega spariva sotto la vista vecchia di un altro PC.
 async function _pianoInserisciCella(dati) {
   // stessa regola dei giorni chiusi per OGNI inserimento, da qualunque flusso
   // arrivi (bozza, scambi, coperture): il controllo sta nel punto unico
   if (dati && dati.data && !(await _pianoConsentiScrittura(String(dati.data).substring(0, 10))))
     throw new Error('giorno chiuso: ' + dati.data);
-  try {
-    const n = await secPost('piano', dati);
-    return n && n[0] ? n[0] : null;
-  } catch (e) {
-    const msg = (e && (e.message || String(e))) || '';
-    if (!/duplicate key|already exists|23505/i.test(msg)) throw e;
-    const filtro = 'collaboratore=eq.' + encodeURIComponent(dati.collaboratore) + '&data=eq.' + dati.data;
-    const patch = Object.assign({}, dati);
-    delete patch.collaboratore;
-    delete patch.data;
-    patch.updated_at = new Date().toISOString();
-    await secPatch('piano', filtro, patch);
-    const ora = await secGet('piano?' + filtro + '&limit=1');
-    return ora && ora[0] ? ora[0] : null;
+  const corpo = Object.assign({}, dati);
+  delete corpo.collaboratore;
+  delete corpo.data;
+  const op = { collaboratore: dati.collaboratore, data: String(dati.data).substring(0, 10), atteso: null, dati: corpo };
+  const es = await _pianoScriviCelle([op]);
+  if (es.ok) return es.righe && es.righe[0] ? es.righe[0] : null;
+  const att = es.conflitti && es.conflitti[0] ? es.conflitti[0].attuale : null;
+  if (!att || att.protetto || att.motivo_blocco || !att.generato) throw _pianoErroreConflitto(es.conflitti);
+  const es2 = await _pianoScriviCelle([
+    Object.assign({}, op, {
+      atteso: Object.assign(_pianoAttesoDi(att), { generato: true }),
+      dati: Object.assign({}, corpo, { updated_at: new Date().toISOString() }),
+    }),
+  ]);
+  if (!es2.ok) throw _pianoErroreConflitto(es2.conflitti);
+  return es2.righe && es2.righe[0] ? es2.righe[0] : null;
+}
+
+// SCRITTURE DEL PIANO IN CORSO SU QUESTO PC (a mano, scambi, coperture...): la
+// generazione automatica aspetta che finiscano prima di cambiare mese, settore e celle
+// in memoria. Prima poteva partire mentre una scrittura era ferma su una conferma: la
+// cella finiva nel settore della generazione.
+let _pianoScrittureInCorso = 0;
+async function _pianoConScrittura(fn) {
+  if (window._pianoAutoInCorso) {
+    toastErrore('Generazione automatica del piano in corso su questo PC: riprova fra qualche minuto.');
+    return false;
   }
+  _pianoScrittureInCorso++;
+  try {
+    return await fn();
+  } finally {
+    _pianoScrittureInCorso--;
+  }
+}
+async function _pianoAttendiScritture(massimoMs) {
+  const fine = Date.now() + (massimoMs || 10 * 60 * 1000);
+  while (_pianoScrittureInCorso > 0 && Date.now() < fine) await new Promise((x) => setTimeout(x, 300));
+  return _pianoScrittureInCorso === 0;
 }
 
 // Carica le righe di un mese per un settore, in modo che SCALI con molti
@@ -2043,6 +2329,8 @@ async function _renderPianoCore() {
     const nGiorni = _pianoUltimoGiorno(ym);
     const da = ym + '-01';
     const a = ym + '-' + String(nGiorni).padStart(2, '0');
+    // ora del database per le finestre di Annulla (una volta per sessione, in parallelo)
+    if (typeof _pianoCalibraOra === 'function') _pianoCalibraOra();
     _pianoRighe = await _pianoCaricaMeseSettore(da, a, _pianoReparto());
     // domeniche libere dei mesi prima (conto annuale per Valida, bozza e Migliora)
     if (typeof _pianoCaricaDomAnno === 'function') await _pianoCaricaDomAnno(ym, _pianoReparto()).catch(() => {});
@@ -3072,6 +3360,7 @@ function pianoCambiaMese(delta) {
 // (la vecchia finestra di modifica cella è stata sostituita dalla
 // scrittura diretta nella cella · pianoCellaInline / pianoSalvaCella)
 async function rimuoviPianoCella(giaChiuso) {
+  const avvisoRete = !!window._sessioneScadutaAvvisata;
   const sel = _pianoCellaSel;
   if (!sel) return;
   // GIORNO CHIUSO: la cancellazione e' una modifica come le altre e passa dallo
@@ -3098,17 +3387,30 @@ async function rimuoviPianoCella(giaChiuso) {
     ))
   )
     return;
-  _pianoUndoSnap('rimozione cella');
+  const passo = _pianoUndoSnap('rimozione cella');
   if (!giaChiuso) document.getElementById('pwd-modal').classList.add('hidden');
+  // solo se la cella e ancora quella mostrata (un collega puo averla cambiata)
+  let es;
   try {
-    await secDel('piano', 'id=eq.' + r.id);
-    _pianoRighe = _pianoRighe.filter((x) => x.id !== r.id);
+    es = await _pianoScriviCelle([{ collaboratore: sel.nome, data: sel.data, atteso: _pianoAttesoDi(r), dati: null }]);
+  } catch (e) {
+    _pianoUndoScarta(passo);
+    _pianoErroreScrittura('Cella NON rimossa: ', e, avvisoRete);
+    return;
+  }
+  if (!es.ok) {
+    _pianoUndoScarta(passo);
+    await _pianoAvvisaConflitti(es.conflitti);
+    return;
+  }
+  try {
+    _pianoMemoriaDopo(es.ops, es.righe);
     logAzione('Piano: cella rimossa', sel.nome + ' ' + sel.data + ' (era ' + r.codice + ')');
     toast('Cella rimossa');
     if (r.codice === 'M' || r.codice === 'M1') await _pianoMalattiaViaDiario(sel.nome, [sel.data]);
     await _pianoFestiviPersiDopo(sel.nome, [{ data: sel.data, codice: r.codice }]);
     renderPiano();
   } catch (e) {
-    toast('Errore rimozione');
+    toastErrore('Cella rimossa, ma il seguito non e riuscito: ' + ((e && e.message) || e));
   }
 }

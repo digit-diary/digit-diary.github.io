@@ -1823,7 +1823,7 @@ function renderBuoniTipiUI() {
 }
 // settori con la Maison (buoni): quelli dove l inventario ha la categoria Buoni
 function _buoniSettoriMaison() {
-  return (typeof getReparti === 'function' ? getReparti() : []).filter((r) => ['slots', 'tavoli'].includes(r.key));
+  return (typeof getReparti === 'function' ? getReparti() : []).filter((r) => repartoConMaison(r.key));
 }
 function _buoniLeggiTabella() {
   const out = [];

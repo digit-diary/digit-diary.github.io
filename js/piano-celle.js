@@ -1037,7 +1037,13 @@ async function _pianoNdChiamata(nome, dstr) {
   }
   return true;
 }
-async function _pianoSalvaCellaBase(nome, dstr, codice) {
+// scrittura a mano in corso: la generazione automatica aspetta che finisca (anche se e
+// ferma su una conferma), cosi mese, settore e celle in memoria restano quelli giusti
+function _pianoSalvaCellaBase(nome, dstr, codice) {
+  return _pianoConScrittura(() => _pianoSalvaCellaBaseEsegui(nome, dstr, codice));
+}
+async function _pianoSalvaCellaBaseEsegui(nome, dstr, codice) {
+  const avvisoRete = !!window._sessioneScadutaAvvisata;
   if (!puoGestirePiano()) return false;
   // giorno chiuso: si procede solo con lo sblocco motivato
   if (!(await _pianoConsentiScrittura(dstr))) return false;
@@ -1137,68 +1143,83 @@ async function _pianoSalvaCellaBase(nome, dstr, codice) {
   }
   // la fotografia per Annulla si prende solo ora, dopo le conferme: una rinuncia
   // non lascia piu un passo vuoto (che svuotava anche Ripristina)
-  if (!window._pianoScritturaBlocco) _pianoUndoSnap('modifica cella ' + nome.split(' ')[0] + ' ' + dstr.substring(8));
-  try {
-    if (!codice) {
-      if (r) {
-        await secDel('piano', 'id=eq.' + r.id);
-        _pianoRighe = _pianoRighe.filter((x) => x.id !== r.id);
-        logAzione('Piano: turno rimosso', nome + ' ' + dstr + ' (era ' + attuale + ')');
-        await _pianoFestiviPersiDopo(nome, [{ data: dstr, codice: attuale }]);
-        // era una malattia: proposta di toglierla anche dal Diario
-        if (attuale === 'M' || attuale === 'M1') await _pianoMalattiaViaDiario(nome, [dstr]);
-        renderPiano();
-      }
+  if (codice && codice === attuale) return;
+  const passo = window._pianoScritturaBlocco
+    ? null
+    : _pianoUndoSnap('modifica cella ' + nome.split(' ')[0] + ' ' + dstr.substring(8));
+  // SCRITTURA CONDIZIONATA: la cella deve essere ancora quella che si vedeva (sigla,
+  // protetto, blocco). Se un collega l ha cambiata o svuotata non si scrive niente, si
+  // dice chi e cosa e si ricarica; nessun passo di Annulla e niente nel Registro.
+  // Prima la modifica per numero di riga arrivava a vuoto e il Registro diceva lo stesso
+  // "Piano modificato".
+  const rep0 = _pianoReparto();
+  let op;
+  if (!codice) {
+    if (!r) {
+      _pianoUndoScarta(passo);
       return;
     }
-    if (codice === attuale) return;
+    op = { collaboratore: nome, data: dstr, atteso: _pianoAttesoDi(r), dati: null };
+  } else {
+    const dati = {
+      codice: codice,
+      protetto: true,
+      generato: false,
+      ora_inizio: orarioJG ? orarioJG.ora_inizio : null,
+      ora_fine: orarioJG ? orarioJG.ora_fine : null,
+      fasce: orarioJG ? orarioJG.fasce : null,
+      operatore: getOperatore(),
+    };
     if (r) {
-      const patchCella = {
-        codice: codice,
-        protetto: true,
-        generato: false,
-        ora_inizio: orarioJG ? orarioJG.ora_inizio : null,
-        ora_fine: orarioJG ? orarioJG.ora_fine : null,
-        fasce: orarioJG ? orarioJG.fasce : null,
-        operatore: getOperatore(),
-        updated_at: new Date().toISOString(),
-      };
+      dati.updated_at = new Date().toISOString();
       // la malattia scioglie il blocco con motivo: il giorno non e' piu' "da tenere libero"
-      if (r.motivo_blocco && (codice === 'M' || codice === 'M1' || codice === 'I')) {
-        patchCella.motivo_blocco = null;
-        r.motivo_blocco = null;
-      }
-      if (commentoRegole)
-        patchCella.commento = (commentoRegole + (r.commento ? ' \u00b7 ' + r.commento : '')).substring(0, 400);
+      if (r.motivo_blocco && (codice === 'M' || codice === 'M1' || codice === 'I')) dati.motivo_blocco = null;
+      if (commentoRegole) dati.commento = (commentoRegole + (r.commento ? ' · ' + r.commento : '')).substring(0, 400);
       // malattia scritta a mano sopra una sigla: stessa nota della malattia dal Diario
-      // ("Ex R23 - operatore"), cosi togliendo la malattia la sigla torna
-      if ((codice === 'M' || codice === 'M1') && attuale && attuale !== 'M' && attuale !== 'M1')
-        patchCella.commento = ('Ex ' + attuale + ' - ' + getOperatore()).substring(0, 400);
-      await secPatch('piano', 'id=eq.' + r.id, patchCella);
-      if (patchCella.commento !== undefined) r.commento = patchCella.commento;
-      r.codice = codice;
-      r.protetto = true;
-      r.generato = false; // come nel database: senza, Annulla vedeva una "modifica di altri"
-      r.ora_inizio = orarioJG ? orarioJG.ora_inizio : null;
-      r.ora_fine = orarioJG ? orarioJG.ora_fine : null;
-      r.fasce = orarioJG ? orarioJG.fasce : null;
+      // ("Ex R23 - operatore"), cosi togliendo la malattia la sigla torna, e com era la
+      // cella (bozza o a mano, protetta, nota, blocco) resta in prima_malattia
+      const eM = (c) => c === 'M' || c === 'M1';
+      if (eM(codice) && attuale && !eM(attuale)) {
+        dati.commento = ('Ex ' + attuale + ' - ' + getOperatore()).substring(0, 400);
+        if (r.prima_malattia !== undefined) dati.prima_malattia = _pianoPrimaMalattiaDi(r);
+      } else if (!eM(codice) && eM(attuale) && r.prima_malattia) dati.prima_malattia = null;
     } else {
-      const nuovo = await _pianoInserisciCella({
-        collaboratore: nome,
-        data: dstr,
-        codice: codice,
-        protetto: true,
-        generato: false,
-        ora_inizio: orarioJG ? orarioJG.ora_inizio : null,
-        ora_fine: orarioJG ? orarioJG.ora_fine : null,
-        fasce: orarioJG ? orarioJG.fasce : null,
-        commento: commentoRegole ? commentoRegole.substring(0, 400) : null,
-        reparto_dip: _pianoReparto(),
-        operatore: getOperatore(),
-      });
-      // _pianoInserisciCella restituisce la riga (non un elenco): prima nuovo[0]
-      // era sempre vuoto e la cella nuova mancava in memoria fino al ridisegno
-      if (nuovo) _pianoRighe.push(Array.isArray(nuovo) ? nuovo[0] : nuovo);
+      dati.commento = commentoRegole ? commentoRegole.substring(0, 400) : null;
+      dati.reparto_dip = rep0;
+    }
+    op = { collaboratore: nome, data: dstr, atteso: _pianoAttesoDi(r), dati: dati };
+  }
+  let esito;
+  try {
+    esito = await _pianoScriviCelle([op]);
+  } catch (e) {
+    _pianoUndoScarta(passo);
+    console.error(e);
+    const blE = window._pianoScritturaBlocco;
+    if (blE) blE.errori = (blE.errori || []).concat([nome + ' ' + dstr.split('-').reverse().join('.')]);
+    if (!blE || !blE.erroreDetto) _pianoErroreScrittura('Piano NON salvato: ', e, avvisoRete);
+    if (blE) blE.erroreDetto = true;
+    return false;
+  }
+  if (!esito.ok) {
+    _pianoUndoScarta(passo);
+    const blC = window._pianoScritturaBlocco;
+    if (blC) {
+      blC.conflitti = (blC.conflitti || []).concat(esito.conflitti);
+      return false;
+    }
+    await _pianoAvvisaConflitti(esito.conflitti);
+    return false;
+  }
+  _pianoMemoriaDopo(esito.ops, esito.righe);
+  try {
+    if (!codice) {
+      logAzione('Piano: turno rimosso', nome + ' ' + dstr + ' (era ' + attuale + ')');
+      await _pianoFestiviPersiDopo(nome, [{ data: dstr, codice: attuale }]);
+      // era una malattia: proposta di toglierla anche dal Diario
+      if (attuale === 'M' || attuale === 'M1') await _pianoMalattiaViaDiario(nome, [dstr]);
+      if (!window._pianoScritturaBlocco) renderPiano();
+      return;
     }
     logAzione('Piano modificato', nome + ' ' + dstr + ' → ' + codice);
     // festivo con diritto al recupero che non si lavora piu (turno tolto): un CGF
@@ -1240,8 +1261,9 @@ async function _pianoSalvaCellaBase(nome, dstr, codice) {
     const gNF = _pianoGruppoNonFormato(nome, codice, '');
     if (gNF) setTimeout(() => _pianoProponiCertificazione(nome, gNF), 300);
   } catch (e) {
+    // la cella e scritta: qui si ferma solo il seguito (Diario, festivi, formazione)
     console.error(e);
-    toast('Errore salvataggio piano');
+    toastErrore('Turno salvato, ma il seguito non e riuscito: ' + ((e && e.message) || e));
   }
 }
 async function pianoCellaPrompt(nome, dstr) {

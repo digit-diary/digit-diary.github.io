@@ -237,6 +237,34 @@
       });
     }
     const filtroRiga = (t, r) => chiave(t) + '=eq.' + r[chiave(t)];
+    // AGGIUNTE E IMPOSTAZIONI (11/10/2026): prima di toglierle o rimetterle si guarda se
+    // sono ancora come le aveva lasciate l azione. Se un collega le ha cambiate si chiede
+    // (canale.chiedi); senza risposta o con un no, l annullamento si ferma come per le
+    // modifiche. Prima si cancellava o si riscriveva sopra la modifica del collega.
+    async function chiediSeCambiata(testo) {
+      const msg =
+        'Nel frattempo ' + testo + ' e stata modificata da qualcun altro: annullamento fermato per non sovrascrivere';
+      if (typeof canale.chiedi !== 'function') throw new Error(msg);
+      const si = await canale.chiedi(
+        'Nel frattempo ' +
+          testo +
+          ' e stata modificata da qualcun altro.\n\nConferma = annullo comunque (la sua modifica si perde). Annulla = mi fermo qui.',
+      );
+      if (!si) throw new Error(msg);
+    }
+    // la riga aggiunta e ancora come l ha scritta l azione? (data di aggiornamento esclusa)
+    async function controllaAggiunta(table, r) {
+      const cur = (await canale.leggi(table + '?' + chiave(table) + '=eq.' + r[chiave(table)]))[0];
+      if (!cur) return false; // gia tolta da qualcun altro: niente da fare
+      const cambiata = Object.keys(r).some((k) => k !== 'updated_at' && k in cur && !uguale(cur[k], r[k]));
+      if (cambiata) await chiediSeCambiata('la riga aggiunta (' + parola(table) + ')');
+      return true;
+    }
+    async function controllaImp(chiaveImp, atteso) {
+      const cur = await canale.leggiImp(chiaveImp);
+      if (!uguale(cur == null ? '' : String(cur), atteso == null ? '' : String(atteso)))
+        await chiediSeCambiata('l impostazione "' + chiaveImp + '"');
+    }
     async function inverti(op) {
       if (op.tipo === 'patch') {
         for (const r of op.prima) {
@@ -247,6 +275,7 @@
         }
       } else if (op.tipo === 'post') {
         for (const r of op.righe) {
+          if (!(await controllaAggiunta(op.table, r))) continue;
           if (CON_CESTINO.indexOf(op.table) >= 0 && 'eliminato' in r)
             await canale.patch(op.table, filtroRiga(op.table, r), {
               eliminato: true,
@@ -258,6 +287,7 @@
       } else if (op.tipo === 'del') {
         for (const r of op.righe) await canale.post(op.table, r);
       } else if (op.tipo === 'imp') {
+        await controllaImp(op.chiave, op.dopo);
         await canale.imp(op.chiave, op.prima == null ? '' : op.prima);
       } else if (op.tipo === 'rinomina') {
         await canale.rinomina(op.a, op.da); // al contrario, in tutto il programma
@@ -284,6 +314,7 @@
       } else if (op.tipo === 'del') {
         for (const r of op.righe) await canale.del(op.table, filtroRiga(op.table, r));
       } else if (op.tipo === 'imp') {
+        await controllaImp(op.chiave, op.prima);
         await canale.imp(op.chiave, op.dopo);
       } else if (op.tipo === 'rinomina') {
         await canale.rinomina(op.da, op.a);
@@ -420,6 +451,8 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     del: (t, f) => secDel(t, f),
     imp: (k, v) => setImp(k, v),
     rinomina: (da, a) => _rinominaCollaboratoreTutto(da, a),
+    // riga o impostazione cambiata da un collega dopo l azione: si chiede prima di annullare
+    chiedi: (testo) => chiediConferma(testo, { titolo: 'Modifica di un altro operatore' }),
     adesso: () => new Date().toISOString(),
     operatore: () => (typeof getOperatore === 'function' && getOperatore()) || 'Admin',
     attesa: (ms, fn) => setTimeout(fn, ms),

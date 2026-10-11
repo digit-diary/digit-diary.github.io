@@ -2509,14 +2509,26 @@ function calcolaGiacenzeSigarette() {
 // Categorie inventario personalizzate (oltre a Buoni e Sigarette), gestite da admin
 function getInvCategorieExtra() {
   const raw = inventarioCategorieExtra;
-  // legacy (array semplice): erano le categorie condivise di Slots/Tavoli
-  if (Array.isArray(raw)) return ['slots', 'tavoli'].includes(currentReparto) ? raw : [];
+  // legacy (array semplice): erano le categorie condivise dei settori storici (Slots/Tavoli)
+  if (Array.isArray(raw)) return _repartoStorico(currentReparto) ? raw : [];
   if (raw && typeof raw === 'object') return Array.isArray(raw[currentReparto]) ? raw[currentReparto] : [];
   return [];
 }
-// Le categorie base Buoni/Sigarette sono legate alla Maison: esistono solo in Slots/Tavoli
+// Le categorie base Buoni/Sigarette sono legate alla Maison: esistono nei settori con la Maison
 function _invConBase() {
-  return ['slots', 'tavoli'].includes(currentReparto);
+  return repartoConMaison(currentReparto);
+}
+// settore storico (REPARTI_BASE: Slots e Tavoli, dati di prima dei settori configurabili)
+function _repartoStorico(key) {
+  return typeof REPARTI_BASE !== 'undefined' && REPARTI_BASE.some((r) => r.key === key);
+}
+// SETTORE CON LA MAISON (buoni e sigarette): la proprieta maison del settore in
+// reparti_config (true/false) se c e; senza, i settori storici (Slots e Tavoli, come prima).
+// Un settore nuovo non ha la Maison finche maison:true non e impostato.
+function repartoConMaison(key) {
+  const info = typeof getRepartoInfo === 'function' ? getRepartoInfo(key) : null;
+  if (info && typeof info.maison === 'boolean') return info.maison;
+  return _repartoStorico(key);
 }
 // CATEGORIE BASE PERSONALIZZABILI (v368, solo admin): per settore Buoni e Sigarette si
 // possono rinominare o nascondere (es. Sigarette ai Tavoli). Calcoli, collegamento con

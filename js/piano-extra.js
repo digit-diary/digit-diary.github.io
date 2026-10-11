@@ -95,20 +95,174 @@ function _pianoUndoSnap(label) {
     const st = _pianoStatoMese();
     st.label = label;
     st.quando = new Date().toISOString(); // per l Annulla unico (l azione piu recente)
+    // FINESTRA DELL OPERAZIONE nell ora del database (migrazione 20260912): Annulla rimette
+    // le celle che QUESTO PC ha scritto da qui alla prossima operazione, dallo storico del
+    // database. La fotografia del mese (righe) resta per i database non aggiornati.
+    if (typeof _pianoOraScarto === 'number') st.t0 = _pianoOraServer();
+    else _pianoCalibraOra();
     window._pianoUndo = window._pianoUndo || [];
+    const prec = window._pianoUndo[window._pianoUndo.length - 1];
+    if (prec && prec.t0 && !prec.t1) {
+      prec.t1 = st.t0 || _pianoOraServer();
+      st.precRiaperto = prec;
+    }
     window._pianoUndo.push(st);
-    if (window._pianoUndo.length > 15) window._pianoUndo.shift();
+    if (window._pianoUndo.length > 15) st.tolto = window._pianoUndo.shift();
+    st.redoPrima = window._pianoRedo || [];
     window._pianoRedo = [];
     if (window._annullaAggiornaBarra) setTimeout(window._annullaAggiornaBarra, 0);
     // prima modifica di questo mese+settore nella sessione: si conserva lo
     // stato di partenza per "Annulla tutto" (non limitato ai 15 passi)
     window._pianoSessSnap = window._pianoSessSnap || {};
     const k = st.ym + '|' + st.rep;
-    if (!window._pianoSessSnap[k])
-      window._pianoSessSnap[k] = { ym: st.ym, rep: st.rep, righe: st.righe, label: 'inizio sessione', n: 0 };
+    if (!window._pianoSessSnap[k]) {
+      window._pianoSessSnap[k] = { ym: st.ym, rep: st.rep, righe: st.righe, label: 'inizio sessione', n: 0, t0: st.t0 };
+      st.sessNuovo = true;
+    }
     window._pianoSessSnap[k].n++;
     _pianoSalvatoFlash();
-  } catch (e) {}
+    return st;
+  } catch (e) {
+    return null;
+  }
+}
+// PASSO DI ANNULLA SENZA SCRITTURA (rete caduta, cella cambiata da un collega, niente da
+// fare): si toglie, e tutto torna come prima della fotografia. Prima restava un passo
+// per una scrittura mai avvenuta.
+function _pianoUndoScarta(st) {
+  if (!st) return;
+  const u = window._pianoUndo || [];
+  const i = u.lastIndexOf(st);
+  if (i < 0) return;
+  u.splice(i, 1);
+  if (st.tolto) u.unshift(st.tolto);
+  if (st.precRiaperto && st.precRiaperto.t1 === st.t0) st.precRiaperto.t1 = null;
+  if (st.redoPrima && !(window._pianoRedo || []).length) window._pianoRedo = st.redoPrima;
+  const k = st.ym + '|' + st.rep;
+  const s = (window._pianoSessSnap || {})[k];
+  if (s) {
+    s.n--;
+    if (st.sessNuovo && s.n <= 0) delete window._pianoSessSnap[k];
+  }
+  if (window._annullaAggiornaBarra) setTimeout(window._annullaAggiornaBarra, 0);
+}
+// ORA DEL DATABASE: le finestre delle operazioni si misurano con l orologio del database
+// (lo storico registra quell ora), non con quello del PC che puo essere avanti o indietro
+let _pianoOraScarto = null; // ms (ora del database - ora del PC); false = funzione assente
+let _pianoOraCalibrando = null;
+async function _pianoCalibraOra() {
+  if (typeof _pianoOraScarto === 'number') return true;
+  if (_pianoOraScarto === false || !getOpToken()) return false;
+  if (!_pianoOraCalibrando)
+    _pianoOraCalibrando = (async () => {
+      try {
+        const c0 = Date.now();
+        const s = await _rpcSicura('piano_ora', {});
+        const c1 = Date.now();
+        const t = Date.parse(s);
+        if (!s || isNaN(t)) throw new Error('ora del database non letta');
+        _pianoOraScarto = t - (c0 + c1) / 2;
+      } catch (e) {
+        if (e && (e.status === 404 || /piano_ora|PGRST202|Could not find the function/i.test(e.message || '')))
+          _pianoOraScarto = false;
+      } finally {
+        _pianoOraCalibrando = null;
+      }
+    })();
+  await _pianoOraCalibrando;
+  return typeof _pianoOraScarto === 'number';
+}
+function _pianoOraServer() {
+  return new Date(Date.now() + (typeof _pianoOraScarto === 'number' ? _pianoOraScarto : 0)).toISOString();
+}
+// ANNULLA DI UNA FINESTRA: le celle che QUESTA sessione ha scritto fra t0 e t1 tornano
+// com erano prima della prima modifica, in UNA scrittura (tutto o niente), e solo se sono
+// ancora come le aveva lasciate l operazione. Le celle cambiate poi da altri si mostrano
+// e si sceglie (riportarle indietro comunque o lasciarle). I giorni chiusi non si toccano.
+// opz: { reparto, da, a } per limitare (Annulla tutto del mese).
+// Ritorna { cambiate, chiusi, altri, inizio, fine } (inizio/fine: la finestra delle
+// scritture dell annullamento, per Ripristina).
+async function _pianoAnnullaFinestra(st, opz) {
+  opz = opz || {};
+  const mod =
+    (await _conSessione(
+      (t) =>
+        _rpcSicura('piano_mie_modifiche', {
+          p_token: t,
+          p_dal: st.t0,
+          p_al: st.t1 || null,
+          p_reparto: opz.reparto || null,
+          p_da: opz.da || null,
+          p_a: opz.a || null,
+        }),
+      getOpToken(),
+    )) || [];
+  const chiave = (c) => c.collaboratore + '|' + String(c.data).substring(0, 10);
+  let celle = mod.filter((c) => !_pianoCelleUguali(c.prima, c.dopo));
+  const chiusi = celle.filter((c) => !_pianoGiornoScrivibile(String(c.data).substring(0, 10))).map(chiave);
+  celle = celle.filter((c) => _pianoGiornoScrivibile(String(c.data).substring(0, 10)));
+  const ora = new Date().toISOString();
+  let ops = celle.map((c) => ({
+    collaboratore: c.collaboratore,
+    data: String(c.data).substring(0, 10),
+    atteso: c.dopo ? _pianoCampiDi(c.dopo) : null,
+    dati: c.prima ? Object.assign(_pianoCampiDi(c.prima), { operatore: getOperatore(), updated_at: ora }) : null,
+  }));
+  let altri = [];
+  let es = await _pianoScriviCelle(ops);
+  if (!es.ok) {
+    altri = es.conflitti || [];
+    const per = new Map(altri.map((c) => [chiave(c), c]));
+    const forza = await chiediConferma(
+      altri.length +
+        (altri.length === 1 ? ' cella e stata cambiata' : ' celle sono state cambiate') +
+        ' da un altro operatore dopo la tua operazione:\n\n' +
+        altri
+          .slice(0, 12)
+          .map((c) => '\u2022 ' + _pianoConflittoTesto(c))
+          .join('\n') +
+        (altri.length > 12 ? '\n... e altre ' + (altri.length - 12) : '') +
+        '\n\nConferma = le riporto comunque indietro. Annulla = lascio le sue modifiche e annullo solo il resto.',
+      { titolo: 'Modifiche di altri operatori' },
+    );
+    ops = ops
+      .map((o) => {
+        const c = per.get(chiave(o));
+        if (!c) return o;
+        return forza ? Object.assign({}, o, { atteso: c.attuale ? _pianoCampiDi(c.attuale) : null }) : null;
+      })
+      .filter(Boolean);
+    es = await _pianoScriviCelle(ops);
+    if (!es.ok) throw _pianoErroreConflitto(es.conflitti);
+  }
+  if (chiusi.length) await _pianoAvvisoGiorniChiusi(chiusi);
+  return {
+    cambiate: ops.length,
+    chiusi: chiusi,
+    altri: altri,
+    lasciate: altri.filter((c) => !ops.some((o) => chiave(o) === chiave(c))).length,
+    inizio: es.inizio || null,
+    fine: es.fine || null,
+  };
+}
+async function _pianoAvvisoGiorniChiusi(chiusi) {
+  await mostraAvviso(
+    chiusi.length +
+      (chiusi.length === 1 ? ' cella di un giorno chiuso non e stata' : ' celle di giorni chiusi non sono state') +
+      ' riportate indietro:\n\n' +
+      chiusi
+        .slice(0, 15)
+        .map((k) => '\u2022 ' + k.split('|')[0] + ' ' + k.split('|')[1].split('-').reverse().join('.'))
+        .join('\n') +
+      (chiusi.length > 15 ? '\n... e altre ' + (chiusi.length - 15) : '') +
+      '\n\nPer correggerle: sblocca il giorno (permesso "Giorni chiusi") e modificale a mano.',
+    { titolo: 'Giorni chiusi' },
+  );
+}
+// il passo si annulla dallo storico del database (finestra) o, su un database non
+// aggiornato, dalla fotografia del mese
+async function _pianoPassoConFinestra(st) {
+  return !!(st && st.t0 && (await _pianoCalibraOra()));
 }
 // Feedback visivo del salvataggio automatico: "Salvato" per qualche secondo
 function _pianoSalvatoFlash() {
@@ -127,52 +281,24 @@ function _pianoSalvatoFlash() {
     }, 2600);
   }, 900);
 }
-// RIPRISTINO MIRATO: si rimettono SOLO le celle diverse dallo stato salvato.
-// Prima si cancellava e si riscriveva tutto il mese: si perdevano le modifiche
-// fatte nel frattempo da altri operatori e si toccavano anche i giorni chiusi.
+// RIPRISTINO MIRATO A UNA FOTOGRAFIA DEL MESE (database non aggiornato e "torna al
+// momento" dello storico): si rimettono SOLO le celle diverse dallo stato salvato.
 //  - giorni chiusi: non si toccano, si elencano;
 //  - celle cambiate da un altro operatore dopo la tua operazione (il database
 //    e diverso da quello che mostrava il tuo schermo, opz.memoria): si chiede.
+// Le celle si scrivono in UNA scrittura (tutto o niente) e solo se sono ancora come
+// appena lette: prima si cancellava e poi si reinseriva in due chiamate, e se la
+// seconda falliva le celle restavano cancellate.
 // Ritorna { cambiate, chiusi: [chiavi], altri: [chiavi] }.
 async function _pianoRipristinaStato(st, opz) {
   opz = opz || {};
   const fine = st.ym + '-' + String(_pianoUltimoGiorno(st.ym)).padStart(2, '0');
-  // sessione valida PRIMA di cancellare qualsiasi cella
-  await _rpcSicura('piano_bulk_upsert', { p_token: getOpToken(), p_rows: [] });
   const cur =
     (await secGet('piano?data=gte.' + st.ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + st.rep + '')) || [];
-  const CAMPI = [
-    'codice',
-    'protetto',
-    'generato',
-    'ora_inizio',
-    'ora_fine',
-    'commento',
-    'colore',
-    'motivo_blocco',
-    'fasce',
-  ];
-  // oggetti (fasce del JG) confrontati con le chiavi in ordine: il database le restituisce
-  // ordinate, la memoria nell ordine in cui sono state scritte
-  const canon = (v) =>
-    JSON.stringify(v, (k, x) =>
-      x && typeof x === 'object' && !Array.isArray(x)
-        ? Object.keys(x)
-            .sort()
-            .reduce((o, kk) => ((o[kk] = x[kk]), o), {})
-        : x,
-    );
-  const val = (v) =>
-    v == null || v === '' || v === false
-      ? ''
-      : typeof v === 'object'
-        ? canon(v)
-        : String(v).substring(0, v === true ? 4 : 400);
-  const firma = (r) => CAMPI.map((c) => val(r[c])).join('|');
   const chiave = (r) => r.collaboratore + '|' + String(r.data).substring(0, 10);
   const salvato = new Map(st.righe.map((r) => [chiave(r), r]));
   const ora = new Map(cur.map((r) => [chiave(r), r]));
-  const diversa = (a, b) => (!a || !b ? !!(a || b) : firma(a) !== firma(b));
+  const diversa = (a, b) => !_pianoCelleUguali(a, b);
   let cambi = [...new Set([...salvato.keys(), ...ora.keys()])].filter((k) => diversa(salvato.get(k), ora.get(k)));
   const chiusi = cambi.filter((k) => !_pianoGiornoScrivibile(k.split('|')[1]));
   cambi = cambi.filter((k) => _pianoGiornoScrivibile(k.split('|')[1]));
@@ -192,7 +318,7 @@ async function _pianoRipristinaStato(st, opz) {
           ' da un altro operatore dopo la tua operazione:\n\n' +
           altri
             .slice(0, 12)
-            .map((k) => '\u2022 ' + desc(k))
+            .map((k) => '• ' + desc(k))
             .join('\n') +
           (altri.length > 12 ? '\n... e altre ' + (altri.length - 12) : '') +
           '\n\nConferma = le riporto comunque indietro. Annulla = lascio le sue modifiche e annullo solo il resto.',
@@ -202,33 +328,30 @@ async function _pianoRipristinaStato(st, opz) {
     }
   }
   if (cambi.length) {
-    const ids = cambi
-      .map((k) => ora.get(k))
-      .filter(Boolean)
-      .map((r) => r.id);
-    for (let i = 0; i < ids.length; i += 150) await secDel('piano', 'id=in.(' + ids.slice(i, i + 150).join(',') + ')');
-    const daScrivere = cambi.map((k) => salvato.get(k)).filter(Boolean);
-    let scritte = 0;
-    for (let i = 0; i < daScrivere.length; i += 2000) {
-      const r = await _rpcSicura('piano_bulk_upsert', { p_token: getOpToken(), p_rows: daScrivere.slice(i, i + 2000) });
-      scritte += (r && r.inserite) || 0;
-    }
-    if (scritte !== daScrivere.length)
-      throw new Error('ripristinate ' + scritte + ' celle su ' + daScrivere.length + ': controlla il mese');
+    if (cambi.length > 3000) throw new Error('troppe celle da ripristinare in una volta (' + cambi.length + ')');
+    const adesso = new Date().toISOString();
+    const ops = cambi.map((k) => {
+      const [n, d] = k.split('|');
+      const att = ora.get(k);
+      const sal = salvato.get(k);
+      return {
+        collaboratore: n,
+        data: d,
+        atteso: att ? _pianoCampiDi(att) : null,
+        dati: sal
+          ? Object.assign(_pianoCampiDi(sal), { operatore: sal.operatore || getOperatore(), updated_at: adesso })
+          : null,
+      };
+    });
+    const es = await _pianoScriviCelle(ops);
+    if (!es.ok)
+      throw new Error(
+        'il mese e cambiato mentre ripristinavo (' +
+          es.conflitti.slice(0, 3).map(_pianoConflittoTesto).join('; ') +
+          '): niente e stato scritto, riprova',
+      );
   }
-  if (chiusi.length)
-    await mostraAvviso(
-      chiusi.length +
-        (chiusi.length === 1 ? ' cella di un giorno chiuso non e stata' : ' celle di giorni chiusi non sono state') +
-        ' riportate indietro:\n\n' +
-        chiusi
-          .slice(0, 15)
-          .map((k) => '\u2022 ' + k.split('|')[0] + ' ' + k.split('|')[1].split('-').reverse().join('.'))
-          .join('\n') +
-        (chiusi.length > 15 ? '\n... e altre ' + (chiusi.length - 15) : '') +
-        '\n\nPer correggerle: sblocca il giorno (permesso "Giorni chiusi") e modificale a mano.',
-      { titolo: 'Giorni chiusi' },
-    );
+  if (chiusi.length) await _pianoAvvisoGiorniChiusi(chiusi);
   return { cambiate: cambi.length, chiusi: chiusi, altri: altri };
 }
 // stato che il TUO schermo mostra ora (per riconoscere le modifiche di altri)
@@ -237,13 +360,18 @@ function _pianoMemoriaDi(st) {
   return _pianoStatoMese().righe;
 }
 // Annulla l'ultima operazione registrata (usato da chi rinuncia a meta' di
-// un'operazione che ha gia' scritto qualcosa, per esempio la bozza).
+// un'operazione che ha gia' scritto qualcosa, per esempio la bozza): dallo storico del
+// database, solo le celle che l operazione ha scritto e con il controllo delle modifiche
+// di altri (prima riportava indietro tutto il mese dalla fotografia, senza controlli)
 async function _pianoRipristinaUltimoSnapshot(messaggio) {
   const u = window._pianoUndo || [];
   const st = u.pop();
   if (!st) return;
   try {
-    await _pianoRipristinaStato(st);
+    if (await _pianoPassoConFinestra(st)) {
+      if (!st.t1) st.t1 = _pianoOraServer();
+      await _pianoAnnullaFinestra(st);
+    } else await _pianoRipristinaStato(st, { memoria: _pianoMemoriaDi(st) });
     toast(messaggio || 'Operazione annullata');
   } catch (e) {
     toastErrore('Ripristino non riuscito: ' + (e.message || '') + '. Usa "Annulla" dal piano.');
@@ -264,6 +392,7 @@ function _pianoMappaRighe(rows, rep) {
     commento: r.commento,
     colore: r.colore,
     motivo_blocco: r.motivo_blocco,
+    prima_malattia: r.prima_malattia, // undefined su un database senza la colonna
     operatore: r.operatore,
     reparto_dip: rep,
   }));
@@ -276,12 +405,47 @@ async function pianoAnnulla() {
   }
   if (!puoGestirePiano()) return;
   const st = u.pop();
-  const memoria = _pianoMemoriaDi(st);
-  let redoAggiunto = false;
   // torna al mese/settore dell'operazione se nel frattempo sei altrove
+  const memoria = _pianoMemoriaDi(st);
   _pianoMeseSel = st.ym;
   if (st.rep !== currentReparto) _pianoRepartoSel = st.rep;
   else _pianoRepartoSel = _pianoRepartoSel === null ? null : st.rep;
+  // DALLO STORICO DEL DATABASE: solo le celle che questo PC ha scritto nell operazione,
+  // in una scrittura sola, con il controllo delle modifiche di altri
+  if (await _pianoPassoConFinestra(st)) {
+    if (!st.t1) st.t1 = _pianoOraServer();
+    try {
+      const esito = await _pianoAnnullaFinestra(st);
+      if (esito.inizio) {
+        window._pianoRedo = window._pianoRedo || [];
+        window._pianoRedo.push({
+          ym: st.ym,
+          rep: st.rep,
+          label: st.label,
+          quando: new Date().toISOString(),
+          t0: esito.inizio,
+          t1: esito.fine,
+        });
+      }
+      logAzione('Piano: annullato', st.label + ' (' + st.ym + ') · ' + esito.cambiate + ' celle');
+      toast(
+        'Annullato: ' +
+          st.label +
+          ' (' +
+          esito.cambiate +
+          ' celle' +
+          (esito.lasciate ? ', ' + esito.lasciate + ' lasciate come le ha messe il collega' : '') +
+          ')',
+      );
+      await _pianoAnnullaSeguito(st);
+    } catch (e) {
+      u.push(st);
+      toastErrore('Annulla non riuscito: ' + ((e && e.message) || e));
+    }
+    renderPiano();
+    return;
+  }
+  let redoAggiunto = false;
   // lo stato corrente (dal DB) diventa il "Ripristina"
   try {
     const fine = st.ym + '-' + String(_pianoUltimoGiorno(st.ym)).padStart(2, '0');
@@ -301,18 +465,22 @@ async function pianoAnnulla() {
     const esito = await _pianoRipristinaStato(st, { memoria: memoria });
     logAzione('Piano: annullato', st.label + ' (' + st.ym + ') · ' + esito.cambiate + ' celle');
     toast('Annullato: ' + st.label + ' (' + esito.cambiate + ' celle)');
-    // la copertura aveva registrato la malattia anche nel Diario: si propone di toglierla
-    if (st.malattiaDiario && typeof _pianoMalattiaViaDiario === 'function')
-      await _pianoMalattiaViaDiario(st.malattiaDiario.nome, st.malattiaDiario.giorni);
-    // e i punti incentivo dati per la stessa copertura
-    if (st.malattiaDiario && typeof _pianoPuntiCoperturaVia === 'function')
-      await _pianoPuntiCoperturaVia(st.malattiaDiario.nome, st.malattiaDiario.giorni);
+    await _pianoAnnullaSeguito(st);
   } catch (e) {
     u.push(st);
     if (redoAggiunto) (window._pianoRedo || []).pop(); // lo stato messo in Ripristina non vale
     toastErrore('Annulla non riuscito: ' + ((e && e.message) || e));
   }
   renderPiano();
+}
+// dopo l annullamento di una copertura: la malattia registrata anche nel Diario e i punti
+async function _pianoAnnullaSeguito(st) {
+  // la copertura aveva registrato la malattia anche nel Diario: si propone di toglierla
+  if (st.malattiaDiario && typeof _pianoMalattiaViaDiario === 'function')
+    await _pianoMalattiaViaDiario(st.malattiaDiario.nome, st.malattiaDiario.giorni);
+  // e i punti incentivo dati per la stessa copertura
+  if (st.malattiaDiario && typeof _pianoPuntiCoperturaVia === 'function')
+    await _pianoPuntiCoperturaVia(st.malattiaDiario.nome, st.malattiaDiario.giorni);
 }
 // ANNULLA TUTTO: riporta il mese visualizzato a com'era all'inizio della
 // sessione. Il bottone appare SOLO a chi ha fatto modifiche qui (lo stato
@@ -335,26 +503,53 @@ async function pianoAnnullaTutto() {
     ))
   )
     return;
-  // lo stato attuale (dal DB) finisce sulla freccia Ripristina: si puo' tornare avanti
-  try {
-    const fine = snap.ym + '-' + String(_pianoUltimoGiorno(snap.ym)).padStart(2, '0');
-    const cur =
-      (await secGet('piano?data=gte.' + snap.ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + snap.rep + '')) || [];
-    window._pianoRedo = window._pianoRedo || [];
-    window._pianoRedo.push({
-      ym: snap.ym,
-      rep: snap.rep,
-      label: 'annulla tutte le modifiche',
-      quando: new Date().toISOString(),
-      righe: _pianoMappaRighe(cur, snap.rep),
-    });
-  } catch (e) {}
-  try {
-    await _pianoRipristinaStato(snap, { memoria: memoria });
-  } catch (e) {
-    toastErrore('Annulla tutto non riuscito: ' + ((e && e.message) || e));
-    renderPiano();
-    return;
+  if (await _pianoPassoConFinestra(snap)) {
+    // le celle di questo mese e settore scritte da questo PC nella sessione
+    const fineM = snap.ym + '-' + String(_pianoUltimoGiorno(snap.ym)).padStart(2, '0');
+    let esito;
+    try {
+      esito = await _pianoAnnullaFinestra(
+        { t0: snap.t0, t1: _pianoOraServer() },
+        { reparto: snap.rep, da: snap.ym + '-01', a: fineM },
+      );
+    } catch (e) {
+      toastErrore('Annulla tutto non riuscito: ' + ((e && e.message) || e));
+      renderPiano();
+      return;
+    }
+    if (esito.inizio) {
+      window._pianoRedo = window._pianoRedo || [];
+      window._pianoRedo.push({
+        ym: snap.ym,
+        rep: snap.rep,
+        label: 'annulla tutte le modifiche',
+        quando: new Date().toISOString(),
+        t0: esito.inizio,
+        t1: esito.fine,
+      });
+    }
+  } else {
+    // lo stato attuale (dal DB) finisce sulla freccia Ripristina: si puo' tornare avanti
+    try {
+      const fine = snap.ym + '-' + String(_pianoUltimoGiorno(snap.ym)).padStart(2, '0');
+      const cur =
+        (await secGet('piano?data=gte.' + snap.ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + snap.rep + '')) || [];
+      window._pianoRedo = window._pianoRedo || [];
+      window._pianoRedo.push({
+        ym: snap.ym,
+        rep: snap.rep,
+        label: 'annulla tutte le modifiche',
+        quando: new Date().toISOString(),
+        righe: _pianoMappaRighe(cur, snap.rep),
+      });
+    } catch (e) {}
+    try {
+      await _pianoRipristinaStato(snap, { memoria: memoria });
+    } catch (e) {
+      toastErrore('Annulla tutto non riuscito: ' + ((e && e.message) || e));
+      renderPiano();
+      return;
+    }
   }
   window._pianoUndo = (window._pianoUndo || []).filter((s) => !(s.ym === snap.ym && s.rep === snap.rep));
   delete window._pianoSessSnap[k];
@@ -373,6 +568,34 @@ async function pianoRipristina() {
   const memoria = _pianoMemoriaDi(st);
   _pianoMeseSel = st.ym;
   if (st.rep !== currentReparto) _pianoRepartoSel = st.rep;
+  // RIPRISTINA DALLO STORICO: le scritture dell annullamento tornano indietro, con lo
+  // stesso controllo delle modifiche di altri
+  if (await _pianoPassoConFinestra(st)) {
+    try {
+      const esito = await _pianoAnnullaFinestra(st);
+      if (esito.inizio) {
+        window._pianoUndo = window._pianoUndo || [];
+        window._pianoUndo.push({
+          ym: st.ym,
+          rep: st.rep,
+          label: st.label,
+          quando: new Date().toISOString(),
+          righe: [],
+          t0: esito.inizio,
+          t1: esito.fine,
+        });
+      }
+    } catch (e) {
+      rd.push(st);
+      toastErrore('Ripristina non riuscito: ' + ((e && e.message) || e));
+      renderPiano();
+      return;
+    }
+    logAzione('Piano: ripristinato', st.label + ' (' + st.ym + ')');
+    toast('Ripristinato: ' + st.label);
+    renderPiano();
+    return;
+  }
   // lo stato corrente del MESE DA RIPRISTINARE torna sull'Annulla (senza svuotare il
   // redo), letto dal database come fa Annulla. Prima si fotografava _pianoRighe, cioe
   // il mese sullo schermo: con Ripristina premuto da un altro mese la fotografia aveva
@@ -398,6 +621,7 @@ async function pianoRipristina() {
     await _pianoRipristinaStato(st, { memoria: memoria });
   } catch (e) {
     rd.push(st);
+    window._pianoUndo.pop();
     toastErrore('Ripristina non riuscito: ' + ((e && e.message) || e));
     renderPiano();
     return;
@@ -408,6 +632,7 @@ async function pianoRipristina() {
 }
 // CANC sulla selezione: cancella tutte le celle del blocco (con conferma)
 async function pianoCancellaSelezione() {
+  const avvisoRete = !!window._sessioneScadutaAvvisata;
   const b = window._pianoBlocco;
   if (!b || !b.completo || b.tab !== 'piano' || !puoGestirePiano()) return;
   const celle = _pianoBloccoCelle();
@@ -435,14 +660,26 @@ async function pianoCancellaSelezione() {
     return;
   // giorni chiusi: ogni giorno toccato va sbloccato con motivo, come per la singola cella
   for (const d of [...new Set(daCanc.map((x) => x.data))].sort()) if (!(await _pianoConsentiScrittura(d))) return;
-  _pianoUndoSnap('cancellazione di ' + daCanc.length + ' celle');
+  const passo = _pianoUndoSnap('cancellazione di ' + daCanc.length + ' celle');
+  // in UNA scrittura e solo se le celle sono ancora quelle mostrate (un collega puo
+  // averle cambiate nel frattempo): altrimenti niente e cancellato e si ricarica
+  let es;
   try {
-    const ids = daCanc.map((r) => r.id);
-    // il canale sicuro accetta solo filtri semplici: cancellazione per id, a gruppi
-    for (let i = 0; i < ids.length; i += 10) {
-      await Promise.all(ids.slice(i, i + 10).map((idr) => secDel('piano', 'id=eq.' + idr)));
-    }
-    _pianoRighe = _pianoRighe.filter((r) => !ids.includes(r.id));
+    es = await _pianoScriviCelle(
+      daCanc.map((r) => ({ collaboratore: r.collaboratore, data: r.data, atteso: _pianoAttesoDi(r), dati: null })),
+    );
+  } catch (e) {
+    _pianoUndoScarta(passo);
+    _pianoErroreScrittura('Celle NON cancellate: ', e, avvisoRete);
+    return;
+  }
+  if (!es.ok) {
+    _pianoUndoScarta(passo);
+    await _pianoAvvisaConflitti(es.conflitti, 'Cancellazione non fatta');
+    return;
+  }
+  try {
+    _pianoMemoriaDopo(es.ops, es.righe);
     logAzione('Piano: celle cancellate da selezione', daCanc.length + ' celle (' + _pianoMeseSel + ')');
     toast('Cancellate ' + daCanc.length + ' celle');
     // tra le celle cancellate c'erano malattie: proposta di aggiornare il
@@ -459,7 +696,7 @@ async function pianoCancellaSelezione() {
     for (const nomeF of Object.keys(perNomeF)) await _pianoFestiviPersiDopo(nomeF, perNomeF[nomeF]);
     renderPiano();
   } catch (e) {
-    toast('Errore cancellazione');
+    toastErrore('Celle cancellate, ma il seguito non e riuscito: ' + ((e && e.message) || e));
   }
 }
 // SCRIVERE UNA SIGLA SU PIU CELLE (richiesta del titolare 08/10/2026, come Excel): si
@@ -518,8 +755,8 @@ async function pianoScriviSuSelezione(codice, celle) {
     return;
   // giorni chiusi: lo sblocco con motivo si chiede una volta per giorno, prima di scrivere
   for (const d of [...new Set(lista.map((x) => x.dstr))].sort()) if (!(await _pianoConsentiScrittura(d))) return;
-  _pianoUndoSnap(codice + ' su ' + lista.length + ' celle');
-  const blocco = { avvisi: [], malattie: {}, viaMalattia: {}, nonFormati: [], scritte: 0, fasce: null };
+  const passo = _pianoUndoSnap(codice + ' su ' + lista.length + ' celle');
+  const blocco = { avvisi: [], malattie: {}, viaMalattia: {}, nonFormati: [], scritte: 0, fasce: null, conflitti: [] };
   window._pianoScritturaBlocco = blocco;
   const nonScritte = [];
   try {
@@ -530,7 +767,10 @@ async function pianoScriviSuSelezione(codice, celle) {
   } finally {
     window._pianoScritturaBlocco = null;
   }
-  logAzione('Piano: ' + codice + ' su più celle', blocco.scritte + ' celle (' + _pianoMeseSel + ')');
+  // nessuna cella scritta (rete, celle cambiate da un collega): nessun passo di Annulla
+  if (!blocco.scritte) _pianoUndoScarta(passo);
+  if (blocco.scritte)
+    logAzione('Piano: ' + codice + ' su più celle', blocco.scritte + ' celle (' + _pianoMeseSel + ')');
   // MALATTIA: Rapporto e Diario una volta per persona e per periodo di giorni di fila
   for (const nome of Object.keys(blocco.malattie)) {
     const giorni = blocco.malattie[nome].sort((a, b) => (a.data < b.data ? -1 : 1));
@@ -556,7 +796,12 @@ async function pianoScriviSuSelezione(codice, celle) {
   }
   toast(codice + ' scritto su ' + blocco.scritte + (blocco.scritte === 1 ? ' cella' : ' celle'));
   const righe = [];
-  if (nonScritte.length) righe.push('Non scritte (vedi avviso): ' + nonScritte.join(', '));
+  if (blocco.conflitti.length)
+    righe.push(
+      'Non scritte, cambiate da un collega mentre lavoravi (ricaricate):\n\u2022 ' +
+        blocco.conflitti.map(_pianoConflittoTesto).join('\n\u2022 '),
+    );
+  else if (nonScritte.length) righe.push('Non scritte (vedi avviso): ' + nonScritte.join(', '));
   if (blocco.avvisi.length) righe.push('Regole da controllare:\n\u2022 ' + blocco.avvisi.join('\n\u2022 '));
   if (blocco.nonFormati.length) righe.push('Non formati per il turno: ' + [...new Set(blocco.nonFormati)].join(', '));
   if (righe.length) await mostraAvviso(righe.join('\n\n'), { titolo: codice + ' su più celle' });
