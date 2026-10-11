@@ -440,18 +440,10 @@ function renderDashboard() {
       alertRischio +
       '</div><div class="stat-label">A rischio</div></div>';
   document.getElementById('dash-stats').innerHTML = statsH;
-  // Helper: estrai data reminder dalla descrizione del promemoria
-  function _getDataRemind(p) {
-    const m = (p.descrizione || '').match(/Promemoria: (\d+) giorno\/i prima/);
-    if (m) {
-      const d = new Date(p.data_scadenza + 'T12:00:00');
-      d.setDate(d.getDate() - parseInt(m[1]));
-      return d.toISOString().split('T')[0];
-    }
-    if ((p.descrizione || '').includes('il giorno stesso')) return p.data_scadenza;
-    return p.data_scadenza;
-  }
-  const domani = new Date(new Date(oggi + 'T12:00:00').getTime() + 86400000).toISOString().split('T')[0];
+  // Giorno dell avviso: regola unica in promemoria.js (accetta "1 giorno prima" e "3 giorni prima";
+  // prima qui si cercava solo il vecchio "giorno/i prima" e la Home non li mostrava)
+  const _getDataRemind = promemoriaDataAvviso;
+  const domani = dataLocaleISO(new Date(new Date(oggi + 'T12:00:00').getTime() + 86400000));
   // DA FARE OGGI: scaduti + reminder di oggi + note non lette + compleanni oggi + ammonimenti
   const todoEl = document.getElementById('dash-todo-list');
   let todoH = '';

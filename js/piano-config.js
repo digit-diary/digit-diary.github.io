@@ -32,6 +32,18 @@ const PIANO_REGOLE_FONTE = {
   riposo_domenica_libera_ore: 'LL art. 18-20a, OLL 1 art. 21: 35 ore (11 + 24) comprese le 23 sab - 23 dom',
   riposo_domenica_lavorata_ore: 'OLL 2 art. 12 cpv. 2 (case da gioco): 36 + 11 = 47 ore consecutive',
 };
+// REGOLE DI LEGGE (legge sul lavoro per le case da gioco): valgono uguali per tutti i
+// settori, decisione del titolare 11/10/2026. Non si personalizzano per settore e un valore
+// per settore gia salvato non conta (_pianoRegolaVal legge sempre quello generale).
+const PIANO_REGOLE_LEGGE = new Set([
+  'min_riposo_ore',
+  'max_consecutivi',
+  'domeniche_libere_anno',
+  'turno_prima_domenica_libera',
+  'ore_settimana_max',
+  'riposo_domenica_libera_ore',
+  'riposo_domenica_lavorata_ore',
+]);
 // NOMI SEMPLICI, GRUPPO E TIPO DI OGNI REGOLA. La scheda Regole parla la
 // lingua di chi la usa: niente HARD/SOFT/peso, ma "cosa fa", "dove agisce",
 // "da dove viene". tipo: 'sino' (interruttore), 'numero', 'testo'.
@@ -674,7 +686,8 @@ function _renderPianoRegoleCard() {
       .forEach((nome) => {
         const g = PIANO_REGOLE_GUIDA[nome];
         const gen = generali[nome];
-        const spec = vista ? specifiche[nome + '|' + vista] : null;
+        const diLegge = PIANO_REGOLE_LEGGE.has(nome);
+        const spec = vista && !diLegge ? specifiche[nome + '|' + vista] : null;
         const r = spec || gen;
         if (!r) return;
         const eccezioni = Object.keys(specifiche)
@@ -687,7 +700,9 @@ function _renderPianoRegoleCard() {
           ? "salvaPianoRegolaSettore('" + escP(nome) + "','" + escP(vista) + "','attivo',this.checked)"
           : 'salvaPianoRegola(' + r.id + ",'attivo',this.checked)";
         let colSett = '';
-        if (vista) {
+        if (diLegge) {
+          colSett = '<span style="color:var(--muted)">di legge: uguale per tutti i settori</span>';
+        } else if (vista) {
           colSett = spec
             ? '<span style="color:var(--c-oro,#8b6914);font-weight:700">eccezione</span> <button class="btn-del-tipo pericolo" style="font-size:var(--fs-sm,.8125rem);padding:1px 6px" onclick="eliminaPianoRegolaSettore(' +
               spec.id +
@@ -709,10 +724,15 @@ function _renderPianoRegoleCard() {
           escP(nome) +
           (PIANO_REGOLE_FONTE[nome] ? ' · ' + escP(PIANO_REGOLE_FONTE[nome]) : '') +
           '</span></td><td>' +
-          valoreInput(r, g.t, onch) +
+          (diLegge && vista
+            ? '<b>' +
+              escP(g.t === 'sino' ? (String(r.valore).toUpperCase() === 'TRUE' ? 'Si' : 'No') : r.valore || '') +
+              '</b>'
+            : valoreInput(r, g.t, onch)) +
           '</td><td style="text-align:left;font-size:var(--fs-sm,.8125rem)">' +
           colSett +
           '</td><td><input type="checkbox"' +
+          (diLegge && vista ? ' disabled' : '') +
           (r.attivo !== false ? ' checked' : '') +
           ' onchange="' +
           onAtt +
@@ -745,6 +765,11 @@ function _renderPianoRegoleCard() {
 // casella da cambiare, non una procedura.
 async function salvaPianoRegolaSettore(nome, settore, campo, valore) {
   if (!isAdmin()) return;
+  if (PIANO_REGOLE_LEGGE.has(nome)) {
+    toastErrore('Regola di legge: vale uguale per tutti i settori e si cambia solo nei valori generali.', 7000);
+    renderPiano();
+    return;
+  }
   if (campo === 'valore') {
     const errore = _pianoValidaRegola(nome, valore, settore);
     if (errore) {

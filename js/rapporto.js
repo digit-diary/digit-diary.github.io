@@ -236,6 +236,9 @@ async function apriGiorno(ds) {
     turnoCol('PRESTO', 'presto', p) +
     turnoCol('NOTTE', 'notte', n) +
     '</div><div style="display:flex;justify-content:center;gap:12px;margin-top:20px"><button class="btn-export" onclick="esportaRapportoCSV()" style="padding:10px 24px;font-size:var(--fs-md,.875rem)">Esporta CSV</button><button class="btn-export btn-export-pdf" onclick="esportaRapportoPDF()" style="padding:10px 24px;font-size:var(--fs-md,.875rem)">Esporta PDF</button></div></div>';
+  // valori di partenza dei due turni: servono per salvare solo i campi cambiati qui
+  _rappSegnaBase(ds, 'PRESTO', p);
+  _rappSegnaBase(ds, 'NOTTE', n);
   // Autosave debounce
   window._rappTimers = {};
   window._rappPending = {};
@@ -993,59 +996,131 @@ function salvaRapportoTurno(ds, turno, cls) {
     return esito;
   });
 }
+// RAPPORTO DA DUE PC: ogni PC ricorda i valori dei campi come li ha caricati (o salvati
+// l ultima volta). Salvando si rilegge la riga dal database e si scrivono SOLO i campi
+// cambiati su questo PC; gli altri restano come li ha lasciati il collega. Prima si
+// mandavano tutti i campi del modulo e chi salvava per ultimo cancellava i testi dell altro.
+const _rappBase = {};
+function _rappBaseChiave(ds, turno) {
+  return ds + '|' + currentReparto + '|' + turno;
+}
+function _rappValore(c, v) {
+  if (c.type === 'number') return parseInt(v) || 0;
+  return v == null ? '' : String(v);
+}
+// valori dei campi di una riga del database (colonne + note_extra)
+function _rappValoriRiga(riga) {
+  const out = {};
+  if (!riga) return out;
+  let extra = {};
+  try {
+    extra = JSON.parse(riga.note_extra || '{}') || {};
+  } catch (e) {}
+  getCampiRapporto().forEach((c) => {
+    const v = RAPPORTO_DB_COLS.includes(c.key) ? riga[c.key] : extra[c.key];
+    out[c.key] = _rappValore(c, v);
+  });
+  return out;
+}
+function _rappSegnaBase(ds, turno, riga) {
+  _rappBase[_rappBaseChiave(ds, turno)] = _rappValoriRiga(riga || {});
+}
+// unione a tre: base (caricato qui), mio (modulo), suo (database adesso)
+function _rappUnisciTre(campi, base, mio, suo) {
+  const valori = {};
+  const conflitti = [];
+  campi.forEach((c) => {
+    const k = c.key;
+    if (!(k in mio)) {
+      // campo non presente nel modulo: resta quello del database
+      if (k in suo) valori[k] = suo[k];
+      return;
+    }
+    const b = k in base ? base[k] : _rappValore(c, '');
+    const m = mio[k];
+    const s = k in suo ? suo[k] : b;
+    if (m === b)
+      valori[k] = s; // non toccato qui: vale quello del collega
+    else if (s === b || s === m)
+      valori[k] = m; // toccato solo qui
+    else {
+      // cambiato su ENTRAMBI i PC: i testi si uniscono, i numeri restano i miei; si avvisa
+      conflitti.push(c.label || k);
+      if (c.type === 'number') valori[k] = m;
+      else if (b && m.startsWith(b) && s.startsWith(b)) valori[k] = s + m.substring(b.length);
+      else valori[k] = s.trim() ? (m.trim() ? s + '\n' + m : s) : m;
+    }
+  });
+  return { valori, conflitti };
+}
 async function _salvaRapportoTurnoEsegui(ds, turno, cls) {
   const campi = getCampiRapporto();
-  const extra = {};
-  const data = {
-    data_rapporto: ds,
-    turno,
-    operatore: getOperatore(),
-    updated_at: new Date().toISOString(),
-    reparto_dip: currentReparto,
-  };
+  const chiaveBase = _rappBaseChiave(ds, turno);
+  const base = _rappBase[chiaveBase] || _rappValoriRiga(_rapportoCacheGet(ds)[turno]);
+  const mio = {};
   campi.forEach((c) => {
     const el = document.getElementById(cls + '-' + c.key);
     if (!el) return;
-    const val = c.type === 'number' ? parseInt(el.value) || 0 : el.value;
-    if (RAPPORTO_DB_COLS.includes(c.key)) data[c.key] = val;
-    else extra[c.key] = val;
+    mio[c.key] = _rappValore(c, el.value);
   });
-  data.note_extra = JSON.stringify(extra);
+  let data = null;
   try {
-    // Prova UPDATE, se nessuna riga aggiornata → INSERT
     const filtro = 'data_rapporto=eq.' + ds + '&turno=eq.' + turno + '&reparto_dip=eq.' + currentReparto;
-    const existing = _rapportoCacheGet(ds)[turno];
-    if (existing) {
-      await secPatch('rapporti_giornalieri', filtro, data);
+    const leggi = async () => ((await secGet('rapporti_giornalieri?' + filtro)) || [])[0] || null;
+    // costruisce la riga da scrivere unendo i valori a quelli del database
+    const componi = (suoRiga) => {
+      const u = _rappUnisciTre(campi, base, mio, _rappValoriRiga(suoRiga));
+      let extraSuo = {};
+      try {
+        extraSuo = JSON.parse((suoRiga && suoRiga.note_extra) || '{}') || {};
+      } catch (e) {}
+      const extra = Object.assign({}, extraSuo); // chiavi extra non piu nel modulo: restano
+      const riga = {
+        data_rapporto: ds,
+        turno,
+        operatore: getOperatore(),
+        updated_at: new Date().toISOString(),
+        reparto_dip: currentReparto,
+      };
+      campi.forEach((c) => {
+        if (!(c.key in u.valori)) return;
+        if (RAPPORTO_DB_COLS.includes(c.key)) riga[c.key] = u.valori[c.key];
+        else extra[c.key] = u.valori[c.key];
+      });
+      riga.note_extra = JSON.stringify(extra);
+      return { riga, u };
+    };
+    let suo = await leggi();
+    let esito = componi(suo);
+    if (suo) {
+      await secPatch('rapporti_giornalieri', filtro, esito.riga);
     } else {
       try {
-        await secPost('rapporti_giornalieri', data);
+        await secPost('rapporti_giornalieri', esito.riga);
       } catch (e2) {
         if (!/duplicate key|already exists|23505/i.test((e2 && e2.message) || '')) throw e2;
-        // un collega ha creato lo stesso rapporto nello stesso momento: si UNISCONO i testi
-        // invece di sovrascrivere il suo (prima il suo spariva)
-        const suo = ((await secGet('rapporti_giornalieri?' + filtro)) || [])[0] || {};
-        const unisci = (a, b) => {
-          const x = a === 0 ? '' : String(a == null ? '' : a).trim();
-          const y = b === 0 ? '' : String(b == null ? '' : b).trim();
-          if (!x) return b;
-          if (!y || x === y) return a;
-          return typeof a === 'number' && typeof b === 'number' ? a : x + '\n' + y;
-        };
-        Object.keys(data).forEach((k) => {
-          if (['data_rapporto', 'turno', 'reparto_dip', 'operatore', 'updated_at', 'note_extra'].includes(k)) return;
-          data[k] = unisci(suo[k], data[k]);
-        });
-        let extraSuo = {};
-        try {
-          extraSuo = JSON.parse(suo.note_extra || '{}') || {};
-        } catch (e3) {}
-        Object.keys(extra).forEach((k) => (extra[k] = unisci(extraSuo[k], extra[k])));
-        data.note_extra = JSON.stringify(Object.assign({}, extraSuo, extra));
-        await secPatch('rapporti_giornalieri', filtro, data);
-        toast('Un collega stava scrivendo lo stesso rapporto: i testi sono stati uniti', 6000);
+        // un collega ha creato lo stesso rapporto nello stesso momento: si riunisce con il suo
+        suo = await leggi();
+        esito = componi(suo);
+        await secPatch('rapporti_giornalieri', filtro, esito.riga);
       }
     }
+    data = Object.assign({}, suo || {}, esito.riga);
+    _rappBase[chiaveBase] = _rappValoriRiga(data);
+    // il modulo mostra i campi scritti dal collega (e i testi uniti)
+    campi.forEach((c) => {
+      const el = document.getElementById(cls + '-' + c.key);
+      if (!el || !(c.key in esito.u.valori)) return;
+      const v = esito.u.valori[c.key];
+      if (v !== mio[c.key]) el.value = v;
+    });
+    if (esito.u.conflitti.length)
+      toast(
+        'Un collega ha cambiato anche: ' +
+          esito.u.conflitti.join(', ') +
+          '. I testi sono stati uniti: controlla il rapporto.',
+        8000,
+      );
     _rapportoCacheSet(ds, turno, data);
     // Auto-malattia: parse assenze field via _processaAssenzeRapporto (analyze + execute)
     // D-Full: D1 origine, D4 audit log, D6 transactional RPC, D7 date validation

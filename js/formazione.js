@@ -1145,7 +1145,7 @@ function renderFormazione() {
   const soglieConLimite = cfgP.soglie.filter((s) => parseInt(s.limite_mese) > 0);
   const attese = _attesePremi();
   if (soglieConLimite.length || attese.length) {
-    const ymCorr = new Date().toISOString().substring(0, 7);
+    const ymCorr = oggiLocale().substring(0, 7);
     html +=
       '<div style="padding:8px 12px;background:var(--paper2);border:1px solid var(--line);border-radius:3px;margin-bottom:12px">';
     if (soglieConLimite.length) {
@@ -1749,7 +1749,11 @@ async function _insertPuntiEvento(nome, punti, azione, descrizione) {
     );
   return true;
 }
-async function assegnaPuntiRapido() {
+// un assegnamento alla volta: il doppio click su "+ Assegna" dava i punti due volte
+function assegnaPuntiRapido() {
+  return unaVoltaSola('punti-assegna-rapido', () => _assegnaPuntiRapidoEsegui());
+}
+async function _assegnaPuntiRapidoEsegui() {
   if (typeof puoModificare === 'function' && !puoModificare('gestione_punti')) {
     toast('Non hai il permesso di assegnare punti');
     return;
@@ -1770,7 +1774,13 @@ async function assegnaPuntiRapido() {
     punti = az.punti;
   }
   try {
-    await _insertPuntiEvento(nome, punti, azione, nota);
+    // false = non scritto (incentivi spenti o doppione rifiutato): niente "+N punti"
+    const scritto = await _insertPuntiEvento(nome, punti, azione, nota);
+    if (!scritto) {
+      if (typeof incentiviAttivi === 'function' && !incentiviAttivi(azione))
+        toast('Incentivi disattivati: punti non assegnati a ' + nome);
+      return;
+    }
     document.getElementById('pt-nota').value = '';
     // Soglia premio appena raggiunta?
     const tot = puntiTotali(nome);
@@ -1820,7 +1830,7 @@ async function registraPremioConsegnato(nome, premio) {
   }
   try {
     const soglia = _premioSogliaDi(premio);
-    const ym = new Date().toISOString().substring(0, 7);
+    const ym = oggiLocale().substring(0, 7);
     const lim = soglia && parseInt(soglia.limite_mese) > 0 ? parseInt(soglia.limite_mese) : 0;
     if (lim) {
       const usati = _consegnatiMesePremio(soglia.premio, ym);
@@ -3206,6 +3216,8 @@ function _renderPopupCopertura() {
   html +=
     '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);text-align:center;margin-top:8px">Puoi sempre assegnare o correggere i punti dopo, dalla pagina Formazione.</p>';
   document.getElementById('pwd-modal-content').innerHTML = html;
+  // chiusa cliccando fuori o con Esc: come "Nessuna copertura" (la promessa non resta appesa)
+  pwdModalSeAnnullata(() => _chiudiPopupCopertura(false));
   document.getElementById('pwd-modal').classList.remove('hidden');
 }
 async function _rimuoviEventoCopertura(id) {

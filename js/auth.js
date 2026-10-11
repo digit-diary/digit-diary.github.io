@@ -14,11 +14,14 @@ async function checkPwd() {
     err.textContent = 'Troppi tentativi. Riprova tra ' + secs + 's';
     return;
   }
-  const legacyH = await sha256(v);
+  // la vecchia impronta SHA-256 (senza sale) si manda SOLO se il database la chiede
+  // (serve_legacy: operatore che non e ancora entrato dopo il passaggio alla nuova)
   // Try individual operator login first
   if (nome) {
     const opH = await secureHash(v, nome);
-    const res = await sbRpc('verify_login', { p_nome: nome, p_hash: opH, p_legacy_hash: legacyH });
+    let res = await sbRpc('verify_login', { p_nome: nome, p_hash: opH });
+    if (res && res.serve_legacy)
+      res = await sbRpc('verify_login', { p_nome: nome, p_hash: opH, p_legacy_hash: await sha256(v) });
     if (res && res.locked) {
       err.textContent = 'Troppi tentativi. Riprova tra 1 minuto';
       return;
@@ -74,7 +77,9 @@ async function checkPwd() {
   }
   // Fallback: master password (admin) - salt sempre __master__
   const masterH = await secureHash(v, '__master__');
-  const masterRes = await sbRpc('verify_master_pwd', { p_hash: masterH, p_legacy_hash: legacyH });
+  let masterRes = await sbRpc('verify_master_pwd', { p_hash: masterH });
+  if (masterRes && masterRes.serve_legacy)
+    masterRes = await sbRpc('verify_master_pwd', { p_hash: masterH, p_legacy_hash: await sha256(v) });
   if (masterRes && masterRes.locked) {
     err.textContent = 'Troppi tentativi. Riprova tra 1 minuto';
     return;
@@ -143,15 +148,15 @@ async function eseguiPrimoCambio() {
     err.textContent = 'Non coincidono';
     return;
   }
-  const nh = await sha256(p1),
-    nhV2 = await secureHash(p1, '__master__'),
+  // solo l impronta nuova (PBKDF2): la vecchia SHA-256 non si salva piu
+  const nhV2 = await secureHash(p1, '__master__'),
     nc = genCode();
   // il codice di recupero si mostra SOLO se il database l ha salvato: un codice
   // mostrato ma non salvato non servirebbe a nulla il giorno che serve
   try {
     await _rpcConEsito('setup_master_pwd', {
       p_default_hash: DEFAULT_PWD_HASH,
-      p_new_hash: nh,
+      p_new_hash: null,
       p_new_recovery: nc,
       p_new_hash_v2: nhV2,
     });
@@ -184,15 +189,14 @@ async function eseguiCambioPwd() {
     err.textContent = 'Non coincidono';
     return;
   }
+  // la vecchia impronta SHA-256 non serve: chi e entrato ha gia quella nuova
   const oh = await secureHash(o, '__master__'),
-    ohL = await sha256(o),
     nh = await secureHash(p1, '__master__'),
     nc = genCode();
   const res = await sbRpc('change_master_pwd', {
     p_old_hash: oh,
     p_new_hash: nh,
     p_new_recovery: nc,
-    p_old_legacy_hash: ohL,
     p_token: getAdminToken(),
   });
   if (!res || !res.success) {
@@ -230,12 +234,11 @@ async function eseguiRecupero() {
     err.textContent = 'Non coincidono';
     return;
   }
-  const nh = await sha256(p1),
-    nhV2 = await secureHash(p1, '__master__'),
+  const nhV2 = await secureHash(p1, '__master__'),
     nc = genCode();
   const res = await sbRpc('recovery_master_pwd', {
     p_code: c,
-    p_new_hash: nh,
+    p_new_hash: null,
     p_new_recovery: nc,
     p_new_hash_v2: nhV2,
   });
@@ -574,7 +577,8 @@ async function tentaBiometrico() {
     switchPage('diario');
     _renderPostLogin();
     // Controlla se admin ha resettato la password → forza cambio
-    var _dcCheck = await sbRpc('check_deve_cambiare', { p_nome: stored.op });
+    // la risposta vale solo con la sessione della persona (20260911)
+    var _dcCheck = await sbRpc('check_deve_cambiare', { p_nome: stored.op, p_token: getOpToken() });
     if (_dcCheck && _dcCheck.deve_cambiare_pwd) {
       setTimeout(() => forzaCambioPwdOperatore(stored.op), 300);
     } else {

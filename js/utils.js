@@ -202,13 +202,15 @@ function toastErrore(m, durata) {
   toast(m, durata, 'errore');
 }
 // Anche le virgolette vanno convertite: un nome con " o ' finiva dentro
-// value="..." e chiudeva l'attributo (iniezione di attributi)
+// value="..." (o value='...') e chiudeva l'attributo (iniezione di attributi).
+// Come escP, ma gli a capo diventano <br>. Usata solo in testo e attributi HTML.
 function esc(s) {
   return s
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
     .replace(/\n/g, '<br>');
 }
 function escP(s) {
@@ -520,8 +522,43 @@ function notifBannerClick() {
   if (_notifAction) _notifAction();
 }
 
-// VERIFICA NOME COLLABORATORE (anti-doppioni)
-async function _verificaNome(nome) {
+// FINESTRE A PROMESSA nel pwd-modal: chi aspetta una risposta dice qui cosa vale
+// "annulla". Chiusa cliccando fuori (maison-helpers.js) o con Esc, la promessa riceve quel
+// valore invece di restare appesa: prima restava appesa e unaVoltaSola non liberava piu
+// il Salva del Diario. Il segno sta DENTRO il contenuto: cambiato il contenuto, sparisce.
+function pwdModalSeAnnullata(fn) {
+  const b = document.getElementById('pwd-modal-content');
+  if (!b || typeof fn !== 'function') return;
+  const m = document.createElement('span');
+  m.hidden = true;
+  m.className = 'pwd-modal-annulla';
+  m._annulla = fn;
+  b.appendChild(m);
+}
+// chiude il pwd-modal come "annulla": risolve la promessa in attesa, se c e
+function pwdModalAnnulla() {
+  const modal = document.getElementById('pwd-modal');
+  if (modal) modal.classList.add('hidden');
+  const b = document.getElementById('pwd-modal-content');
+  const m = b && b.querySelector('.pwd-modal-annulla');
+  if (m && typeof m._annulla === 'function') {
+    const f = m._annulla;
+    m._annulla = null;
+    f();
+  }
+}
+// c e una finestra a promessa aperta nel pwd-modal?
+function pwdModalInAttesa() {
+  const modal = document.getElementById('pwd-modal');
+  const b = document.getElementById('pwd-modal-content');
+  const m = b && b.querySelector('.pwd-modal-annulla');
+  return !!(modal && !modal.classList.contains('hidden') && m && m._annulla);
+}
+// VERIFICA NOME COLLABORATORE (anti-doppioni). Ritorna il nome scelto. Finestra chiusa
+// senza scegliere (clic fuori, Esc): con annullabile=true ritorna null e chi chiama si
+// ferma (Diario); altrimenti il nome cosi come e stato scritto, senza aggiungerlo.
+async function _verificaNome(nome, annullabile) {
+  const _annulla = () => (annullabile ? null : nome);
   if (!nome) return nome;
   const nl = nome.toLowerCase();
   // Esiste esattamente?
@@ -568,6 +605,7 @@ async function _verificaNome(nome) {
           res(scelte[btn.dataset.verifyUsa]);
         });
       });
+      pwdModalSeAnnullata(() => res(_annulla()));
       document.getElementById('pwd-modal').classList.remove('hidden');
     });
   }
@@ -601,6 +639,10 @@ async function _verificaNome(nome) {
       this.remove();
     };
     document.body.appendChild(resolver);
+    pwdModalSeAnnullata(() => {
+      resolver.remove();
+      res(_annulla());
+    });
     document.getElementById('pwd-modal').classList.remove('hidden');
   });
 }

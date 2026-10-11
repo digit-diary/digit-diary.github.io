@@ -21,16 +21,39 @@ async function _salvaEsegui() {
     _highlightField('inp-testo');
     return;
   }
-  nome = await _verificaNome(nome);
+  // MALATTIA DAL/AL: date controllate PRIMA di tutto. Prima, con "Al" prima di "Dal" (o con
+  // una sola delle due) si saltava il periodo e si salvava una malattia di OGGI (e nel Piano
+  // il turno di oggi diventava M).
+  let malDal = '',
+    malAl = '';
+  if (tipoSelezionato === nomeCorrente('Malattia')) {
+    malDal = ((document.getElementById('inp-mal-dal') || {}).value || '').trim();
+    malAl = ((document.getElementById('inp-mal-al') || {}).value || '').trim();
+    if (malDal && malAl && malDal > malAl) {
+      toastErrore(
+        'Malattia non salvata: la data "Al" (' +
+          malAl.split('-').reverse().join('.') +
+          ') è prima della data "Dal" (' +
+          malDal.split('-').reverse().join('.') +
+          '). Correggi le date.',
+        8000,
+      );
+      _highlightField('inp-mal-al');
+      return;
+    }
+    // una sola data: malattia di quel giorno (non di oggi)
+    if (malDal && !malAl) malAl = malDal;
+    if (malAl && !malDal) malDal = malAl;
+  }
+  nome = await _verificaNome(nome, true);
+  if (!nome) return; // finestra del nome chiusa senza scegliere: non si salva
   document.getElementById('inp-nome').value = nome;
   const importo = parseFloat(document.getElementById('inp-importo').value) || 0;
   const valuta = importo ? document.getElementById('inp-valuta').value : '';
   const reparto = document.getElementById('inp-reparto').value;
   // Malattia con range Dal/Al → crea registrazione per ogni giorno
   if (tipoSelezionato === nomeCorrente('Malattia')) {
-    const malDal = (document.getElementById('inp-mal-dal') || {}).value;
-    const malAl = (document.getElementById('inp-mal-al') || {}).value;
-    if (malDal && malAl && malDal <= malAl) {
+    if (malDal && malAl) {
       const dInizio = new Date(malDal + 'T12:00:00'),
         dFine = new Date(malAl + 'T12:00:00');
       const nGiorni = Math.round((dFine - dInizio) / 86400000) + 1;
@@ -38,11 +61,13 @@ async function _salvaEsegui() {
         !(await chiediConferma(
           nome +
             ': registrare ' +
-            nGiorni +
-            ' giorni di malattia dal ' +
-            dInizio.toLocaleDateString('it-IT') +
-            ' al ' +
-            dFine.toLocaleDateString('it-IT') +
+            (nGiorni === 1
+              ? '1 giorno di malattia il ' + dInizio.toLocaleDateString('it-IT')
+              : nGiorni +
+                ' giorni di malattia dal ' +
+                dInizio.toLocaleDateString('it-IT') +
+                ' al ' +
+                dFine.toLocaleDateString('it-IT')) +
             '?',
         ))
       )
@@ -121,7 +146,10 @@ async function _salvaEsegui() {
             '. Riprova per quei giorni.',
           9000,
         );
-      else toast(nome + ': ' + creati + ' giorni malattia registrati');
+      else
+        toast(
+          nome + ': ' + creati + (creati === 1 ? ' giorno di malattia registrato' : ' giorni di malattia registrati'),
+        );
       aggiornaNomi();
       render();
       updateStats();

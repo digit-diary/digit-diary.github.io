@@ -218,15 +218,39 @@ async function _completaPromemoriaEsegui(id) {
       return;
     }
     p = p || ora[0];
-    await secPatch('promemoria', 'id=eq.' + id, {
+    // Si segna fatto SOLO se e ancora aperto (completata=eq.false): fra la lettura sopra e
+    // questa scrittura un altro PC puo averlo gia fatto. secure_update non dice quante righe
+    // ha cambiato: si rilegge e si guarda se l istante salvato e il nostro.
+    const quando = new Date().toISOString();
+    await secPatch('promemoria', 'id=eq.' + id + '&completata=eq.false', {
       completata: true,
       completata_da: op,
-      completata_at: new Date().toISOString(),
+      completata_at: quando,
     });
+    const dopo = (await secGet('promemoria?id=eq.' + id)) || [];
+    const mio =
+      dopo.length &&
+      dopo[0].completata &&
+      dopo[0].completata_da === op &&
+      new Date(dopo[0].completata_at).getTime() === new Date(quando).getTime();
+    if (!mio) {
+      if (dopo.length) Object.assign(p, dopo[0]);
+      await aggiornaPromemoriaDalServer();
+      toast(
+        'Era già fatto' +
+          (dopo.length && dopo[0].completata
+            ? ': ' +
+              (dopo[0].completata_da || '?') +
+              (dopo[0].completata_at ? ' il ' + new Date(dopo[0].completata_at).toLocaleDateString('it-IT') : '')
+            : ''),
+      );
+      return;
+    }
     p.completata = true;
     p.completata_da = op;
-    p.completata_at = new Date().toISOString();
-    if (!promemoriaCache.includes(p)) promemoriaCache.push(p);
+    p.completata_at = quando;
+    // confronto per id: l oggetto in cache e quello letto dal DB sono due oggetti diversi
+    if (!promemoriaCache.some((x) => x.id === p.id)) promemoriaCache.push(p);
     // Se ripetitivo → crea la prossima occorrenza (dopo oggi, una sola)
     if (p.ripetizione) {
       const nuovaData = _pmProssimaData(p, oggiLocale());
@@ -241,7 +265,9 @@ async function _completaPromemoriaEsegui(id) {
               '&completata=eq.false&data_scadenza=gte.' +
               nuovaData +
               '&reparto_dip=eq.' +
-              encodeURIComponent(rep),
+              encodeURIComponent(rep) +
+              // stesso titolo ma per un altro collega non e un doppione
+              (p.assegnato_a ? '&assegnato_a=eq.' + encodeURIComponent(p.assegnato_a) : '&assegnato_a=is.null'),
           )) || [];
         if (gia.length) {
           toast("Fatto. Il prossimo c'è già: " + gia[0].data_scadenza.split('-').reverse().join('.'));
@@ -290,6 +316,7 @@ async function riattivaPromemoria(id) {
         !x.completata &&
         x.titolo === p.titolo &&
         x.ripetizione === p.ripetizione &&
+        (x.assegnato_a || '') === (p.assegnato_a || '') &&
         (x.reparto_dip || '') === (p.reparto_dip || '') &&
         x.data_scadenza > p.data_scadenza,
     );
@@ -495,15 +522,22 @@ function aggiornaPromemoriaBadge() {
     badge.style.display = 'none';
   }
 }
-function _getDataRemindGlobal(p) {
-  const m = (p.descrizione || '').match(/Promemoria: (\d+) giorn[oi](?:\/i)? prima/);
-  if (m) {
-    const d = new Date(p.data_scadenza + 'T12:00:00');
-    d.setDate(d.getDate() - parseInt(m[1]));
-    return d.toISOString().split('T')[0];
+// GIORNO DELL AVVISO di un promemoria (unica regola, usata anche dalla Home in consegna.js).
+// La descrizione dice "Promemoria: 3 giorni prima alle 08:00" (dal 09/10), "1 giorno prima",
+// la vecchia scrittura "3 giorno/i prima" oppure "il giorno stesso". Date locali, mai UTC.
+function promemoriaDataAvviso(p) {
+  const scad = (p && p.data_scadenza) || '';
+  const m = ((p && p.descrizione) || '').match(/Promemoria: (\d+) giorn[oi](?:\/i)? prima/);
+  if (m && /^\d{4}-\d{2}-\d{2}$/.test(scad)) {
+    const d = new Date(scad + 'T12:00:00');
+    d.setDate(d.getDate() - parseInt(m[1], 10));
+    return dataLocaleISO(d);
   }
-  if ((p.descrizione || '').includes('il giorno stesso')) return p.data_scadenza;
-  return p.data_scadenza;
+  // "il giorno stesso" o nessuna indicazione: il giorno della scadenza
+  return scad;
+}
+function _getDataRemindGlobal(p) {
+  return promemoriaDataAvviso(p);
 }
 function mostraPromemoriaLogin() {
   const op = getOperatore();
@@ -1154,7 +1188,9 @@ async function caricaMaisonFile(input, forzaSostituisci) {
         modalBox.innerHTML = mHtml;
         document.getElementById('pwd-modal').classList.remove('hidden');
         // Aspetta click su "Continua importazione"
-        await new Promise((resolve) => {
+        const continua = await new Promise((resolve) => {
+          // chiusa senza "Continua" (clic fuori, Esc): l importazione si ferma
+          pwdModalSeAnnullata(() => resolve(false));
           document.getElementById('disamb-continua-btn').onclick = function () {
             // Salva selezioni
             Object.keys(_ambigui).forEach((cog) => {
@@ -1162,9 +1198,14 @@ async function caricaMaisonFile(input, forzaSostituisci) {
               if (sel) window._maisonDisambigua[cog] = sel.value;
             });
             document.getElementById('pwd-modal').classList.add('hidden');
-            resolve();
+            resolve(true);
           };
         });
+        if (!continua) {
+          status.textContent = '';
+          toast('Importazione annullata');
+          return;
+        }
         window._maisonDisambiguaDone = true;
       }
     }

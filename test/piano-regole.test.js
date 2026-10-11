@@ -696,6 +696,58 @@ console.log('\n== idoneita: motore unico (10.10) ==');
   );
 }
 
+console.log('== domeniche libere dell anno: una regola per Valida e bozza ==');
+{
+  const conto = { prima: 8, attese: 10 }; // ne servono 2 in questo mese
+  const a = R.domenicheLibereMese(['libera', 'lavoro', 'libera', 'esclusa'], conto);
+  eq(a.libere, 2, 'due libere valide');
+  eq(a.violata, false, '8 + 2 = 10 attese: rispettata');
+  const b = R.domenicheLibereMese(['libera', 'lavoro', 'non_valida', 'lavoro'], conto);
+  eq(b.violata, true, 'una sola libera valida (l altra ha il sabato oltre le 23): violata');
+  const c = R.domenicheLibereMese(['libera', 'aperta', 'lavoro'], conto);
+  eq([c.violata, c.raggiungibile, c.possibili], [true, true, 2], 'una aperta: oggi violata, ma ancora raggiungibile');
+  eq(R.domenicheLibereMese(['lavoro', 'lavoro'], null).violata, true, 'senza conto annuale: almeno una nel mese');
+  eq(R.domenicheLibereMese(['lavoro', 'libera'], null).violata, false, 'senza conto annuale: una basta');
+  eq(R.domenicheLibereMese([], conto).violata, false, 'mese senza domeniche: niente da segnalare');
+  eq(R.domenicheLibereMese(['lavoro'], { prima: 12, attese: 10 }).violata, false, 'chi e avanti puo lavorare');
+  // bozza: il turno si mette se si arriva ancora alle domeniche dovute
+  eq(
+    R.domenicaTurnoAmmesso(['aperta', 'aperta', 'aperta'], ['lavoro', 'aperta', 'aperta'], conto),
+    true,
+    'restano 2 domeniche aperte su 2 dovute: si puo lavorare',
+  );
+  eq(
+    R.domenicaTurnoAmmesso(['lavoro', 'aperta', 'aperta'], ['lavoro', 'lavoro', 'aperta'], conto),
+    false,
+    'resterebbe 1 domenica su 2 dovute: no',
+  );
+  eq(
+    R.domenicaTurnoAmmesso(['lavoro', 'aperta', 'aperta'], ['lavoro', 'non_valida', 'aperta'], conto),
+    false,
+    'un sabato oltre le 23 prima di una domenica che serve: no',
+  );
+  eq(
+    R.domenicaTurnoAmmesso(['aperta', 'aperta'], ['lavoro', 'aperta'], { prima: 0, attese: 5 }),
+    true,
+    'gia indietro senza rimedio (predefinito): puo lavorare, Valida lo segnala comunque',
+  );
+  eq(
+    R.domenicaTurnoAmmesso(['aperta', 'aperta'], ['lavoro', 'aperta'], { prima: 0, attese: 5 }, true),
+    false,
+    'gia indietro senza rimedio, rigido: non perde altre domeniche libere',
+  );
+  eq(
+    R.domenicaTurnoAmmesso(
+      ['lavoro', 'esclusa', 'aperta'],
+      ['lavoro', 'esclusa', 'aperta'],
+      { prima: 0, attese: 5 },
+      true,
+    ),
+    true,
+    'rigido: un turno che non toglie domeniche si puo mettere',
+  );
+}
+
 console.log('\n=======================================');
 console.log('  ' + passati + ' passati, ' + falliti + ' falliti');
 console.log('=======================================\n');

@@ -194,6 +194,124 @@ console.log('== posti rari prima dei comuni ==');
   ok(r.dopo.scoperti === 1, 'resta scoperto un solo posto, quello che altri possono coprire');
 }
 
+console.log('== seme fisso per mese e settore (ripetibile) ==');
+ok(R.semeRicerca('2026-11', 'slots', 0) === R.semeRicerca('2026-11', 'slots', 0), 'stesso mese e settore: stesso seme');
+ok(
+  R.semeRicerca('2026-11', 'slots', 0) !== R.semeRicerca('2026-11', 'slots', 1),
+  'altra variante (riprova): altro seme',
+);
+ok(R.semeRicerca('2026-11', 'slots', 0) !== R.semeRicerca('2026-11', 'tavoli', 0), 'altro settore: altro seme');
+ok(R.semeRicerca('', '', 0) > 0, 'il seme non e mai zero');
+{
+  const a = R.cerca(problema(), { seme: R.semeRicerca('2026-11', 'prova', 0) }, 6000);
+  const b = R.cerca(problema(), { seme: R.semeRicerca('2026-11', 'prova', 0) }, 6000);
+  ok(JSON.stringify(a.stato) === JSON.stringify(b.stato), 'stesso seme e stesse iterazioni: stesso piano');
+  ok(JSON.stringify(a.cambi) === JSON.stringify(b.cambi), 'stesso seme e stesse iterazioni: stessi cambi');
+}
+
+console.log('== equita delle notti (scartoNotti) ==');
+{
+  const z = R.scartoNotti({ A: { notti: 5, turni: 10 }, B: { notti: 5, turni: 10 } });
+  ok(z.totale === 0, 'quote uguali: scarto zero');
+  const d = R.scartoNotti({ A: { notti: 5, turni: 10 }, B: { notti: 0, turni: 10 } });
+  ok(Math.abs(d.totale - 12.5) < 1e-9, '50% e 0%: (25^2 + 25^2) / 100 = 12,5 (' + d.totale + ')');
+  const g = R.scartoNotti(
+    {
+      A: { notti: 5, turni: 10 },
+      B: { notti: 0, turni: 10 },
+      C: { notti: 10, turni: 10 },
+      D: { notti: 10, turni: 10 },
+    },
+    (n) => (n === 'A' || n === 'B' ? 'HOST' : 'SUP'),
+  );
+  ok(Math.abs(g.gruppi.HOST - 12.5) < 1e-9 && g.gruppi.SUP === 0, 'i gruppi (funzioni) non si mescolano');
+  const f = R.scartoNotti({ A: { notti: 5, turni: 10 }, B: { notti: 0, turni: 10 } }, (n) => (n === 'B' ? null : 'X'));
+  ok(f.totale === 0, 'chi e fuori dal gruppo (null) non conta');
+  const w = R.scartoNotti({ A: { notti: 0, turni: 8 }, B: { notti: 2, turni: 2 } }, null, 8);
+  // B pesa 2/8: media pesata 20%, scarti 20 e 80
+  ok(
+    Math.abs(w.totale - (1 * 400 + 0.25 * 6400) / 100) < 1e-9,
+    'chi ha pochi turni pesa in proporzione (' + w.totale + ')',
+  );
+}
+{
+  // 4 giorni, un turno di notte e uno di mattina al giorno: Anna fa tutte le notti
+  const gg = giorni.slice(0, 4);
+  const st = { Anna: {}, Bruno: {} };
+  const fb = {};
+  gg.forEach((d) => {
+    st.Anna[d] = 'N';
+    st.Bruno[d] = 'M';
+    fb[d] = { M: 1, N: 1 };
+  });
+  const base = {
+    giorni: gg,
+    persone: ['Anna', 'Bruno'],
+    stato: st,
+    riposo: '',
+    fabbisogno: fb,
+    modificabile: () => true,
+    ammessi: () => ['M', 'N', ''],
+    costoPersona: () => 0,
+    tipoNotte: (c) => (c === 'N' ? 1 : c === 'M' ? 0 : null),
+    gruppoEquita: () => 'HOST',
+  };
+  const r = R.cerca(base, { seme: 5, pesoNotti: 10, temperatura: 0 }, 3000);
+  const notti = (n) => gg.filter((d) => r.stato[n][d] === 'N').length;
+  ok(
+    notti('Anna') === 2 && notti('Bruno') === 2,
+    'con il peso delle notti: 2 notti a testa (' + notti('Anna') + '/' + notti('Bruno') + ')',
+  );
+  ok(r.dopo.scoperti === 0 && r.dopo.notti === 0, 'nessun posto scoperto, scarto delle notti zero');
+  // 4 turni a testa (meno di 8: pesano 0,5): scarti di 50 punti, 0,5 x 2500 x 2 / 100 = 25
+  ok(r.prima.notti === 25, 'partenza: 100% e 0% = scarto 25 (' + r.prima.notti + ')');
+}
+
+console.log('== posti riservati: vincolo duro ==');
+{
+  // Anna e l unica che fa S (riservato ai Supervisor); sul turno S ha una regola violata
+  // (5.000): lasciare S scoperto costerebbe meno (300 x 5). Senza riservati la ricerca la
+  // sposta su M; con S riservato no.
+  const d0 = giorni[0];
+  const pr = (ris) => ({
+    giorni: [d0],
+    persone: ['Anna', 'Bruno', 'Carla'],
+    stato: { Anna: { [d0]: 'S' }, Bruno: { [d0]: 'M' }, Carla: { [d0]: '' } },
+    riposo: '',
+    fabbisogno: { [d0]: { S: 1, M: 2 } },
+    modificabile: () => true,
+    ammessi: (n) => (n === 'Anna' ? ['S', 'M', ''] : ['M', '']),
+    costoPersona: (n, m) => (n === 'Anna' && m[d0] === 'S' ? 5000 : 0) + (n === 'Carla' && m[d0] === 'M' ? 2000 : 0),
+    riservati: ris,
+  });
+  const senza = R.cerca(pr(null), { seme: 3 }, 2000);
+  ok(senza.stato.Anna[d0] !== 'S', 'senza riservati: Anna lascia S (' + senza.stato.Anna[d0] + ')');
+  const con = R.cerca(pr({ [d0]: { S: true } }), { seme: 3 }, 2000);
+  ok(con.stato.Anna[d0] === 'S' && con.dopo.riservati === 0, 'con S riservato: resta coperto');
+  const conPeso = R.cerca(pr({ [d0]: { S: true } }), { seme: 3, pesoRiservato: 30000 }, 2000);
+  ok(conPeso.stato.Anna[d0] === 'S', 'con il peso dei riservati: resta coperto anche durante la ricerca');
+}
+{
+  // un posto riservato gia scoperto alla partenza non blocca gli altri miglioramenti
+  const d0 = giorni[0];
+  const r = R.cerca(
+    {
+      giorni: [d0],
+      persone: ['Anna', 'Bruno'],
+      stato: { Anna: { [d0]: '' }, Bruno: { [d0]: '' } },
+      riposo: '',
+      fabbisogno: { [d0]: { S: 1, M: 1 } },
+      modificabile: () => true,
+      ammessi: () => ['M', ''],
+      costoPersona: () => 0,
+      riservati: { [d0]: { S: true } },
+    },
+    { seme: 2 },
+    500,
+  );
+  ok(r.dopo.scoperti === 1 && r.dopo.riservati === 1, 'S resta scoperto (nessuno puo), M si copre lo stesso');
+}
+
 console.log('== non peggiora mai ==');
 ok(
   r1.dopo.punteggio <= r1.prima.punteggio && r2.dopo.punteggio <= r2.prima.punteggio,

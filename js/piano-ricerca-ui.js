@@ -20,7 +20,37 @@
 // (una regola pesa piu di tutti i posti che si potrebbero coprire violandola);
 // ore SOPRA il massimo contano come una regola (la bozza non le supera mai), ore
 // SOTTO il minimo meno (coprire i posti le fa salire)
-const RICERCA_PESI = { legge: 60000, regola: 20000, oreSotto: 200, scoperto: 300, oraObiettivo: 2 };
+// QUALITA (regole equilibrio_livelli e minimo_competenza_giorno: forti in ogni fascia, livello
+// medio, competenze per fascia): sono preferenze di organizzazione, non regole. Prima pesavano
+// 20.000 per fascia come una regola vera: Migliora scopriva un posto (300) pur di aggiustare
+// un livello medio. Ora 150: meno di un posto scoperto (300, fino a 1.500 se raro), cosi un
+// posto non si scambia mai per una fascia piu equilibrata; piu delle ore verso l obiettivo
+// (2 all ora: un turno spostato = 16) e dell equita delle notti, cosi a parita di posti una
+// fascia equilibrata vince.
+// RISERVATO: un posto riservato (turno PRINCIPALE di poche funzioni, es. le Z dei Supervisor
+// o i 21/81/911 dei SUP dei Tavoli) scoperto pesa 30.000 in piu: sopra ogni altra regola
+// (20.000) e sotto la legge (60.000): si copre a costo di un altra regola, mai violando la
+// legge. In piu e un vincolo duro: il risultato non scopre piu posti riservati di prima.
+// NOTTI: equita delle notti fra persone comparabili (stessa funzione), 3 punti per ogni
+// (punto percentuale di scarto)^2 / 100: spostare una persona da +30 a +25 punti sopra la
+// media vale ~8, come 4 ore verso l obiettivo; mai quanto un posto o una regola. Si cambia
+// con l impostazione del piano equita_notti_peso (0 = spenta).
+const RICERCA_PESI = {
+  legge: 60000,
+  regola: 20000,
+  qualita: 150,
+  riservato: 30000,
+  oreSotto: 200,
+  scoperto: 300,
+  oraObiettivo: 2,
+  notti: 3,
+};
+// iterazioni al minuto del tempo scelto (circa un minuto su un PC d ufficio, novembre Slots:
+// ~700 al secondo). La ricerca conta le iterazioni, non i secondi: con lo stesso seme e lo
+// stesso piano di partenza il risultato e identico. Il tempo resta un freno (al massimo il
+// doppio di quello scelto): su un PC lento si ferma prima e lo dice (risultato non ripetibile).
+const RICERCA_ITER_MINUTO = 42000;
+const RICERCA_TEMPO_FRENO = 2;
 // REGOLE DI LEGGE e di riposo: non possono mai aumentare (riposo minimo fra due
 // turni, giorni consecutivi, riposo singolo dopo 4 giorni, ore della settimana,
 // riposo attorno alla domenica). Con lo stesso peso la preferenza "giorni a
@@ -34,6 +64,28 @@ function _ricercaPesoOrdine(msg) {
   if (/di riposo dopo/.test(m)) return 1.5;
   if (/domenica .*lavorata|riposo di .* ore/.test(m)) return 1.2;
   return 1;
+}
+// regole di QUALITA fra persone (equilibrio_livelli, minimo_competenza_giorno): peso proprio
+function _ricercaRegolaDiQualita(msg) {
+  const m = String(msg || '');
+  return (
+    /^giorno \d+, .*: .*(di livello L\d+ o più \(minimo|livello medio )/.test(m) ||
+    /^giorno \d+: servono \d+ con /.test(m)
+  );
+}
+// TURNO DI NOTTE per l equita: finisce dopo la mezzanotte, alle 2 o piu tardi (ai Tavoli quasi
+// tutti i turni sono di tipo NOTTURNO, anche il 14-23:45: il tipo non distingue la notte vera)
+function _ricercaTurnoDiNotte(t) {
+  if (!t || !t.ora_inizio || !t.ora_fine) return false;
+  const i = _pianoOra(String(t.ora_inizio).substring(0, 5));
+  const f = _pianoOra(String(t.ora_fine).substring(0, 5));
+  return i != null && f != null && f < i && f >= 2;
+}
+// peso di un insieme di violazioni fra persone (regole e qualita)
+function _ricercaPesoGruppi(viol) {
+  let c = 0;
+  viol.forEach((v) => (c += _ricercaRegolaDiQualita(v.msg) ? RICERCA_PESI.qualita : RICERCA_PESI.regola));
+  return c;
 }
 function _ricercaRegolaDiLegge(msg) {
   return /di riposo dopo|giorni lavorativi consecutivi|riposo singolo dopo|lavorate nella settimana|domenica .*lavorata|domenica libera:|riposo di .* ore|preferenza: massimo \d+ a settimana/.test(
@@ -195,7 +247,10 @@ async function _ricercaPrepara(opz) {
   // la persona e idonea (stesso criterio della bozza), piu il riposo
   const turnoInfoDi = {};
   _pianoTurniReparto().forEach((t) => (turnoInfoDi[t.codice] = t));
+  const _ammessiMemo = {};
   const ammessi = (n, d) => {
+    const km = n + '|' + d;
+    if (_ammessiMemo[km]) return _ammessiMemo[km].slice();
     const dow = new Date(d + 'T12:00:00').getDay();
     const wd = (righeDi[n + '|' + d] || [])[0];
     const isWd = wd && wd.codice === 'WD';
@@ -206,7 +261,36 @@ async function _ricercaPrepara(opz) {
       return _pianoIdoneoStatico(n, t, dow, idoneita);
     });
     out.push(isWd ? 'WD' : '');
-    return out;
+    _ammessiMemo[km] = out;
+    return out.slice();
+  };
+  // POSTI RISERVATI: un turno del fabbisogno che possono fare solo persone che lo hanno fra i
+  // turni PRINCIPALI della loro funzione (stesso criterio della bozza, postoRiservato)
+  const tipoPrincipale = (n, c) =>
+    (_pianoMappFunzione((_pianoCollabInfo(n) || {}).funzione) || []).some(
+      (v) => v.turno_codice === c && v.tipo === 'PRINCIPALE',
+    );
+  const riservati = {};
+  Object.keys(fabbisogno).forEach((d) =>
+    Object.keys(fabbisogno[d]).forEach((c) => {
+      if (!(fabbisogno[d][c] > 0)) return;
+      const chi = nomi.filter((n) => (stato[n] || {})[d] === c || ammessi(n, d).includes(c));
+      if (chi.length && chi.every((n) => tipoPrincipale(n, c))) (riservati[d] = riservati[d] || {})[c] = true;
+    }),
+  );
+  // EQUITA DELLE NOTTI: 1 turno di notte, 0 turno di giorno, null altro (riposo, assenze, altri
+  // settori, l allievo in formazione); gruppo = funzione, solo chi puo fare turni di notte
+  const tipoNotte = (c) => {
+    if (!c || c[0] === '#' || c[0] === '~') return null;
+    const t = turnoInfoDi[c];
+    if (!t) return null;
+    return _ricercaTurnoDiNotte(t) ? 1 : 0;
+  };
+  const gruppoEquita = (n) => {
+    const info = _pianoCollabInfo(n) || {};
+    if (_pianoCoperturaCfg(info)) return null;
+    if (!giorniAperti.some((d) => ammessi(n, d).some((c) => tipoNotte(c) === 1))) return null;
+    return String(info.funzione || '-').toUpperCase();
   };
   // REGOLE della persona, con lo stesso controllo di "Valida regole"
   const ctx = _pianoCtxViolazioni(ym);
@@ -274,7 +358,7 @@ async function _ricercaPrepara(opz) {
               righe.push({ collaboratore: n, data: d, codice: perNome[n], reparto_dip: rep });
           } else (righeDi[n + '|' + d] || []).forEach((r) => righe.push(r));
         });
-        return RICERCA_PESI.regola * _pianoViolazioniGruppi(righe, ctx).filter((v) => v.giorno === g).length;
+        return _ricercaPesoGruppi(_pianoViolazioniGruppi(righe, ctx).filter((v) => v.giorno === g));
       }
     : null;
   // regole di gruppo sul MESE intero (limite e minimo di una funzione nel mese)
@@ -304,7 +388,7 @@ async function _ricercaPrepara(opz) {
     ? (statoTutto) => {
         const righe = estranei.slice();
         nomi.forEach((n) => righePersona(n, statoTutto[n]).forEach((r) => righe.push(r)));
-        return RICERCA_PESI.regola * _pianoViolazioniGruppi(righe, ctx).filter((v) => v.giorno === 0).length;
+        return _ricercaPesoGruppi(_pianoViolazioniGruppi(righe, ctx).filter((v) => v.giorno === 0));
       }
     : null;
   // solo peggioramenti: punteggio di partenza (piano di oggi, senza le celle obbligate)
@@ -337,6 +421,8 @@ async function _ricercaPrepara(opz) {
     righeDi: righeDi,
     righePersona: righePersona,
     dettaglioPersona: dettaglioPersona,
+    // posti riservati: li usa pianoRicercaCalcola (vincolo di Migliora), non le formazioni
+    riservati: riservati,
     problema: {
       giorni: giorniAperti,
       persone: nomi,
@@ -350,6 +436,8 @@ async function _ricercaPrepara(opz) {
       costoMese: cM,
       toccaMese: toccaMese,
       fissi: opz.fissi || null,
+      tipoNotte: tipoNotte,
+      gruppoEquita: gruppoEquita,
     },
   };
 }
@@ -369,6 +457,23 @@ function _ricercaScoperti(righe, fabbisogno) {
   return s;
 }
 
+// posti RISERVATI scoperti (riservati = { dstr: { codice: true } })
+function _ricercaScopertiRiservati(righe, fabbisogno, riservati) {
+  if (!riservati) return 0;
+  const cnt = {};
+  righe.forEach((r) => {
+    if (!_pianoCopreQui(r)) return;
+    const k = String(r.data).substring(0, 10) + '|' + r.codice;
+    cnt[k] = (cnt[k] || 0) + 1;
+  });
+  let s = 0;
+  Object.keys(riservati).forEach((d) =>
+    Object.keys(riservati[d]).forEach(
+      (c) => (s += Math.max(0, ((fabbisogno[d] || {})[c] || 0) - (cnt[d + '|' + c] || 0))),
+    ),
+  );
+  return s;
+}
 // righe del mese con lo stato trovato dalla ricerca (per la verifica finale)
 function _ricercaRigheDa(prep, stato) {
   const out = _pianoRighe.filter((r) => !prep.problema.persone.includes(r.collaboratore));
@@ -377,7 +482,7 @@ function _ricercaRigheDa(prep, stato) {
 }
 
 // conteggio ufficiale (Valida regole + posti scoperti) per un insieme di righe del mese
-function _ricercaMisuraUfficiale(righe, fabbOriginale) {
+function _ricercaMisuraUfficiale(righe, fabbOriginale, riservati) {
   const salva = _pianoRighe;
   try {
     _pianoRighe = righe;
@@ -395,6 +500,9 @@ function _ricercaMisuraUfficiale(righe, fabbOriginale) {
     return {
       violazioni: v.lista.length,
       legge: v.lista.filter((x) => _ricercaRegolaDiLegge(x.msg)).length,
+      // regole di qualita (livelli, competenze per fascia): contano in regole, peso proprio
+      qualita: v.lista.filter((x) => _ricercaRegolaDiQualita(x.msg)).length,
+      riservati: _ricercaScopertiRiservati(righe, fabbOriginale, riservati),
       voci: v.lista.map((x) => x.nome + (x.giorno ? ' ' + x.giorno : '') + ': ' + x.msg),
       regole: v.lista.length - sotto,
       oreSotto: sotto,
@@ -410,9 +518,13 @@ function _ricercaMisuraUfficiale(righe, fabbOriginale) {
 // secondi: tempo a disposizione; onPasso(stato) per la barra di avanzamento;
 // opz (facoltativo): { prepara: opzioni di _ricercaPrepara, motore: opzioni del
 // motore, es. pesoCambio } per le correzioni mirate (confine fra due mesi)
+// opz.variante: 0 (predefinita) = il seme del mese e del settore; 1, 2... = altri semi per
+// "riprova con un altro seme" (stesso input e stessa variante = stesso risultato).
+// opz.seme: seme esplicito (test). opz.iterazioni: numero di iterazioni (senza: dai secondi).
 async function pianoRicercaCalcola(secondi, onPasso, opz) {
   opz = opz || {};
   const prep = await _ricercaPrepara(opz.prepara);
+  prep.problema.riservati = prep.riservati;
   // metro diverso per le persone (es. correzioni dopo l import: solo riposi e giorni
   // di fila): opz.costoPersona(prep) -> (nome, mappa) => costo; i gruppi non contano
   if (typeof opz.costoPersona === 'function') {
@@ -442,31 +554,57 @@ async function pianoRicercaCalcola(secondi, onPasso, opz) {
         f.turno_codice
       ] = q;
   });
-  const prima = _ricercaMisuraUfficiale(_pianoRighe, fabbOriginale);
+  const prima = _ricercaMisuraUfficiale(_pianoRighe, fabbOriginale, prep.riservati);
+  // SEME FISSO per mese e settore (prima Date.now(): due Migliora sullo stesso piano davano
+  // risultati diversi). La variante cambia il seme (riprova).
+  const variante = parseInt(opz.variante) || 0;
+  const seme = opz.seme != null ? opz.seme : PianoRicerca.semeRicerca(prep.ym, prep.reparto, variante);
+  const pn = parseFloat(_pianoRegolaVal('equita_notti_peso'));
   const motore = PianoRicerca.crea(
     prep.problema,
-    Object.assign({ pesoScoperto: RICERCA_PESI.scoperto, seme: Date.now() % 100000 }, opz.motore || {}),
+    Object.assign(
+      {
+        pesoScoperto: RICERCA_PESI.scoperto,
+        pesoRiservato: RICERCA_PESI.riservato,
+        pesoNotti: pn >= 0 ? pn : RICERCA_PESI.notti,
+        seme: seme,
+      },
+      opz.motore || {},
+    ),
   );
-  const ms = Math.max(1, secondi) * 1000;
+  // ITERAZIONI, non secondi: stesso numero di passi = stesso risultato (ripetibile)
+  const totIter = Math.max(1, opz.iterazioni || Math.round((Math.max(1, secondi) / 60) * RICERCA_ITER_MINUTO));
+  const msFreno = Math.max(1, secondi) * 1000 * RICERCA_TEMPO_FRENO;
+  const FETTA = 25; // ~30 ms: la pagina resta usabile
   const inizio = Date.now();
-  // a fette da 40 ms: la pagina resta usabile
+  let fatte = 0;
+  let troncata = false;
   window._ricercaFerma = false;
-  while (Date.now() - inizio < ms && !window._ricercaFerma) {
-    const frazione = (Date.now() - inizio) / ms;
-    const m = motore.passo(40, frazione);
-    if (onPasso) onPasso({ frazione: frazione, scoperti: m.scoperti, punteggio: m.punteggio });
+  while (fatte < totIter && !window._ricercaFerma) {
+    if (Date.now() - inizio > msFreno) {
+      troncata = true;
+      break;
+    }
+    const n = Math.min(FETTA, totIter - fatte);
+    const m = motore.passo(0, fatte / totIter, n);
+    fatte += n;
+    if (onPasso) onPasso({ frazione: fatte / totIter, scoperti: m.scoperti, punteggio: m.punteggio });
     await new Promise((x) => setTimeout(x, 0));
   }
+  const fermata = !!window._ricercaFerma;
   const ris = motore.risultato();
   const righeDopo = _ricercaRigheDa(prep, ris.stato);
-  const dopo = _ricercaMisuraUfficiale(righeDopo, fabbOriginale);
-  // si usa solo se nessuna regola peggiora e i posti scoperti non aumentano
+  const dopo = _ricercaMisuraUfficiale(righeDopo, fabbOriginale, prep.riservati);
+  // si usa solo se nessuna regola peggiora, i posti scoperti (e i riservati) non aumentano;
+  // le regole di qualita hanno il loro peso nel punteggio (possono cedere a un posto coperto)
+  const regoleVere = (x) => x.regole - (x.qualita || 0);
   const migliore =
     // mai persone in piu del fabbisogno rispetto a prima (doppioni)
     (ris.dopo.eccesso || 0) <= (ris.prima.eccesso || 0) &&
     dopo.legge <= prima.legge &&
-    dopo.regole <= prima.regole &&
+    regoleVere(dopo) <= regoleVere(prima) &&
     dopo.scoperti <= prima.scoperti &&
+    dopo.riservati <= prima.riservati &&
     (dopo.regole < prima.regole ||
       dopo.scoperti < prima.scoperti ||
       dopo.oreSotto < prima.oreSotto ||
@@ -479,7 +617,13 @@ async function pianoRicercaCalcola(secondi, onPasso, opz) {
     iterazioni: ris.iterazioni,
     punteggio: { prima: ris.prima.punteggio, dopo: ris.dopo.punteggio },
     eccesso: { prima: ris.prima.eccesso || 0, dopo: ris.dopo.eccesso || 0 },
+    notti: { prima: ris.prima.notti || 0, dopo: ris.dopo.notti || 0 },
     migliore: migliore,
+    seme: seme,
+    variante: variante,
+    // ripetibile: lavoro completo (non fermato, non frenato dal tempo)
+    ripetibile: !troncata && !fermata,
+    troncata: troncata,
   };
 }
 
@@ -487,7 +631,9 @@ async function pianoRicercaCalcola(secondi, onPasso, opz) {
 // MIGLIORA LA BOZZA: si sceglie il tempo, la ricerca lavora (la pagina resta
 // usabile, si puo fermare), poi si vede prima/dopo controllato con "Valida
 // regole" e si decide se applicare. Si puo annullare con Annulla del piano.
-async function pianoMigliora() {
+// opz.variante: seme diverso (vedi pianoMiglioraRiprova); senza, il seme del mese e settore
+async function pianoMigliora(opz) {
+  opz = opz && typeof opz === 'object' ? opz : {};
   if (!_pianoAzioneAutoConsentita('genera')) return;
   if (!puoGestirePiano()) return;
   const scelta = await chiediModulo(
@@ -530,12 +676,22 @@ async function pianoMigliora() {
   let res;
   try {
     const t0 = Date.now();
-    res = await pianoRicercaCalcola(secondi, (x) => {
-      const pass = Math.round((Date.now() - t0) / 1000);
-      barra.style.width = Math.round(x.frazione * 100) + '%';
-      testo.textContent =
-        'Sto cercando: ' + pass + ' di ' + secondi + ' secondi. Posti scoperti in questo momento: ' + x.scoperti + '.';
-    });
+    res = await pianoRicercaCalcola(
+      secondi,
+      (x) => {
+        const pass = Math.round((Date.now() - t0) / 1000);
+        barra.style.width = Math.round(x.frazione * 100) + '%';
+        testo.textContent =
+          'Sto cercando: ' +
+          Math.round(x.frazione * 100) +
+          '% (' +
+          pass +
+          ' secondi). Posti scoperti in questo momento: ' +
+          x.scoperti +
+          '.';
+      },
+      { variante: opz.variante || 0 },
+    );
   } catch (e) {
     velo.remove();
     toastErrore('Ricerca non riuscita: ' + (e.message || e));
@@ -548,12 +704,16 @@ async function pianoMigliora() {
   const riepilogo =
     'Risultato controllato con "Valida regole":' +
     riga('Regole di legge violate (riposi, giorni di fila, ore della settimana, domenica)', P.legge, D.legge) +
-    riga('Altre regole violate', P.regole - P.legge, D.regole - D.legge) +
+    riga('Altre regole violate', P.regole - P.legge - P.qualita, D.regole - D.legge - D.qualita) +
+    riga('Regole di qualità (livelli, competenze per fascia)', P.qualita, D.qualita) +
     riga('Posti del fabbisogno scoperti', P.scoperti, D.scoperti) +
+    riga('di cui posti riservati (es. Supervisor)', P.riservati, D.riservati) +
     riga('Persone sotto il minimo di ore', P.oreSotto, D.oreSotto) +
     riga('Turni oltre il fabbisogno (doppioni)', res.eccesso.prima, res.eccesso.dopo) +
     '\n• Celle cambiate: ' +
-    res.cambi.length;
+    res.cambi.length +
+    (res.variante ? ' (tentativo ' + (res.variante + 1) + ')' : '') +
+    (res.ripetibile ? '' : '\n(Ricerca interrotta prima della fine: rifacendola il risultato può cambiare.)');
   logAzione(
     'Piano: ricerca sulla bozza',
     _pianoMeseSel +
@@ -569,6 +729,8 @@ async function pianoMigliora() {
       P.scoperti +
       '>' +
       D.scoperti +
+      ' · seme ' +
+      res.seme +
       (res.migliore ? '' : ' · non applicabile'),
   );
   if (!res.migliore || !res.cambi.length) {
@@ -587,6 +749,15 @@ async function pianoMigliora() {
   );
   if (!ok) return;
   await _ricercaScrivi(res);
+}
+
+// RIPROVA CON UN ALTRO SEME: stesso mese e settore, variante successiva (0, 1, 2...). Il
+// pulsante "Riprova con un altro tentativo" accanto a Migliora chiama questa funzione.
+const _ricercaVarianti = {}; // 'ym|settore' -> ultima variante usata
+async function pianoMiglioraRiprova() {
+  const k = _pianoMeseSel + '|' + _pianoReparto();
+  _ricercaVarianti[k] = (_ricercaVarianti[k] || 0) + 1;
+  return pianoMigliora({ variante: _ricercaVarianti[k] });
 }
 
 // scrive le celle cambiate (solo celle generate o vuote), con la fotografia per Annulla

@@ -608,7 +608,11 @@ function ccAggiornaRestituzioni() {
       )
       .join('');
 }
-async function confermaCercaCambioLibero() {
+// un cambio alla volta: il doppio click su "Applica cambio" lo applicava due volte
+function confermaCercaCambioLibero() {
+  return unaVoltaSola('piano-cerca-cambio-applica', () => _confermaCercaCambioLiberoEsegui());
+}
+async function _confermaCercaCambioLiberoEsegui() {
   if (!_ccDati || !puoGestirePiano()) return;
   if (!(await _pianoConsentiScrittura(_ccDati.data))) return; // giorno chiuso
   const i = parseInt((document.getElementById('cc-collega') || {}).value) || 0;
@@ -1978,7 +1982,11 @@ async function _pianoMalattiaViaDiario(nome, giorniDstr) {
   }
   return tolte;
 }
-async function confermaCoperturaMalattia() {
+// una copertura alla volta: il doppio click su "Conferma copertura" la applicava due volte
+function confermaCoperturaMalattia() {
+  return unaVoltaSola('piano-copertura-malattia', () => _confermaCoperturaMalattiaEsegui());
+}
+async function _confermaCoperturaMalattiaEsegui() {
   const m = _malattiaPiano;
   if (!m) return;
   // basta lo sblocco sul primo giorno: copre il flusso, e gli inserimenti sui

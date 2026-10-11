@@ -127,6 +127,16 @@ async function _salvaMaisonManualeEsegui() {
     toast('Inserisci un importo');
     return;
   }
+  // importo negativo: non esistono storni nella Maison (prima veniva salvato e abbassava i totali)
+  if (importo < 0) {
+    toastErrore('Importo non valido: deve essere maggiore di zero (nella Maison non esistono storni).');
+    _highlightField('maison-man-importo');
+    return;
+  }
+  if ((parseInt(document.getElementById('maison-man-px').value) || 1) < 1) {
+    toastErrore('Persone non valide: almeno 1.');
+    return;
+  }
   const tipo = document.getElementById('maison-man-tipo').value || null;
   // La quantita' di buoni e' quella scritta dall'operatore (default 1): ricavarla dal costo
   // dell'intera riga assegnava 9 BL a chi ne aveva usato uno solo
@@ -265,6 +275,11 @@ async function _salvaRegaloEsegui() {
     return;
   }
   const importo = parseFloat(document.getElementById('regalo-importo').value) || null;
+  // l importo del regalo e facoltativo, ma se c e non puo essere negativo
+  if (importo !== null && importo < 0) {
+    toastErrore('Importo non valido: deve essere maggiore di zero.');
+    return;
+  }
   const data = document.getElementById('regalo-data').value || oggiLocale();
   try {
     const r = await secPost('regali_maison', {
@@ -2352,7 +2367,7 @@ function eseguiConfrontoMaison() {
           ';border-radius:2px 2px 0 0;height:' +
           Math.max(pct, 2) +
           'px;opacity:0.7" title="' +
-          d.nome +
+          escP(d.nome) +
           ': ' +
           fmtCHF(v) +
           ' CHF"></div>';
@@ -3037,6 +3052,11 @@ async function salvaModificaMaisonRiga(id, nome) {
   const costo = parseFloat(document.getElementById('edit-mr-costo').value) || 0;
   const tipo = document.getElementById('edit-mr-tipo').value || null;
   const note = document.getElementById('edit-mr-note').value.trim();
+  // costo negativo o persone sotto 1: nessun caso valido (non esistono storni)
+  if (costo < 0 || px < 1) {
+    toastErrore(costo < 0 ? 'Costo non valido: non può essere negativo.' : 'Persone non valide: almeno 1.');
+    return;
+  }
   try {
     await secPatch('costi_maison', 'id=eq.' + id, {
       px,

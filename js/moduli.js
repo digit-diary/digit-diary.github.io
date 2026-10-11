@@ -325,7 +325,9 @@ async function generaModuloPDF(tipo) {
     _highlightField('mod-collaboratore');
     return;
   }
-  collab = await _verificaNome(collab);
+  // finestra "Nome simile" chiusa (clic fuori o Esc): il modulo non si genera
+  collab = await _verificaNome(collab, true);
+  if (!collab) return;
   document.getElementById('mod-collaboratore').value = collab;
   // ALLINEAMENTO e RDI finiscono nel fascicolo personale: se mancano la non
   // conformita' o l'obiettivo il documento esce ufficiale ma vuoto, quindi si

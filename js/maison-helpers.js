@@ -183,6 +183,7 @@ function _scegliCandidatoNome(input, candidates) {
       '<div class="pwd-modal-btns"><button class="btn-modal-cancel" id="dis-cancel">Annulla</button><button class="btn-modal-ok" id="dis-ok">Conferma</button></div>';
     mc.innerHTML = html;
     document.getElementById('pwd-modal').classList.remove('hidden');
+    pwdModalSeAnnullata(() => resolve(null));
     document.getElementById('dis-cancel').onclick = () => {
       document.getElementById('pwd-modal').classList.add('hidden');
       resolve(null);
@@ -1256,6 +1257,10 @@ async function _salvaSpeseExtraEsegui() {
     toast("Inserisci l'importo");
     return;
   }
+  if (importo < 0) {
+    toastErrore('Importo non valido: deve essere maggiore di zero.');
+    return;
+  }
   // Controllo duplicati: stesso beneficiario + stessa data + stesso importo
   const seDup = getSpeseReparto().find(
     (r) =>
@@ -1360,6 +1365,10 @@ async function salvaModificaSE(id) {
   const desc = document.getElementById('edit-se-desc').value.trim();
   if (!benef || !importo) {
     toast('Compila beneficiario e importo');
+    return;
+  }
+  if (importo < 0) {
+    toastErrore('Importo non valido: deve essere maggiore di zero.');
     return;
   }
   try {
@@ -2784,6 +2793,23 @@ async function rimuoviCategoriaInventario(key) {
   _invTab = _invTabDefault();
   renderInventario();
 }
+// USCITA PIU GRANDE DELLA GIACENZA: prima veniva accettata e la scorta andava sotto zero.
+// Non c e un caso in cui sia giusto (i pezzi arrivati si registrano prima con Carica):
+// si blocca e si dice quanti ce ne sono. Ritorna true se l uscita si puo registrare.
+function _invUscitaPossibile(giacenza, qty, articolo) {
+  const g = Math.max(0, parseInt(giacenza) || 0);
+  if (qty <= g) return true;
+  toastErrore(
+    'Uscita non registrata: di ' +
+      articolo +
+      (g ? ' ce ne sono solo ' + g : ' non ce ne sono in scorta') +
+      ' (richiesti ' +
+      qty +
+      '). Se sono arrivati nuovi pezzi, registra prima il carico.',
+    9000,
+  );
+  return false;
+}
 // --- Sezione generica per categoria custom: giacenze, carico, uscita, movimenti ---
 function _giacenzeCustom(catKey) {
   const inv = getInventarioReparto().filter((r) => r.categoria === catKey);
@@ -2936,6 +2962,7 @@ async function _salvaInvCustomMovimentoEsegui(catKey, movimento) {
     return;
   }
   const cat = getInvCategorieExtra().find((c) => c.key === catKey);
+  if (!isIn && !_invUscitaPossibile(_giacenzeCustom(catKey)[art], qty, art)) return;
   try {
     const r = await secPost('inventario', {
       categoria: catKey,
@@ -3322,6 +3349,7 @@ async function _salvaInventarioUscitaEsegui() {
     toast('Inserisci la quantit\u00e0');
     return;
   }
+  if (!_invUscitaPossibile(calcolaGiacenzaBuoni()[tipo], qty, tipo)) return;
   const rec = {
     categoria: 'buono',
     tipo: tipo,
@@ -3404,6 +3432,7 @@ async function _salvaInventarioSigUscitaEsegui() {
     toast('Inserisci il cliente');
     return;
   }
+  if (!_invUscitaPossibile(calcolaGiacenzeSigarette()[marca], qty, marca)) return;
   const rec = {
     categoria: 'sigaretta',
     tipo: marca,
@@ -3499,6 +3528,30 @@ async function salvaModificaInventario(id) {
   }
   const updates = { tipo: tipo, quantita: qty, cliente: cliente, note: nota };
   if (dataISO) updates.data_movimento = dataISO;
+  // anche la MODIFICA non puo portare la scorta sotto zero (come le uscite nuove):
+  // si prova il movimento cambiato sulla giacenza e, se va sotto, si blocca
+  const c0 = inventarioCache.find((x) => x.id === id);
+  if (c0) {
+    const vecchio = { tipo: c0.tipo, quantita: c0.quantita };
+    Object.assign(c0, { tipo: tipo, quantita: qty });
+    const giac =
+      c0.categoria === 'buono'
+        ? calcolaGiacenzaBuoni()
+        : c0.categoria === 'sigaretta'
+          ? calcolaGiacenzeSigarette()
+          : _giacenzeCustom(c0.categoria);
+    const sotto = [...new Set([vecchio.tipo, tipo])].filter((t) => (giac[t] || 0) < 0);
+    Object.assign(c0, vecchio);
+    if (sotto.length) {
+      toastErrore(
+        'Modifica non salvata: la scorta di ' +
+          sotto.join(', ') +
+          ' andrebbe sotto zero. Se sono arrivati nuovi pezzi, registra prima il carico.',
+        9000,
+      );
+      return;
+    }
+  }
   try {
     await secPatch('inventario', 'id=eq.' + id, updates);
     const c = inventarioCache.find((x) => x.id === id);
@@ -3508,7 +3561,7 @@ async function salvaModificaInventario(id) {
     renderInventario();
     toast('Movimento modificato');
   } catch (e) {
-    toast('Errore modifica');
+    toastErrore('Movimento non modificato: ' + ((e && e.message) || e));
   }
 }
 async function sincronizzaPareggioBuoni() {
@@ -3938,8 +3991,10 @@ window.addEventListener('load', async () => {
     _renderPostLogin();
     if (getOperatore()) {
       document.getElementById('operatore-display').textContent = 'Operatore: ' + getOperatore();
+      // con il token: il database risponde solo per la persona collegata (migrazione 20260911)
       const authCheck = await sbRpc('check_deve_cambiare', {
         p_nome: getOperatore(),
+        p_token: getOpToken(),
       });
       if (authCheck && authCheck.deve_cambiare_pwd) setTimeout(() => forzaCambioPwdOperatore(getOperatore()), 300);
       else {
@@ -4036,7 +4091,15 @@ document.getElementById('pwd-modal').addEventListener('click', function (e) {
       c.includes('scegli una nuova')
     )
       return;
-    this.classList.add('hidden');
+    // chiusa senza scegliere: la finestra a promessa riceve "annulla" (utils.js)
+    pwdModalAnnulla();
+  }
+});
+// Esc su una finestra a promessa del pwd-modal: come Annulla
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && typeof pwdModalInAttesa === 'function' && pwdModalInAttesa()) {
+    e.preventDefault();
+    pwdModalAnnulla();
   }
 });
 document.getElementById('operatore-modal').addEventListener('click', function (e) {

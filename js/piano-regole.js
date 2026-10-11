@@ -829,6 +829,59 @@
     return giornoBloccato(iso, adesso, cfg);
   }
 
+  // ===== DOMENICHE LIBERE DELL ANNO: UNA SOLA REGOLA PER VALIDA E BOZZA =====
+  // (OLL2 art. 24; conto annuale deciso dal titolare 08/10/2026: in un mese con bisogno si
+  // puo lavorare la domenica, purche nell anno si resti in linea con le domeniche attese.)
+  // Prima la bozza la trattava come preferenza (chi ha lavorato meno domeniche viene dopo) e
+  // Valida come regola di legge: la bozza creava le violazioni e Migliora le correggeva
+  // sacrificando posti rari. Ora tutte e due chiedono qui.
+  // stati: lo stato di ogni domenica del mese per la persona:
+  //   'libera'     vale fra quelle dell anno (riposo, sabato finito entro le 23)
+  //   'non_valida' libera ma non conta (il sabato finisce oltre le 23, codice che non e riposo)
+  //   'lavoro'     turno di lavoro
+  //   'esclusa'    vacanza o malattia: non conta (ne a favore ne contro)
+  //   'aperta'     (bozza) cella ancora da decidere: puo diventare libera
+  // conto: { prima, attese } (domeniche libere valide gia avute nell anno e attese fino alla
+  // fine del mese) oppure null (conto annuale non caricato: almeno una libera nel mese).
+  // Ritorna { libere, possibili, serve, violata, raggiungibile }:
+  //   violata       con le domeniche di oggi la regola non e rispettata (Valida)
+  //   raggiungibile lasciando libere le domeniche aperte si rispetta ancora (bozza)
+  function domenicheLibereMese(stati, conto) {
+    const st = stati || [];
+    let libere = 0;
+    let aperte = 0;
+    st.forEach((s) => {
+      if (s === 'libera') libere++;
+      else if (s === 'aperta') aperte++;
+    });
+    const possibili = libere + aperte;
+    if (!st.length) return { libere: 0, possibili: 0, serve: 0, violata: false, raggiungibile: true };
+    const serve = conto ? (conto.attese || 0) - (conto.prima || 0) : 1;
+    return {
+      libere: libere,
+      possibili: possibili,
+      serve: serve,
+      violata: libere < serve,
+      raggiungibile: possibili >= serve,
+    };
+  }
+  // LA BOZZA PUO METTERE QUESTO TURNO? (vincolo, non preferenza) prima/dopo: gli stati delle
+  // domeniche del mese senza e con il turno nuovo (una domenica lavorata, o un sabato che
+  // finisce oltre le 23 prima di una domenica libera). Il turno si puo mettere se la persona
+  // arriva ancora alle domeniche dovute fino a questo mese. Chi e GIA indietro senza rimedio
+  // nel mese (Valida lo segnala comunque):
+  //   rigido = false (predefinito): il turno si puo mettere; nell ordine dei candidati viene
+  //            per ultimo la domenica (chi e indietro recupera nei mesi dopo, decisione del
+  //            titolare 08/10/2026);
+  //   rigido = true: non perde altre domeniche libere (tutte le domeniche aperte restano libere).
+  function domenicaTurnoAmmesso(statiPrima, statiDopo, conto, rigido) {
+    const dopo = domenicheLibereMese(statiDopo, conto);
+    if (dopo.raggiungibile) return true;
+    const prima = domenicheLibereMese(statiPrima, conto);
+    if (!prima.raggiungibile) return rigido ? dopo.possibili >= prima.possibili : true;
+    return false;
+  }
+
   return {
     oraNum,
     riposoOre,
@@ -846,5 +899,7 @@
     chiusuraDelGiorno,
     giornoBloccato,
     meseBloccato,
+    domenicheLibereMese,
+    domenicaTurnoAmmesso,
   };
 });

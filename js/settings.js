@@ -1237,8 +1237,8 @@ async function eseguiCambioPwdOp() {
     p1 = document.getElementById('op-new-pwd-1').value,
     p2 = document.getElementById('op-new-pwd-2').value,
     err = document.getElementById('pwd-modal-error');
-  const oh = await secureHash(o, op),
-    ohL = await sha256(o);
+  // la vecchia impronta SHA-256 non serve piu: il primo accesso la converte (migrazione 20260911)
+  const oh = await secureHash(o, op);
   if (p1.length < 4) {
     err.textContent = 'Troppo corta';
     return;
@@ -1254,7 +1254,6 @@ async function eseguiCambioPwdOp() {
     p_nome: op,
     p_old_hash: oh,
     p_new_hash: nh,
-    p_old_legacy_hash: ohL,
     p_token: getOpToken(),
   });
   if (!res || !res.success) {
