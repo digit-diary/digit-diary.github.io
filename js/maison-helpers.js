@@ -3774,118 +3774,138 @@ async function esportaInventarioPDF() {
   doc.save('inventario_' + _catLbl.toLowerCase().replace(/\s+/g, '_') + '_' + oggiLocale() + '.pdf');
 }
 
-// MENU MOBILE
+// MENU MOBILE (telefono): pannello a sinistra con le pagine in gruppi, come il menu del computer,
+// e in fondo le azioni del profilo (testo, tema, stampa, esci) che al telefono non stanno in testata
 function toggleMobileNav() {
-  document.getElementById('mobile-nav').classList.toggle('show');
+  const m = document.getElementById('mobile-nav');
+  if (m.classList.contains('show')) chiudiMobileNav();
+  else {
+    aggiornaMenuMobile();
+    m.classList.add('show');
+    const h = document.getElementById('hamburger-btn');
+    if (h) h.setAttribute('aria-expanded', 'true');
+    const v = m.querySelector('.mobile-nav-item.active') || m.querySelector('.mobile-nav-close');
+    if (v) v.focus();
+  }
 }
 function chiudiMobileNav() {
-  document.getElementById('mobile-nav').classList.remove('show');
+  const m = document.getElementById('mobile-nav');
+  if (!m.classList.contains('show')) return;
+  m.classList.remove('show');
+  const h = document.getElementById('hamburger-btn');
+  if (h) {
+    h.setAttribute('aria-expanded', 'false');
+    h.focus();
+  }
 }
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') {
+    const m = document.getElementById('mobile-nav');
+    if (m && m.classList.contains('show')) chiudiMobileNav();
+  }
+});
+// voci del menu: stesse etichette e stessi gruppi del menu del computer (index.html)
+const MENU_PAGINE = [
+  { g: 'Oggi', page: 'dashboard', icon: 'home', label: 'Home' },
+  { g: 'Oggi', page: 'diario', icon: 'diario', label: 'Diario' },
+  { g: 'Oggi', page: 'rapporto', icon: 'calendario', label: 'Rapporto', vis: 'rapporto' },
+  { g: 'Oggi', page: 'consegna', icon: 'penna', label: 'Consegna', vis: 'consegna', badgeId: 'consegna-badge' },
+  {
+    g: 'Oggi',
+    page: 'promemoria',
+    icon: 'clipboard',
+    label: 'Promemoria',
+    vis: 'promemoria',
+    badgeId: 'promemoria-badge',
+  },
+  {
+    g: 'Oggi',
+    page: 'note-collega',
+    icon: 'mail',
+    label: 'Note colleghi',
+    vis: 'note_collega',
+    badgeId: 'note-badge',
+  },
+  { g: 'Persone', page: 'piano', icon: 'calendario', label: 'Piano', vis: 'piano' },
+  { g: 'Persone', page: 'formazione', icon: 'formazione', label: 'Formazione', vis: 'formazione' },
+  { g: 'Persone', page: 'moduli', icon: 'file', label: 'Moduli', vis: 'moduli' },
+  { g: 'Maison e inventario', page: 'maison', icon: 'maison', label: 'Maison', vis: 'maison' },
+  { g: 'Maison e inventario', page: 'inventario', icon: 'inventario', label: 'Inventario', vis: 'inventario' },
+  { g: 'Strumenti', page: 'assistente', icon: 'assistente', label: 'Assistente', vis: 'assistente' },
+  { g: 'Strumenti', page: 'statistiche', icon: 'stats', label: 'Statistiche del Diario', vis: 'statistiche' },
+  { g: 'Strumenti', page: 'registro', icon: 'clipboard', label: 'Registro attività', vis: 'registro', adminOnly: true },
+  { g: 'Strumenti', page: 'guida', icon: 'aiuto', label: 'Guida del programma' },
+  { g: 'Strumenti', page: 'impostazioni', icon: 'settings', label: 'Impostazioni generali' },
+];
 function aggiornaMenuMobile() {
   try {
+    if (typeof navAggiornaMenu === 'function') navAggiornaMenu();
     const items = document.getElementById('mobile-nav-items');
     if (!items) return;
-    // in gruppi (controllo del 09/10/2026), come il menu del computer; c e anche la Guida
-    const tabs = [
-      { g: 'Oggi', page: 'dashboard', icon: '<i class="icx icx-home"></i>', label: 'Home' },
-      { g: 'Oggi', page: 'diario', icon: '<i class="icx icx-diario"></i>', label: 'Diario' },
-      { g: 'Oggi', page: 'rapporto', icon: '<i class="icx icx-calendario"></i>', label: 'Rapporto', vis: 'rapporto' },
-      {
-        g: 'Oggi',
-        page: 'consegna',
-        icon: '<i class="icx icx-penna"></i>',
-        label: 'Consegna',
-        vis: 'consegna',
-        badgeId: 'consegna-badge',
-      },
-      {
-        g: 'Oggi',
-        page: 'promemoria',
-        icon: '<i class="icx icx-clipboard"></i>',
-        label: 'Promemoria',
-        vis: 'promemoria',
-        badgeId: 'promemoria-badge',
-      },
-      { g: 'Persone', page: 'piano', icon: '<i class="icx icx-calendario"></i>', label: 'Piano', vis: 'piano' },
-      {
-        g: 'Persone',
-        page: 'formazione',
-        icon: '<i class="icx icx-formazione"></i>',
-        label: 'Formazione',
-        vis: 'formazione',
-      },
-      { g: 'Persone', page: 'moduli', icon: '<i class="icx icx-file"></i>', label: 'Moduli', vis: 'moduli' },
-      {
-        g: 'Comunicare',
-        page: 'note-collega',
-        icon: '<i class="icx icx-mail"></i>',
-        label: 'Note Colleghi',
-        vis: 'note_collega',
-        badgeId: 'note-badge',
-      },
-      {
-        g: 'Comunicare',
-        page: 'assistente',
-        icon: '<i class="icx icx-assistente"></i>',
-        label: 'Assistente',
-        vis: 'assistente',
-      },
-      { g: 'Locale', page: 'maison', icon: '<i class="icx icx-maison"></i>', label: 'Maison', vis: 'maison' },
-      {
-        g: 'Locale',
-        page: 'inventario',
-        icon: '<i class="icx icx-inventario"></i>',
-        label: 'Inventario',
-        vis: 'inventario',
-      },
-      {
-        g: 'Strumenti',
-        page: 'statistiche',
-        icon: '<i class="icx icx-stats"></i>',
-        label: 'Statistiche',
-        vis: 'statistiche',
-      },
-      {
-        g: 'Strumenti',
-        page: 'registro',
-        icon: '<i class="icx icx-clipboard"></i>',
-        label: 'Registro',
-        adminOnly: true,
-      },
-      { g: 'Strumenti', page: 'guida', icon: '<i class="icx icx-clipboard"></i>', label: 'Guida' },
-      { g: 'Strumenti', page: 'impostazioni', icon: '<i class="icx icx-settings"></i>', label: 'Impostazioni' },
-    ];
     const cur = localStorage.getItem('pagina_corrente') || 'dashboard';
-    let html = '';
+    const op = typeof getOperatore === 'function' ? getOperatore() : '';
+    const oggi = new Date();
+    let html =
+      '<div class="mobile-nav-testa"><div class="mobile-nav-titolo">Diario Collaboratori</div><div class="mobile-nav-chi">' +
+      (op ? escP(op) + ' · ' : '') +
+      (typeof GIORNI !== 'undefined' ? GIORNI[oggi.getDay()] + ' ' : '') +
+      oggi.toLocaleDateString('it-IT') +
+      '</div></div>';
     let gruppoPrima = '';
-    tabs.forEach(function (t) {
+    MENU_PAGINE.forEach(function (t) {
       if (t.adminOnly && !isAdmin()) return;
       if (t.vis && typeof isVis === 'function' && !isVis(t.vis)) return;
+      // stessa regola del menu del computer: una voce nascosta li e nascosta anche qui
+      const tabPc = document.querySelector('.nav-tabs .nav-tab[data-page="' + t.page + '"]');
+      if (tabPc && tabPc.style.display === 'none') return;
       if (t.g !== gruppoPrima) {
         html += '<div class="mobile-nav-gruppo">' + t.g + '</div>';
         gruppoPrima = t.g;
       }
       var badge = t.badgeId ? document.getElementById(t.badgeId) : null;
       var badgeHtml =
-        badge && badge.style.display !== 'none' ? '<span class="nav-badge">' + badge.textContent + '</span>' : '';
+        badge && badge.style.display !== 'none' && badge.textContent
+          ? '<span class="nav-badge">' + escP(badge.textContent) + '</span>'
+          : '';
       html +=
         '<button class="mobile-nav-item' +
-        (cur === t.page ? ' active' : '') +
+        (cur === t.page ? ' active" aria-current="page' : '') +
         '" onclick="switchPage(\'' +
         t.page +
-        '\');chiudiMobileNav()">' +
+        '\');chiudiMobileNav()"><i class="icx icx-' +
         t.icon +
-        ' ' +
+        '"></i> ' +
         t.label +
         badgeHtml +
         '</button>';
     });
+    // azioni del profilo: al telefono la testata e nascosta, qui restano a portata di dito
+    const scuro = document.body.classList.contains('dark-theme');
+    const dim = document.getElementById('testo-dim-lbl');
+    html +=
+      '<div class="mobile-nav-gruppo">Il tuo profilo</div><div class="mobile-nav-profilo">' +
+      '<div class="mobile-nav-testo" role="group" aria-label="Dimensione del testo"><button type="button" class="btn-header" onclick="cambiaDimensioneTesto(-1);this.parentNode.querySelector(\'span\').textContent=document.getElementById(\'testo-dim-lbl\').textContent" aria-label="Testo più piccolo">A&minus;</button><span>' +
+      escP(dim ? dim.textContent : '100%') +
+      '</span><button type="button" class="btn-header" onclick="cambiaDimensioneTesto(1);this.parentNode.querySelector(\'span\').textContent=document.getElementById(\'testo-dim-lbl\').textContent" aria-label="Testo più grande">A+</button></div>' +
+      '<button type="button" class="mobile-nav-item" onclick="toggleTema();aggiornaMenuMobile()"><i class="icx icx-' +
+      (scuro ? 'sole' : 'luna') +
+      '"></i> ' +
+      (scuro ? 'Tema chiaro' : 'Tema scuro') +
+      '</button>' +
+      '<button type="button" class="mobile-nav-item" onclick="chiudiMobileNav();window.print()"><i class="icx icx-stampa"></i> Stampa</button>' +
+      '<button type="button" class="mobile-nav-item mobile-nav-esci" onclick="chiudiMobileNav();esci()"><i class="icx icx-esci"></i> Esci</button></div>';
     items.innerHTML = html;
-    var curTab = tabs.find(function (t) {
+    var curTab = MENU_PAGINE.find(function (t) {
       return t.page === cur;
     });
     var hBtn = document.getElementById('hamburger-btn');
-    if (hBtn && curTab) hBtn.innerHTML = '<i class="icx icx-menu"></i> ' + curTab.icon + ' ' + curTab.label;
+    if (hBtn && curTab)
+      hBtn.innerHTML =
+        '<i class="icx icx-menu"></i><span class="hamburger-pagina"><i class="icx icx-' +
+        curTab.icon +
+        '"></i> ' +
+        curTab.label +
+        '</span><span class="sr-solo"> · apri il menu</span>';
   } catch (e) {
     console.error('Menu mobile error:', e);
   }

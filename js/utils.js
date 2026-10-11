@@ -873,7 +873,7 @@ function getRepartoInfo(key) {
   return getRepartiTutti().find((r) => r.key === key) || null;
 }
 function repartoLabel(key) {
-  if (key === 'entrambi') return 'Tutti i reparti';
+  if (key === 'entrambi') return 'Tutti i settori';
   const r = getRepartoInfo(key);
   return r ? r.label : key || '';
 }
@@ -912,10 +912,10 @@ function _repBadge(rep, piccolo) {
         repartoLettera(rep) +
         '</span>';
 }
-// Opzioni <select> reparto (con eventuale voce 'Tutti i reparti')
+// Opzioni <select> settore (con eventuale voce 'Tutti i settori')
 function opzioniRepartoHtml(selezionato, conEntrambi) {
   let h = conEntrambi
-    ? '<option value="entrambi"' + (selezionato === 'entrambi' ? ' selected' : '') + '>Tutti i reparti</option>'
+    ? '<option value="entrambi"' + (selezionato === 'entrambi' ? ' selected' : '') + '>Tutti i settori</option>'
     : '';
   getReparti().forEach((r) => {
     h +=

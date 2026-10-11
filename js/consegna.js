@@ -383,9 +383,9 @@ function renderDashboard() {
   const gd = new Date(oggi + 'T12:00:00');
   // Titolo: usa la giornata di gioco, non la data di sistema
   document.getElementById('dash-titolo').textContent =
-    'Dashboard · GD ' + gd.getDate() + ' ' + MESI_FULL[gd.getMonth()] + ' ' + gd.getFullYear();
+    'GD ' + gd.getDate() + ' ' + MESI_FULL[gd.getMonth()].toLowerCase() + ' ' + gd.getFullYear();
   document.getElementById('dash-sottotitolo').textContent =
-    GIORNI[gd.getDay()] + ' · Turno ' + turno + ' · ' + getOperatore();
+    GIORNI[gd.getDay()] + ' · turno ' + turno + ' · ' + getOperatore();
   // Stats bar: 6 KPI
   const op = getOperatore();
   const pmMiei = promemoriaCache.filter(
@@ -438,7 +438,7 @@ function renderDashboard() {
       (alertRischio ? ' red' : '') +
       '">' +
       alertRischio +
-      '</div><div class="stat-label">A rischio</div></div>';
+      '</div><div class="stat-label">Collaboratori a rischio</div></div>';
   document.getElementById('dash-stats').innerHTML = statsH;
   // Giorno dell avviso: regola unica in promemoria.js (accetta "1 giorno prima" e "3 giorni prima";
   // prima qui si cercava solo il vecchio "giorno/i prima" e la Home non li mostrava)
@@ -453,34 +453,37 @@ function renderDashboard() {
   });
   pmOggi.forEach((p) => {
     const isScaduto = p.data_scadenza < oggi;
+    // stessa spunta "Fatto" della pagina Promemoria, a sinistra
     todoH +=
-      '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="color:' +
-      (isScaduto ? 'var(--accent)' : 'var(--c-arancio,#e67e22)') +
-      ';font-weight:700;font-size:var(--fs-lg,1.0625rem)">' +
-      (isScaduto ? '!' : '&#9679;') +
-      '</span><span style="flex:1;cursor:pointer" onclick="switchPage(\'promemoria\')"><strong>' +
+      '<div class="dash-pm-riga" style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px"><label class="pm-spunta" title="Segna come fatto"><input type="checkbox" onchange="this.closest(\'.dash-pm-riga\').classList.add(\'pm-fatto\');_completaPromemoriaDaHome(' +
+      p.id +
+      ')" aria-label="Segna come fatto: ' +
+      escP(p.titolo) +
+      '"></label><span style="flex:1;cursor:pointer" onclick="switchPage(\'promemoria\')"><strong class="pm-titolo">' +
       escP(p.titolo) +
       '</strong>' +
-      (p.data_scadenza !== oggi
-        ? ' <span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">scade ' +
+      (isScaduto
+        ? ' <span style="color:var(--accent);font-weight:700;font-size:var(--fs-sm,.8125rem)">scaduto il ' +
           new Date(p.data_scadenza + 'T12:00:00').toLocaleDateString('it-IT') +
           '</span>'
-        : '') +
-      '</span><button class="btn-act pin" onclick="_completaPromemoriaDaHome(' +
-      p.id +
-      ')" style="color:var(--c-verde,#2c6e49);border-color:var(--c-verde,#2c6e49);font-size:var(--fs-sm,.8125rem)">Fatto</button></div>';
+        : p.data_scadenza !== oggi
+          ? ' <span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">scade il ' +
+            new Date(p.data_scadenza + 'T12:00:00').toLocaleDateString('it-IT') +
+            '</span>'
+          : ' <span style="color:var(--c-arancio,#b85c0e);font-weight:600;font-size:var(--fs-sm,.8125rem)">scade oggi</span>') +
+      '</span></div>';
   });
   if (noteNL)
     todoH +=
       '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer" onclick="switchPage(\'note-collega\')"><span style="color:var(--c-azzurro,#1f6fa3);font-size:var(--fs-lg,1.0625rem)"><i class="icx icx-mail"></i></span><span>' +
-      noteNL +
-      ' nota/e non letta/e</span></div>';
+      (noteNL === 1 ? '1 nota non letta' : noteNL + ' note non lette') +
+      '</span></div>';
   const bdays = isVis('alert_compleanni') ? _getCompleanniProssimi(0) : [];
   bdays.forEach((bd) => {
     todoH +=
       '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="font-size:var(--fs-lg,1.0625rem)"><i class="icx icx-torta"></i></span><span style="flex:1"><strong>' +
       escP(bd.nome) +
-      '</strong> · <span style="color:var(--accent2);font-weight:700">Compleanno OGGI!</span></span></div>';
+      '</strong> · <span style="color:var(--accent2);font-weight:700">compie gli anni oggi</span></span></div>';
   });
   const ammA = checkAmmonimentiAlerts();
   ammA.forEach((a) => {
@@ -509,7 +512,7 @@ function renderDashboard() {
     domH +=
       '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;cursor:pointer" onclick="switchPage(\'promemoria\')"><span style="color:var(--c-viola,#7b2d8b);font-size:var(--fs-lg,1.0625rem)">&#9679;</span><span style="flex:1"><strong>' +
       escP(p.titolo) +
-      '</strong> <span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">scade ' +
+      '</strong> <span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">scade il ' +
       new Date(p.data_scadenza + 'T12:00:00').toLocaleDateString('it-IT') +
       '</span></span></div>';
   });
@@ -585,7 +588,7 @@ function renderDashboard() {
             '</strong> <span style="font-size:var(--fs-sm,.8125rem);font-weight:700;color:' +
             (isOggi ? 'var(--accent2)' : 'var(--muted)') +
             '">' +
-            (isOggi ? 'COMPLEANNO OGGI!' : 'tra ' + bd.giorni + (bd.giorni === 1 ? ' giorno' : ' giorni')) +
+            (isOggi ? 'compleanno oggi' : 'tra ' + bd.giorni + (bd.giorni === 1 ? ' giorno' : ' giorni')) +
             '</span></div></div>';
         });
     }
@@ -611,7 +614,7 @@ function renderDashboard() {
             '</strong> <span style="font-size:var(--fs-sm,.8125rem);font-weight:700;color:' +
             (isOggi ? 'var(--accent2)' : 'var(--muted)') +
             '">' +
-            (isOggi ? 'COMPLEANNO OGGI!' : 'tra ' + bd.giorni + (bd.giorni === 1 ? ' giorno' : ' giorni')) +
+            (isOggi ? 'compleanno oggi' : 'tra ' + bd.giorni + (bd.giorni === 1 ? ' giorno' : ' giorni')) +
             '</span></div></div>';
         });
     }

@@ -421,85 +421,128 @@ function getPromemoriaFiltrati() {
     return true;
   });
 }
+// TESTO DI UN PROMEMORIA come si legge: i vecchi salvati dicono "1 giorno/i prima", qui
+// diventano "1 giorno prima" / "3 giorni prima". Solo lettura: nel database resta tutto com e
+// (promemoriaDataAvviso accetta entrambe le scritture).
+function promemoriaTestoLeggibile(t) {
+  return String(t || '').replace(/(\d+) giorno\/i prima/g, (m, n) =>
+    n === '1' ? '1 giorno prima' : n + ' giorni prima',
+  );
+}
+// La descrizione salvata ha in coda "Promemoria: ..." e "Ripeti: ...": nell elenco diventano
+// righe di dettaglio ("Avviso 1 giorno prima alle 08:00 · Si ripete ogni mese") e resta il testo libero.
+function _pmDividiDescrizione(d) {
+  const righe = promemoriaTestoLeggibile(d).split('\n');
+  const testo = [];
+  let avviso = '';
+  let ripeti = '';
+  righe.forEach((r) => {
+    if (/^Promemoria: /.test(r)) avviso = r.replace(/^Promemoria: /, '');
+    else if (/^Ripeti: /.test(r)) ripeti = r.replace(/^Ripeti: /, '');
+    else testo.push(r);
+  });
+  return { testo: testo.join('\n').trim(), avviso, ripeti };
+}
+// spunta "Fatto": conferma subito a vista (riga barrata), poi salva; se il salvataggio non
+// riesce l elenco si ridisegna com era. Togliere la spunta riattiva il promemoria.
+function _pmSpunta(inp, id) {
+  const riga = inp.closest('.pm-item');
+  if (inp.checked) {
+    if (riga) riga.classList.add('pm-fatto', 'pm-appena-fatto');
+    Promise.resolve(completaPromemoria(id)).finally(() => renderPromemoria());
+  } else {
+    if (riga) riga.classList.remove('pm-fatto');
+    Promise.resolve(riattivaPromemoria(id)).finally(() => renderPromemoria());
+  }
+}
+document.addEventListener('click', (e) => {
+  // il menu "..." si chiude cliccando altrove
+  document.querySelectorAll('details.pm-menu[open]').forEach((d) => {
+    if (!d.contains(e.target)) d.removeAttribute('open');
+  });
+});
 function renderPromemoria() {
   const data = getPromemoriaFiltrati();
   const el = document.getElementById('promemoria-list');
   if (!el) return;
   const oggi = oggiLocale();
-  const op = getOperatore();
   const admin = isAdmin();
   if (!data.length) {
     el.innerHTML =
       '<div class="empty-state"><p>Nessun promemoria</p><small>Crea un nuovo promemoria per assegnare compiti agli operatori</small></div>';
     return;
   }
+  const dataIt = (d) => new Date(d + 'T12:00:00').toLocaleDateString('it-IT');
   el.innerHTML = data
     .map((p) => {
       const scaduto = !p.completata && p.data_scadenza < oggi;
       const prossimo =
         !p.completata && !scaduto && p.data_scadenza <= dataLocaleISO(new Date(Date.now() + 3 * 86400000));
-      const mio = _includeOpInCsv(p.assegnato_a, op);
-      const bgStyle = p.completata
-        ? 'opacity:.6;border-left:3px solid #2c6e49'
-        : scaduto
-          ? 'border-left:3px solid var(--accent);background:rgba(192,57,43,0.05)'
-          : prossimo
-            ? 'border-left:3px solid #e67e22;background:rgba(230,126,34,0.05)'
-            : 'border-left:3px solid var(--line)';
+      const stato = p.completata ? ' pm-fatto' : scaduto ? ' pm-scaduto' : prossimo ? ' pm-prossimo' : '';
+      const chi =
+        p.assegnato_a === 'tutti'
+          ? 'Tutti'
+          : (() => {
+              // tanti destinatari: "7 persone" (elenco completo al passaggio del mouse)
+              const l = String(p.assegnato_a || '')
+                .split(',')
+                .map((x) => x.trim())
+                .filter(Boolean);
+              return l.length > 3 ? l.length + ' persone' : l.join(', ');
+            })();
+      const desc = _pmDividiDescrizione(p.descrizione);
+      const meta = [
+        (scaduto ? 'Scaduto il ' : 'Scadenza ') + dataIt(p.data_scadenza),
+        desc.avviso ? 'Avviso ' + desc.avviso : '',
+        desc.ripeti ? 'Si ripete ' + desc.ripeti : '',
+        'Creato da ' + (p.creato_da || 'Admin'),
+      ].filter(Boolean);
+      const titoloJs = escP(p.titolo);
       return (
-        '<div class="scad-item" style="' +
-        bgStyle +
-        ';padding:14px 0;flex-wrap:wrap"><div style="display:flex;align-items:center;gap:10px;width:100%;flex-wrap:wrap"><span class="scad-date' +
-        (scaduto ? ' overdue' : '') +
-        '">' +
-        new Date(p.data_scadenza + 'T12:00:00').toLocaleDateString('it-IT') +
-        '</span><strong style="flex:1;font-size:var(--fs-lg,1.0625rem);' +
-        (p.completata ? 'text-decoration:line-through' : '') +
-        '">' +
-        escP(p.titolo) +
-        '</strong><span style="font-size:var(--fs-sm,.8125rem);padding:2px 8px;border-radius:2px;background:' +
-        (p.assegnato_a === 'tutti' ? 'var(--accent2)' : 'var(--pieno-azzurro)') +
-        ';color:white;font-weight:600" title="' +
+        '<div class="scad-item pm-item' +
+        stato +
+        '" data-id="' +
+        p.id +
+        '"><label class="pm-spunta" title="' +
+        (p.completata ? 'Fatto: togli la spunta per riattivarlo' : 'Segna come fatto') +
+        '"><input type="checkbox"' +
+        (p.completata ? ' checked' : '') +
+        ' onchange="_pmSpunta(this,' +
+        p.id +
+        ')" aria-label="' +
+        (p.completata ? 'Fatto, togli la spunta per riattivare: ' : 'Segna come fatto: ') +
+        titoloJs +
+        '"></label><div class="pm-corpo"><div class="pm-riga1"><strong class="pm-titolo">' +
+        titoloJs +
+        '</strong><span class="pm-chi' +
+        (p.assegnato_a === 'tutti' ? ' pm-chi-tutti' : '') +
+        '" title="' +
         escP(String(p.assegnato_a || '').replace(/,\s*/g, ', ')) +
         '">' +
-        escP(
-          p.assegnato_a === 'tutti'
-            ? 'Tutti'
-            : (() => {
-                // tanti destinatari: "7 persone" (elenco completo al passaggio del mouse)
-                const l = String(p.assegnato_a || '')
-                  .split(',')
-                  .map((x) => x.trim())
-                  .filter(Boolean);
-                return l.length > 3 ? l.length + ' persone' : l.join(', ');
-              })(),
-        ) +
+        escP(chi) +
         '</span>' +
-        (scaduto
-          ? '<span style="font-size:var(--fs-sm,.8125rem);color:var(--accent);font-weight:700">SCADUTO</span>'
-          : '') +
+        (scaduto ? '<span class="pm-stato">Scaduto</span>' : '') +
         (p.completata
-          ? '<span style="font-size:var(--fs-sm,.8125rem);color:var(--c-verde,#2c6e49);font-weight:600">Fatto da ' +
+          ? '<span class="pm-fatto-da"><i class="icx icx-check"></i> Fatto da ' +
             escP(p.completata_da || '?') +
-            ' il ' +
-            new Date(p.completata_at).toLocaleDateString('it-IT') +
+            (p.completata_at ? ' il ' + new Date(p.completata_at).toLocaleDateString('it-IT') : '') +
             '</span>'
           : '') +
-        '<div style="display:flex;gap:6px">' +
-        (!p.completata
-          ? '<button class="btn-act pin" onclick="completaPromemoria(' +
-            p.id +
-            ')" style="color:var(--c-verde,#2c6e49);border-color:var(--c-verde,#2c6e49)">Fatto</button>'
-          : '<button class="btn-act tipo" onclick="riattivaPromemoria(' + p.id + ')">Riattiva</button>') +
-        (admin ? '<button class="btn-act del" onclick="eliminaPromemoria(' + p.id + ')">Elimina</button>' : '') +
-        '</div></div>' +
-        (p.descrizione
-          ? '<div style="width:100%;padding:6px 0 0;color:var(--muted);font-size:var(--fs-md,.875rem)">' +
-            esc(p.descrizione) +
-            '</div>'
+        '</div>' +
+        (desc.testo ? '<div class="pm-desc">' + esc(desc.testo) + '</div>' : '') +
+        '<div class="pm-meta">' +
+        meta.map(escP).join(' · ') +
+        '</div></div><div class="pm-azioni">' +
+        (p.completata
+          ? '<button type="button" class="btn-act tipo" onclick="riattivaPromemoria(' + p.id + ')">Riattiva</button>'
           : '') +
-        '<div style="width:100%;font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:4px">Creato da ' +
-        escP(p.creato_da || 'Admin') +
+        (admin
+          ? '<details class="pm-menu"><summary class="btn-act" aria-label="Altre azioni: ' +
+            titoloJs +
+            '" title="Altre azioni"><i class="icx icx-altro"></i></summary><div class="pm-menu-lista" role="menu"><button type="button" role="menuitem" class="pm-menu-elimina" onclick="this.closest(\'details\').removeAttribute(\'open\');eliminaPromemoria(' +
+            p.id +
+            ')"><i class="icx icx-cestino"></i> Elimina promemoria</button></div></details>'
+          : '') +
         '</div></div>'
       );
     })
@@ -607,7 +650,7 @@ function mostraPromemoriaLogin() {
       return (
         '<div style="background:var(--paper2);border-radius:3px;padding:12px;margin-bottom:8px;border-left:3px solid ' +
         (scaduto ? 'var(--accent)' : '#e67e22') +
-        '"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><strong>' +
+        '"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:4px"><strong>' +
         escP(p.titolo) +
         '</strong><span style="font-size:var(--fs-sm,.8125rem);color:' +
         (scaduto ? 'var(--accent)' : 'var(--c-arancio,#e67e22)') +
@@ -615,7 +658,9 @@ function mostraPromemoriaLogin() {
         new Date(p.data_scadenza + 'T12:00:00').toLocaleDateString('it-IT') +
         '</span></div>' +
         (p.descrizione
-          ? '<div style="font-size:var(--fs-md,.875rem);color:var(--muted)">' + esc(p.descrizione) + '</div>'
+          ? '<div style="font-size:var(--fs-md,.875rem);color:var(--muted)">' +
+            esc(promemoriaTestoLeggibile(p.descrizione)) +
+            '</div>'
           : '') +
         '</div>'
       );

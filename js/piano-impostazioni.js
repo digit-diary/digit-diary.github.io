@@ -33,13 +33,13 @@ function _renderPianoMappatureCard() {
     collaboratoriCache.filter(
       (c) =>
         c.attivo !== false &&
-        (c.reparto_dip || 'slots') === _pianoReparto() &&
+        _repartoDi(c) === _pianoReparto() &&
         String(c.funzione || '').toUpperCase() === String(fz).toUpperCase(),
     ).length;
   const ordine = { PRINCIPALE: 1, AMMESSO: 2, PREFERITO: 3 };
   const perFz = {};
   pianoMappatureCache
-    .filter((m) => (m.reparto_dip || 'slots') === _pianoReparto())
+    .filter((m) => _repartoDi(m) === _pianoReparto())
     .forEach((m) => (perFz[m.funzione] = (perFz[m.funzione] || []).concat(m)));
   Object.keys(perFz)
     .sort()
@@ -120,9 +120,7 @@ async function aggiungiPianoMappatura() {
     return;
   }
   if (
-    pianoMappatureCache.some(
-      (m) => m.funzione === fz && m.turno_codice === turno && (m.reparto_dip || 'slots') === _pianoReparto(),
-    )
+    pianoMappatureCache.some((m) => m.funzione === fz && m.turno_codice === turno && _repartoDi(m) === _pianoReparto())
   ) {
     toastErrore('Mappatura già presente: ' + fz + ' → ' + turno);
     return;
@@ -131,14 +129,11 @@ async function aggiungiPianoMappatura() {
   const nPers = collaboratoriCache.filter(
     (c) =>
       c.attivo !== false &&
-      (c.reparto_dip || 'slots') === _pianoReparto() &&
+      _repartoDi(c) === _pianoReparto() &&
       String(c.funzione || '').toUpperCase() === String(fz).toUpperCase(),
   ).length;
   const limitavaGia = pianoMappatureCache.some(
-    (m) =>
-      m.funzione === fz &&
-      (m.reparto_dip || 'slots') === _pianoReparto() &&
-      (m.tipo === 'PRINCIPALE' || m.tipo === 'AMMESSO'),
+    (m) => m.funzione === fz && _repartoDi(m) === _pianoReparto() && (m.tipo === 'PRINCIPALE' || m.tipo === 'AMMESSO'),
   );
   if ((tipo === 'PRINCIPALE' || tipo === 'AMMESSO') && !limitavaGia) {
     const testo = nPers
@@ -191,13 +186,13 @@ async function rimuoviPianoMappatura(id) {
     const limitaAncora = pianoMappatureCache.some(
       (x) =>
         x.funzione === m.funzione &&
-        (x.reparto_dip || 'slots') === (m.reparto_dip || 'slots') &&
+        _repartoDi(x) === _repartoDi(m) &&
         (x.tipo === 'PRINCIPALE' || x.tipo === 'AMMESSO'),
     );
     const conFz = collaboratoriCache.some(
       (c) =>
         c.attivo !== false &&
-        (c.reparto_dip || 'slots') === (m.reparto_dip || 'slots') &&
+        _repartoDi(c) === _repartoDi(m) &&
         String(c.funzione || '').toUpperCase() === String(m.funzione).toUpperCase(),
     );
     if ((m.tipo === 'PRINCIPALE' || m.tipo === 'AMMESSO') && !limitaAncora && conFz)
@@ -406,7 +401,7 @@ async function generaConSolver() {
     _pianoViolLista = null;
     renderPiano();
   } catch (e) {
-    toastErrore('Solver non raggiungibile (' + (e.message || '') + '). Resta disponibile "Genera bozza".', 10000);
+    toastErrore('Solver non raggiungibile (' + (e.message || '') + '). Resta disponibile "Prepara il mese".', 10000);
   }
 }
 async function salvaMaxCambi(v) {
@@ -509,7 +504,7 @@ async function salvaPianoFunzioni(v) {
   const inUso = [
     ...new Set(
       collaboratoriCache
-        .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === rep && c.funzione)
+        .filter((c) => c.attivo !== false && _repartoDi(c) === rep && c.funzione)
         .map((c) => String(c.funzione).toUpperCase()),
     ),
   ];
@@ -801,7 +796,7 @@ const _REGOLE_GRUPPO_TIPI = {
     'I turni scelti solo da un livello di Formazione in su; eccezioni per persona in Preferenze, Turni consentiti',
   minimo_livello_giorno: 'Almeno quante persone di un livello di Formazione al giorno, anche solo certi giorni o turni',
   minimo_competenza_giorno:
-    'Almeno quante persone con una competenza di Formazione (anche una specialità Extra, per esempio Poker) al giorno, con giorni, tipo di turno e fascia oraria facoltativi',
+    'Almeno quante persone con una competenza di Formazione (anche una specialità senza livello, per esempio Poker) al giorno, con giorni, tipo di turno e fascia oraria facoltativi',
   equilibrio_livelli:
     'Forti e deboli distribuiti nelle fasce orarie: in ogni fascia almeno quanti forti e livello medio vicino a quello del giorno. La bozza bilancia, Valida segnala',
   turni_solo_collaboratori:
@@ -1405,7 +1400,7 @@ function _rgCampiHtml(tipo, c) {
                       '"' +
                       (String(k2.key).toLowerCase() === String(c.comp).toLowerCase() ? ' selected' : '') +
                       '>' +
-                      escP(((parseInt(k2.livello) || 0) >= 1 ? 'L' + k2.livello : 'Extra') + ' · ' + k2.label) +
+                      escP(((parseInt(k2.livello) || 0) >= 1 ? 'L' + k2.livello : 'Specialità') + ' · ' + k2.label) +
                       '</option>',
                   )
                   .join('')
@@ -2014,7 +2009,7 @@ function _renderPianoRegoleGruppoCard() {
   h +=
     '<div style="overflow-x:auto"><table class="piano-table" style="min-width:680px;font-size:var(--fs-md,.875rem)"><thead><tr><th>Area</th><th style="text-align:left">Regola</th><th>Attiva</th><th></th></tr></thead><tbody>';
   pianoRegoleGruppoCache
-    .filter((r) => (r.reparto_dip || 'slots') === _pianoReparto())
+    .filter((r) => _repartoDi(r) === _pianoReparto())
     .sort((a, b) => (a.gruppo || '').localeCompare(b.gruppo || '') || a.id - b.id)
     .forEach((r) => {
       h +=
@@ -2044,7 +2039,7 @@ function _renderPianoRegoleGruppoCard() {
         r.id +
         ')">Elimina</button></td></tr>';
     });
-  if (!pianoRegoleGruppoCache.some((r) => (r.reparto_dip || 'slots') === _pianoReparto()))
+  if (!pianoRegoleGruppoCache.some((r) => _repartoDi(r) === _pianoReparto()))
     h +=
       '<tr><td colspan="5" style="text-align:left;color:var(--muted);padding:10px">Nessuna regola di gruppo per ' +
       escP(typeof repartoLabel === 'function' ? repartoLabel(_pianoReparto()) : _pianoReparto()) +
@@ -2073,7 +2068,7 @@ function _renderPianoRegoleGruppoCard() {
       .join('') +
     '</ul></li>' +
     '<li><b>Livelli di Formazione</b>: il livello di ognuno e quello di Formazione (L2 = tutte le competenze fino a L2 certificate). Chi deve fare un turno anche senza il livello lo trova in Preferenze collaboratori, <b>Turni consentiti</b>. Quando qualcuno sale di livello, i turni si aprono da soli; sotto la regola si vede quante persone la soddisfano.</li>' +
-    '<li>Le regole valgono per il <b>settore aperto</b>: ogni settore ha le sue, con le sue sigle e le sue funzioni. Agiscono in Valida regole, nella bozza, nei cambi turno e nella scrittura a mano (avviso).</li>' +
+    '<li>Le regole valgono per il <b>settore aperto</b>: ogni settore ha le sue, con le sue sigle e le sue funzioni. Agiscono in Controlla le regole, nella bozza, nei cambi turno e nella scrittura a mano (avviso).</li>' +
     '</ol></details>' +
     '<div id="rg-modulo" style="margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:3px;background:var(--paper2)">' +
     '<div class="add-tipo-row" onchange="rgAggiornaAnteprima()" oninput="rgAggiornaAnteprima()"><div class="field"><label>Area</label><select id="rg-gruppo" style="padding:8px" onchange="rgGruppoCambiato()">' +
@@ -2320,7 +2315,7 @@ function _pianoValidaRegolaGruppo(gruppo, tipo, valore, settore) {
         .filter(
           (x) =>
             x.attivo !== false &&
-            (x.reparto_dip || 'slots') === String(settore || '').toLowerCase() &&
+            _repartoDi(x) === String(settore || '').toLowerCase() &&
             String(x.gruppo || '').toUpperCase() === gr,
         )
         .map((x) => String(x.codice).toUpperCase());
@@ -2422,7 +2417,7 @@ async function aggiungiRegolaGruppo() {
     pianoRegoleGruppoCache.some(
       (r) =>
         String(r.tipo_regola).toLowerCase() === 'coordinatori' &&
-        (r.reparto_dip || 'slots') === _pianoReparto() &&
+        _repartoDi(r) === _pianoReparto() &&
         r.id !== window._rgModifica,
     )
   ) {
@@ -2493,7 +2488,7 @@ function _renderPianoCongediNpCard() {
   const puoModCnp = typeof puoModificareStoricoHr === 'function' && puoModificareStoricoHr();
   const rep = _pianoReparto();
   const lista = _pianoCongediNp
-    .filter((c) => (c.reparto_dip || 'slots') === rep)
+    .filter((c) => _repartoDi(c) === rep)
     .slice()
     .sort((a, b) => String(b.dal).localeCompare(String(a.dal)));
   const sogliaGg = parseInt(_pianoRegolaVal('congedo_np_giorni_vacanze'));
@@ -2994,7 +2989,7 @@ function _pianoListaCodici(v) {
 function _pianoGruppiDiCodici(codici, rep) {
   const perCod = {};
   (pianoTurniCache || [])
-    .filter((t) => (t.reparto_dip || 'slots') === rep)
+    .filter((t) => _repartoDi(t) === rep)
     .forEach((t) => (perCod[String(t.codice).toUpperCase()] = String(t.gruppo || '').toUpperCase()));
   const out = new Set();
   codici.forEach((c) => {
@@ -3094,7 +3089,7 @@ async function pianoBloccaSenzaRequisiti() {
   const nomi = [];
   const motivo = {};
   collaboratoriCache
-    .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === rep)
+    .filter((c) => c.attivo !== false && _repartoDi(c) === rep)
     .filter((c) => !['RESP', 'VICERESP'].includes(String(c.funzione || '').toUpperCase()))
     .filter((c) => !codici.every((x) => ha(c).includes(x)))
     .sort((a, b) => a.nome.localeCompare(b.nome))
@@ -3254,7 +3249,7 @@ function _pianoAvvisoDomenicheGiorni(c) {
       (max ? ', ' + max + ' giorni a settimana' : '') +
       '.\n\nCosi lavora tutte le domeniche: le domeniche libere del regolamento (almeno ' +
       min +
-      ' all anno, con il sabato che finisce entro le 23) non sono garantite e Valida regole le segnalera.\n\nSoluzione: spunta un giorno in più (es. giovedì) e scegli "a settimana" ' +
+      ' all anno, con il sabato che finisce entro le 23) non sono garantite e Controlla le regole le segnalerà.\n\nSoluzione: spunta un giorno in più (es. giovedì) e scegli "a settimana" ' +
       set.length +
       ': ogni settimana il programma sceglie quali ' +
       set.length +

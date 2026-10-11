@@ -176,7 +176,15 @@ function _fziChiudi() {
 function _fziMostraColonne() {
   const z = _fzi;
   const comps = _fziComp(z.rep);
-  const lvTesto = (k) => ((parseInt(k.livello) || 0) >= 1 ? 'L' + k.livello : 'Extra');
+  // nome del gradino per esteso (es. "Gradino 4 · ISP 2"), specialita a parte
+  const lvTesto = (k) =>
+    (parseInt(k.livello) || 0) >= 1
+      ? 'Gradino ' +
+        k.livello +
+        (typeof livelloNome === 'function' && livelloNome(k.livello, z.rep) !== k.label
+          ? ' (' + livelloNome(k.livello, z.rep) + ')'
+          : '')
+      : 'Specialità';
   const titoli = z.righe[z.rigaTitoli] || [];
   const nCol = Math.max(0, ...z.righe.map((r) => r.length));
   const opzComp = (scelta, titolo) =>
@@ -197,7 +205,7 @@ function _fziMostraColonne() {
       .join('') +
     '<option value="__nuova"' +
     (scelta === '__nuova' ? ' selected' : '') +
-    '>+ nuova specialità (Extra): ' +
+    '>+ nuova specialità (senza livello): ' +
     escP(titolo) +
     '</option>';
   const sel = 'padding:6px 8px;max-width:100%;box-sizing:border-box';
@@ -377,12 +385,11 @@ function _fziAnteprima() {
   const trovati = r.righe.filter((x) => x.collab);
   const nuovi = r.righe.filter((x) => !x.collab);
   const conModifiche = trovati.filter((x) => x.piu.length || x.meno.length);
+  // stesso badge della matrice: nome del livello per esteso, "Senza livello" ben visibile
   const lvChip = (lv) =>
-    '<span class="mini-badge" style="background:' +
-    (typeof _lvColore === 'function' ? _lvColore(lv) : '#1a4a7a') +
-    '">' +
-    (lv ? 'L' + lv : 'nessun livello') +
-    '</span>';
+    typeof _lvBadge === 'function'
+      ? _lvBadge(lv, z.rep)
+      : '<span class="mini-badge" style="background:#1a4a7a">' + (lv ? 'Livello ' + lv : 'Senza livello') + '</span>';
   const riga = (x, i) =>
     '<tr><td>' +
     (x.collab

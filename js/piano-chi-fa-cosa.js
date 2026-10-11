@@ -71,7 +71,7 @@ function _pcfcRegoleCheCitano(cod, rep) {
   return pianoRegoleGruppoCache.filter(
     (r) =>
       r.attivo !== false &&
-      (r.reparto_dip || 'slots') === (rep || _pianoReparto()) &&
+      _repartoDi(r) === (rep || _pianoReparto()) &&
       _pcfcSigleDellaRegola(r).some((m) => _pcfcCombacia(m, c)),
   );
 }
@@ -242,7 +242,7 @@ function _pcfcCopertura(nome, t, sp) {
   return {
     esito: 'serve',
     motivo:
-      'viene da un altro settore: la bozza lo usa solo con Completa con coperture' +
+      'viene da un altro settore: la bozza lo usa solo con Copri i buchi con altri settori (menu Sistema)' +
       (cop.max_turni ? ', al massimo ' + cop.max_turni + ' turni nel mese' : '') +
       ' · ' +
       sp.motivo,
@@ -270,8 +270,14 @@ function _pcfcPercheAMano(nome, t, dowG, bozzaOk, manoOk) {
 }
 
 function _pcfcChip(esito) {
-  const m = { si: ['pcfc-si', 'Si'], serve: ['pcfc-serve', 'Ammesso'], no: ['pcfc-no', 'No'] }[esito];
+  const m = { si: ['pcfc-si', 'Sì'], serve: ['pcfc-serve', 'Solo se serve'], no: ['pcfc-no', 'No'] }[esito];
   return '<span class="pcfc-chip ' + m[0] + '">' + m[1] + '</span>';
+}
+// a mano la cella si scrive sempre: con o senza avviso
+function _pcfcChipMano(ok) {
+  return ok
+    ? '<span class="pcfc-chip pcfc-si">Sì</span>'
+    : '<span class="pcfc-chip pcfc-serve">Sì, con un avviso</span>';
 }
 const _PCFC_DOVE = {
   pref: 'Preferenze',
@@ -306,8 +312,8 @@ function pcfcVai(i) {
   const origine = typeof _navStatoCorrente === 'function' ? _navStatoCorrente() : null;
   const chiave = x.chiave;
   const rep = _pianoReparto();
-  const cosa = String(chiave).startsWith('area:') ? 'turni dell area ' + gr : cod;
-  const titolo = '<b>' + escP(nome) + ' · ' + escP(cosa) + '</b>: ' + escP(sp.motivo) + '.';
+  const cosa = x.cosaTesto || (String(chiave).startsWith('area:') ? "turni dell'area " + gr : cod);
+  const titolo = '<b>' + escP(x.nomeTesto || nome) + ' · ' + escP(cosa) + '</b>: ' + escP(sp.motivo) + '.';
   let consiglio = '';
   let trova = null;
   if (sp.dove === 'formazione') {
@@ -449,7 +455,7 @@ function _pcfcCosaDecide(t) {
       ),
     );
   const mapp = (typeof pianoMappatureCache !== 'undefined' ? pianoMappatureCache : []).filter(
-    (m) => (m.reparto_dip || 'slots') === rep && String(m.turno_codice).toUpperCase() === cod,
+    (m) => _repartoDi(m) === rep && String(m.turno_codice).toUpperCase() === cod,
   );
   if (mapp.length)
     voci.push(
@@ -540,7 +546,7 @@ async function _pcfcRender() {
     '<div class="main-card" style="margin-top:16px"><div class="card-header">Chi può fare cosa · ' +
     escP(repartoLabel(rep)) +
     '</div><div style="padding:10px 14px">' +
-    '<p class="pcfc-intro">Sola lettura. Dice chi e <b>abilitato</b> a ogni turno e perché, con il pulsante che porta dove si cambia. Fra gli abilitati la bozza sceglie poi tenendo conto di riposi, ore, vacanze, fabbisogno e regole del giorno.</p>' +
+    '<p class="pcfc-intro">Sola lettura. Per ogni turno la tabella risponde a due domande: <b>il programma lo assegna</b> quando prepara il mese? e <b>puoi assegnarlo tu</b> a mano? A mano puoi sempre scrivere qualsiasi turno: se la persona non è abilitata compare un avviso, ma non sei bloccato. Il pulsante a destra porta dove si cambia la regola. Fra le persone abilitate il programma sceglie poi tenendo conto di riposi, ore, vacanze, posti da coprire e regole del giorno.</p>' +
     '<div class="add-tipo-row" style="margin-bottom:8px">' +
     '<div class="field"><label for="pcfc-vista">Vista</label><select id="pcfc-vista" style="' +
     sel +
@@ -567,13 +573,13 @@ async function _pcfcRender() {
       .map((d) => opz(String(d), _PCFC_GIORNI[d] + (d === oggi ? ' (oggi)' : ''), d === st.dow))
       .join('') +
     '</select></div></div>' +
-    '<p class="pcfc-legenda">' +
+    '<p class="pcfc-legenda"><b>Il programma lo assegna?</b> ' +
     _pcfcChip('si') +
-    ' la bozza può darglielo &nbsp; ' +
+    ' sì &nbsp; ' +
     _pcfcChip('serve') +
-    ' solo se serve: dopo tutti gli altri e se e sotto le sue ore &nbsp; ' +
+    ' solo dopo tutti gli altri e se la persona è sotto le sue ore &nbsp; ' +
     _pcfcChip('no') +
-    ' la bozza non glielo da mai. <b>A mano</b>: la cella si scrive sempre, la colonna dice se compare un avviso.</p>';
+    ' mai</p>';
 
   if (!persone.length || !turni.length) {
     h +=
@@ -601,10 +607,10 @@ async function _pcfcRender() {
   const passa = (r) => st.filtro === 'tutti' || (st.filtro === 'mano' ? !!r.percheMano : r.sp.esito === st.filtro);
   const filtri = [
     ['tutti', 'Tutti'],
-    ['si', 'Si'],
-    ['serve', 'Ammesso'],
-    ['no', 'No'],
-    ['mano', 'Diversi a mano'],
+    ['si', 'Il programma li assegna'],
+    ['serve', 'Solo se serve'],
+    ['no', 'Non li assegna'],
+    ['mano', 'A mano è diverso'],
   ]
     .filter(([k]) => k === 'tutti' || conteggi[k])
     .map(
@@ -652,6 +658,8 @@ async function _pcfcRender() {
 
   const bottone = (r) => {
     if (!r.sp.dove || !_pcfcDoveVisibile(r.sp.dove)) return '';
+    // piu persone sulla stessa riga: un posto che riguarda la singola persona non c e
+    if (r.nomeTesto && ['formazione', 'pref', 'scheda'].includes(r.sp.dove)) return '';
     const i = _pcfcRighe.push(r) - 1;
     return (
       '<button class="btn-act pcfc-vai" type="button" onclick="pcfcVai(' +
@@ -661,6 +669,8 @@ async function _pcfcRender() {
       '</button>'
     );
   };
+  // una riga per esito e motivo: i turni (o le persone) con la stessa risposta si
+  // riuniscono, cosi la stessa frase non si ripete su venti righe
   const riga = (titolo, chiave, r) => {
     r.chiave = chiave;
     const chip = r.diverso ? _pcfcChip(r.bozza ? 'si' : 'no') : _pcfcChip(r.sp.esito);
@@ -671,70 +681,94 @@ async function _pcfcRender() {
       titolo +
       '</td><td class="pcfc-c-esito">' +
       chip +
-      '</td><td class="pcfc-c-perché">' +
-      escP(r.sp.motivo) +
-      (r.diverso ? ' <span class="pcfc-allarme">(da verificare: la bozza decide diversamente)</span>' : '') +
       '</td><td class="pcfc-c-mano">' +
-      (r.percheMano
-        ? '<span class="pcfc-chip ' +
-          (r.mano ? 'pcfc-si' : 'pcfc-no') +
-          '">' +
-          (r.mano ? 'Nessun avviso' : 'Avviso') +
-          '</span> <span class="pcfc-mano-perché">' +
-          escP(r.percheMano) +
-          '</span>'
-        : '<span class="pcfc-uguale">come la bozza</span>') +
+      _pcfcChipMano(r.mano) +
+      '</td><td class="pcfc-c-perche">' +
+      escP(r.sp.motivo) +
+      (r.diverso ? ' <span class="pcfc-allarme">(da verificare: il programma decide diversamente)</span>' : '') +
+      (r.percheMano ? '<span class="pcfc-mano-perche">A mano: ' + escP(r.percheMano) + '</span>' : '') +
       '</td><td class="pcfc-c-vai">' +
       bottone(r) +
       '</td></tr>'
     );
   };
+  const COLONNE = 5;
   const testa = (primaCol) =>
     '<div class="pcfc-scroll"><table class="pcfc-tab"><thead><tr><th>' +
     primaCol +
-    '</th><th>Bozza</th><th>Perché</th><th>A mano</th><th>Dove si cambia</th></tr></thead><tbody>';
+    '</th><th>Il programma lo assegna?</th><th>Puoi assegnarlo tu?</th><th>Perché</th><th>Dove si cambia</th></tr></thead><tbody>';
+  // dove la persona conta (formazione, preferenze, scheda): nella vista per turno ogni
+  // persona resta sulla sua riga, perché il pulsante porta alla sua riga
+  // (solo per chi e escluso: li c e qualcosa da cambiare persona per persona)
+  const personale = (r) =>
+    st.vista === 'turno' && r.sp.esito === 'no' && ['formazione', 'pref', 'scheda'].includes(r.sp.dove);
+  const chiaveGruppo = (r) =>
+    r.diverso || personale(r)
+      ? null
+      : [r.sp.esito, r.sp.motivo, r.mano, r.percheMano, r.sp.dove, (r.sp.rif || []).join(',')].join('|');
+  const SEZIONI = [
+    ['si', st.vista === 'turno' ? 'Il programma glielo assegna' : 'Il programma li assegna'],
+    ['serve', 'Il programma li assegna solo se serve'],
+    ['no', st.vista === 'turno' ? 'Il programma non glielo assegna' : 'Il programma non li assegna'],
+  ];
+  const esitoRiga = (r) => (r.diverso ? (r.bozza ? 'si' : 'no') : r.sp.esito);
+  const piuAree = new Set(righe.map((r) => String(r.t.gruppo || '-').toUpperCase())).size > 1;
   let corpo = '';
-  if (st.vista === 'persona') {
-    // per area: titolo con il conteggio; un area tutta esclusa per lo stesso motivo = una riga
-    const perArea = {};
-    righe.forEach((r) => {
-      const g = String(r.t.gruppo || '-').toUpperCase();
-      (perArea[g] = perArea[g] || []).push(r);
+  SEZIONI.forEach(([es, titoloSez]) => {
+    const vis = righe.filter((r) => passa(r) && esitoRiga(r) === es);
+    if (!vis.length) return;
+    corpo +=
+      '<tr class="pcfc-area pcfc-sez-' +
+      es +
+      '"><td colspan="' +
+      COLONNE +
+      '">' +
+      titoloSez +
+      ' <span>· ' +
+      _pcfcPlur(vis.length, st.vista === 'turno' ? 'persona' : 'turno', st.vista === 'turno' ? 'persone' : 'turni') +
+      '</span></td></tr>';
+    const gruppi = [];
+    const perChiave = {};
+    vis.forEach((r) => {
+      const k = chiaveGruppo(r);
+      if (k && perChiave[k]) perChiave[k].push(r);
+      else {
+        const g = [r];
+        gruppi.push(g);
+        if (k) perChiave[k] = g;
+      }
     });
-    Object.keys(perArea).forEach((g) => {
-      const tutte = perArea[g];
-      const vis = tutte.filter(passa);
-      if (!vis.length) return;
-      const possibili = tutte.filter((r) => r.sp.esito !== 'no').length;
-      corpo +=
-        '<tr class="pcfc-area"><td colspan="5">' +
-        escP(g) +
-        ' <span>· ' +
-        possibili +
-        ' su ' +
-        _pcfcPlur(tutte.length, 'turno', 'turni') +
-        '</span></td></tr>';
-      const stessoNo =
-        vis.length > 2 &&
-        vis.every((r) => r.sp.esito === 'no' && !r.diverso && !r.percheMano && r.sp.motivo === vis[0].sp.motivo);
-      if (stessoNo)
+    gruppi.forEach((g) => {
+      if (st.vista === 'persona') {
+        // sigle dei turni, divise per area se il settore ne ha piu di una
+        const perArea = {};
+        g.forEach((r) => {
+          const a = String(r.t.gruppo || '-').toUpperCase();
+          (perArea[a] = perArea[a] || []).push(r.t.codice);
+        });
+        const titolo = Object.keys(perArea)
+          .map(
+            (a) =>
+              (piuAree ? '<span class="pcfc-area-nome">' + escP(a) + '</span> ' : '') +
+              '<b>' +
+              escP(perArea[a].join(', ')) +
+              '</b>',
+          )
+          .join('<br>');
+        if (g.length > 1) g[0].cosaTesto = 'turni ' + g.map((r) => r.t.codice).join(', ');
+        corpo += riga(titolo, g.length > 1 ? 'gruppo:' + g[0].t.codice : g[0].t.codice, g[0]);
+      } else {
+        if (g.length > 1) g[0].nomeTesto = g.map((r) => r.nome).join(', ');
         corpo += riga(
-          'tutti i ' +
-            vis.length +
-            ' turni <span class="pcfc-sigle">' +
-            escP(vis.map((r) => r.t.codice).join(', ')) +
-            '</span>',
-          'area:' + g,
-          vis[0],
+          '<b>' + escP(g.map((r) => r.nome).join(', ')) + '</b>',
+          g.length > 1 ? 'gruppo:' + g[0].nome : g[0].nome,
+          g[0],
         );
-      else vis.forEach((r) => (corpo += riga('<b>' + escP(r.t.codice) + '</b>', r.t.codice, r)));
+      }
     });
-    h += testa('Turno') + corpo;
-  } else {
-    righe.filter(passa).forEach((r) => (corpo += riga('<b>' + escP(r.nome) + '</b>', r.nome, r)));
-    h += testa('Collaboratore') + corpo;
-  }
-  if (!corpo) h += '<tr><td colspan="5" class="pcfc-vuoto">Nessuna riga con questo filtro.</td></tr>';
+  });
+  h += testa(st.vista === 'persona' ? 'Turni' : 'Collaboratori') + corpo;
+  if (!corpo) h += '<tr><td colspan="' + COLONNE + '" class="pcfc-vuoto">Nessuna riga con questo filtro.</td></tr>';
   h += '</tbody></table></div></div></div>';
   box2.innerHTML = h;
 }

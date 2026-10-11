@@ -45,7 +45,7 @@ const VIS_ITEMS = {
     gestione_formazioni: 'Formazioni · registrare sessioni formative svolte (es. supervisor)',
     gestione_piano: 'Piano di lavoro · modificare la griglia turni del mese (es. supervisor)',
     piano_auto_genera:
-      'Piano · GENERA: genera bozza, migliora la bozza, genera con il solver, completa con coperture, migliora ore, valida regole, cancella la bozza (celle non protette)',
+      'Piano · PREPARARE IL MESE (BOZZA): prepara il mese, migliora la bozza, prepara con il motore avanzato, copri i buchi con altri settori, sistema le ore, controlla le regole, svuota il mese (celle non protette)',
     piano_auto_vacanze:
       'Piano · VACANZE E CGF AUTOMATICI: importa il file vacanze, applica le vacanze del mese al piano, assegna i CGF del mese (la V di una persona dagli Avvisi resta libera)',
     piano_auto_import:
@@ -1071,7 +1071,7 @@ function apriAccessiExtra(nome) {
   if (!isAdmin()) return;
   const proprio = operatoriRepartoMap[nome] || 'entrambi';
   if (proprio === 'entrambi') {
-    toast(nome + ' vede già tutti i reparti');
+    toast(nome + ' vede già tutti i settori');
     return;
   }
   const cfg = (window._operatoriAccessiExtra || {})[nome] || {};
@@ -1087,9 +1087,9 @@ function apriAccessiExtra(nome) {
   let h =
     '<h3>Accessi extra · ' +
     escP(nome) +
-    '</h3><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:10px">Reparto principale: <b>' +
+    '</h3><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:10px">Settore principale: <b>' +
     escP(repartoLabel(proprio)) +
-    '</b>. Concedi l\'accesso a sezioni di altri reparti: tutte, oppure solo quelle che spunti. Senza "può modificare" l\'accesso è in sola lettura.</p>' +
+    '</b>. Concedi l\'accesso a sezioni di altri settori: tutte, oppure solo quelle che spunti. Senza "può modificare" l\'accesso è in sola lettura.</p>' +
     '<div style="max-height:52vh;overflow:auto;text-align:left">';
   altri.forEach((r) => {
     const v = cfg[r.key];
@@ -1625,11 +1625,17 @@ function renderCampiRapportoUI() {
             (idx === campi.length - 1 ? ' disabled' : '') +
             '>&#9660;</button></div><button class="btn-del-tipo" style="margin-left:6px" onclick="rinominaCampo(\'' +
             c.key +
-            '\')">Rinomina</button><button class="btn-del-tipo pericolo" style="margin-left:4px" onclick="' +
+            '\')">Rinomina</button><button class="btn-del-tipo' +
+            // i campi predefiniti non si eliminano: si nascondono (e si rimettono dall elenco
+            // "Campi nascosti" qui sotto). "Rimuovi" solo per quelli aggiunti a mano.
+            (isDefault ? '" title="Nasconde il campo dal rapporto; i dati restano e si può rimettere"' : ' pericolo"') +
+            ' style="margin-left:4px" onclick="' +
             (isDefault ? 'nascondiCampoDefault' : 'rimuoviCampoRapporto') +
             "('" +
             c.key +
-            '\')">Rimuovi</button>'
+            '\')">' +
+            (isDefault ? 'Nascondi' : 'Rimuovi') +
+            '</button>'
           : '') +
         '</div>'
       );
@@ -1637,7 +1643,7 @@ function renderCampiRapportoUI() {
     .join('');
   if (adm && campiNascosti.length) {
     cHtml +=
-      '<div style="margin-top:12px;padding:10px;background:var(--paper2);border-radius:3px"><small style="color:var(--muted);display:block;margin-bottom:6px">Campi nascosti:</small>' +
+      '<div style="margin-top:12px;padding:10px;background:var(--paper2);border-radius:3px"><small style="color:var(--muted);display:block;margin-bottom:6px">Campi nascosti (clicca per rimetterli nel rapporto):</small>' +
       campiNascosti
         .map((k) => {
           const d = CAMPI_RAPPORTO_DEFAULT.find((x) => x.key === k);
@@ -2132,9 +2138,25 @@ function renderSettoriUI() {
         '</button>';
       if (nDati)
         html +=
-          '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' + nDati + ' record collegati</span>';
+          '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)" title="Collaboratori e registrazioni di questo settore: disattivarlo non li cancella">' +
+          nDati +
+          ' dati collegati</span>';
     }
     html += '</div>';
+    // MAISON (buoni e sigarette): per i settori aggiunti si sceglie qui (maison:true/false
+    // in reparti_config, letto da repartoConMaison); Slots e Tavoli l hanno sempre
+    const conMaison = typeof repartoConMaison === 'function' ? repartoConMaison(r.key) : !custom;
+    html +=
+      '<label class="st-maison" title="' +
+      (custom
+        ? 'Se spuntata, il settore usa la Maison: buoni, sigarette e i loro movimenti'
+        : 'Nei settori di base la Maison è sempre attiva') +
+      '"><input type="checkbox"' +
+      (conMaison ? ' checked' : '') +
+      (custom ? ' onchange="salvaMaisonSettore(\'' + r.key + '\',this.checked)"' : ' disabled') +
+      '> <b>Buoni e sigarette (Maison)</b>' +
+      (custom ? '' : ' <span>sempre attivi nei settori di base</span>') +
+      '</label>';
     // pagine abilitate per questo settore
     html += '<div style="display:flex;flex-wrap:wrap;gap:4px 14px;padding-left:4px">';
     Object.entries(PAGINE_REPARTO).forEach(([pk, plabel]) => {
@@ -2240,6 +2262,29 @@ async function toggleAttivoSettore(key) {
   logAzione('Settore ' + (disattiva ? 'disattivato' : 'riattivato'), r.label);
   renderSettoriUI();
   toast('Settore ' + (disattiva ? 'disattivato' : 'riattivato'));
+}
+// Casella "Buoni e sigarette (Maison)" di un settore aggiunto: scrive maison true/false
+// nel settore (reparti_config), la stessa proprieta che repartoConMaison legge
+async function salvaMaisonSettore(key, on) {
+  if (!isAdmin()) {
+    toast('Non hai il permesso');
+    renderSettoriUI();
+    return;
+  }
+  const lista = getRepartiCustom().map((x) => Object.assign({}, x));
+  const r = lista.find((x) => x.key === key);
+  if (!r) return;
+  r.maison = !!on;
+  const prima = repartiConfig;
+  repartiConfig = lista;
+  if (!(await _salvaRepartiConfig())) {
+    repartiConfig = prima;
+    renderSettoriUI();
+    return;
+  }
+  logAzione('Settore: Maison', r.label + ' · buoni e sigarette ' + (on ? 'attivi' : 'non attivi'));
+  renderSettoriUI();
+  toast(r.label + ': buoni e sigarette ' + (on ? 'attivi' : 'non attivi'));
 }
 async function salvaPaginaSettore(repKey, pageKey, abilitata) {
   if (!repartiPagineCfg || typeof repartiPagineCfg !== 'object') repartiPagineCfg = {};
@@ -2655,4 +2700,429 @@ function stampaSchedaPermessi() {
   w.document.write(h);
   w.document.close();
   logAzione('Scheda permessi stampata', ops.length + ' operatori');
+}
+
+// ================================================================
+// GESTIONE COLLABORATORI · elenco in sola lettura + scheda con Salva (ondata 3)
+// Prima ogni riga aveva una decina di menu che salvavano al primo clic: un clic
+// sbagliato cambiava un dato. Ora l elenco si legge soltanto; un clic apre la scheda
+// della persona, si cambia quello che serve e si conferma con Salva (Annulla = niente).
+// I salvataggi passano dalle STESSE funzioni di prima (cambiaImpiegoCollaboratore,
+// cambiaCategoriaCollaboratore, cambiaFunzioneCollaboratore, ... in moduli.js), con
+// gli stessi controlli dei permessi, registro attivita e storico HR.
+// ================================================================
+// sigle delle funzioni piu comuni scritte per esteso (le altre restano come sono)
+const _GC_FUNZIONI_NOMI = {
+  RESP: 'Responsabile',
+  SUP: 'Supervisore',
+  BO: 'Back Office',
+  CR: 'Croupier',
+  ISP: 'Ispettore',
+};
+function _gcFunzioneTesto(f) {
+  const s = String(f || '').toUpperCase();
+  return s && _GC_FUNZIONI_NOMI[s] ? s + ' · ' + _GC_FUNZIONI_NOMI[s] : s;
+}
+function _gcSettoreTesto(rep) {
+  return rep === 'entrambi' ? 'Tutti i settori' : repartoLabel(rep || 'slots');
+}
+function _gcPercTesto(c) {
+  return Math.round((parseFloat(c.percentuale) || 1) * 100) + '%';
+}
+function _gcDataIt(d) {
+  return d ? String(d).substring(0, 10).split('-').reverse().join('.') : '';
+}
+// permessi calcolati una volta da renderCollaboratoriUI (moduli.js) e riusati dalla scheda
+function _gcPermessi() {
+  return window._gcPerm || {};
+}
+// righe dell elenco (sola lettura). p = permessi, lista = collaboratori attivi del settore
+function _gcElencoHtml(attivi, inattivi, p) {
+  const vedeCat = p.puoCat || (typeof puoVedereCategorie === 'function' && puoVedereCategorie());
+  const ordina = (arr) =>
+    arr
+      .slice()
+      .sort((a, b) =>
+        vedeCat
+          ? (a.categoria || 9) - (b.categoria || 9) || a.nome.localeCompare(b.nome)
+          : a.nome.localeCompare(b.nome),
+      );
+  const testa =
+    '<thead><tr><th>Collaboratore</th><th>Funzione</th>' +
+    (vedeCat ? '<th>Categoria</th>' : '') +
+    '<th class="num">Percentuale</th><th>Settore</th><th>Livello</th><th class="gc-col-apri"><span class="fz-sr">Apri</span></th></tr></thead>';
+  const riga = (c) => {
+    const lv = typeof livelloDiCollaboratore === 'function' ? livelloDiCollaboratore(c) : 0;
+    const cop = typeof _coperturaSettori === 'function' ? _coperturaSettori(c) : [];
+    return (
+      '<tr class="collab-riga gc-riga" tabindex="0" role="button" data-nome="' +
+      escP(c.nome.toLowerCase()) +
+      '" onclick="gcApriScheda(' +
+      c.id +
+      ")\" onkeydown=\"if(event.key==='Enter'||event.key===' '){event.preventDefault();gcApriScheda(" +
+      c.id +
+      ')}" title="Apri la scheda per modificare">' +
+      '<td data-et="Collaboratore"><span class="gc-nome">' +
+      escP(c.nome) +
+      '</span>' +
+      (c.data_fine_rapporto
+        ? ' <span class="gc-etichetta gc-fine" title="Ultimo giorno di lavoro: dal giorno dopo non è più nel piano e nelle ore dovute">fine contratto ' +
+          _gcDataIt(c.data_fine_rapporto) +
+          '</span>'
+        : '') +
+      (cop.length
+        ? '<span class="gc-sotto">Copre anche: ' + cop.map((k) => escP(repartoLabel(k))).join(', ') + '</span>'
+        : '') +
+      '</td><td data-et="Funzione">' +
+      (c.funzione ? escP(_gcFunzioneTesto(c.funzione)) : '<span class="gc-manca">da indicare</span>') +
+      '</td>' +
+      (vedeCat
+        ? '<td data-et="Categoria">' +
+          (c.categoria ? c.categoria + '&ordf;' : '<span class="gc-manca">-</span>') +
+          '</td>'
+        : '') +
+      '<td data-et="Percentuale" class="num">' +
+      _gcPercTesto(c) +
+      '</td><td data-et="Settore">' +
+      escP(_gcSettoreTesto(c.reparto_dip)) +
+      '</td><td data-et="Livello">' +
+      (typeof _lvBadge === 'function' ? _lvBadge(lv) : lv ? 'Livello ' + lv : 'Senza livello') +
+      '</td><td class="gc-col-apri" aria-hidden="true">&rsaquo;</td></tr>'
+    );
+  };
+  const gruppo = (titolo, arr, spiega) =>
+    arr.length
+      ? '<h5 class="gc-gruppo">' +
+        titolo +
+        ' <span>' +
+        arr.length +
+        (spiega ? ' · ' + spiega : '') +
+        '</span></h5><table class="gc-tab">' +
+        testa +
+        '<tbody>' +
+        ordina(arr).map(riga).join('') +
+        '</tbody></table>'
+      : '';
+  let h =
+    '<p class="gc-intro">Clicca un nome per aprire la sua scheda: lì modifichi i dati e confermi con <b>Salva</b>. Vai a: <a href="#" onclick="switchPage(\'formazione\');return false">Formazione</a> · <a href="#" onclick="switchPage(\'piano\');if(typeof pianoCambiaTab===\'function\')pianoCambiaTab(\'impostazioni\');return false">Piano › Impostazioni</a></p>';
+  if (attivi.length > 8)
+    h +=
+      '<input type="text" id="collab-cerca" placeholder="Cerca collaboratore..." aria-label="Cerca collaboratore" oninput="filtraCollaboratoriUI(this.value)" class="campo-cerca">';
+  const fissi = attivi.filter((c) => c.impiego === 'fisso');
+  const jolly = attivi.filter((c) => c.impiego === 'jolly');
+  const senza = attivi.filter((c) => !c.impiego);
+  h += gruppo('Fissi', fissi);
+  h += gruppo('Jolly', jolly, 'chiamati quando serve');
+  h += gruppo('Impiego da indicare', senza, 'apri la scheda e scegli Fisso o Jolly');
+  if (!attivi.length) h += '<p class="gc-intro">Nessun collaboratore in questo settore.</p>';
+  if (inattivi.length && p.adminFull)
+    h +=
+      '<div class="gc-disattivati"><h5 class="gc-gruppo">Disattivati <span>' +
+      inattivi.length +
+      ' · clicca un nome per riattivarlo (chiede conferma)</span></h5><div class="gc-disattivati-lista">' +
+      inattivi
+        .map(
+          (c) =>
+            '<button type="button" class="gc-btn-riattiva" onclick="gcRiattiva(\'' +
+            _jsArg(c.nome) +
+            '\')">' +
+            escP(c.nome) +
+            '</button>',
+        )
+        .join('') +
+      '</div></div>';
+  return h;
+}
+async function gcRiattiva(nome) {
+  if (
+    !(await chiediConferma('Riattivare ' + nome + '?\n\nTorna negli elenchi, nel piano e nelle scelte dei nomi.', {
+      ok: 'Riattiva',
+    }))
+  )
+    return;
+  if (typeof riattivaCollaboratore === 'function') await riattivaCollaboratore(nome);
+}
+// ---- scheda (finestra) ----
+function _gcCerca(id) {
+  return (window._gcRecords || []).find((x) => x.id === id) || (collaboratoriCache || []).find((x) => x.id === id);
+}
+function gcApriScheda(id) {
+  const c = _gcCerca(id);
+  if (!c) return;
+  const p = _gcPermessi();
+  const vedeCat = p.puoCat || (typeof puoVedereCategorie === 'function' && puoVedereCategorie());
+  const imp = c.impiego || '';
+  const cat = c.categoria || '';
+  const sel = (id2, opz, abil, extra) =>
+    '<select id="' + id2 + '"' + (abil ? '' : ' disabled') + (extra || '') + '>' + opz + '</select>';
+  const opt = (v, t, cur) =>
+    '<option value="' + escP(String(v)) + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + t + '</option>';
+  const campo = (et, html, aiuto) =>
+    '<label class="gc-campo"><span class="gc-campo-et">' +
+    et +
+    '</span>' +
+    html +
+    (aiuto ? '<span class="gc-campo-aiuto">' + aiuto + '</span>' : '') +
+    '</label>';
+  const funzioni =
+    typeof _pianoFunzioniDi === 'function'
+      ? _pianoFunzioniDi(c.reparto_dip || 'slots')
+      : window._pianoFunzioni || ['RESP', 'SUP', 'BO', 'HOST'];
+  if (c.funzione && !funzioni.includes(c.funzione)) funzioni.push(c.funzione);
+  const percCur = Math.round((parseFloat(c.percentuale) || 1) * 100);
+  const percOpz = [100, 90, 80, 70, 60, 50, 40, 30, 20];
+  if (!percOpz.includes(percCur)) percOpz.unshift(percCur);
+  let settOpz = opt('entrambi', 'Tutti i settori', c.reparto_dip || 'slots');
+  getReparti().forEach((r) => (settOpz += opt(r.key, escP(r.label), c.reparto_dip || 'slots')));
+  const lv = typeof livelloDiCollaboratore === 'function' ? livelloDiCollaboratore(c) : 0;
+  let h =
+    '<div class="fz-fin-testa"><div><h3 id="gc-titolo">' +
+    escP(c.nome) +
+    '</h3><p>' +
+    (typeof _lvBadge === 'function' ? _lvBadge(lv) + ' · ' : '') +
+    escP(_gcSettoreTesto(c.reparto_dip)) +
+    (c.data_fine_rapporto ? ' · <b>fine contratto ' + _gcDataIt(c.data_fine_rapporto) + '</b>' : '') +
+    '</p></div><button type="button" class="fz-chiudi" aria-label="Chiudi senza salvare" onclick="gcChiudiScheda()">&times;</button></div>';
+  h +=
+    '<form class="gc-form" onsubmit="event.preventDefault();gcSalvaScheda(' +
+    c.id +
+    ')" oninput="_gcSegnaModifica()" onchange="_gcSegnaModifica()">';
+  h += '<fieldset><legend>Contratto</legend><div class="gc-griglia">';
+  h += campo(
+    'Impiego',
+    sel(
+      'gc-impiego',
+      opt('', 'Da indicare', imp) + opt('fisso', 'Fisso', imp) + opt('jolly', 'Jolly (chiamato quando serve)', imp),
+      p.puoImp,
+    ),
+  );
+  if (vedeCat)
+    h += campo(
+      'Categoria',
+      sel(
+        'gc-categoria',
+        opt('', 'Nessuna', cat) + [5, 4, 3, 2, 1].map((n) => opt(n, n + 'ª categoria', cat)).join(''),
+        p.puoCat,
+      ),
+      '5ª = ingresso, 1ª = la più alta',
+    );
+  if (p.puoImpiegoDati) {
+    h += campo(
+      'Funzione',
+      sel(
+        'gc-funzione',
+        opt('', 'Da indicare', c.funzione || '') +
+          funzioni.map((f) => opt(f, escP(_gcFunzioneTesto(f)), c.funzione || '')).join(''),
+        true,
+      ),
+      'Usata dal Piano di lavoro per le regole dei turni',
+    );
+    h += campo(
+      'Percentuale d’impiego',
+      sel('gc-perc', percOpz.map((n) => opt(n / 100, n + '%', percCur / 100)).join(''), true),
+      'Per il saldo delle ore e i codici del contratto',
+    );
+    h += campo(
+      'Lingue parlate',
+      '<input type="text" id="gc-lingue" maxlength="20" placeholder="IT, EN" value="' + escP(c.lingue || '') + '">',
+      'Sigle separate da spazio o virgola (IT italiano, EN inglese, DE tedesco, FR francese)',
+    );
+  }
+  if (p.adminFull)
+    h += campo('Settore', sel('gc-settore', settOpz, true), 'Il settore dove ha il contratto e le ore dovute');
+  h += '</div></fieldset>';
+  if (p.puoHrMod)
+    h +=
+      '<fieldset><legend>Date</legend><div class="gc-griglia">' +
+      campo(
+        'Data di nascita',
+        '<input type="text" id="gc-nascita" placeholder="12.01.1997" value="' +
+          escP(c.data_nascita ? dataNascitaLabel(c.data_nascita, false) : '') +
+          '">',
+        'Basta giorno e mese (12.01) se l’anno non si conosce',
+      ) +
+      campo(
+        'Inizio attività',
+        '<input type="text" id="gc-inizio" placeholder="01.05.2024" value="' +
+          escP(_gcDataIt(c.data_assunzione)) +
+          '">',
+        'Serve per anzianità, giubilei e giorni di vacanza',
+      ) +
+      '</div></fieldset>';
+  h +=
+    '<div class="gc-pulsanti"><button type="button" class="btn-secondario" onclick="gcChiudiScheda()">Annulla</button><button type="submit" class="btn-add-tipo" id="gc-salva">Salva</button></div></form>';
+  // ALTRE AZIONI (amministratore): aprono la loro finestra, con le loro conferme
+  if (p.adminFull) {
+    const cop = typeof _coperturaSettori === 'function' ? _coperturaSettori(c) : [];
+    h +=
+      '<div class="gc-azioni"><h4>Altre azioni</h4>' +
+      '<div class="gc-azione"><div><b>Copertura di altri settori</b><span>' +
+      (cop.length
+        ? 'Può coprire i buchi in: ' + cop.map((k) => escP(repartoLabel(k))).join(', ')
+        : 'Per ora lavora solo nel suo settore') +
+      '</span></div><button type="button" class="btn-secondario fz-btn-piccolo" onclick="gcAltraAzione(\'copertura\',' +
+      c.id +
+      ')">Imposta copertura</button></div>' +
+      '<div class="gc-azione"><div><b>Cambia il nome</b><span>Il nuovo nome vale ovunque: piano, Diario, storico</span></div><button type="button" class="btn-secondario fz-btn-piccolo" onclick="gcAltraAzione(\'rinomina\',' +
+      c.id +
+      ')">Rinomina</button></div>' +
+      '<div class="gc-azione"><div><b>' +
+      (c.data_fine_rapporto ? 'Fine contratto' : 'Disattiva o fine contratto') +
+      '</b><span>' +
+      (c.data_fine_rapporto
+        ? 'Ultimo giorno ' + _gcDataIt(c.data_fine_rapporto) + ': puoi cambiare la data o toglierla'
+        : 'Chiede l’ultimo giorno di lavoro: fino a quel giorno resta tutto') +
+      '</span></div><button type="button" class="btn-secondario fz-btn-piccolo fz-btn-pericolo" onclick="gcAltraAzione(\'disattiva\',' +
+      c.id +
+      ')">' +
+      (c.data_fine_rapporto ? 'Cambia' : 'Disattiva') +
+      '</button></div>' +
+      '</div>';
+  }
+  let velo = document.getElementById('gc-velo');
+  if (!velo) {
+    velo = document.createElement('div');
+    velo.id = 'gc-velo';
+    velo.className = 'fz-velo';
+    velo.innerHTML =
+      '<div class="fz-finestra gc-finestra" role="dialog" aria-modal="true" aria-labelledby="gc-titolo"><div id="gc-corpo"></div></div>';
+    velo.addEventListener('mousedown', (e) => {
+      if (e.target === velo) gcChiudiScheda();
+    });
+    document.body.appendChild(velo);
+    document.addEventListener('keydown', _gcTasti, true);
+  }
+  document.getElementById('gc-corpo').innerHTML = h;
+  window._gcModificata = false;
+  const primo = velo.querySelector('select:not([disabled]),input');
+  if (primo) primo.focus();
+}
+function _gcSegnaModifica() {
+  window._gcModificata = true;
+}
+function _gcTasti(e) {
+  if (
+    e.key === 'Escape' &&
+    !document.querySelector('.finestra-velo') &&
+    document.getElementById('pwd-modal').classList.contains('hidden')
+  ) {
+    e.preventDefault();
+    gcChiudiScheda();
+  }
+}
+async function gcChiudiScheda(forza) {
+  if (!forza && window._gcModificata) {
+    if (
+      !(await chiediConferma('Ci sono modifiche non salvate. Chiudere la scheda senza salvarle?', {
+        ok: 'Chiudi senza salvare',
+      }))
+    )
+      return false;
+  }
+  const v = document.getElementById('gc-velo');
+  if (v) v.remove();
+  document.removeEventListener('keydown', _gcTasti, true);
+  window._gcModificata = false;
+  return true;
+}
+// rinomina, copertura e disattivazione hanno le loro finestre e conferme: si chiude la
+// scheda (chiedendo se ci sono modifiche non salvate) e si apre la loro
+async function gcAltraAzione(cosa, id) {
+  const c = _gcCerca(id);
+  if (!c || !(await gcChiudiScheda())) return;
+  if (cosa === 'copertura' && typeof apriCoperturaCollab === 'function') apriCoperturaCollab(id);
+  else if (cosa === 'rinomina' && typeof rinominaCollaboratore === 'function') rinominaCollaboratore(c.nome);
+  else if (cosa === 'disattiva' && typeof disattivaCollaboratore === 'function') disattivaCollaboratore(c.nome);
+}
+// SALVA: per ogni campo cambiato si chiama la funzione di sempre, una alla volta.
+// Alla fine si controlla che i valori siano davvero arrivati (le funzioni mostrano da
+// sole l errore o chiedono conferma per le date): se qualcosa non e passato la scheda resta aperta.
+async function gcSalvaScheda(id) {
+  const c = _gcCerca(id);
+  if (!c) return;
+  const p = _gcPermessi();
+  const val = (k) => {
+    const el = document.getElementById(k);
+    return el && !el.disabled ? el.value : undefined;
+  };
+  const prima = {
+    impiego: c.impiego || '',
+    categoria: c.categoria ? String(c.categoria) : '',
+    funzione: c.funzione || '',
+    percentuale: String(parseFloat(c.percentuale) || 1),
+    lingue: c.lingue || '',
+    reparto_dip: c.reparto_dip || 'slots',
+    data_nascita: c.data_nascita ? dataNascitaLabel(c.data_nascita, false) : '',
+    data_assunzione: _gcDataIt(c.data_assunzione),
+  };
+  const dopo = {
+    impiego: val('gc-impiego'),
+    categoria: val('gc-categoria'),
+    funzione: val('gc-funzione'),
+    percentuale: val('gc-perc') !== undefined ? String(parseFloat(val('gc-perc'))) : undefined,
+    lingue: val('gc-lingue') !== undefined ? val('gc-lingue').trim() : undefined,
+    reparto_dip: val('gc-settore'),
+    data_nascita: val('gc-nascita') !== undefined ? val('gc-nascita').trim() : undefined,
+    data_assunzione: val('gc-inizio') !== undefined ? val('gc-inizio').trim() : undefined,
+  };
+  const cambiati = Object.keys(dopo).filter((k) => dopo[k] !== undefined && dopo[k] !== prima[k]);
+  if (!cambiati.length) {
+    gcChiudiScheda(true);
+    toast('Nessuna modifica');
+    return;
+  }
+  const b = document.getElementById('gc-salva');
+  if (b) b.disabled = true;
+  for (const k of cambiati) {
+    if (k === 'impiego' && p.puoImp) await cambiaImpiegoCollaboratore(id, dopo.impiego);
+    else if (k === 'categoria' && p.puoCat) await cambiaCategoriaCollaboratore(id, dopo.categoria);
+    else if (k === 'funzione') await cambiaFunzioneCollaboratore(id, dopo.funzione);
+    else if (k === 'percentuale') await cambiaPercentualeCollaboratore(id, dopo.percentuale);
+    else if (k === 'lingue') await cambiaLingueCollaboratore(id, dopo.lingue);
+    else if (k === 'data_nascita' || k === 'data_assunzione') await cambiaDataCollaboratore(id, k, dopo[k]);
+    else if (k === 'reparto_dip' && p.adminFull) await cambiaRepartoCollaboratore(id, dopo.reparto_dip);
+  }
+  // verifica: rileggo dal database i campi cambiati
+  let rec = null;
+  try {
+    const r = await secGet('collaboratori?id=eq.' + id + '&limit=1');
+    rec = Array.isArray(r) ? r[0] : null;
+  } catch (e) {}
+  const nonSalvati = [];
+  if (rec) {
+    const ora = {
+      impiego: rec.impiego || '',
+      categoria: rec.categoria ? String(rec.categoria) : '',
+      funzione: rec.funzione || '',
+      percentuale: String(parseFloat(rec.percentuale) || 1),
+      reparto_dip: rec.reparto_dip || 'slots',
+    };
+    cambiati.forEach((k) => {
+      if (ora[k] !== undefined && ora[k] !== dopo[k]) nonSalvati.push(k);
+      if (k === 'data_nascita' || k === 'data_assunzione') {
+        // stessa lettura di cambiaDataCollaboratore: 12.01.1997, 12/01/1997, solo 12.01
+        const atteso = dopo[k] ? _parseDataNascita(dopo[k]) : null;
+        if (String(rec[k] || '').substring(0, 10) !== String(atteso || '')) nonSalvati.push(k);
+      }
+    });
+    Object.assign(c, rec);
+  }
+  if (b) b.disabled = false;
+  if (nonSalvati.length) {
+    const nomi = {
+      impiego: 'impiego',
+      categoria: 'categoria',
+      funzione: 'funzione',
+      percentuale: 'percentuale',
+      reparto_dip: 'settore',
+      data_nascita: 'data di nascita',
+      data_assunzione: 'inizio attività',
+    };
+    toastErrore('Non salvato: ' + nonSalvati.map((k) => nomi[k] || k).join(', ') + '. Controlla e riprova.');
+    return;
+  }
+  window._gcModificata = false;
+  gcChiudiScheda(true);
+  toast('Scheda di ' + c.nome + ' salvata');
+  renderCollaboratoriUI();
 }

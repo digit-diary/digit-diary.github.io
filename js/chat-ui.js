@@ -4228,16 +4228,30 @@ function checkCompleanniBanner() {
     if (repC !== currentReparto && repC !== 'entrambi') return;
     if (_isCompleannoOggi(c.data_nascita)) compleanni.push(c.nome);
   });
-  if (compleanni.length) {
-    banner.textContent = '<i class="icx icx-torta"></i> Buon compleanno a: ' + compleanni.join(', ') + '!';
+  // una riga sola: icona, nomi e la X per chiuderla (resta chiusa per oggi, su questo dispositivo).
+  // Prima "Buon compleanno a:", i nomi e il "!" finale erano sparsi su tutta la larghezza.
+  var chiave = 'compleanni_chiuso_' + oggiLocale() + '_' + currentReparto;
+  var chiuso = false;
+  try {
+    chiuso = localStorage.getItem(chiave) === compleanni.join('|');
+  } catch (e) {}
+  if (compleanni.length && !chiuso) {
     banner.innerHTML =
-      '<i class="icx icx-torta"></i> Buon compleanno a: <strong>' +
+      '<i class="icx icx-torta" aria-hidden="true"></i><span class="compleanni-testo">Buon compleanno a <strong>' +
       compleanni
         .map(function (n) {
           return escP(n);
         })
         .join(', ') +
-      '</strong>!';
+      '</strong>!</span><button type="button" class="compleanni-chiudi" aria-label="Chiudi l\'avviso dei compleanni per oggi" title="Chiudi per oggi"><i class="icx icx-chiudi"></i></button>';
+    banner.querySelector('.compleanni-chiudi').onclick = function () {
+      try {
+        localStorage.setItem(chiave, compleanni.join('|'));
+      } catch (e) {}
+      banner.classList.add('hidden');
+      banner.style.display = 'none';
+    };
+    banner.setAttribute('role', 'status');
     banner.classList.remove('hidden');
     banner.style.display = 'flex';
   } else {

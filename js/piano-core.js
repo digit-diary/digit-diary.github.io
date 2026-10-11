@@ -29,6 +29,20 @@ function _pianoYmOggi() {
 }
 let _pianoMeseSel = _pianoYmOggi();
 let _pianoCellaSel = null; // {nome, data} in modifica
+// UN SOLO SETTORE: porta il programma (barra in alto) e il Piano sul settore rep, per
+// esempio quando Annulla torna a un operazione fatta in un altro settore. Se la barra non
+// lo permette, il Piano lo mostra lo stesso (come prima).
+function _pianoVaiAlSettore(rep) {
+  if (!rep) return;
+  if (rep !== currentReparto && typeof setReparto === 'function') setReparto(rep);
+  _pianoRepartoSel = rep === currentReparto ? null : rep;
+}
+// SETTORE DI UNA RIGA (turno, collaboratore, cella, regola...): le righe scritte prima
+// che esistessero i settori non hanno reparto_dip e sono delle Slots. Un solo punto per
+// questa regola, cosi un settore nuovo non dipende da copie sparse del valore.
+function _repartoDi(r) {
+  return (r && r.reparto_dip) || 'slots';
+}
 
 // Colori dei codici speciali · PALETTE ORIGINALE TURNIVO (= formattazione
 // condizionale dell'Excel del casinò). I codici non elencati restano bianchi.
@@ -210,7 +224,7 @@ const PIANO_AUTO_PERMESSI = {
   formazioni: 'piano_formazioni', // pianificare formazioni (proposte di cambi, applica, annulla, svolta)
 };
 const PIANO_AUTO_NOMI = {
-  genera: 'Piano: genera',
+  genera: 'Piano: preparare il mese (bozza)',
   vacanze: 'Piano: vacanze e CGF automatici',
   import: 'Piano: import da file',
   cancella: 'Piano: cancellazioni di massa',
@@ -254,7 +268,7 @@ function _pianoRegoleTurnoFunzione() {
   return pianoRegoleGruppoCache.filter(
     (r) =>
       r.attivo !== false &&
-      (r.reparto_dip || 'slots') === _pianoReparto() &&
+      _repartoDi(r) === _pianoReparto() &&
       /^(turni_solo_funzioni|funzione_turni_giorni|livello_turni|turni_solo_collaboratori)$/.test(
         String(r.tipo_regola || '').toLowerCase(),
       ),
@@ -263,8 +277,9 @@ function _pianoRegoleTurnoFunzione() {
 // Funzioni che a mano possono fare qualsiasi turno (regola funzioni_fanno_tutto):
 // il Supervisor copre anche i livelli sotto, come in Formazione
 function _pianoFunzioniFannoTutto() {
+  // senza regola vale il predefinito del catalogo (piano-config.js, PIANO_REGOLE_GUIDA)
   const v = _pianoRegolaVal('funzioni_fanno_tutto');
-  const testo = v == null ? 'SUP,RESP' : String(v);
+  const testo = v == null ? String(_pianoRegolaPredefinita('funzioni_fanno_tutto') || '') : String(v);
   return new Set(
     testo
       .split(',')
@@ -290,10 +305,7 @@ function _pianoFunzioniFannoTutto() {
 function _pianoRegolaCoordinatori(rep) {
   rep = rep || _pianoReparto();
   const r = (pianoRegoleGruppoCache || []).find(
-    (x) =>
-      x.attivo !== false &&
-      String(x.tipo_regola || '').toLowerCase() === 'coordinatori' &&
-      (x.reparto_dip || 'slots') === rep,
+    (x) => x.attivo !== false && String(x.tipo_regola || '').toLowerCase() === 'coordinatori' && _repartoDi(x) === rep,
   );
   if (!r) return null;
   const [g, n, c] = String(r.valore || '').split('|');
@@ -467,7 +479,7 @@ function _pianoViolazioneFunzioneTurno(nome, t, dow, automatica) {
 function _pianoRegoleGruppoDi(gruppo) {
   const g = (gruppo || '').toUpperCase();
   return pianoRegoleGruppoCache.filter(
-    (r) => r.attivo !== false && (r.gruppo || '').toUpperCase() === g && (r.reparto_dip || 'slots') === _pianoReparto(),
+    (r) => r.attivo !== false && (r.gruppo || '').toUpperCase() === g && _repartoDi(r) === _pianoReparto(),
   );
 }
 // Competenze certificate in Formazione -> gruppi del piano.
@@ -488,11 +500,52 @@ const _COMPETENZE_GRUPPI_DEFAULT = {
   valet_servizio: 'VALET',
   valet_accoglienza: 'VALET',
 };
+// SETTORE NUOVO CON UN SOLO GRUPPO DI TURNI: le sue competenze di Formazione senza
+// collegamento (ne predefinito ne scelto in Piano > Impostazioni) aprono quell unico
+// gruppo. I settori che esistevano gia restano come sono (ai Tavoli, per esempio, le
+// competenze non collegate lasciano decidere i Settori della persona e la storia dei
+// turni): per loro i collegamenti si scelgono a mano. Le competenze rimaste scollegate
+// le elenca _pianoCompetenzeScollegate (avviso in Formazione).
+const _PIANO_SETTORI_COLLEGAMENTI_A_MANO = ['slots', 'tavoli', 'valet', 'cleaning'];
+function _pianoCompetenzeGruppoUnico() {
+  const out = {};
+  const tutte = typeof getCompetenzeConfigAll === 'function' ? getCompetenzeConfigAll() : {};
+  Object.keys(tutte || {}).forEach((rep) => {
+    if (_PIANO_SETTORI_COLLEGAMENTI_A_MANO.includes(rep)) return;
+    const gruppi = [
+      ...new Set(
+        (pianoTurniCache || [])
+          .filter((t) => t.attivo !== false && _repartoDi(t) === rep)
+          .map((t) => String(t.gruppo || '').toUpperCase())
+          .filter(Boolean),
+      ),
+    ];
+    if (gruppi.length !== 1) return;
+    (tutte[rep] || []).forEach((k) => {
+      if (k && k.key) out[k.key] = gruppi[0];
+    });
+  });
+  return out;
+}
 function _pianoCompetenzeGruppiGrezze() {
   const cfg = window._pianoCompGruppiCfg;
-  return cfg && typeof cfg === 'object'
-    ? Object.assign({}, _COMPETENZE_GRUPPI_DEFAULT, cfg)
-    : _COMPETENZE_GRUPPI_DEFAULT;
+  return Object.assign(
+    {},
+    _pianoCompetenzeGruppoUnico(),
+    _COMPETENZE_GRUPPI_DEFAULT,
+    cfg && typeof cfg === 'object' ? cfg : {},
+  );
+}
+// COMPETENZE SCOLLEGATE di un settore: quelle della scala di Formazione (livello 1 o piu)
+// che non aprono nessun gruppo di turni del settore, quindi non abilitano a nessun turno.
+// Per l avviso in Formazione: _pianoCompetenzeScollegate(rep) -> [{ key, label }]
+// (vuoto = tutto collegato). Si collegano in Piano > Impostazioni, competenze e gruppi.
+function _pianoCompetenzeScollegate(rep) {
+  const tutte = typeof getCompetenzeConfigAll === 'function' ? getCompetenzeConfigAll() : {};
+  const mappa = _pianoCompetenzeGruppi();
+  return ((tutte || {})[rep] || [])
+    .filter((k) => k && k.key && (parseInt(k.livello) || 0) >= 1 && !mappa[k.key])
+    .map((k) => ({ key: k.key, label: k.label || k.key }));
 }
 // Un collegamento vale solo se il gruppo esiste fra i turni del settore a cui la
 // competenza appartiene in Formazione (es. Croupier dei Tavoli -> TAVOLI). Un gruppo di
@@ -505,7 +558,7 @@ function _pianoCollegamentoValido(chiave, gruppo) {
   const reps = Object.keys(tutte).filter((r) => (tutte[r] || []).some((k) => k.key === chiave));
   if (!reps.length) return true; // competenza non configurata: si lascia com e
   return pianoTurniCache.some(
-    (t) => t.attivo !== false && reps.includes(t.reparto_dip || 'slots') && (t.gruppo || '').toUpperCase() === g,
+    (t) => t.attivo !== false && reps.includes(_repartoDi(t)) && (t.gruppo || '').toUpperCase() === g,
   );
 }
 // in memoria finche non cambiano collegamenti, turni o competenze (la bozza la chiama
@@ -727,8 +780,31 @@ async function _pianoCaricaCfg() {
   // elenco (formato di prima, vale per le Slot) oppure oggetto per settore
   const fzCfg = window._pianoFunzioni;
   const fzOggetto = fzCfg && typeof fzCfg === 'object' && !Array.isArray(fzCfg);
-  if (!fzOggetto && (!Array.isArray(fzCfg) || !fzCfg.length)) window._pianoFunzioni = ['RESP', 'SUP', 'BO', 'HOST'];
+  if (!fzOggetto && (!Array.isArray(fzCfg) || !fzCfg.length))
+    window._pianoFunzioni = _PIANO_FUNZIONI_SLOTS_PREDEFINITE.slice();
   _pianoCfgCaricata = true;
+}
+// funzioni predefinite quando l impostazione piano_funzioni manca: e il formato di prima
+// (un elenco), che vale solo per le Slots. Ogni altro settore, anche nuovo, parte
+// dall elenco vuoto piu le funzioni che i suoi collaboratori hanno gia (_pianoFunzioniDi)
+const _PIANO_FUNZIONI_SLOTS_PREDEFINITE = ['RESP', 'SUP', 'BO', 'HOST'];
+// COLORE DELLA RIGA PER FUNZIONE nel calendario: SUP verdino e BO arancio chiaro come
+// sempre (Turnivo); un altra funzione che ha un gruppo di turni con lo stesso nome nel
+// settore (per esempio in un settore nuovo) prende il colore di quel gruppo, se ne ha uno.
+function _pianoRigaFunzioneAttr(infoC) {
+  const fz = String((infoC && infoC.funzione) || '');
+  if (fz === 'SUP') return ' class="piano-row-sup"';
+  if (fz === 'BO') return ' class="piano-row-bo"';
+  if (!fz) return '';
+  const rep = _pianoReparto();
+  const t = (pianoTurniCache || []).find(
+    (x) =>
+      x.attivo !== false &&
+      _repartoDi(x) === rep &&
+      String(x.gruppo || '').toUpperCase() === fz.toUpperCase() &&
+      /^#[0-9a-f]{3,8}$/i.test(String(x.colore || '').trim()),
+  );
+  return t ? ' class="piano-row-gruppo" style="--riga-col:' + String(t.colore).trim() + '"' : '';
 }
 // FUNZIONI DISPONIBILI PER SETTORE (v427, segnalazione del titolare: nei Tavoli i menu
 // mostravano le funzioni delle Slot e non CR, DI). L impostazione piano_funzioni e un
@@ -746,7 +822,7 @@ function _pianoFunzioniDi(rep) {
   rep = rep || (typeof _pianoReparto === 'function' ? _pianoReparto() : 'slots');
   const out = _pianoFunzioniConfig(rep);
   (typeof collaboratoriCache !== 'undefined' ? collaboratoriCache : [])
-    .filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === rep && c.funzione)
+    .filter((c) => c.attivo !== false && _repartoDi(c) === rep && c.funzione)
     .forEach((c) => {
       const f = String(c.funzione).toUpperCase();
       if (!out.includes(f)) out.push(f);
@@ -769,7 +845,7 @@ function _pianoFunzioniTutte() {
 function _pianoMappFunzione(funzione, rep) {
   if (!funzione) return null;
   const settore = rep || _pianoReparto();
-  const m = pianoMappatureCache.filter((x) => x.funzione === funzione && (x.reparto_dip || 'slots') === settore);
+  const m = pianoMappatureCache.filter((x) => x.funzione === funzione && _repartoDi(x) === settore);
   return m.length ? m : null;
 }
 // multi-reparto: appartiene al reparto corrente se è il suo principale
@@ -778,7 +854,7 @@ function _pianoMappFunzione(funzione, rep) {
 // Gestione collaboratori): tetto mensile di turni, gruppi ammessi, accompagnato
 function _pianoCoperturaCfg(info, rep) {
   const r = rep || _pianoReparto();
-  if (!info || (info.reparto_dip || 'slots') === r) return null;
+  if (!info || _repartoDi(info) === r) return null;
   let o = info.copertura_reparti;
   if (typeof o === 'string') {
     try {
@@ -791,7 +867,7 @@ function _pianoCoperturaCfg(info, rep) {
 }
 function _pianoAppartieneAlReparto(c, rep) {
   const r = rep || _pianoReparto();
-  if ((c.reparto_dip || 'slots') === r) return true;
+  if (_repartoDi(c) === r) return true;
   return String(c.reparti_extra || '')
     .split(',')
     .map((x) => x.trim().toLowerCase())
@@ -839,7 +915,7 @@ function _pianoCollabInfo(nome) {
 }
 
 function _pianoTurniReparto() {
-  return pianoTurniCache.filter((t) => t.attivo !== false && (t.reparto_dip || 'slots') === _pianoReparto());
+  return pianoTurniCache.filter((t) => t.attivo !== false && _repartoDi(t) === _pianoReparto());
 }
 // SETTORE DEL TURNO di una cella: la sigla dice di quale settore e il posto
 // coperto, qualunque foglio l abbia scritta (Balliu e Papa al Valet con R22/R23,
@@ -852,7 +928,7 @@ function _pianoSettoreTurno(r, repAperto) {
   const repRiga = (r && r.reparto_dip) || 'slots';
   const cod = r && r.codice;
   const settori = new Set(
-    (pianoTurniCache || []).filter((t) => t.attivo !== false && t.codice === cod).map((t) => t.reparto_dip || 'slots'),
+    (pianoTurniCache || []).filter((t) => t.attivo !== false && t.codice === cod).map((t) => _repartoDi(t)),
   );
   if (!settori.size || settori.has(repRiga)) return repRiga;
   if (settori.has(qui)) return qui;
@@ -870,9 +946,8 @@ function _pianoTurnoInfoRiga(r) {
   if (!r || !r.codice) return null;
   const s = _pianoSettoreTurno(r);
   return (
-    (pianoTurniCache || []).find(
-      (t) => t.attivo !== false && t.codice === r.codice && (t.reparto_dip || 'slots') === s,
-    ) || _pianoTurnoInfo(r.codice)
+    (pianoTurniCache || []).find((t) => t.attivo !== false && t.codice === r.codice && _repartoDi(t) === s) ||
+    _pianoTurnoInfo(r.codice)
   );
 }
 function _pianoTurnoInfo(codice) {
@@ -1424,7 +1499,7 @@ async function ndAllineaPiano(nome, ym) {
         updated_at: new Date().toISOString(),
       });
       out.messe++;
-      out.scoperti.push({ data: d, codice: r.codice, reparto: r.reparto_dip || 'slots' });
+      out.scoperti.push({ data: d, codice: r.codice, reparto: _repartoDi(r) });
     }
   }
   if (out.messe || out.tolte)
@@ -1441,7 +1516,7 @@ async function ndTurniNeiGiorni(nome, giorni) {
     (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=in.(' + giorni.join(',') + ')')) || [];
   return righe
     .filter((r) => _pianoIsLavoro(r.codice) && r.codice !== 'ND')
-    .map((r) => ({ data: String(r.data).substring(0, 10), codice: r.codice, reparto: r.reparto_dip || 'slots' }))
+    .map((r) => ({ data: String(r.data).substring(0, 10), codice: r.codice, reparto: _repartoDi(r) }))
     .sort((x, y) => x.data.localeCompare(y.data));
 }
 function _pianoMalattieMese(ym) {
@@ -2213,13 +2288,10 @@ async function _pianoCaricaMeseSettore(da, a, rep) {
   // sigle che esistono SOLO in questo settore: una cella con quella sigla nel piano
   // di un altro settore copre un posto qui (Papa del Valet su R22 della Reception)
   const soloQui = (pianoTurniCache || [])
-    .filter((t) => t.attivo !== false && (t.reparto_dip || 'slots') === rep)
+    .filter((t) => t.attivo !== false && _repartoDi(t) === rep)
     .map((t) => t.codice)
     .filter(
-      (cod) =>
-        !(pianoTurniCache || []).some(
-          (t) => t.attivo !== false && t.codice === cod && (t.reparto_dip || 'slots') !== rep,
-        ),
+      (cod) => !(pianoTurniCache || []).some((t) => t.attivo !== false && t.codice === cod && _repartoDi(t) !== rep),
     );
   const periodo = '&reparto_dip=neq.' + rep + '&data=gte.' + dalB + '&data=lte.' + alB;
   const bordoNulla = (pr) => pr.catch(() => []);
@@ -2372,22 +2444,29 @@ async function _renderPianoCore() {
         '<button class="btn-act pin" onclick="pianoCambiaMese(-1)">&larr;</button><span style="min-width:150px;text-align:center;font-weight:700">' +
         escP(label) +
         '</span><button class="btn-act pin" onclick="pianoCambiaMese(1)">&rarr;</button>';
-      h +=
-        '<select onchange="pianoCambiaReparto(this.value)" style="padding:4px 8px;font-size:var(--fs-sm,.8125rem);border:1px solid var(--line-forte);border-radius:var(--r-1);background:var(--paper);color:var(--ink)">';
+      // SETTORE: uno solo per tutto il programma. La tendina (se si vedono piu settori)
+      // cambia anche quello della barra in alto (pianoCambiaReparto -> setReparto)
       const ammessiRep = _pianoRepartiAmmessi();
-      getReparti()
-        .filter((rp) => ammessiRep.includes(rp.key))
-        .forEach((rp) => {
+      const repVisibili = getReparti().filter((rp) => ammessiRep.includes(rp.key));
+      if (repVisibili.length > 1) {
+        h +=
+          '<label class="pbar-settore" title="Settore del piano: è lo stesso della barra in alto, cambiarlo qui lo cambia anche lì"><span class="pbar-settore-lbl">Settore</span><select onchange="pianoCambiaReparto(this.value)">';
+        repVisibili.forEach((rp) => {
           h +=
             '<option value="' +
             rp.key +
             '"' +
             (rp.key === _pianoReparto() ? ' selected' : '') +
-            ' style="color:#000">' +
+            '>' +
             escP(rp.label) +
             '</option>';
         });
-      h += '</select>';
+        h += '</select></label>';
+      } else
+        h +=
+          '<span class="pbar-settore"><span class="pbar-settore-lbl">Settore</span> ' +
+          escP(repartoLabel(_pianoReparto())) +
+          '</span>';
       if (puoMod) {
         // Annulla / Ripristina: quelli generici in basso (Ctrl+Z / Ctrl+Y), per tutto il programma
         h +=
@@ -2395,130 +2474,144 @@ async function _renderPianoCore() {
           '<input type="text" id="piano-cerca" class="campo-cerca" placeholder="Cerca nome o sigla..." value="' +
           escP(window._pianoCercaTesto || '') +
           '" oninput="pianoCercaFiltra(this.value)" title="Mostra solo i collaboratori il cui nome contiene il testo, oppure chi ha quella sigla nel mese (es. C8). Vuoto = tutti">';
-        const ssnap = (window._pianoSessSnap || {})[_pianoMeseSel + '|' + _pianoReparto()];
-        if (ssnap)
-          h +=
-            '<button class="btn-export btn-pericolo" style="font-size:var(--fs-sm,.8125rem);padding:3px 9px" title="Riporta questo mese a com\'era quando hai iniziato a modificarlo in questa sessione (' +
-            ssnap.n +
-            ' operazioni tue)" onclick="pianoAnnullaTutto()">Annulla tutto (' +
-            ssnap.n +
-            ')</button>';
       }
       h += '</div>'; // fine riga navigazione
-      // barra comandi in gruppi etichettati: Pianifica · Controlla · Strumenti · Esporta
-      const pbtn = (label, onclick, tipo, title) =>
-        '<button class="btn-export pbar-btn' +
-        (tipo ? ' ' + tipo : '') +
-        '"' +
-        (title ? ' title="' + title + '"' : '') +
-        ' onclick="' +
+      // BARRA COMANDI (ondata 3): un azione principale (Prepara il mese), poi i menu
+      // Controlla · Sistema · Strumenti · Esporta con nome semplice e una riga di
+      // spiegazione per ogni voce; le azioni che cancellano stanno a parte, in rosso.
+      // Le funzioni chiamate e i permessi sono gli stessi di prima.
+      const voce = (nome, onclick, spiega) =>
+        '<button type="button" class="pmenu-voce" onclick="pianoMenuChiudi();' +
         onclick +
-        '">' +
-        label +
-        '</button>';
-      const pgrp = (label, inner) =>
-        inner ? '<span class="pbar-grp"><span class="pbar-grp-lbl">' + label + '</span>' + inner + '</span>' : '';
-      h += '<div class="pbar-riga">';
+        '"><span class="pmenu-nome">' +
+        nome +
+        '</span><span class="pmenu-spiega">' +
+        spiega +
+        '</span></button>';
+      const menu = (id, nome, icona, voci) =>
+        voci
+          ? '<details class="pmenu" data-pmenu="' +
+            id +
+            '"><summary class="btn-export pbar-btn pmenu-apri">' +
+            (icona ? '<i class="icx ' + icona + '"></i>' : '') +
+            nome +
+            '<i class="icx icx-giu pmenu-freccia"></i></summary><div class="pmenu-lista" role="menu">' +
+            voci +
+            '</div></details>'
+          : '';
+      h += '<div class="pbar-riga pbar-comandi">';
       // azioni automatiche (bozza, coperture, migliora ore, cancella, importa): solo
-      // con il permesso apposito; senza, i pulsanti non compaiono
+      // con il permesso apposito; senza, le voci non compaiono
       const puoAuto = puoMod && puoAzioniAutoPiano('genera');
+      let pericolo = '';
       if (puoMod) {
-        let g = '';
         if (puoAuto)
-          g += pbtn(
-            'Genera bozza',
-            'generaBozzaPiano()',
-            'pbar-ok',
-            'Riempie il fabbisogno con i collaboratori di questo settore (chi copre da altri settori NON viene usato)',
+          h +=
+            '<button type="button" class="btn-export pbar-btn pbar-principale" onclick="pianoPreparaMese()" title="Il programma riempie i posti del mese con i collaboratori di questo settore, rispettando regole, vacanze e preferenze. Le celle già scritte non vengono toccate. Alla fine propone di migliorare la bozza.">' +
+            '<i class="icx icx-calendario"></i>Prepara il mese</button>';
+        // Controlla
+        h += menu(
+          'controlla',
+          'Controlla',
+          'icx-check',
+          // Valida regole: con il permesso Genera (scelta del titolare, v357)
+          (puoAuto
+            ? voce(
+                'Controlla le regole',
+                'validaPiano()',
+                'Cerca nel mese i turni che non rispettano riposi, ore e regole del settore e li colora in rosso',
+              )
+            : '') +
+            voce(
+              'Perché manca qualcuno',
+              'pianoPercheScoperti()',
+              "Per ogni posto rimasto vuoto: chi era libero e perché nessuno l'ha preso (personale, formazione, impostazioni, regole)",
+            ),
+        );
+        // Sistema
+        let sis = '';
+        if (puoAuto)
+          sis += voce(
+            'Migliora la bozza',
+            'pianoMigliora()',
+            'Prova scambi e spostamenti fra i turni preparati dal programma e tiene solo quelli che rispettano meglio regole, posti e ore. Ti mostra prima e dopo',
           );
-        if (puoAuto && window._pianoSolverUrl)
-          g += pbtn(
-            'Genera con il motore avanzato',
-            'generaConSolver()',
-            'pbar-ok',
-            'Motore avanzato sul server interno: cerca il piano migliore del mese, distribuendo il lavoro in modo equo. Usa le stesse regole del settore e non tocca le celle esistenti',
+        if (puoAuto)
+          sis += voce(
+            'Sistema le ore',
+            'miglioraOrePiano()',
+            'Sposta turni preparati dal programma da chi lavora troppe ore a chi ne ha poche, nello stesso giorno e senza rompere regole',
           );
         if (
           puoAuto &&
           collaboratoriCache.some((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && _pianoCoperturaCfg(c))
         )
-          g += pbtn(
-            'Completa con coperture',
+          sis += voce(
+            'Copri i buchi con altri settori',
             'completaConCoperture()',
-            '',
-            'Tappa i buchi rimasti usando i collaboratori di altri settori abilitati a coprire qui. Da usare DOPO aver generato i piani dei loro reparti',
+            'Riempie i posti rimasti vuoti con chi può coprire da altri settori. Da fare dopo aver preparato i piani dei loro settori',
           );
-        if (puoAuto)
-          g += pbtn(
-            'Migliora la bozza',
-            'pianoMigliora()',
-            'pbar-ok',
-            'Ricerca a tempo sulla bozza: prova scambi e spostamenti e tiene solo quelli che migliorano regole, posti scoperti e ore. Più tempo, risultato migliore. Mostra prima e dopo e chiede prima di applicare',
+        if (puoAuto && window._pianoSolverUrl)
+          sis += voce(
+            'Prepara con il motore avanzato',
+            'generaConSolver()',
+            'Il server interno cerca il piano migliore del mese, con il lavoro diviso in modo equo. Stesse regole, non tocca le celle esistenti',
           );
-        if (puoAuto)
-          g += pbtn(
-            'Migliora ore',
-            'miglioraOrePiano()',
-            '',
-            'Dopo la bozza: scambia turni generati tra chi è sopra e chi è sotto le ore dovute (stesso giorno, regole rispettate)',
-          );
-        h += pgrp('Pianifica', g);
-        h += pgrp(
-          'Controlla',
-          // Valida regole: con il permesso Genera (scelta del titolare, v357)
-          (puoAuto
-            ? pbtn(
-                'Valida regole',
-                'validaPiano()',
-                '',
-                'Controlla tutto il mese contro le regole del settore e mostra le violazioni',
-              )
-            : '') +
-            pbtn(
-              'Perché scoperto',
-              'pianoPercheScoperti()',
-              '',
-              'Per ogni posto del fabbisogno rimasto scoperto: chi c era, perché nessuno l ha preso e cosa manca (personale, formazione, impostazioni, regole)',
-            ) +
-            pbtn(
-              'Copertura malattia',
-              'apriCoperturaMalattia()',
-              '',
-              'Trova chi può coprire i turni di un collaboratore in malattia',
-            ),
+        sis += voce(
+          'Sostituisci chi è in malattia',
+          'apriCoperturaMalattia()',
+          'Trova chi può coprire i turni di un collaboratore in malattia',
         );
-        h += pgrp(
+        h += menu('sistema', 'Sistema', 'icx-refresh', sis);
+        // Strumenti
+        h += menu(
+          'strumenti',
           'Strumenti',
-          pbtn(
-            'Ordine predefinito',
+          'icx-settings',
+          voce(
+            "Rimetti l'ordine dei nomi",
             'ripristinaOrdinePiano()',
-            '',
-            'Trascina i nomi per riordinare; questo pulsante ripristina l ordine predefinito (responsabili, vice, SUP, BO, poi gli altri; i jolly in fondo)',
-          ) +
-            _pianoColoriBarHtml() +
-            (puoAuto || (puoMod && puoAzioniAutoPiano('cancella'))
-              ? pbtn(
-                  'Cancella piano',
-                  'cancellaBozzaPiano()',
-                  'pbar-warn',
-                  'Svuota il mese di questo settore (si può annullare)',
-                )
-              : ''),
+            "I nomi si riordinano trascinandoli; questa voce torna all'ordine predefinito (responsabili, vice, SUP, BO, poi gli altri, jolly in fondo)",
+          ),
         );
+        if (puoAuto || (puoMod && puoAzioniAutoPiano('cancella')))
+          pericolo +=
+            '<button type="button" class="btn-export pbar-btn pbar-pericolo" onclick="cancellaBozzaPiano()" title="Toglie i turni del mese di questo settore. Chiede prima conferma e si può annullare">' +
+            '<i class="icx icx-cestino"></i>Svuota il mese</button>';
+        const ssnap = (window._pianoSessSnap || {})[_pianoMeseSel + '|' + _pianoReparto()];
+        if (ssnap)
+          pericolo +=
+            '<button type="button" class="btn-export pbar-btn pbar-pericolo" title="Riporta questo mese a com\'era quando hai iniziato a modificarlo in questa sessione (' +
+            ssnap.n +
+            ' operazioni tue)" onclick="pianoAnnullaTutto()"><i class="icx icx-refresh"></i>Annulla tutto (' +
+            ssnap.n +
+            ')</button>';
       }
       let ge =
-        pbtn('Copia per Excel', 'copiaPianoExcel()', 'pbar-soft') + pbtn('Stampa PDF', 'stampaPianoPDF()', 'pbar-soft');
+        voce('Stampa PDF', 'stampaPianoPDF()', 'Il piano del mese pronto da stampare o salvare in PDF') +
+        voce('Copia per Excel', 'copiaPianoExcel()', 'Copia la griglia: in Excel basta incollare');
       if (puoMod && puoAzioniAutoPiano('import')) {
-        ge += pbtn('Importa piano', "document.getElementById('piano-imp-file').click()", 'pbar-soft');
-        ge +=
-          '<input type="file" id="piano-imp-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importaPianoExcel(this)">';
+        ge += voce(
+          'Importa da Excel',
+          "document.getElementById('piano-imp-file').click()",
+          'Legge un piano da un file Excel o CSV e lo controlla prima di scriverlo',
+        );
       }
-      h += pgrp('Esporta', ge);
+      h += menu('esporta', 'Esporta', 'icx-download', ge);
+      if (puoMod && puoAzioniAutoPiano('import'))
+        h +=
+          '<input type="file" id="piano-imp-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importaPianoExcel(this)">';
+      // colori e formato delle celle: strumento di lavoro sulla selezione, resta a vista
+      if (puoMod) h += '<span class="pbar-colori">' + _pianoColoriBarHtml() + '</span>';
+      if (pericolo) h += '<span class="pbar-pericoli">' + pericolo + '</span>';
+      h += '</div><div class="pbar-riga pbar-nota">';
       h +=
         '<span class="pbar-info">' +
         _pianoRighe.length +
         ' assegnazioni' +
-        (puoMod ? ' · doppio clic modifica, trascina o Shift+clic per selezionare' : ' · sola lettura') +
+        (puoMod
+          ? ' · doppio clic su una cella per cambiarla · trascina o Shift+clic per selezionarne più di una'
+          : ' · sola lettura') +
         '</span></div></div>';
       h += '<div id="piano-violazioni"></div><div id="piano-auto-avviso"></div><div id="piano-confine"></div>';
 
@@ -2535,7 +2628,7 @@ async function _renderPianoCore() {
           .filter(
             (c) =>
               c.attivo !== false &&
-              (c.reparto_dip || 'slots') === _pianoReparto() &&
+              _repartoDi(c) === _pianoReparto() &&
               (c.impiego === 'jolly' || (!c.impiego && c.is_jolly)) &&
               !consegnato.has(c.nome.toLowerCase()),
           )
@@ -2567,9 +2660,16 @@ async function _renderPianoCore() {
       // compare il marcatore di chiusura (CH5/CH7) sopra il numero del giorno
       await _pianoCaricaFestivita(parseInt(ym.split('-')[0]));
       await _pianoCaricaRecupero(ym);
-      const LC = _pianoCalcolaLarghezze(nomi);
+      let LC = _pianoCalcolaLarghezze(nomi);
+      // TELEFONO: colonna del nome stretta e funzione nascosta (nome intero e funzione al
+      // tocco, nella mini-scheda), cosi a schermo restano piu giorni. Le tabelle sotto
+      // (fabbisogno, differenze) leggono la stessa larghezza e restano allineate.
+      const telefono = !!(window.matchMedia && window.matchMedia('(max-width: 600px)').matches);
+      if (telefono) LC = window._pianoLargCol = { nome: 104, fun: 0, tot: 104 };
       h +=
-        '<div class="piano-wrap"><table data-seltab="piano" class="piano-table piano-fixed" style="width:' +
+        '<div class="piano-wrap"><table data-seltab="piano" class="piano-table piano-fixed' +
+        (telefono ? ' piano-tel' : '') +
+        '" style="width:' +
         (LC.tot + 37 * nGiorni + 326) +
         'px"><colgroup><col style="width:' +
         LC.nome +
@@ -2704,7 +2804,7 @@ async function _renderPianoCore() {
             if (_pianoTurnoInfo(codice) && !_pianoCopreQui(r)) {
               stile += (stile ? ';' : '') + 'opacity:.65;font-style:italic';
               titolo = '[' + repartoLabel(_pianoSettoreTurno(r)) + '] ' + titolo;
-            } else if ((r.reparto_dip || 'slots') !== _pianoReparto()) {
+            } else if (_repartoDi(r) !== _pianoReparto()) {
               titolo =
                 (_pianoTurnoInfo(codice) ? 'Turno ' + repartoLabel(_pianoReparto()) + ' ' : '') +
                 '(scritto nel piano ' +
@@ -2768,7 +2868,7 @@ async function _renderPianoCore() {
           const violMsg = _pianoViolCelle[nome + '|' + dstr];
           if (violMsg) {
             cls += ' piano-viol';
-            titolo += (titolo ? ' · ' : '') + 'Attenzione: ' + violMsg.join(' | ');
+            titolo += (titolo ? ' · ' : '') + 'Attenzione: ' + violMsg.map(_pianoMsgSemplice).join(' | ');
           }
           // stile personalizzato della cella: colore (vince sul turno) + formato
           const colEff = _pianoColoreCella(r);
@@ -2816,12 +2916,7 @@ async function _renderPianoCore() {
         const orePiano = _rett ? Math.round(parseFloat(_rett.ore_reali) * 100) / 100 : orePianificate;
         const saldo = Math.round((orePiano - dovute) * 10) / 10;
         const ytd = _pianoYtdConMese(nome, saldo, orePiano);
-        const _clsRiga =
-          infoC && infoC.funzione === 'SUP'
-            ? ' class="piano-row-sup"'
-            : infoC && infoC.funzione === 'BO'
-              ? ' class="piano-row-bo"'
-              : '';
+        const _clsRiga = _pianoRigaFunzioneAttr(infoC);
         h +=
           '<tr' +
           _clsRiga +
@@ -2847,7 +2942,7 @@ async function _renderPianoCore() {
                 const ina = _pianoInattivoInfo(nome);
                 if (!ina)
                   return '<span class="piano-estraneo" title="Non presente in Gestione collaboratori: funzione, percentuale e ore dovute non vengono calcolate">fuori anagrafica</span>';
-                const repIna = ina.reparto_dip || 'slots';
+                const repIna = _repartoDi(ina);
                 return (
                   '<span class="piano-estraneo" title="Disattivato in Gestione collaboratori ma presente nel piano' +
                   (repIna !== _pianoReparto() ? ' · settore ' + escP(repartoLabel(repIna)) : '') +
@@ -2856,27 +2951,27 @@ async function _renderPianoCore() {
                   '</span>'
                 );
               })()
-            : (infoC.reparto_dip || 'slots') !== _pianoReparto()
+            : _repartoDi(infoC) !== _pianoReparto()
               ? _pianoAppartieneAlReparto(infoC)
                 ? // copertura prevista in Gestione collaboratori: normale, non un errore
                   (() => {
                     const cop = _pianoCoperturaCfg(infoC) || {};
                     return (
                       '<span class="piano-copre" title="Collaboratore ' +
-                      escP(repartoLabel(infoC.reparto_dip || 'slots')) +
+                      escP(repartoLabel(_repartoDi(infoC))) +
                       ' abilitato a coprire in questo settore' +
                       (cop.max_turni ? ' · max ' + cop.max_turni + ' turni al mese' : '') +
                       (cop.gruppi ? ' · solo ' + escP(String(cop.gruppi).toUpperCase()) : '') +
                       (cop.accompagnato ? ' · accompagnato' : '') +
                       '">copre &middot; ' +
-                      escP(repartoLabel(infoC.reparto_dip || 'slots')) +
+                      escP(repartoLabel(_repartoDi(infoC))) +
                       '</span>'
                     );
                   })()
                 : '<span class="piano-estraneo" title="Collaboratore del settore ' +
-                  escP(repartoLabel(infoC.reparto_dip || 'slots')) +
+                  escP(repartoLabel(_repartoDi(infoC))) +
                   ': non è abilitato a coprire qui, il suo piano dovrebbe stare nel suo settore">' +
-                  escP(repartoLabel(infoC.reparto_dip || 'slots')) +
+                  escP(repartoLabel(_repartoDi(infoC))) +
                   '</span>'
               : '') +
           '</td><td class="piano-fun"><strong>' +
@@ -3125,7 +3220,7 @@ async function _renderPianoCore() {
           });
         hFabb += '</tbody></table></div>';
         hFabb +=
-          '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);padding:8px 14px">assegnati/richiesti · celle gialle (weekend verdi) come la PIANIFICAZIONE dell&#39;Excel; numero <span style="color:var(--c-rosso,#c0392b);font-weight:700">rosso</span> = carenza. Il fabbisogno guida "Genera bozza".</p></div>';
+          '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);padding:8px 14px">assegnati/richiesti · celle gialle (weekend verdi) come la PIANIFICAZIONE dell&#39;Excel; numero <span style="color:var(--c-rosso,#c0392b);font-weight:700">rosso</span> = carenza. Il fabbisogno guida "Prepara il mese".</p></div>';
 
         // DIFFERENZE + EFFETTIVI · schema IDENTICO a Turnivo (calendario.html):
         // differenze = effettivi - pianificazione (verde >0, rosso <0, vuoto 0),
@@ -3413,4 +3508,61 @@ async function rimuoviPianoCella(giaChiuso) {
   } catch (e) {
     toastErrore('Cella rimossa, ma il seguito non e riuscito: ' + ((e && e.message) || e));
   }
+}
+
+// ================================================================
+// BARRA COMANDI DEL CALENDARIO (ondata 3): menu a tendina e azione principale
+// ================================================================
+// chiude i menu aperti della barra (dopo una scelta, un clic fuori o Esc)
+function pianoMenuChiudi(tranne) {
+  document.querySelectorAll('details.pmenu[open]').forEach((d) => {
+    if (d !== tranne) d.removeAttribute('open');
+  });
+}
+document.addEventListener('click', (e) => {
+  const aperto = e.target && e.target.closest ? e.target.closest('details.pmenu') : null;
+  pianoMenuChiudi(aperto);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') pianoMenuChiudi();
+});
+// PREPARA IL MESE: la bozza (generaBozzaPiano, invariata) e poi, se e stata scritta,
+// la proposta del passo dopo: Migliora la bozza. I posti scoperti si spiegano con
+// "Perché manca qualcuno" (menu Controlla), proposto se non si migliora.
+async function pianoPreparaMese() {
+  window._pianoUltimaBozza = null;
+  window._pianoPreparaInCorso = true;
+  try {
+    await generaBozzaPiano();
+  } finally {
+    window._pianoPreparaInCorso = false;
+  }
+  const b = window._pianoUltimaBozza;
+  if (!b) return; // annullata, niente da fare o errore (i messaggi li ha gia dati la bozza)
+  const mese = (MESI_FULL[parseInt(b.ym.split('-')[1]) - 1] || b.ym) + ' ' + b.ym.split('-')[0];
+  const scop = b.scoperti
+    ? b.scoperti + (b.scoperti === 1 ? ' posto è rimasto scoperto.' : ' posti sono rimasti scoperti.')
+    : 'tutti i posti sono coperti.';
+  const migliora = await chiediConferma(
+    'La bozza di ' +
+      mese +
+      ' è pronta: ' +
+      scop +
+      '\n\nPasso consigliato: Migliora la bozza. Il programma prova scambi e spostamenti fra i turni appena preparati e tiene solo quelli che rispettano meglio le regole, coprono più posti o equilibrano le ore. Prima di cambiare qualcosa ti mostra il prima e il dopo.',
+    { titolo: 'Prepara il mese', ok: 'Migliora la bozza', annulla: 'Non ora' },
+  );
+  if (migliora) {
+    await pianoMigliora();
+    return;
+  }
+  if (b.scoperti && typeof pianoPercheScoperti === 'function')
+    if (
+      await chiediConferma(
+        'Vuoi vedere perché ' +
+          (b.scoperti === 1 ? 'un posto è rimasto scoperto' : b.scoperti + ' posti sono rimasti scoperti') +
+          ' e cosa manca (personale, formazione, impostazioni)? Lo trovi anche nel menu Controlla, alla voce Perché manca qualcuno.',
+        { titolo: 'Posti scoperti', ok: 'Vedi perché', annulla: 'Dopo' },
+      )
+    )
+      await pianoPercheScoperti();
 }

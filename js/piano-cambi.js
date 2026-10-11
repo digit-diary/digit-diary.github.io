@@ -1242,7 +1242,7 @@ async function ripristinaOrdinePiano() {
   delete window._pianoOrdineCollab[_pianoReparto()];
   if (!(await salvaImp('piano_ordine_collab', JSON.stringify(window._pianoOrdineCollab)))) return;
   logAzione('Piano: ordine predefinito', _pianoReparto());
-  toast('Ordine predefinito: responsabili, vice, SUP, BO, poi gli altri; i jolly in fondo');
+  toast('Ordine dei nomi rimesso: responsabili, vice, SUP, BO, poi gli altri; i jolly in fondo');
   renderPiano();
 }
 
@@ -1312,7 +1312,7 @@ function apriCoperturaMalattia() {
   const nGiorni = _pianoUltimoGiorno(_pianoMeseSel);
   const b = document.getElementById('pwd-modal-content');
   b.innerHTML =
-    '<h3>Copertura malattia · ' +
+    '<h3>Sostituisci chi è in malattia · ' +
     _pianoMeseSel +
     '</h3><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Cerca i migliori sostituti liberi per i turni del collaboratore malato.</p>' +
     '<div class="field" style="text-align:left"><label>Collaboratore malato</label><select id="mal-collab" style="width:100%;padding:8px">' +

@@ -125,27 +125,17 @@ async function _pianoConfineAggiorna() {
   window._pianoConfineUltimo = { verso: verso, dal: dal };
   let h = '';
   const puo = typeof puoAzioniAutoPiano === 'function' && puoAzioniAutoPiano('genera');
+  // UNA RIGA RIASSUNTIVA per confine (ondata 3): quante regole di legge, i pulsanti, e
+  // l elenco in parole che si apre a richiesta (prima 6-12 righe sempre aperte)
   const blocco = (r, titolo, apri) => {
     if (!r || !r.lista.length) return '';
+    const rg = _pianoRiepilogoGravita(r.lista);
     let b =
-      '<div style="border-left:3px solid #b8860b;background:var(--paper2,rgba(184,134,11,.06));padding:8px 12px;margin:6px 0;font-size:var(--fs-sm,.8125rem)">' +
-      '<b>' +
+      '<div class="pavv pavv-grave pavv-confine"><div class="pavv-riga"><i class="icx icx-calendario"></i><span class="pavv-tit">' +
       escP(titolo) +
-      '</b><div style="margin:4px 0;line-height:1.6">';
-    r.lista.slice(0, 8).forEach((v) => {
-      b +=
-        '<div' +
-        (typeof _attrCella === 'function' ? _attrCella(v.nome, v.data) : '') +
-        '>• <strong>' +
-        escP(v.nome) +
-        '</strong> ' +
-        escP(_pianoGgMm(v.data)) +
-        ': ' +
-        escP(v.msg) +
-        '</div>';
-    });
-    if (r.lista.length > 8) b += '<div>e altre ' + (r.lista.length - 8) + '</div>';
-    b += '</div><div style="display:flex;gap:8px;flex-wrap:wrap">';
+      '</span>' +
+      rg.html +
+      '<button type="button" class="btn-act pavv-apri" aria-expanded="false" onclick="pianoAvvisiApri(this)">Mostra l\'elenco</button>';
     if (apri)
       b +=
         '<button class="btn-act" onclick="pianoConfineApri(\'' +
@@ -157,29 +147,29 @@ async function _pianoConfineAggiorna() {
       b +=
         '<button class="btn-act" onclick="pianoConfineCorreggi(\'' +
         escP(r.ymB) +
-        '\')" title="Cerca pochi cambi fra le celle generate dei primi giorni di ' +
+        '\')" title="Cerca pochi cambi fra le celle preparate dal programma nei primi giorni di ' +
         escP(_pianoConfineMeseLabel(r.ymB)) +
         ': mostra la proposta e scrive solo se confermi">Proponi correzione</button>';
-    b += '</div></div>';
+    b +=
+      '</div><div class="pavv-corpo">' +
+      _pianoElencoAvvisi(
+        r.lista.map((v) => ({ msg: v.msg, html: _pianoRigaAvviso(v.nome, v.data, _pianoGgMm(v.data), v.msg) })),
+      ) +
+      '</div></div>';
     return b;
   };
   h += blocco(
     verso,
-    _pianoConfineMeseLabel(verso && verso.ymB) +
-      ' e già pianificato ed e da ricontrollare: i turni di fine ' +
+    'Inizio di ' +
+      _pianoConfineMeseLabel(verso && verso.ymB) +
+      ' (già pianificato): i turni di fine ' +
       _pianoConfineMeseLabel(ym) +
-      ' rompono ' +
-      ((verso && verso.lista.length) || 0) +
-      ' regole di legge nei suoi primi giorni',
+      ' creano',
     true,
   );
   h += blocco(
     dal,
-    'Da ricontrollare: i turni di fine ' +
-      _pianoConfineMeseLabel(dal && dal.ymA) +
-      ' rompono ' +
-      ((dal && dal.lista.length) || 0) +
-      ' regole di legge nei primi giorni di questo mese',
+    'Primi giorni di questo mese: i turni di fine ' + _pianoConfineMeseLabel(dal && dal.ymA) + ' creano',
     false,
   );
   el2.innerHTML = h;
@@ -264,7 +254,7 @@ async function pianoConfineCorreggi(ymB) {
   const ok = await chiediModulo(
     'Proposta per ' +
       _pianoConfineMeseLabel(ymB) +
-      ' (controllata con "Valida regole"):\n• Regole di legge violate nel mese: ' +
+      ' (controllata con "Controlla le regole"):\n• Regole di legge non rispettate nel mese: ' +
       P.legge +
       ' → ' +
       D.legge +

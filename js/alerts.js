@@ -171,14 +171,18 @@ function renderAlertCompatti() {
   const rischio = document.getElementById('rischio-alerts-container');
   if (!cassa) return;
   let strip = document.getElementById('alert-compatto');
+  // PERMESSI: si contano e si mostrano solo gli avvisi che l operatore puo vedere (prima la
+  // riga compatta rimetteva visibili anche quelli di cassa/rischio nascosti dai permessi)
+  const okCassa = typeof isVis !== 'function' || isVis('alert_cassa');
+  const okRischio = typeof isVis !== 'function' || isVis('alert_rischio');
   const banners = [
-    ...(cassa ? cassa.querySelectorAll('.cassa-alert-banner') : []),
-    ...(rischio ? rischio.querySelectorAll('.rischio-alert-banner, .cassa-alert-banner') : []),
+    ...(cassa && okCassa ? cassa.querySelectorAll('.cassa-alert-banner') : []),
+    ...(rischio && okRischio ? rischio.querySelectorAll('.rischio-alert-banner, .cassa-alert-banner') : []),
   ];
   if (banners.length < 2) {
     if (strip) strip.remove();
-    if (cassa) cassa.style.display = '';
-    if (rischio) rischio.style.display = '';
+    if (cassa) cassa.style.display = okCassa ? '' : 'none';
+    if (rischio) rischio.style.display = okRischio ? '' : 'none';
     return;
   }
   if (!strip) {
@@ -199,8 +203,8 @@ function renderAlertCompatti() {
     '<span class="sec-chev">&#9660;</span>';
   strip.classList.toggle('aperto', !!window._alertEspansi);
   const vis = window._alertEspansi ? '' : 'none';
-  if (cassa) cassa.style.display = vis;
-  if (rischio) rischio.style.display = vis;
+  if (cassa) cassa.style.display = okCassa ? vis : 'none';
+  if (rischio) rischio.style.display = okRischio ? vis : 'none';
 }
 function toggleCassaDD(type) {
   const dd = document.getElementById('cassa-' + type + '-dd');

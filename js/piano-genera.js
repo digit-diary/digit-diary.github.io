@@ -1848,7 +1848,7 @@ async function pianoProponiCorrezioniImport(ym, errori) {
   const mappa = (righe) => {
     const m = {};
     righe.forEach((r) => {
-      if ((r.reparto_dip || 'slots') !== _pianoReparto() && !_pianoCopreQui(r)) return;
+      if (_repartoDi(r) !== _pianoReparto() && !_pianoCopreQui(r)) return;
       (m[r.collaboratore] = m[r.collaboratore] || {})[String(r.data).substring(0, 10)] = {
         cod: r.codice,
         ini: r.ora_inizio,
@@ -1932,7 +1932,7 @@ async function pianoProponiCorrezioniImport(ym, errori) {
     await mostraAvviso(
       'Non ho trovato correzioni sicure: ogni cambio provato avrebbe peggiorato un altra regola o lasciato un posto scoperto. Il piano resta come nel file.\n\nI ' +
         prima.length +
-        ' errori di riposo e giorni di fila restano da sistemare a mano: li trovi con Valida regole.',
+        ' errori di riposo e giorni di fila restano da sistemare a mano: li trovi con Controlla le regole (menu Controlla).',
       { titolo: 'Correzioni del piano importato', ok: 'Ho capito' },
     );
     return;
@@ -2049,33 +2049,225 @@ async function pianoRiepilogoViolazioni(ym, titolo) {
   else renderPiano();
 }
 
+// ================================================================
+// AVVISI IN PAROLE (ondata 3): i messaggi delle regole restano quelli di sempre (li
+// leggono Migliora, i filtri degli Avvisi, le prove), ma si MOSTRANO in italiano
+// semplice, con le ore in "45 h 08 min" e la regola spiegata. Solo testo a video.
+// ================================================================
+// 45.13 -> "45 h 08 min", 10 -> "10 h", 0.5 -> "30 min"
+function _pianoOreHM(ore) {
+  const v = parseFloat(ore);
+  if (!isFinite(v)) return String(ore);
+  const min = Math.round(Math.abs(v) * 60);
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  if (!h) return (v < 0 ? '-' : '') + m + ' min';
+  return (v < 0 ? '-' : '') + h + ' h' + (m ? ' ' + String(m).padStart(2, '0') + ' min' : '');
+}
+// regole di legge (riposi, giorni di fila, ore della settimana, domeniche): rosso.
+// Le altre (ore del mese, preferenze, formazione, regole del settore): da controllare.
+function _pianoViolDiLegge(msg) {
+  return /di riposo dopo|giorni lavorativi consecutivi|riposo singolo dopo|lavorate nella settimana|domenica .*lavorata|domenica (\S+ )?libera:|nessuna domenica libera|riposo di .* ore/.test(
+    String(msg || ''),
+  );
+}
+function _pianoMsgSemplice(msg) {
+  const m = String(msg || '');
+  const hm = _pianoOreHM;
+  let x;
+  if ((x = m.match(/^(\d+) giorni lavorativi consecutivi \(max (\d+)\)$/)))
+    return x[1] + ' giorni di lavoro di fila: al massimo se ne possono fare ' + x[2];
+  if ((x = m.match(/^solo ([\d.]+)h di riposo dopo (.+?) \(min(?:imo)? ([\d.]+)h\)$/)))
+    return (
+      'solo ' +
+      hm(x[1]) +
+      ' di riposo dopo ' +
+      (/^il turno/.test(x[2]) ? x[2] : 'il turno ' + x[2]) +
+      ': fra due turni servono almeno ' +
+      hm(x[3])
+    );
+  if ((x = m.match(/^riposo singolo dopo (\d+) giorni di lavoro \(vietato 4\+1\+1\)$/)))
+    return (
+      'un solo giorno di riposo dopo ' +
+      x[1] +
+      ' giorni di lavoro: dopo 4 o più giorni di lavoro servono almeno 2 giorni di riposo di fila'
+    );
+  if (
+    (x = m.match(
+      /^([\d.]+) ore \(([\d.]+) da orologio \+ ([\d.]+) notturno\) lavorate nella settimana (\S+)-(\S+) \(max ([\d.]+)( compreso il 10%| da orologio)\)$/,
+    ))
+  )
+    return (
+      hm(x[1]) +
+      ' di lavoro nella settimana dal ' +
+      x[4] +
+      ' al ' +
+      x[5] +
+      ' (' +
+      hm(x[2]) +
+      ' di turni + ' +
+      hm(x[3]) +
+      ' del 10% notturno): il massimo è ' +
+      hm(x[6]) +
+      (x[7] === ' da orologio' ? ' di turni, senza il 10% notturno' : '')
+    );
+  if (
+    (x = m.match(
+      /^domenica (\S+) libera: riposo di ([\d.]+) ore consecutive \(minimo ([\d.]+), comprese le 23 del sabato e le 23 della domenica\)$/,
+    ))
+  )
+    return (
+      'domenica ' +
+      x[1] +
+      ' libera, ma con solo ' +
+      hm(x[2]) +
+      ' di riposo di fila: ne servono almeno ' +
+      hm(x[3]) +
+      ', dalle 23 del sabato alle 23 della domenica comprese'
+    );
+  if (
+    (x = m.match(
+      /^domenica (\S+) lavorata: nessun riposo di ([\d.]+) ore ne nella settimana prima ne in quella dopo \(il più lungo: prima ([\d.]+), dopo ([\d.]+) ore\)$/,
+    ))
+  )
+    return (
+      'domenica ' +
+      x[1] +
+      ' lavorata: serve un riposo di almeno ' +
+      hm(x[2]) +
+      ' di fila nella settimana prima o in quella dopo (il più lungo è di ' +
+      hm(x[3]) +
+      ' prima e ' +
+      hm(x[4]) +
+      ' dopo)'
+    );
+  if ((x = m.match(/^ore mese ([\d.]+)h (SOPRA il massimo|SOTTO il minimo) ([\d.]+)h \(regole tolleranza( jolly)?\)$/)))
+    return (
+      'ore del mese: ' +
+      hm(x[1]) +
+      (x[2].startsWith('SOPRA') ? ', sopra il massimo di ' : ', sotto il minimo di ') +
+      hm(x[3])
+    );
+  if ((x = m.match(/^(\d+) giorni di lavoro nella settimana (\S+) \(preferenza: massimo (\d+) a settimana\)$/)))
+    return (
+      x[1] +
+      ' giorni di lavoro nella settimana del ' +
+      x[2] +
+      ': nelle sue preferenze al massimo ' +
+      x[3] +
+      ' a settimana'
+    );
+  if (
+    (x = m.match(
+      /^domenica libera: (\d+) nell anno su (\d+) attese fino a questo mese \(minimo (\d+) all anno(?:, arretrato (\d+) da recuperare entro dicembre)?\): da recuperare$/,
+    ))
+  )
+    return (
+      'domeniche libere: ' +
+      x[1] +
+      " finora nell'anno, a questo punto dovrebbero essere " +
+      x[2] +
+      ' (il minimo è ' +
+      x[3] +
+      " all'anno)" +
+      (x[4] ? ': ' + x[4] + ' da recuperare entro dicembre' : '')
+    );
+  if (m === 'domenica non conteggiabile come libera: il sabato finisce oltre le 23')
+    return 'questa domenica non conta come libera: il turno del sabato finisce dopo le 23';
+  if (m === 'turno notturno il giorno prima delle vacanze (deve essere diurno)')
+    return 'turno di notte il giorno prima delle vacanze: deve essere un turno di giorno';
+  if ((x = m.match(/^(\S+): non risulta formato\/idoneo per il gruppo (.*)$/)))
+    return 'turno ' + x[1] + ": non risulta formato per l'area " + x[2];
+  if ((x = m.match(/^preferenza solo diurni: (\S+) e notturno$/)))
+    return 'turno ' + x[1] + ' di notte, ma nelle sue preferenze fa solo turni di giorno';
+  if ((x = m.match(/^preferenza solo notturni: (\S+) non e notturno$/)))
+    return 'turno ' + x[1] + ' di giorno, ma nelle sue preferenze fa solo turni di notte';
+  if ((x = m.match(/^preferenza giorni di lavoro: (\S+) di (\S+) \(lavora solo (.*)\)$/)))
+    return 'turno ' + x[1] + ' di ' + x[2] + ', ma nelle sue preferenze lavora solo ' + x[3];
+  return m;
+}
+// riga riassuntiva per gravita: { legge, altre, html } (html = le due etichette colorate)
+function _pianoRiepilogoGravita(lista) {
+  const legge = (lista || []).filter((v) => _pianoViolDiLegge(v.msg)).length;
+  const altre = (lista || []).length - legge;
+  const chip = (n, cls, uno, molti) =>
+    n ? '<span class="pavv-chip ' + cls + '">' + n + ' ' + (n === 1 ? uno : molti) + '</span>' : '';
+  return {
+    legge: legge,
+    altre: altre,
+    html:
+      chip(legge, 'pavv-legge', 'problema di legge', 'problemi di legge') +
+      chip(altre, 'pavv-contr', 'cosa da controllare', 'cose da controllare'),
+  };
+}
+// una riga dell elenco: nome, giorno, regola in parole (si clicca per andare alla cella)
+function _pianoRigaAvviso(nome, dataISO, etichettaGiorno, msg) {
+  return (
+    '<li class="' +
+    (_pianoViolDiLegge(msg) ? 'pavv-l' : 'pavv-c') +
+    '"' +
+    (typeof _attrCella === 'function' && dataISO ? _attrCella(nome, dataISO) : '') +
+    ' title="' +
+    escP(msg) +
+    '"><b>' +
+    escP(nome) +
+    '</b>' +
+    (etichettaGiorno ? ' <span class="pavv-quando">' + escP(etichettaGiorno) + '</span>' : '') +
+    ' <span class="pavv-cosa">' +
+    escP(_pianoMsgSemplice(msg)) +
+    '</span></li>'
+  );
+}
+// elenco ordinato: prima le regole di legge, poi le altre
+function _pianoElencoAvvisi(voci) {
+  const l = voci.filter((v) => _pianoViolDiLegge(v.msg));
+  const c = voci.filter((v) => !_pianoViolDiLegge(v.msg));
+  const blocco = (titolo, arr) =>
+    arr.length
+      ? '<div class="pavv-gruppo">' +
+        titolo +
+        '</div><ul class="pavv-lista">' +
+        arr.map((v) => v.html).join('') +
+        '</ul>'
+      : '';
+  return (
+    blocco('Problemi di legge: riposi, giorni di fila, ore della settimana, domeniche', l) +
+    blocco('Da controllare: ore del mese, preferenze, formazione e regole del settore', c)
+  );
+}
+function pianoAvvisiApri(btn) {
+  const box = btn && btn.closest('.pavv');
+  if (!box) return;
+  const aperto = box.classList.toggle('aperto');
+  btn.textContent = aperto ? "Nascondi l'elenco" : "Mostra l'elenco";
+  btn.setAttribute('aria-expanded', aperto ? 'true' : 'false');
+}
 function _pianoRenderViolazioni() {
   const el = document.getElementById('piano-violazioni');
   if (!el || _pianoViolLista === null) return;
   if (!_pianoViolLista.length) {
     el.innerHTML =
-      '<p style="padding:8px 14px;font-size:var(--fs-sm,.8125rem);color:var(--c-verde,#2c6e49);font-weight:600"><i class="icx icx-check"></i> Nessuna violazione delle regole attive nel mese.</p>';
+      '<div class="pavv pavv-ok"><div class="pavv-riga"><i class="icx icx-check"></i><span class="pavv-tit">Controllo delle regole:</span> nessun problema nel mese.</div></div>';
     return;
   }
-  let h =
-    '<div style="padding:8px 14px"><p style="font-size:var(--fs-sm,.8125rem);font-weight:700;color:var(--accent);margin-bottom:6px">' +
-    _pianoViolLista.length +
-    ' violazioni (celle evidenziate in rosso):</p><div style="max-height:180px;overflow-y:auto;font-size:var(--fs-md,.875rem);line-height:1.7">';
-  _pianoViolLista.forEach((v) => {
-    const dV = v.giorno ? _pianoMeseSel + '-' + String(v.giorno).padStart(2, '0') : '';
-    h +=
-      '<div' +
-      (typeof _attrCella === 'function' && dV ? _attrCella(v.nome, dV) : '') +
-      '>• <strong>' +
-      escP(v.nome) +
-      '</strong> · giorno ' +
-      v.giorno +
-      ': ' +
-      escP(v.msg) +
-      '</div>';
-  });
-  h += '</div></div>';
-  el.innerHTML = h;
+  const rg = _pianoRiepilogoGravita(_pianoViolLista);
+  const voci = _pianoViolLista.map((v) => ({
+    msg: v.msg,
+    html: _pianoRigaAvviso(
+      v.nome,
+      v.giorno ? _pianoMeseSel + '-' + String(v.giorno).padStart(2, '0') : '',
+      v.giorno ? 'giorno ' + v.giorno : 'nel mese',
+      v.msg,
+    ),
+  }));
+  el.innerHTML =
+    '<div class="pavv ' +
+    (rg.legge ? 'pavv-grave' : 'pavv-medio') +
+    '"><div class="pavv-riga"><i class="icx icx-avviso"></i><span class="pavv-tit">Controllo delle regole:</span>' +
+    rg.html +
+    '<span class="pavv-nota">celle in rosso nel calendario</span><button type="button" class="btn-act pavv-apri" aria-expanded="false" onclick="pianoAvvisiApri(this)">Mostra l\'elenco</button></div><div class="pavv-corpo">' +
+    _pianoElencoAvvisi(voci) +
+    '</div></div>';
 }
 
 // ================================================================
@@ -2089,7 +2281,7 @@ async function completaConCoperture() {
   if (!puoGestirePiano()) return;
   const chi = collaboratoriCache
     .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && _pianoCoperturaCfg(c))
-    .map((c) => c.nome + ' (' + repartoLabel(c.reparto_dip || 'slots') + ')');
+    .map((c) => c.nome + ' (' + repartoLabel(_repartoDi(c)) + ')');
   if (!chi.length) {
     toast('Nessun collaboratore abilitato a coprire in questo settore');
     return;
@@ -2229,9 +2421,7 @@ async function generaBozzaPiano(usaCoperture) {
     const anno = parseInt(ym.substring(0, 4));
     const altri = new Set(
       collaboratoriCache
-        .filter(
-          (c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && (c.reparto_dip || 'slots') !== _pianoReparto(),
-        )
+        .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && _repartoDi(c) !== _pianoReparto())
         .map((c) => c.nome),
     );
     if (altri.size && typeof _vacGiorni === 'function') {
@@ -2596,7 +2786,7 @@ async function generaBozzaPiano(usaCoperture) {
   const regoleAreaMese = pianoRegoleGruppoCache.filter(
     (r) =>
       r.attivo !== false &&
-      (r.reparto_dip || 'slots') === _pianoReparto() &&
+      _repartoDi(r) === _pianoReparto() &&
       String(r.tipo_regola || '').toLowerCase() === 'turni_persona_area_mese',
   );
   const turniAreaMese = (n, gr) => {
@@ -3544,7 +3734,7 @@ async function generaBozzaPiano(usaCoperture) {
   if (
     !auto &&
     !(await chiediConferma(
-      'Genera bozza per ' +
+      'Prepara il mese per ' +
         ym +
         ' (' +
         repartoLabel(_pianoReparto()) +
@@ -3572,7 +3762,7 @@ async function generaBozzaPiano(usaCoperture) {
         (riposiRestano.length
           ? '\n• riposo attorno alla domenica ancora da sistemare a mano: ' + riposiRestano.join(', ')
           : '') +
-        '\n\nLe celle esistenti (vacanze, protette, malattie) NON vengono toccate.\nLa bozza si può eliminare con "Cancella piano". Procedere?',
+        '\n\nLe celle esistenti (vacanze, protette, malattie) NON vengono toccate.\nLa bozza si può togliere con "Svuota il mese". Procedere?',
     ))
   ) {
     // Le C di riempimento e le vacanze sono gia' state riscritte per poter
@@ -3632,14 +3822,16 @@ async function generaBozzaPiano(usaCoperture) {
     );
     _pianoViolLista = null;
     _pianoViolCelle = {};
+    // esito per "Prepara il mese" (piano-core.js), che propone poi Migliora la bozza
+    window._pianoUltimaBozza = { ym: ym, celle: r.inserite, scoperti: scoperti.length };
     await renderPiano();
     // posti scoperti: il programma dice perche e cosa manca (personale, formazione, impostazioni)
-    if (scoperti.length && typeof pianoPercheScoperti === 'function')
+    if (scoperti.length && typeof pianoPercheScoperti === 'function' && !window._pianoPreparaInCorso)
       if (
         await chiediConferma(
           scoperti.length +
             (scoperti.length === 1 ? ' posto e rimasto scoperto' : ' posti sono rimasti scoperti') +
-            '. Vuoi vedere perché e cosa manca (personale, formazione, impostazioni)? Prima puoi anche provare Migliora la bozza: il pulsante Perché scoperto resta nella barra.',
+            '. Vuoi vedere perché e cosa manca (personale, formazione, impostazioni)? Prima puoi anche provare Migliora la bozza (menu Sistema): Perché manca qualcuno resta nel menu Controlla.',
           { titolo: 'Posti scoperti', ok: 'Vedi perché', annulla: 'Dopo' },
         )
       )
@@ -3661,7 +3853,7 @@ async function cancellaBozzaPiano() {
   const a = ym + '-' + String(_pianoUltimoGiorno(ym)).padStart(2, '0');
   // si contano SOLO le celle di questo settore, come quelle che si cancellano (prima si
   // contavano anche quelle di chi copre da un altro settore: "TUTTE (120)" e poi "110 rimosse")
-  const mieC = _pianoRighe.filter((r) => (r.reparto_dip || 'slots') === _pianoReparto());
+  const mieC = _pianoRighe.filter((r) => _repartoDi(r) === _pianoReparto());
   const nonProtette = mieC.filter((r) => !r.protetto).length;
   const protette = mieC.length - nonProtette;
   const meseTxt = new Date(ym + '-01T12:00:00').toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
@@ -3695,7 +3887,7 @@ async function eseguiCancellaPiano(tutto) {
   const ym = _pianoMeseSel;
   const da = ym + '-01';
   const a = ym + '-' + String(_pianoUltimoGiorno(ym)).padStart(2, '0');
-  const mie = _pianoRighe.filter((r) => (r.reparto_dip || 'slots') === _pianoReparto()); // non le celle degli altri settori
+  const mie = _pianoRighe.filter((r) => _repartoDi(r) === _pianoReparto()); // non le celle degli altri settori
   const n = tutto ? mie.length : mie.filter((r) => !r.protetto).length;
   if (!n) {
     toast('Niente da cancellare');

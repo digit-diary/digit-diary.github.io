@@ -1303,7 +1303,7 @@ async function formazioneStampaProposta(i) {
   } else y += 6;
   doc.setFontSize(10);
   doc.text(
-    'Valida regole: violazioni ' +
+    'Controlla le regole: violazioni ' +
       p.prima.violazioni +
       ' -> ' +
       p.dopo.violazioni +

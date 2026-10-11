@@ -52,19 +52,19 @@ const PIANO_REGOLE_GUIDA = {
     g: 'Riposo e giorni di lavoro',
     n: 'Ore minime di riposo fra due turni',
     t: 'numero',
-    d: 'Valida regole, bozza, cambi turno, coperture',
+    d: 'Controlla le regole, bozza, cambi turno, coperture',
   },
   max_consecutivi: {
     g: 'Riposo e giorni di lavoro',
     n: 'Giorni di lavoro consecutivi al massimo',
     t: 'numero',
-    d: 'Valida regole, bozza, cambi turno, coperture',
+    d: 'Controlla le regole, bozza, cambi turno, coperture',
   },
   no_4w1c1w: {
     g: 'Riposo e giorni di lavoro',
     n: 'Vietato: 4 giorni di lavoro, 1 di riposo, poi di nuovo lavoro',
     t: 'sino',
-    d: 'Valida regole e bozza',
+    d: 'Controlla le regole e bozza',
   },
   blocchi_compatti: {
     g: 'Riposo e giorni di lavoro',
@@ -106,55 +106,55 @@ const PIANO_REGOLE_GUIDA = {
     g: 'Domeniche',
     n: 'Domeniche libere garantite in un anno',
     t: 'numero',
-    d: 'Valida regole, tabella Domeniche, Benessere, bozza',
+    d: 'Controlla le regole, tabella Domeniche, Benessere, bozza',
   },
   turno_prima_domenica_libera: {
     g: 'Domeniche',
     n: 'La domenica libera vale solo se il sabato finisce entro le 23',
     t: 'sino',
-    d: 'Valida regole, tabella Domeniche, Benessere',
+    d: 'Controlla le regole, tabella Domeniche, Benessere',
   },
   tolleranza_ore: {
     g: 'Ore e saldo',
     n: 'Scarto accettato dalle ore dovute del mese (più o meno): vale solo se le due regole "sopra" e "sotto" sono vuote',
     t: 'numero',
-    d: 'Valida regole, bozza, Migliora ore (se sopra e sotto sono vuote)',
+    d: 'Controlla le regole, bozza, Sistema le ore (se sopra e sotto sono vuote)',
   },
   tolleranza_ore_sopra: {
     g: 'Ore e saldo',
     n: 'Ore massime sopra le dovute del mese (se attiva vince sulla precedente)',
     t: 'numero',
-    d: 'Valida regole, bozza, Migliora ore',
+    d: 'Controlla le regole, bozza, Sistema le ore',
   },
   tolleranza_ore_sotto: {
     g: 'Ore e saldo',
     n: 'Ore massime sotto le dovute del mese (se attiva vince sulla precedente)',
     t: 'numero',
-    d: 'Valida regole',
+    d: 'Controlla le regole',
   },
   riposo_domenica_libera_ore: {
     g: 'Domeniche',
     n: 'Domenica libera: ore consecutive minime di riposo (comprese le 23 del sabato - 23 della domenica)',
     t: 'numero',
-    d: 'Valida regole, avviso sulla cella, bozza, scheda Avvisi',
+    d: 'Controlla le regole, avviso sulla cella, bozza, scheda Avvisi',
   },
   riposo_domenica_lavorata_ore: {
     g: 'Domeniche',
     n: 'Domenica lavorata: ore consecutive minime di riposo nella settimana prima oppure in quella dopo (lunedì-sabato)',
     t: 'numero',
-    d: 'Valida regole, avviso sulla cella, scheda Avvisi',
+    d: 'Controlla le regole, avviso sulla cella, scheda Avvisi',
   },
   ore_settimana_con_notturno: {
     g: 'Ore e saldo',
     n: 'Il massimo di ore della settimana comprende il 10% notturno (Si) o solo le ore da orologio (No)',
     t: 'sino',
-    d: 'Valida regole, avviso sulla cella, bozza, scheda Avvisi',
+    d: 'Controlla le regole, avviso sulla cella, bozza, scheda Avvisi',
   },
   ore_settimana_max: {
     g: 'Ore e saldo',
     n: 'Ore lavorate massime nella settimana lunedì-domenica (con o senza il 10% notturno: vedi la regola sotto)',
     t: 'numero',
-    d: 'Valida regole, avviso sulla cella, bozza, scheda Avvisi',
+    d: 'Controlla le regole, avviso sulla cella, bozza, scheda Avvisi',
   },
   saldo_ore_max: {
     g: 'Ore e saldo',
@@ -178,13 +178,13 @@ const PIANO_REGOLE_GUIDA = {
     g: 'Ausiliari (jolly)',
     n: 'Ore massime al mese per gli ausiliari senza percentuale',
     t: 'numero',
-    d: 'Valida regole e bozza',
+    d: 'Controlla le regole e bozza',
   },
   jolly_ore_min: {
     g: 'Ausiliari (jolly)',
     n: 'Ore minime al mese per gli ausiliari senza percentuale',
     t: 'numero',
-    d: 'Valida regole (solo avviso)',
+    d: 'Controlla le regole (solo avviso)',
   },
   jolly_codici_gia_pagati: {
     g: 'Ausiliari (jolly)',
@@ -376,13 +376,17 @@ const PIANO_REGOLE_GUIDA = {
     g: 'Vacanze',
     n: 'Turno diurno il giorno prima della vacanza',
     t: 'sino',
-    d: 'Valida regole',
+    d: 'Controlla le regole',
   },
+  // valore predefinito (p): vale anche quando nel database la riga non c e (motore e
+  // scheda lo leggono da qui, _pianoFunzioniFannoTutto in piano-core.js)
   funzioni_fanno_tutto: {
     g: 'Funzioni e turni',
     n: 'Funzioni che a mano possono fare qualsiasi turno (il livello alto comprende quelli sotto, come in Formazione)',
+    s: 'Sigle delle funzioni separate da virgola (per esempio SUP,RESP). Vuoto = nessuna: a mano valgono per tutti le regole del settore.',
     t: 'testo',
-    d: 'Scrittura manuale, Valida regole, cambi turno e coperture (la bozza automatica segue le regole del settore)',
+    p: 'SUP,RESP',
+    d: 'Scrittura manuale, Controlla le regole, cambi turno e coperture (la bozza automatica segue le regole del settore)',
   },
   chiusura_ora_normale: {
     g: 'Orari di chiusura',
@@ -441,7 +445,7 @@ const PIANO_REGOLE_GUIDA = {
     s: 'Sigle delle funzioni separate da virgola (per esempio RESP). Vuoto = nessuna funzione esente.',
     t: 'testo',
     p: 'RESP',
-    d: 'Valida regole (riposo attorno alla domenica, domeniche libere), tabella Domeniche, bozza',
+    d: 'Controlla le regole (riposo attorno alla domenica, domeniche libere), tabella Domeniche, bozza',
   },
   domeniche_indietro_rigido: {
     g: 'Domeniche',
@@ -533,14 +537,13 @@ const PIANO_REGOLE_LIMITI = {
 function _pianoContestoSettore(settore) {
   const chiave = String(settore || '').toLowerCase();
   const tutti = !chiave;
-  const turni = pianoTurniCache.filter((t) => t.attivo !== false && (tutti || (t.reparto_dip || 'slots') === chiave));
+  const turni = pianoTurniCache.filter((t) => t.attivo !== false && (tutti || _repartoDi(t) === chiave));
   const funzioni = new Set();
   collaboratoriCache
-    .filter((c) => c.attivo !== false && (tutti || (c.reparto_dip || 'slots') === chiave))
+    .filter((c) => c.attivo !== false && (tutti || _repartoDi(c) === chiave))
     .forEach((c) => c.funzione && funzioni.add(String(c.funzione).toUpperCase()));
   const jolly = collaboratoriCache.some(
-    (c) =>
-      c.attivo !== false && (tutti || (c.reparto_dip || 'slots') === chiave) && (c.is_jolly || c.impiego === 'jolly'),
+    (c) => c.attivo !== false && (tutti || _repartoDi(c) === chiave) && (c.is_jolly || c.impiego === 'jolly'),
   );
   return {
     label: tutti ? 'nessun settore' : repartoLabel(chiave),
@@ -606,9 +609,7 @@ function _pianoValidaRegola(nome, valore, settore) {
     // sigle dei turni del settore (o di tutti i settori per il valore generale)
     const chiave = String(settore || '').toLowerCase();
     const noti = new Set(
-      pianoTurniCache
-        .filter((t) => !chiave || (t.reparto_dip || 'slots') === chiave)
-        .map((t) => String(t.codice).toUpperCase()),
+      pianoTurniCache.filter((t) => !chiave || _repartoDi(t) === chiave).map((t) => String(t.codice).toUpperCase()),
     );
     const ignoti = v
       .split(',')
@@ -701,7 +702,7 @@ function _renderPianoRegoleCard() {
     '<li><b>Si / No</b> accende o spegne una preferenza. La casella <b>Attiva</b> spegne qualsiasi regola senza perdere il valore: spenta, e come se non esistesse.</li>' +
     '<li><b>Un valore diverso per un settore</b>: scegli il settore nel menu in alto e cambia il numero. Nasce l eccezione per quel settore; gli altri tengono il valore generale. "Torna al generale" la toglie. Esempio: riposo 11 ore ovunque, 12 ai Tavoli.</li>' +
     '<li><b>Regole nuove sui gruppi di lavoro</b> (chi può fare cassa, quanti Supervisor al giorno, una funzione richiesta): si creano nella card <b>Regole di gruppo</b>, più in basso in questa scheda, scegliendo il tipo dall elenco. Non serve scrivere codice.</li>' +
-    '<li><b>Preferenze di una persona</b> (solo diurni o notturni, turni bloccati, giorni di lavoro, affiancamento): in Piano &gt; Impostazioni, Preferenze collaboratori. La copertura di altri settori, la funzione e la percentuale in Impostazioni &gt; Gestione collaboratori; competenze e livelli in Formazione. La bozza e Valida regole le rispettano.</li>' +
+    '<li><b>Preferenze di una persona</b> (solo diurni o notturni, turni bloccati, giorni di lavoro, affiancamento): in Piano &gt; Impostazioni, Preferenze collaboratori. La copertura di altri settori, la funzione e la percentuale in Impostazioni &gt; Gestione collaboratori; competenze e livelli in Formazione. La bozza e Controlla le regole le rispettano.</li>' +
     '<li><b>Fonte</b>: sotto ogni regola normativa c e il riferimento (RAP, legge sul lavoro, direttiva). Se cambia il regolamento, cambia il numero qui: il programma non va toccato. Ogni modifica finisce nel Registro attività.</li>' +
     '</ol></details>';
   if (vista)
@@ -1025,7 +1026,7 @@ async function setPianoFabbisogno(codice, dstr, qDiretta) {
   if (!puoGestirePiano()) return;
   if (!_pianoAzioneAutoConsentita('fabbisogno')) return; // visibile a tutti, modificabile con il permesso
   const esistente = _pianoFabbCache.find(
-    (f) => f.turno_codice === codice && f.data === dstr && (f.reparto_dip || 'slots') === _pianoReparto(),
+    (f) => f.turno_codice === codice && f.data === dstr && _repartoDi(f) === _pianoReparto(),
   );
   const attuale = esistente ? esistente.quantita : 0;
   let q;
@@ -1085,7 +1086,7 @@ function fabbisognoInline(codice, dstr, el, opz) {
   if (!puoGestirePiano() || !el || el.querySelector('input')) return;
   if (!opz.blocco) _fabbSelezionaCella(el);
   const esistente = _pianoFabbCache.find(
-    (f) => f.turno_codice === codice && f.data === dstr && (f.reparto_dip || 'slots') === _pianoReparto(),
+    (f) => f.turno_codice === codice && f.data === dstr && _repartoDi(f) === _pianoReparto(),
   );
   const attuale = esistente ? esistente.quantita : 0;
   const vecchio = el.innerHTML;
@@ -2203,13 +2204,12 @@ async function _importaPianoDaWb(wb, ym, opz) {
       const cod = String(r.codice || '').toUpperCase();
       if (cod === x.codice) {
         // JG gia nel piano senza orario: l orario della nota del file si aggiunge
-        if (x.ora_inizio && !r.ora_inizio && (r.reparto_dip || 'slots') === rep) orariNuovi.push({ riga: r, nuovo: x });
-        if (x.motivo_blocco && !r.motivo_blocco && (r.reparto_dip || 'slots') === rep)
-          lucchettiNuovi.push({ riga: r, nuovo: x });
+        if (x.ora_inizio && !r.ora_inizio && _repartoDi(r) === rep) orariNuovi.push({ riga: r, nuovo: x });
+        if (x.motivo_blocco && !r.motivo_blocco && _repartoDi(r) === rep) lucchettiNuovi.push({ riga: r, nuovo: x });
         const voluto = coloreVoluto(r, x);
         if (
           voluto !== (r.colore || '') &&
-          (r.reparto_dip || 'slots') === rep &&
+          _repartoDi(r) === rep &&
           !(_pianoGiornoBloccato(x.data) && !_pianoGiornoSbloccato(x.data))
         )
           coloriDiversi.push({ riga: r, nuovo: x, colore: voluto || null });
@@ -2218,7 +2218,7 @@ async function _importaPianoDaWb(wb, ym, opz) {
       }
       const voce = x.collaboratore + ' ' + gg(x.data) + ': ' + cod + ' (file ' + x.codice + ')';
       // cella scritta dal piano di un altro settore: la decide quel settore
-      if ((r.reparto_dip || 'slots') !== rep) tenute.altroSettore.push(voce);
+      if (_repartoDi(r) !== rep) tenute.altroSettore.push(voce);
       // malattia registrata (dal Diario o a mano): vale la malattia, non il turno del file
       else if (MAL.includes(cod) && !MAL.includes(x.codice)) tenute.malattia.push(voce);
       // giorno chiuso: si corregge solo sbloccandolo, con motivo
@@ -2239,7 +2239,7 @@ async function _importaPianoDaWb(wb, ym, opz) {
       esistenti.forEach((r) => {
         const d = String(r.data).substring(0, 10);
         if (!giorniFile.has(d) || fileChiave.has(r.collaboratore + '|' + d)) return;
-        if ((r.reparto_dip || 'slots') !== rep) return;
+        if (_repartoDi(r) !== rep) return;
         const cod = String(r.codice || '').toUpperCase();
         if (!cod || MAL.includes(cod) || cod === 'ND' || cod === 'CNP' || /^V/.test(cod)) return;
         if (_pianoCellaRiservata(r) || /^Piano vacanze/.test(String(r.commento || ''))) return;
@@ -2513,7 +2513,7 @@ async function _importaPianoDaWb(wb, ym, opz) {
     // solo se il file e davvero il piano del mese: con un mese vuoto o a meta nel
     // file (es. novembre non ancora compilato) proponeva di disattivare tutti
     const attiviSettore = collaboratoriCache.filter(
-      (c) => c.attivo !== false && (c.reparto_dip || 'slots') === _pianoReparto(),
+      (c) => c.attivo !== false && _repartoDi(c) === _pianoReparto(),
     ).length;
     const fileCompleto = lavoranti.size >= Math.max(3, attiviSettore * 0.6);
     const daDisattivare = !fileCompleto
@@ -2521,7 +2521,7 @@ async function _importaPianoDaWb(wb, ym, opz) {
       : collaboratoriCache.filter(
           (c) =>
             c.attivo !== false &&
-            (c.reparto_dip || 'slots') === _pianoReparto() &&
+            _repartoDi(c) === _pianoReparto() &&
             !lavoranti.has(c.nome) &&
             !String(c.reparti_extra || '').trim(), // i multi-reparto lavorano altrove
         );
@@ -2938,7 +2938,7 @@ async function pianoVerificaDurateNotte() {
         '<tr><td style="text-align:left;font-weight:600">' +
         escP(p.t.codice) +
         ' <span style="font-weight:400;color:var(--muted)">' +
-        escP(repartoLabel(p.t.reparto_dip || 'slots')) +
+        escP(repartoLabel(_repartoDi(p.t))) +
         '</span></td><td>' +
         (p.t.ora_inizio || '').substring(0, 5) +
         '-' +

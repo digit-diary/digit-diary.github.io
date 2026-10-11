@@ -85,7 +85,7 @@ function _pianoStatoMese() {
     ym: _pianoMeseSel,
     rep: rep,
     righe: _pianoMappaRighe(
-      (_pianoRighe || []).filter((r) => (r.reparto_dip || 'slots') === rep),
+      (_pianoRighe || []).filter((r) => _repartoDi(r) === rep),
       rep,
     ),
   };
@@ -408,8 +408,7 @@ async function pianoAnnulla() {
   // torna al mese/settore dell'operazione se nel frattempo sei altrove
   const memoria = _pianoMemoriaDi(st);
   _pianoMeseSel = st.ym;
-  if (st.rep !== currentReparto) _pianoRepartoSel = st.rep;
-  else _pianoRepartoSel = _pianoRepartoSel === null ? null : st.rep;
+  _pianoVaiAlSettore(st.rep);
   // DALLO STORICO DEL DATABASE: solo le celle che questo PC ha scritto nell operazione,
   // in una scrittura sola, con il controllo delle modifiche di altri
   if (await _pianoPassoConFinestra(st)) {
@@ -567,7 +566,7 @@ async function pianoRipristina() {
   const st = rd.pop();
   const memoria = _pianoMemoriaDi(st);
   _pianoMeseSel = st.ym;
-  if (st.rep !== currentReparto) _pianoRepartoSel = st.rep;
+  _pianoVaiAlSettore(st.rep);
   // RIPRISTINA DALLO STORICO: le scritture dell annullamento tornano indietro, con lo
   // stesso controllo delle modifiche di altri
   if (await _pianoPassoConFinestra(st)) {
@@ -1449,7 +1448,7 @@ async function fabbScriviSuSelezione(q, celle) {
     if (!tr || !td.dataset.g || !td.hasAttribute('ondblclick')) return;
     const dstr = _pianoMeseSel + '-' + String(td.dataset.g).padStart(2, '0');
     const es = _pianoFabbCache.find(
-      (f) => f.turno_codice === tr.dataset.cod && f.data === dstr && (f.reparto_dip || 'slots') === _pianoReparto(),
+      (f) => f.turno_codice === tr.dataset.cod && f.data === dstr && _repartoDi(f) === _pianoReparto(),
     );
     if ((es ? es.quantita : 0) !== q) lista.push({ cod: tr.dataset.cod, dstr: dstr, es: es });
   });
@@ -2581,7 +2580,7 @@ async function miglioraOrePiano() {
     const tutteRighe = (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '')) || [];
     const repM = _pianoReparto();
     righe = tutteRighe.filter((r) => {
-      if ((r.reparto_dip || 'slots') === repM) return true;
+      if (_repartoDi(r) === repM) return true;
       const infoM = _pianoCollabInfo(r.collaboratore);
       return !!(infoM && String(infoM.reparti_extra || '').trim() && _pianoAppartieneAlReparto(infoM));
     });
@@ -2613,7 +2612,7 @@ async function miglioraOrePiano() {
   } catch (e) {
     // senza i giorni a cavallo del mese i riposi e i giorni di fila non si controllano:
     // meglio fermarsi che proporre spostamenti sbagliati
-    toastErrore('Migliora ore fermato: non riesco a leggere i giorni prima e dopo il mese. Riprova.', 8000);
+    toastErrore('Sistema le ore fermato: non riesco a leggere i giorni prima e dopo il mese. Riprova.', 8000);
     return;
   }
   const infoDi = {};
@@ -2710,9 +2709,7 @@ async function miglioraOrePiano() {
   // simulato. Prima non si guardavano: uno spostamento poteva mettere due SUP nello
   // stesso giorno o un SUP in piu nel mese, e lo diceva Valida dopo.
   const repMO = _pianoReparto();
-  const conGruppiMO = (pianoRegoleGruppoCache || []).some(
-    (r) => r.attivo !== false && (r.reparto_dip || 'slots') === repMO,
-  );
+  const conGruppiMO = (pianoRegoleGruppoCache || []).some((r) => r.attivo !== false && _repartoDi(r) === repMO);
   const righeSim = righe.map((r) => Object.assign({}, r));
   const simDi = {};
   righeSim.forEach((r) => (simDi[r.collaboratore + '|' + parseInt(r.data.split('-')[2])] = r));
@@ -2819,7 +2816,7 @@ async function miglioraOrePiano() {
   if (
     !autoMO &&
     !(await chiediConferma(
-      'Migliora ore (' +
+      'Sistema le ore (' +
         ym +
         '):\n\n• ' +
         scambi.length +
@@ -2869,7 +2866,7 @@ async function miglioraOrePiano() {
     renderPiano();
   } catch (e) {
     console.error(e);
-    toastErrore('Migliora ore interrotto: ' + ((e && e.message) || e) + '. Il calendario mostra lo stato attuale.');
+    toastErrore('Sistema le ore interrotto: ' + ((e && e.message) || e) + '. Il calendario mostra lo stato attuale.');
     renderPiano();
   }
 }
@@ -2953,7 +2950,7 @@ async function _pianoProponiCertificazioniBulk(coppie, opz) {
   const proposte = [];
   Object.keys(perNome).forEach((nome) => {
     const info = _pianoCollabInfo(nome) || {};
-    const rep = info.reparto_dip || 'slots';
+    const rep = _repartoDi(info);
     const comps = (cfgAll[rep] || []).filter((k) => parseInt(k.livello) >= 1);
     const livDi = (key) => parseInt((comps.find((k) => k.key === key) || {}).livello) || 0;
     // la competenza del livello piu alto fra i gruppi fatti: le altre vengono in cascata
@@ -3496,6 +3493,46 @@ const _AVV_SEZIONI = [
   ['malattie', 'Malattie lunghe'],
   ['vacanze', 'Vacanze non nel piano'],
 ];
+// sotto-schede con problemi di legge o urgenti (numero in rosso); le altre sono da
+// controllare (numero arancio)
+const _AVV_GRAVI = ['sett', 'riposo', 'scoperti', 'malattie'];
+// riga riassuntiva in cima alla scheda: quanti problemi di legge e quante cose da controllare
+// extra = { regole, anno }: le voci gravi dentro sotto-schede da controllare
+function _pianoAvvisiRiepilogo(c, extra) {
+  const somma = (chiavi) => chiavi.reduce((t, k) => t + (c[k] || 0), 0);
+  const inPiu = ((extra && extra.regole) || 0) + ((extra && extra.anno) || 0);
+  const gravi = somma(_AVV_GRAVI) + inPiu;
+  const altre = somma(_AVV_SEZIONI.map(([k]) => k).filter((k) => !_AVV_GRAVI.includes(k))) - inPiu;
+  const chip = (n, cls, uno, molti, dove) =>
+    n
+      ? '<span class="pavv-chip ' + cls + '" title="' + dove + '">' + n + ' ' + (n === 1 ? uno : molti) + '</span>'
+      : '';
+  return (
+    '<div class="pavv ' +
+    (gravi ? 'pavv-grave' : altre ? 'pavv-medio' : 'pavv-ok') +
+    ' avv-riepilogo"><div class="pavv-riga"><i class="icx ' +
+    (gravi || altre ? 'icx-avviso' : 'icx-check') +
+    '"></i><span class="pavv-tit">In sintesi:</span>' +
+    (gravi || altre
+      ? chip(
+          gravi,
+          'pavv-legge',
+          'problema da risolvere',
+          'problemi da risolvere',
+          "Ore settimanali, riposo attorno alla domenica, regole di legge del mese (riposi, giorni di fila), chiusura dell'anno in rosso, posti scoperti, malattie oltre il 14. giorno",
+        ) +
+        chip(
+          altre,
+          'pavv-contr',
+          'cosa da controllare',
+          'cose da controllare',
+          "Altre regole del mese (ore del mese, preferenze, formazione), chiusura dell'anno in arancio, vacanze non nel piano",
+        ) +
+        '<span class="pavv-nota">numeri rossi: da risolvere · arancio: da controllare</span>'
+      : ' nessun avviso.') +
+    '</div></div>'
+  );
+}
 let _pianoAvvSub = (() => {
   try {
     return localStorage.getItem('piano_avvisi_sub') || 'sett';
@@ -3571,7 +3608,7 @@ async function _pianoAvvisiLenti(forza) {
         ok = JSON.parse((await getImp('piano_vacanze_ok')) || '{}') || {};
       } catch (e) {}
       const delSettore = new Set(
-        collaboratoriCache.filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === rep).map((c) => c.nome),
+        collaboratoriCache.filter((c) => c.attivo !== false && _repartoDi(c) === rep).map((c) => c.nome),
       );
       const oggiV = _pianoOggiStr();
       vac.forEach((v) => {
@@ -3992,6 +4029,11 @@ async function _renderPianoAvvisiTab() {
   const v = _pianoAvvisiVeloci();
   const l = await _pianoAvvisiLenti(false);
   const c = _pianoAvvisiConteggi(v, l);
+  // fra le regole del mese, quelle di legge (riposi, giorni di fila...) contano come gravi
+  const regoleLegge = v.regole.filter((x) => _pianoViolDiLegge(x.msg)).length;
+  // e nella chiusura d anno quelle in rosso (contano anche nel numero della campanella)
+  const annoGravi = l ? l.anno.filter((x) => x.voci.some((y) => y.grave)).length : 0;
+  const gravi = { regole: regoleLegge, anno: annoGravi };
   const [a, m] = _pianoMeseSel.split('-');
   const mese = (typeof MESI_FULL !== 'undefined' ? MESI_FULL[parseInt(m) - 1] : m) + ' ' + a;
   const cerca = (t) => ' data-cerca="' + escP(String(t).toLowerCase()) + '"';
@@ -4007,8 +4049,8 @@ async function _renderPianoAvvisiTab() {
   // ore settimanali
   sez.sett =
     '<p class="avv-intro">Settimane lunedì-domenica oltre <b>' +
-    (v.max || '-') +
-    ' ore' +
+    (v.max ? _pianoOreHM(v.max) : '-') +
+    ' di lavoro' +
     (v.conNotte ? ' compreso il 10% notturno' : ' da orologio') +
     '</b>. Contano turni e JG (non vacanze, malattie, CGF, riposi); il turno che passa la mezzanotte conta nella settimana in cui inizia. Limite e 10% si cambiano nella scheda Regole.</p>' +
     (!v.max
@@ -4016,7 +4058,15 @@ async function _renderPianoAvvisiTab() {
       : !v.sett.length
         ? vuoto('Nessuno supera il limite nelle settimane di questo mese.')
         : tabella(
-            ['Collaboratore', 'Settimana', 'Da orologio', '10% notturno', 'Totale', 'Oltre', 'Giorni lavorati'],
+            [
+              'Collaboratore',
+              'Settimana',
+              'Ore di turno',
+              '10% notturno',
+              'Totale',
+              'Oltre il massimo',
+              'Giorni lavorati',
+            ],
             v.sett.map(
               (s) =>
                 '<tr' +
@@ -4030,16 +4080,24 @@ async function _renderPianoAvvisiTab() {
                 _pianoGgMm(s.domenica) +
                 '</td><td class="' +
                 (v.conNotte ? '' : 'avv-forte') +
-                '">' +
+                '" title="' +
                 s.ore.toFixed(2) +
-                '</td><td>+' +
+                ' ore">' +
+                _pianoOreHM(s.ore) +
+                '</td><td title="' +
                 s.notte.toFixed(2) +
+                ' ore">+ ' +
+                _pianoOreHM(s.notte) +
                 '</td><td class="' +
                 (v.conNotte ? 'avv-forte' : '') +
-                '">' +
+                '" title="' +
                 s.totale.toFixed(2) +
-                '</td><td class="avv-rosso">+' +
+                ' ore">' +
+                _pianoOreHM(s.totale) +
+                '</td><td class="avv-rosso" title="' +
                 (s.conta - v.max).toFixed(2) +
+                ' ore">+ ' +
+                _pianoOreHM(s.conta - v.max) +
                 '</td><td class="avv-piccolo">' +
                 s.giorni.sort().map(_pianoGgMm).join(', ') +
                 '</td></tr>',
@@ -4096,14 +4154,18 @@ async function _renderPianoAvvisiTab() {
             .map(
               (x) =>
                 '<tr' +
-                cerca(x.nome + ' ' + x.msg) +
+                cerca(x.nome + ' ' + x.msg + ' ' + _pianoMsgSemplice(x.msg)) +
                 (x.giorno ? _attrCella(x.nome, _pianoMeseSel + '-' + String(x.giorno).padStart(2, '0')) : '') +
                 '>' +
                 nome(x.nome) +
                 '<td>' +
                 (x.giorno ? 'giorno ' + x.giorno : 'mese') +
-                '</td><td>' +
+                '</td><td class="' +
+                (_pianoViolDiLegge(x.msg) ? 'avv-rosso' : '') +
+                '" title="' +
                 escP(x.msg) +
+                '">' +
+                escP(_pianoMsgSemplice(x.msg)) +
                 '</td></tr>',
             ),
         ));
@@ -4223,6 +4285,7 @@ async function _renderPianoAvvisiTab() {
     '<div class="main-card avv-card" style="margin-top:16px"><div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Avvisi del piano · ' +
     escP(mese) +
     '</span><span class="avv-strumenti"><input id="avv-cerca" type="search" placeholder="Cerca per nome o testo" oninput="pianoAvvisiCerca()" autocomplete="off"><span id="avv-cerca-n" class="avv-piccolo"></span><button class="btn-secondario" onclick="pianoAvvisiAggiorna()" title="Ricalcola chiusura d anno, scoperti e malattie">Aggiorna</button><button class="btn-secondario" onclick="esportaTabellaExcel(document.querySelector(\'.avv-sub:not([hidden]) table\'),\'avvisi_\' + _pianoAvvSub + \'_\' + _pianoMeseSel)" title="La sotto-scheda aperta, come si vede">Excel</button></span></div>' +
+    _pianoAvvisiRiepilogo(c, gravi) +
     '<div class="settings-tabs avv-tabs">' +
     _AVV_SEZIONI
       .map(
@@ -4236,9 +4299,11 @@ async function _renderPianoAvvisiTab() {
           '\')">' +
           t +
           ' <span class="settings-tab-n' +
-          (c[k] ? ' avv-n-on' : '') +
-          '">' +
+          (c[k] ? ' avv-n-on' + (_AVV_GRAVI.includes(k) || gravi[k] ? ' avv-n-legge' : ' avv-n-contr') : '') +
+          '" title="' +
           c[k] +
+          '">' +
+          (c[k] > 99 ? '99+' : c[k]) +
           '</span></button>',
       )
       .join('') +
@@ -4520,26 +4585,27 @@ async function pianoPercheScoperti() {
     });
     window._pwdLargoObs.observe(modale, { attributes: true, attributeFilter: ['class'] });
   }
-  b.innerHTML = '<h3>Perché scoperto · ' + escP(ym) + '</h3><p>Analisi in corso...</p>';
+  b.innerHTML = '<h3>Perché manca qualcuno · ' + escP(ym) + '</h3><p>Analisi in corso...</p>';
   document.getElementById('pwd-modal').classList.remove('hidden');
   let r;
   try {
     r = await _pianoAnalisiScoperti(ym);
   } catch (e) {
-    b.innerHTML = '<h3>Perché scoperto</h3><p>Analisi non riuscita: ' + escP((e && e.message) || String(e)) + '</p>';
+    b.innerHTML =
+      '<h3>Perché manca qualcuno</h3><p>Analisi non riuscita: ' + escP((e && e.message) || String(e)) + '</p>';
     return;
   }
   const chiudi =
     '<div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Chiudi</button></div>';
   const settore = typeof repartoLabel === 'function' ? repartoLabel(_pianoReparto()) : _pianoReparto();
   if (!r.totPosti) {
-    b.innerHTML = '<h3>Perché scoperto</h3><p>Il mese non ha fabbisogno in ' + escP(settore) + '.</p>' + chiudi;
+    b.innerHTML = '<h3>Perché manca qualcuno</h3><p>Il mese non ha fabbisogno in ' + escP(settore) + '.</p>' + chiudi;
     return;
   }
   const nScop = r.scoperti.reduce((s, x) => s + x.quanti, 0);
   const perc = Math.round(((r.totPosti - nScop) / r.totPosti) * 1000) / 10;
   let h =
-    '<h3>Perché scoperto · ' +
+    '<h3>Perché manca qualcuno · ' +
     escP(settore) +
     ' · ' +
     escP(ym) +

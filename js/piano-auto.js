@@ -312,7 +312,9 @@ async function _pianoAutoEsegui(rep, ym, minuti) {
             );
           const fin = esito.ricerca.applicata ? D : P;
           if (fin.legge || fin.scoperti)
-            righe.push('Da controllare in Piano > Calendario con "Valida regole" prima di usarlo.');
+            righe.push(
+              'Da controllare in Piano > Calendario con "Controlla le regole" (menu Controlla) prima di usarlo.',
+            );
         } else if (b.scoperti) righe.push('• ' + b.scoperti + ' posti senza candidato idoneo');
         // COPERTURE DA ALTRI SETTORI e MIGLIORA ORE (richiesta del titolare 08/10/2026: la
         // generazione automatica fa la stessa sequenza che si fa a mano). Le coperture
@@ -323,13 +325,13 @@ async function _pianoAutoEsegui(rep, ym, minuti) {
           if (altro !== rep) await _pianoAutoCoperture(altro, ym, righe);
         _pianoMeseSel = ym;
         _pianoRepartoSel = rep;
-        _pianoAutoFase('Bilancio le ore (Migliora ore)...');
+        _pianoAutoFase('Bilancio le ore (Sistema le ore)...');
         auto.miglioraOre = null;
         await miglioraOrePiano();
         const mo = auto.miglioraOre;
         if (mo && mo.scambi)
           righe.push(
-            '• Migliora ore: ' +
+            '• Sistema le ore: ' +
               mo.scambi +
               ' turni spostati da chi e sopra a chi e sotto le ore (scarto medio ' +
               mo.prima +
@@ -339,7 +341,7 @@ async function _pianoAutoEsegui(rep, ym, minuti) {
           );
         if (b.riposiDaSistemare && b.riposiDaSistemare.length)
           righe.push('• Riposo attorno alla domenica da sistemare a mano: ' + b.riposiDaSistemare.join(', '));
-        righe.push('Si cancella con "Cancella piano" (solo le celle generate) se non va.');
+        righe.push('Si toglie con "Svuota il mese" (solo le celle generate) se non va.');
       }
     }
   } catch (e) {
@@ -433,7 +435,7 @@ async function _pianoAutoCoperture(repT, ym, righe) {
         nomi +
         '): rimandate, il piano di ' +
         mancano.join(', ') +
-        ' non c e ancora. Si fanno quando viene generato (anche a mano: "Completa con coperture").',
+        ' non c e ancora. Si fanno quando viene generato (anche a mano: "Copri i buchi con altri settori", menu Sistema).',
     );
     return;
   }
@@ -483,7 +485,7 @@ async function pianoAutoRenderCard() {
   const sel = 'padding:4px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)';
   let h =
     '<div class="main-card" style="margin-top:16px"><div class="card-header">Generazione automatica del piano</div><div style="padding:10px 14px">' +
-    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px;line-height:1.5">Dal giorno scelto in poi il primo PC con il programma aperto genera il piano del mese dopo (vacanze, congedi, CGF, turni) e lo migliora per i minuti indicati. Se il PC si accende più tardi, la fa appena acceso. Una sola volta per mese e settore, anche con più PC accesi. Serve che le vacanze dell anno siano importate: se mancano aspetta e avvisa. Non tocca mai gli inserimenti a mano; se il mese ha già una bozza non la rifa. Alla fine avvisa con una nota chi ha il permesso "Genera bozza". Prossimo mese da generare: <b>' +
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px;line-height:1.5">Dal giorno scelto in poi il primo PC con il programma aperto genera il piano del mese dopo (vacanze, congedi, CGF, turni) e lo migliora per i minuti indicati. Se il PC si accende più tardi, la fa appena acceso. Una sola volta per mese e settore, anche con più PC accesi. Serve che le vacanze dell anno siano importate: se mancano aspetta e avvisa. Non tocca mai gli inserimenti a mano; se il mese ha già una bozza non la rifa. Alla fine avvisa con una nota chi ha il permesso "Piano: preparare il mese (bozza)". Prossimo mese da generare: <b>' +
     escP(_pianoAutoMeseLabel(mese || '')) +
     '</b>.</p>' +
     '<div style="overflow-x:auto"><table class="tbl-semplice" style="border-collapse:collapse;font-size:var(--fs-sm,.8125rem)"><thead><tr>' +
@@ -629,7 +631,7 @@ async function pianoAutoRiprova(rep, mese) {
         _pianoAutoMeseLabel(mese) +
         ' (' +
         rep +
-        ')?\n\nParte subito su questo PC se il giorno e arrivato. Se il mese ha già una bozza non la rifa: per rigenerarlo prima "Cancella piano".',
+        ')?\n\nParte subito su questo PC se il giorno e arrivato. Se il mese ha già una bozza non la rifa: per rigenerarlo prima "Svuota il mese".',
     ))
   )
     return;

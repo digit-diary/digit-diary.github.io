@@ -150,3 +150,212 @@ function navTorna() {
   navChiudiBarra();
   if (b.alRitorno) b.alRitorno();
 }
+
+// ================================================================
+// MENU DELLE PAGINE (ondata 3, 11/10/2026)
+// Al computer il menu sta su una riga: le pagine di ogni giorno sempre in vista, Maison e
+// Inventario e gli strumenti (Statistiche, Registro, Guida, Impostazioni) in due menu a
+// tendina. Le voci restano .nav-tab con data-page: i permessi le nascondono come prima
+// (applicaVisibilita in settings.js); qui si decide solo come si vedono i gruppi.
+// ================================================================
+function _navVoceVisibile(el) {
+  if (!el) return false;
+  if (el.classList.contains('nav-gruppo')) return !el.hidden;
+  return el.classList.contains('nav-tab') && el.style.display !== 'none';
+}
+function _navImposta(el, attr, val) {
+  // si scrive solo se cambia: l osservatore qui sotto non deve girare a vuoto
+  if (val === null) {
+    if (el.hasAttribute(attr)) el.removeAttribute(attr);
+  } else if (el.getAttribute(attr) !== val) el.setAttribute(attr, val);
+}
+function navAggiornaMenu() {
+  const nav = document.querySelector('.nav-tabs');
+  if (!nav) return;
+  nav
+    .querySelectorAll('.nav-tab')
+    .forEach((t) => _navImposta(t, 'aria-current', t.classList.contains('active') ? 'page' : null));
+  nav.querySelectorAll('.nav-gruppo').forEach((g) => {
+    const voci = [...g.querySelectorAll('.nav-tab')].filter(_navVoceVisibile);
+    _navImposta(g, 'hidden', voci.length ? null : '');
+    // una voce sola (per esempio un operatore che vede solo l Inventario): niente tendina,
+    // la voce sta nella riga come le altre
+    const singolo = voci.length === 1;
+    if (g.classList.contains('nav-gruppo-singolo') !== singolo) g.classList.toggle('nav-gruppo-singolo', singolo);
+    const attivo = voci.some((t) => t.classList.contains('active'));
+    if (g.classList.contains('attivo') !== attivo) g.classList.toggle('attivo', attivo);
+  });
+  // separatori: solo tra due gruppi che hanno qualcosa da mostrare
+  let primaVisibile = false;
+  let sepInAttesa = null;
+  [...nav.children].forEach((el) => {
+    if (el.classList.contains('nav-sep')) {
+      _navImposta(el, 'hidden', '');
+      if (primaVisibile && !sepInAttesa) sepInAttesa = el;
+      return;
+    }
+    if (_navVoceVisibile(el)) {
+      if (sepInAttesa) _navImposta(sepInAttesa, 'hidden', null);
+      sepInAttesa = null;
+      primaVisibile = true;
+    }
+  });
+}
+function navChiudiGruppi(tranne) {
+  document.querySelectorAll('.nav-gruppo.aperto').forEach((g) => {
+    if (g.dataset.gruppo === tranne) return;
+    g.classList.remove('aperto');
+    const b = g.querySelector('.nav-gruppo-btn');
+    if (b) b.setAttribute('aria-expanded', 'false');
+  });
+}
+function navGruppoApriChiudi(key, apri, fuocoSu) {
+  const g = document.querySelector('.nav-gruppo[data-gruppo="' + key + '"]');
+  if (!g) return;
+  const ora = apri === undefined ? !g.classList.contains('aperto') : !!apri;
+  navChiudiGruppi(key);
+  g.classList.toggle('aperto', ora);
+  const b = g.querySelector('.nav-gruppo-btn');
+  if (b) b.setAttribute('aria-expanded', ora ? 'true' : 'false');
+  if (ora && fuocoSu) {
+    const voci = [...g.querySelectorAll('.nav-gruppo-menu .nav-tab')].filter(_navVoceVisibile);
+    const v =
+      fuocoSu === 'ultima' ? voci[voci.length - 1] : voci.find((x) => x.classList.contains('active')) || voci[0];
+    if (v) v.focus();
+  }
+}
+// tastiera: frecce dentro la tendina, Esc chiude e torna al pulsante, Tab esce e chiude
+document.addEventListener('keydown', (e) => {
+  const g = e.target && e.target.closest ? e.target.closest('.nav-gruppo') : null;
+  if (!g || g.classList.contains('nav-gruppo-singolo')) return;
+  const key = g.dataset.gruppo;
+  const btn = g.querySelector('.nav-gruppo-btn');
+  const voci = [...g.querySelectorAll('.nav-gruppo-menu .nav-tab')].filter(_navVoceVisibile);
+  if (e.target === btn) {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      navGruppoApriChiudi(key, true, e.key === 'ArrowUp' ? 'ultima' : 'prima');
+    } else if (e.key === 'Escape' && g.classList.contains('aperto')) {
+      e.preventDefault();
+      navGruppoApriChiudi(key, false);
+    }
+    return;
+  }
+  const i = voci.indexOf(e.target);
+  if (i < 0) return;
+  let dest = null;
+  if (e.key === 'ArrowDown') dest = voci[(i + 1) % voci.length];
+  else if (e.key === 'ArrowUp') dest = voci[(i - 1 + voci.length) % voci.length];
+  else if (e.key === 'Home') dest = voci[0];
+  else if (e.key === 'End') dest = voci[voci.length - 1];
+  else if (e.key === 'Escape') {
+    e.preventDefault();
+    navGruppoApriChiudi(key, false);
+    btn.focus();
+    return;
+  }
+  if (dest) {
+    e.preventDefault();
+    dest.focus();
+  }
+});
+document.addEventListener('focusin', (e) => {
+  const g = e.target && e.target.closest ? e.target.closest('.nav-gruppo') : null;
+  navChiudiGruppi(g ? g.dataset.gruppo : null);
+});
+document.addEventListener('click', (e) => {
+  const g = e.target && e.target.closest ? e.target.closest('.nav-gruppo') : null;
+  // scelta una voce della tendina: si chiude; clic fuori: si chiude
+  if (!g || e.target.closest('.nav-gruppo-menu')) navChiudiGruppi(null);
+  // scelta fatta: il fuoco torna sul pulsante della tendina (chi usa la tastiera non si perde)
+  if (g && e.target.closest('.nav-gruppo-menu .nav-tab') && !g.classList.contains('nav-gruppo-singolo')) {
+    const b = g.querySelector('.nav-gruppo-btn');
+    if (b) b.focus();
+  }
+});
+
+// BARRA DEL TELEFONO: ricerca a icona e segnalazioni come contatore
+function navApriRicercaTelefono(apri) {
+  const ora = apri === undefined ? !document.body.classList.contains('ricerca-aperta') : !!apri;
+  document.body.classList.toggle('ricerca-aperta', ora);
+  const b = document.getElementById('btn-ricerca-tel');
+  if (b) b.setAttribute('aria-expanded', ora ? 'true' : 'false');
+  if (ora) {
+    const i = document.getElementById('ricerca-globale');
+    if (i) setTimeout(() => i.focus(), 0);
+  }
+}
+function _navContaSegnalazioni() {
+  let n = 0;
+  const vis = (k) => typeof isVis !== 'function' || isVis(k);
+  const ca = document.getElementById('cassa-alerts-container');
+  const ra = document.getElementById('rischio-alerts-container');
+  if (ca && vis('alert_cassa')) n += ca.querySelectorAll('.cassa-alert-banner').length;
+  if (ra && vis('alert_rischio')) n += ra.querySelectorAll('.rischio-alert-banner, .cassa-alert-banner').length;
+  return n;
+}
+function navAggiornaBarraTelefono() {
+  const n = _navContaSegnalazioni();
+  const b = document.getElementById('btn-segnalazioni-tel');
+  if (b) {
+    const num = document.getElementById('segnalazioni-tel-num');
+    if (num && num.textContent !== String(n)) num.textContent = n;
+    if (b.hidden !== !n) b.hidden = !n;
+    const et = n === 1 ? '1 segnalazione operativa' : n + ' segnalazioni operative';
+    _navImposta(b, 'aria-label', et + (document.body.classList.contains('segn-aperte') ? ': nascondi' : ': mostra'));
+    _navImposta(b, 'title', et);
+    if (!n && document.body.classList.contains('segn-aperte')) document.body.classList.remove('segn-aperte');
+  }
+  // la lente compare solo a chi ha la ricerca globale
+  const rg = document.querySelector('.ricerca-globale-wrap');
+  const br = document.getElementById('btn-ricerca-tel');
+  if (br && rg) {
+    const nasc = rg.style.display === 'none';
+    if (br.hidden !== nasc) br.hidden = nasc;
+  }
+}
+function navApriSegnalazioniTelefono() {
+  const ora = !document.body.classList.contains('segn-aperte');
+  document.body.classList.toggle('segn-aperte', ora);
+  const b = document.getElementById('btn-segnalazioni-tel');
+  if (b) b.setAttribute('aria-expanded', ora ? 'true' : 'false');
+  // con 2 o piu segnalazioni c e la striscia compatta: aperta qui, aperta anche lei
+  if (document.getElementById('alert-compatto') && typeof renderAlertCompatti === 'function') {
+    window._alertEspansi = ora;
+    renderAlertCompatti();
+  }
+  navAggiornaBarraTelefono();
+  if (ora) {
+    const ca = document.getElementById('cassa-alerts-container');
+    if (ca) ca.scrollIntoView({ block: 'nearest' });
+  }
+}
+
+// un solo osservatore: quando i permessi o la pagina cambiano, menu e barra si riallineano
+(function () {
+  let inCoda = false;
+  const aggiorna = () => {
+    if (inCoda) return;
+    inCoda = true;
+    requestAnimationFrame(() => {
+      inCoda = false;
+      navAggiornaMenu();
+      navAggiornaBarraTelefono();
+    });
+  };
+  const nav = document.querySelector('.nav-tabs');
+  if (nav && window.MutationObserver) {
+    new MutationObserver(aggiorna).observe(nav, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['style', 'class'],
+    });
+    ['cassa-alerts-container', 'rischio-alerts-container'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) new MutationObserver(aggiorna).observe(el, { childList: true, subtree: true });
+    });
+    const rg = document.querySelector('.ricerca-globale-wrap');
+    if (rg) new MutationObserver(aggiorna).observe(rg, { attributes: true, attributeFilter: ['style'] });
+  }
+  aggiorna();
+})();

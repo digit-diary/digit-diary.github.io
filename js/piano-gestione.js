@@ -76,8 +76,8 @@ function _renderPianoDomenicheBody() {
   let h =
     '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Diritto: ' +
     diritto +
-    ' domeniche libere all anno (regola "Domeniche libere garantite in un anno"). Vacanza e malattia non contano né tra le libere né tra le lavorate (stesso criterio di Valida regole e di Benessere)' +
-    (chkSab ? '; il sabato deve finire entro le 23, come in Valida regole' : '') +
+    ' domeniche libere all anno (regola "Domeniche libere garantite in un anno"). Vacanza e malattia non contano né tra le libere né tra le lavorate (stesso criterio di Controlla le regole e di Benessere)' +
+    (chkSab ? '; il sabato deve finire entro le 23, come in Controlla le regole' : '') +
     '. Nei mesi senza piano non si conta nulla. Rosso = le domeniche rimaste nell anno non bastano più per arrivare al diritto: da li in poi vanno restituite per prime.</p>';
   h +=
     '<div style="overflow:auto;max-height:66vh"><table id="piano-domeniche-table" class="piano-table piano-fisse3" style="min-width:1050px;font-size:var(--fs-sm,.8125rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Fun</th><th>%</th>';
@@ -1848,11 +1848,19 @@ function _pianoRepartiAmmessi() {
   const extra = typeof _accessiExtraDi === 'function' ? _accessiExtraDi(op) : null;
   return tutti.filter((k) => k === proprio || !!(extra && extra[k]));
 }
+// UN SOLO SELETTORE DI SETTORE (ondata 3): cambiare settore nel Piano cambia anche quello
+// della barra in alto (setReparto, che ridisegna il Piano se e aperto), cosi il Piano e il
+// resto del programma mostrano sempre lo stesso settore. _pianoRepartoSel resta solo per
+// i passaggi temporanei interni (generazione automatica, Formazione), che lo rimettono.
 function pianoCambiaReparto(rep) {
   if (!_pianoRepartiAmmessi().includes(rep)) return;
-  _pianoRepartoSel = rep === currentReparto ? null : rep;
   _pianoViolCelle = {};
   _pianoViolLista = null;
+  if (rep !== currentReparto && typeof setReparto === 'function') {
+    setReparto(rep); // stessi controlli dei permessi della barra in alto
+    if (currentReparto === rep) return;
+  }
+  _pianoRepartoSel = rep === currentReparto ? null : rep;
   renderPiano();
 }
 

@@ -716,7 +716,7 @@ async function pianoMigliora(opz) {
   // perche la ricerca non e arrivata in fondo, in parole semplici
   const fermataDaTe = !res.ripetibile && !res.troncata;
   const riepilogo =
-    'Risultato controllato con "Valida regole":' +
+    'Risultato controllato con "Controlla le regole":' +
     riga('Regole di legge violate (riposi, giorni di fila, ore della settimana, domenica)', P.legge, D.legge) +
     riga('Altre regole violate', P.regole - P.legge - P.qualita, D.regole - D.legge - D.qualita) +
     riga('Regole di qualità (livelli, competenze per fascia)', P.qualita, D.qualita) +

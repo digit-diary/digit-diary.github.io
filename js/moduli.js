@@ -1156,181 +1156,12 @@ async function renderCollaboratoriUI() {
   const attivi = delReparto.filter((c) => c.attivo !== false);
   const inattivi = delReparto.filter((c) => c.attivo === false);
   const el = document.getElementById('collaboratori-list');
-  // link incrociati: da qui si raggiungono al volo le altre due "case" del collaboratore
-  const linkBar =
-    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Qui: anagrafica (nome, funzione, %, impiego, categoria, lingue). ' +
-    '<a href="#" onclick="switchPage(\'formazione\');return false" style="color:var(--c-verde,#2c6e49);font-weight:700">Competenze e livelli → Formazione</a> · ' +
-    '<a href="#" onclick="switchPage(\'piano\');if(typeof pianoCambiaTab===\'function\')pianoCambiaTab(\'impostazioni\');return false" style="color:var(--c-blu,#1a4a7a);font-weight:700">Preferenze turni → Piano/Impostazioni</a></p>';
-  const selStyle =
-    'font-size:var(--fs-sm,.8125rem);padding:3px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)';
-  const rigaCollab = (c) => {
-    const rep = c.reparto_dip || 'slots';
-    const imp = c.impiego || '';
-    const cat = c.categoria || '';
-    return (
-      '<div class="collab-riga" data-nome="' +
-      escP(c.nome.toLowerCase()) +
-      '" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--paper2);border-radius:3px;margin-bottom:6px;border:1px solid var(--line);flex-wrap:wrap"><span style="flex:1;font-weight:400;min-width:140px">' +
-      escP(c.nome) +
-      (cat && (puoCat || (typeof puoVedereCategorie === 'function' && puoVedereCategorie()))
-        ? ' <span class="mini-badge" style="background:var(--accent2);font-size:var(--fs-sm,.8125rem)">' +
-          cat +
-          '&ordf;</span>'
-        : '') +
-      '</span><select ' +
-      (puoImp ? '' : 'disabled ') +
-      'onchange="cambiaImpiegoCollaboratore(' +
-      c.id +
-      ',this.value)" title="Tipo di impiego" style="' +
-      selStyle +
-      '"><option value=""' +
-      (imp === '' ? ' selected' : '') +
-      '>Impiego...</option><option value="fisso"' +
-      (imp === 'fisso' ? ' selected' : '') +
-      '>Fisso</option><option value="jolly"' +
-      (imp === 'jolly' ? ' selected' : '') +
-      '>Jolly</option></select>' +
-      (puoCat || (typeof puoVedereCategorie === 'function' && puoVedereCategorie())
-        ? '<select ' +
-          (puoCat ? '' : 'disabled ') +
-          'onchange="cambiaCategoriaCollaboratore(' +
-          c.id +
-          ',this.value)" title="Categoria (5&ordf; = ingresso, 1&ordf; = massima)" style="' +
-          selStyle +
-          '"><option value=""' +
-          (cat === '' ? ' selected' : '') +
-          '>Cat...</option>' +
-          [5, 4, 3, 2, 1]
-            .map((n) => '<option value="' + n + '"' + (cat === n ? ' selected' : '') + '>' + n + '&ordf;</option>')
-            .join('') +
-          '</select>'
-        : '') +
-      (puoImpiegoDati
-        ? '<select onchange="cambiaFunzioneCollaboratore(' +
-          c.id +
-          ',this.value)" title="Funzione (per il Piano di lavoro: regole SUP/BO)" style="' +
-          selStyle +
-          '"><option value=""' +
-          (!c.funzione ? ' selected' : '') +
-          '>Funzione...</option>' +
-          // le funzioni del SETTORE del collaboratore (prima sempre quelle delle Slot:
-          // un croupier CR aveva il menu vuoto)
-          (typeof _pianoFunzioniDi === 'function'
-            ? _pianoFunzioniDi(c.reparto_dip || 'slots')
-            : window._pianoFunzioni || ['RESP', 'SUP', 'BO', 'HOST']
-          )
-            .map((f) => '<option value="' + f + '"' + (c.funzione === f ? ' selected' : '') + '>' + f + '</option>')
-            .join('') +
-          '</select><select onchange="cambiaPercentualeCollaboratore(' +
-          c.id +
-          ',this.value)" title="Percentuale d\'impiego (per saldo ore e codici CCL)" style="' +
-          selStyle +
-          '">' +
-          [100, 90, 80, 70, 60, 50, 40, 30, 20]
-            .map((p) => {
-              const v = p / 100;
-              const cur = Math.round((parseFloat(c.percentuale) || 1) * 100);
-              return '<option value="' + v + '"' + (cur === p ? ' selected' : '') + '>' + p + '%</option>';
-            })
-            .join('') +
-          '</select><input type="text" value="' +
-          (c.lingue || '').replace(/"/g, '&quot;') +
-          '" placeholder="IT, EN" maxlength="20" title="Lingue parlate (sigle separate da spazio o virgola, es. IT EN DE). Vengono mostrate nel Piano accanto al nome" onchange="cambiaLingueCollaboratore(' +
-          c.id +
-          ',this.value)" style="' +
-          selStyle +
-          ';width:76px">'
-        : '') +
-      (puoHrMod
-        ? // DATE scritte a mano, come nella scheda: si accetta 12.01.1997 e
-          // anche solo 12.01 quando l'anno non si conosce. Il campo calendario
-          // obbligava a passare dal selettore e rendeva scomodo mettere l'anno.
-          '<span style="display:inline-flex;align-items:center;gap:4px"><span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">Nascita</span>' +
-          '<input type="text" value="' +
-          escP(c.data_nascita ? dataNascitaLabel(c.data_nascita, false) : '') +
-          '" placeholder="12.01.1997" title="Data di nascita: 12.01.1997 oppure solo 12.01 se l anno non si conosce" onchange="cambiaDataCollaboratore(' +
-          c.id +
-          ',\'data_nascita\',this.value)" style="' +
-          selStyle +
-          ';width:104px"></span>' +
-          '<span style="display:inline-flex;align-items:center;gap:4px"><span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">Inizio attività</span>' +
-          '<input type="text" value="' +
-          escP(c.data_assunzione ? String(c.data_assunzione).substring(0, 10).split('-').reverse().join('.') : '') +
-          '" placeholder="01.05.2024" title="Inizio attività: serve per anzianità, giubilei e giorni di vacanza" onchange="cambiaDataCollaboratore(' +
-          c.id +
-          ',\'data_assunzione\',this.value)" style="' +
-          selStyle +
-          ';width:104px"></span>'
-        : '') +
-      (adminFull
-        ? '<select onchange="cambiaRepartoCollaboratore(' +
-          c.id +
-          ',this.value)" style="' +
-          selStyle +
-          '">' +
-          opzioniRepartoHtml(rep === 'entrambi' ? 'entrambi' : rep, true) +
-          '</select>' +
-          _coperturaChipHtml(c) +
-          '<button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2)" onclick="rinominaCollaboratore(\'' +
-          _jsArg(c.nome) +
-          '\')">Rinomina</button><button class="btn-del-tipo pericolo" onclick="disattivaCollaboratore(\'' +
-          _jsArg(c.nome) +
-          '\')">Disattiva</button>' +
-          (c.data_fine_rapporto
-            ? '<span class="mini-badge" style="background:#7f8c8d" title="Ultimo giorno di lavoro: dal giorno dopo non e più nel piano e nelle ore dovute">fine contratto ' +
-              String(c.data_fine_rapporto).substring(0, 10).split('-').reverse().join('.') +
-              '</span>'
-            : '')
-        : '') +
-      '</div>'
-    );
-  };
-  // Sezioni: Fissi / Jolly / senza inquadramento (dentro ogni gruppo: categoria 1ª → 5ª, poi nome)
-  const vedeCat = puoCat || (typeof puoVedereCategorie === 'function' && puoVedereCategorie());
-  const ordina = (arr) =>
-    arr
-      .slice()
-      .sort((a, b) =>
-        vedeCat
-          ? (a.categoria || 9) - (b.categoria || 9) || a.nome.localeCompare(b.nome)
-          : a.nome.localeCompare(b.nome),
-      );
-  const fissi = ordina(attivi.filter((c) => c.impiego === 'fisso'));
-  const jolly = ordina(attivi.filter((c) => c.impiego === 'jolly'));
-  const senza = ordina(attivi.filter((c) => !c.impiego));
-  const titoloSez = (t, n) =>
-    '<p style="font-size:var(--fs-sm,.8125rem);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:12px 0 6px">' +
-    t +
-    ' (' +
-    n +
-    ')</p>';
-  let html = '';
-  if (attivi.length > 8)
-    html +=
-      '<input type="text" id="collab-cerca" placeholder="Cerca collaboratore..." oninput="filtraCollaboratoriUI(this.value)" class="campo-cerca">';
-  if (fissi.length) html += titoloSez('Fissi', fissi.length) + fissi.map(rigaCollab).join('');
-  if (jolly.length) html += titoloSez('Jolly', jolly.length) + jolly.map(rigaCollab).join('');
-  if (senza.length)
-    html +=
-      (fissi.length || jolly.length ? titoloSez('Senza inquadramento', senza.length) : '') +
-      senza.map(rigaCollab).join('');
-  if (!attivi.length) html = '<p style="color:var(--muted);font-size:var(--fs-md,.875rem)">Nessun collaboratore.</p>';
-  if (inattivi.length && adminFull) {
-    html +=
-      '<div style="margin-top:12px;padding:10px;background:var(--paper2);border-radius:3px"><small style="color:var(--muted);display:block;margin-bottom:6px">Collaboratori disattivati (clicca per riattivare):</small><div style="display:flex;flex-wrap:wrap;gap:6px">' +
-      inattivi
-        .map(
-          (c) =>
-            '<button style="padding:4px 10px;font-size:var(--fs-sm,.8125rem);border:1px solid var(--line);border-radius:2px;cursor:pointer;background:var(--paper);color:var(--muted)" onclick="riattivaCollaboratore(\'' +
-            _jsArg(c.nome) +
-            '\')">+ ' +
-            escP(c.nome) +
-            '</button>',
-        )
-        .join('') +
-      '</div></div>';
-  }
-  el.innerHTML = linkBar + html;
+  // ELENCO IN SOLA LETTURA + SCHEDA CON SALVA (ondata 3, in settings.js: _gcElencoHtml,
+  // gcApriScheda). I salvataggi della scheda passano dalle funzioni qui sotto
+  // (cambiaImpiegoCollaboratore, cambiaCategoriaCollaboratore, ...), come prima.
+  window._gcPerm = { adminFull, puoImp, puoCat, puoImpiegoDati, puoHrMod };
+  window._gcRecords = delReparto;
+  el.innerHTML = _gcElencoHtml(attivi, inattivi, window._gcPerm);
 }
 // filtro live della lista collaboratori (solo visivo, non tocca i dati)
 function filtraCollaboratoriUI(testo) {
@@ -1613,34 +1444,6 @@ function _coperturaSettori(c) {
     .map((x) => x.trim().toLowerCase())
     .filter(Boolean);
 }
-function _coperturaChipHtml(c) {
-  const sett = _coperturaSettori(c);
-  const cfg = _coperturaDi(c);
-  const testo = sett.length
-    ? sett
-        .map((k) => {
-          const d = cfg[k] || {};
-          return (
-            repartoLabel(k) +
-            (d.max_turni ? ' ' + d.max_turni + '/mese' : '') +
-            (d.gruppi ? ' ' + String(d.gruppi).toUpperCase() : '') +
-            (d.accompagnato ? ' (acc.)' : '')
-          );
-        })
-        .join(' · ')
-    : 'Copertura...';
-  return (
-    '<button class="btn-del-tipo" title="Settori in cui questo collaboratore può coprire i buchi" style="' +
-    (sett.length
-      ? 'color:var(--c-blu,#1a4a7a);border-color:var(--c-blu,#1a4a7a);font-weight:600'
-      : 'color:var(--muted)') +
-    '" onclick="apriCoperturaCollab(' +
-    c.id +
-    ')">' +
-    escP(testo) +
-    '</button>'
-  );
-}
 function apriCoperturaCollab(id) {
   const c = collaboratoriCache.find((x) => x.id === id) || {};
   const principale = c.reparto_dip || 'slots';
@@ -1779,9 +1582,9 @@ async function cambiaRepartoCollaboratore(id, rep) {
     logAzione('Reparto collaboratore', (c ? c.nome : 'ID ' + id) + ' → ' + rep);
     renderCollaboratoriUI();
     aggiornaNomi();
-    toast('Reparto aggiornato: ' + rep);
+    toast('Settore aggiornato: ' + repartoLabel(rep));
   } catch (e) {
-    toast('Errore cambio reparto');
+    toast('Errore cambio settore');
   }
 }
 async function cambiaImpiegoCollaboratore(id, imp) {

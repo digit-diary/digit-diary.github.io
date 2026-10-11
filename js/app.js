@@ -424,7 +424,9 @@ function renderTipiUI() {
               ne +
               '\')">Rinomina</button><button class="btn-del-tipo pericolo" style="margin-left:4px" onclick="' +
               (d ? "nascondiTipoDefault('" + origNe + "')" : "rimuoviTipo('" + ne + "')") +
-              '">Rimuovi</button>'
+              '">' +
+              (d ? 'Nascondi' : 'Rimuovi') +
+              '</button>'
             : '') +
           '</div>'
         );

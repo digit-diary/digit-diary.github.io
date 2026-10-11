@@ -327,12 +327,20 @@
       </div>
     </header>
 
-    <div
-      class="scadenze-banner hidden"
-      id="compleanni-banner"
-      style="background: #b8860b; cursor: default"
-      onclick=""
-    ></div>
+    <!-- BARRA DEL TELEFONO (ondata 3): una riga sola con menu, ricerca e segnalazioni; al computer non si vede -->
+    <div class="barra-telefono" id="barra-telefono">
+      <button class="hamburger-btn" onclick="toggleMobileNav()" id="hamburger-btn" aria-controls="mobile-nav" aria-expanded="false">
+        <i class="icx icx-menu"></i> Menu
+      </button>
+      <button type="button" class="barra-tel-btn" id="btn-ricerca-tel" onclick="navApriRicercaTelefono()" aria-label="Cerca ovunque" aria-expanded="false" title="Cerca ovunque">
+        <i class="icx icx-cerca"></i>
+      </button>
+      <button type="button" class="barra-tel-btn barra-tel-segn" id="btn-segnalazioni-tel" onclick="navApriSegnalazioniTelefono()" aria-expanded="false" hidden>
+        <i class="icx icx-avviso"></i> <span id="segnalazioni-tel-num">0</span>
+      </button>
+    </div>
+
+    <div class="scadenze-banner compleanni-banner hidden" id="compleanni-banner"></div>
     <div id="cassa-alerts-container"></div>
     <div id="rischio-alerts-container"></div>
 
@@ -343,201 +351,98 @@
         class="ricerca-globale-input"
         id="ricerca-globale"
         placeholder="Cerca ovunque: diario, moduli, note, registro..."
+        aria-label="Cerca ovunque"
         oninput="cercaGlobale(this.value)"
         onfocus="if (this.value.length >= 2) cercaGlobale(this.value);"
       />
       <div class="ricerca-globale-results" id="ricerca-globale-results"></div>
     </div>
 
-    <div class="reparto-switch" id="reparto-switch" style="display: none"></div>
-    <button
-      class="hamburger-btn"
-      onclick="toggleMobileNav()"
-      id="hamburger-btn"
-    >
-      <i class="icx icx-menu"></i> Menu
-    </button>
+    <div class="reparto-switch" id="reparto-switch" style="display: none" role="group" aria-label="Settore"></div>
     <div
       class="mobile-nav"
       id="mobile-nav"
       onclick="if (event.target === this) chiudiMobileNav();"
     >
-      <div class="mobile-nav-panel">
+      <div class="mobile-nav-panel" role="dialog" aria-modal="true" aria-label="Menu delle pagine">
         <button class="mobile-nav-close" onclick="chiudiMobileNav()">
-          &#10005; Chiudi
+          <i class="icx icx-chiudi"></i> Chiudi
         </button>
         <div id="mobile-nav-items"></div>
       </div>
     </div>
-    <div class="nav-tabs">
-      <button
-        class="nav-tab active"
-        data-page="dashboard"
-        onclick="switchPage('dashboard')"
-      >
+    <!-- MENU DELLE PAGINE (ondata 3): una riga. Le pagine di ogni giorno e quelle delle persone
+         sono sempre in vista, Maison/Inventario e gli strumenti (Assistente compreso) in due menu a tendina. Ogni voce resta un .nav-tab
+         con data-page: i permessi (applicaVisibilita) le nascondono come prima. -->
+    <nav class="nav-tabs" aria-label="Pagine del programma">
+      <button class="nav-tab active" data-page="dashboard" onclick="switchPage('dashboard')" title="La giornata in breve">
         <i class="icx icx-home"></i> Home
       </button>
-      <button class="nav-tab" data-page="diario" onclick="switchPage('diario')">
+      <button class="nav-tab" data-page="diario" onclick="switchPage('diario')" title="Registrazioni del turno">
         <i class="icx icx-diario"></i> Diario
       </button>
-      <button
-        class="nav-tab"
-        data-page="rapporto"
-        onclick="switchPage('rapporto')"
-        title="Rapporto giornaliero di turno"
-      >
+      <button class="nav-tab" data-page="rapporto" onclick="switchPage('rapporto')" title="Rapporto giornaliero di turno">
         <i class="icx icx-calendario"></i> Rapporto
       </button>
-      <button
-        class="nav-tab"
-        data-page="consegna"
-        onclick="switchPage('consegna')"
-        title="Consegne turno tra operatori"
-      >
+      <button class="nav-tab" data-page="consegna" onclick="switchPage('consegna')" title="Consegne del turno tra operatori">
         <i class="icx icx-penna"></i> Consegna
-        <span
-          id="consegna-badge"
-          style="
-            display: none;
-            background: var(--accent);
-            color: white;
-            border-radius: 9px;
-            font-size: var(--fs-sm,.8125rem);
-            padding: 1px 6px;
-            margin-left: 4px;
-            font-weight: 700;
-          "
-          title="Consegne non lette"
-        ></span>
+        <span id="consegna-badge" class="nav-badge" style="display: none" title="Consegne non lette"></span>
       </button>
-      <button
-        class="nav-tab"
-        data-page="promemoria"
-        onclick="switchPage('promemoria')"
-        title="Promemoria con scadenze"
-      >
+      <button class="nav-tab" data-page="promemoria" onclick="switchPage('promemoria')" title="Promemoria con scadenze">
         <i class="icx icx-clipboard"></i> Promemoria
-        <span
-          id="promemoria-badge"
-          style="
-            display: none;
-            background: var(--accent);
-            color: white;
-            border-radius: 9px;
-            font-size: var(--fs-sm,.8125rem);
-            padding: 1px 6px;
-            margin-left: 4px;
-            font-weight: 700;
-          "
-          title="Promemoria in scadenza"
-        ></span>
+        <span id="promemoria-badge" class="nav-badge" style="display: none" title="Promemoria in scadenza"></span>
+      </button>
+      <button class="nav-tab" data-page="note-collega" onclick="switchPage('note-collega')" title="Messaggi tra colleghi">
+        <i class="icx icx-mail"></i> Note colleghi
+        <span id="note-badge" class="nav-badge" style="display: none" title="Note non lette"></span>
       </button>
       <span class="nav-sep" aria-hidden="true"></span>
-      <button
-        class="nav-tab"
-        data-page="piano"
-        onclick="switchPage('piano')"
-        title="Piano di lavoro mensile: turni e assenze"
-      >
+      <button class="nav-tab" data-page="piano" onclick="switchPage('piano')" title="Piano di lavoro mensile: turni e assenze">
         <i class="icx icx-calendario"></i> Piano
       </button>
-      <button
-        class="nav-tab"
-        data-page="formazione"
-        onclick="switchPage('formazione')"
-        title="Multidisciplinarità: competenze, livelli e punti"
-      >
+      <button class="nav-tab" data-page="formazione" onclick="switchPage('formazione')" title="Competenze, livelli e punti dei collaboratori">
         <i class="icx icx-formazione"></i> Formazione
       </button>
-      <button
-        class="nav-tab"
-        data-page="moduli"
-        onclick="switchPage('moduli')"
-        title="Moduli disciplinari e apprezzamento"
-      >
+      <button class="nav-tab" data-page="moduli" onclick="switchPage('moduli')" title="Moduli disciplinari e di apprezzamento">
         <i class="icx icx-file"></i> Moduli
       </button>
       <span class="nav-sep" aria-hidden="true"></span>
-      <button
-        class="nav-tab"
-        data-page="note-collega"
-        onclick="switchPage('note-collega')"
-        title="Messaggi tra colleghi"
-      >
-        <i class="icx icx-mail"></i> Note Colleghi
-        <span
-          id="note-badge"
-          style="
-            display: none;
-            background: var(--accent);
-            color: white;
-            border-radius: 9px;
-            font-size: var(--fs-sm,.8125rem);
-            padding: 1px 6px;
-            margin-left: 4px;
-            font-weight: 700;
-          "
-          title="Note non lette"
-        ></span>
-      </button>
-      <button
-        class="nav-tab"
-        data-page="assistente"
-        onclick="switchPage('assistente')"
-        title="Assistente AI per scrittura professionale"
-      >
-        <i class="icx icx-assistente"></i> Assistente
-      </button>
-      <span class="nav-sep" aria-hidden="true"></span>
-      <button
-        class="nav-tab"
-        data-page="maison"
-        onclick="switchPage('maison')"
-        title="Gestione costi e clienti Maison"
-      >
-        <i class="icx icx-maison"></i> Maison
-      </button>
-      <button
-        class="nav-tab"
-        data-page="inventario"
-        onclick="switchPage('inventario')"
-      >
-        <i class="icx icx-inventario"></i> Inventario
-      </button>
-      <span class="nav-sep" aria-hidden="true"></span>
-      <button
-        class="nav-tab"
-        data-page="statistiche"
-        onclick="switchPage('statistiche')"
-      >
-        <i class="icx icx-stats"></i> Statistiche
-      </button>
-      <button
-        class="nav-tab"
-        data-page="registro"
-        onclick="switchPage('registro')"
-        id="tab-registro"
-        style="display: none"
-      >
-        <i class="icx icx-clipboard"></i> Registro
-      </button>
-      <button
-        class="nav-tab"
-        data-page="guida"
-        onclick="switchPage('guida')"
-        title="Guida del programma"
-      >
-        <i class="icx icx-clipboard"></i> Guida
-      </button>
-
-      <button
-        class="nav-tab"
-        data-page="impostazioni"
-        onclick="switchPage('impostazioni')"
-      >
-        <i class="icx icx-settings"></i> Impostazioni
-      </button>
-    </div>
+      <div class="nav-gruppo" data-gruppo="locale">
+        <button type="button" class="nav-gruppo-btn" id="nav-btn-locale" aria-haspopup="true" aria-expanded="false" aria-controls="nav-menu-locale" onclick="navGruppoApriChiudi('locale')">
+          Maison e inventario<i class="icx icx-giu nav-gruppo-freccia"></i>
+        </button>
+        <div class="nav-gruppo-menu" id="nav-menu-locale" role="menu" aria-labelledby="nav-btn-locale">
+          <button class="nav-tab" role="menuitem" data-page="maison" onclick="switchPage('maison')" title="Costi e clienti Maison">
+            <i class="icx icx-maison"></i> Maison
+          </button>
+          <button class="nav-tab" role="menuitem" data-page="inventario" onclick="switchPage('inventario')" title="Magazzino e carichi">
+            <i class="icx icx-inventario"></i> Inventario
+          </button>
+        </div>
+      </div>
+      <div class="nav-gruppo" data-gruppo="strumenti">
+        <button type="button" class="nav-gruppo-btn" id="nav-btn-strumenti" aria-haspopup="true" aria-expanded="false" aria-controls="nav-menu-strumenti" onclick="navGruppoApriChiudi('strumenti')">
+          Strumenti<i class="icx icx-giu nav-gruppo-freccia"></i>
+        </button>
+        <div class="nav-gruppo-menu" id="nav-menu-strumenti" role="menu" aria-labelledby="nav-btn-strumenti">
+          <button class="nav-tab" role="menuitem" data-page="assistente" onclick="switchPage('assistente')" title="Aiuto a scrivere testi chiari e professionali">
+            <i class="icx icx-assistente"></i> Assistente
+          </button>
+          <button class="nav-tab" role="menuitem" data-page="statistiche" onclick="switchPage('statistiche')" title="Numeri e report delle registrazioni">
+            <i class="icx icx-stats"></i> Statistiche del Diario
+          </button>
+          <button class="nav-tab" role="menuitem" data-page="registro" id="tab-registro" onclick="switchPage('registro')" title="Chi ha fatto cosa e quando" style="display: none">
+            <i class="icx icx-clipboard"></i> Registro attività
+          </button>
+          <button class="nav-tab" role="menuitem" data-page="guida" onclick="switchPage('guida')" title="Come si usa ogni pagina">
+            <i class="icx icx-aiuto"></i> Guida del programma
+          </button>
+          <button class="nav-tab" role="menuitem" data-page="impostazioni" onclick="switchPage('impostazioni')" title="Impostazioni del programma e del tuo profilo">
+            <i class="icx icx-settings"></i> Impostazioni generali
+          </button>
+        </div>
+      </div>
+    </nav>
 
     <!-- DASHBOARD -->
     <div class="page active" id="page-dashboard">
@@ -3339,7 +3244,7 @@
 
     <div class="page" id="page-assistente">
       <div class="main-card">
-        <div class="card-header">Assistente – Scrittura veloce</div>
+        <div class="card-header">Assistente · scrittura veloce</div>
         <div class="form-area">
           <p
             style="color: var(--muted); font-size: var(--fs-md,.875rem); margin-bottom: 16px"
@@ -3599,7 +3504,7 @@
         <div class="add-tipo-row sez-form"><div class="field"><label>Nome nuovo campo</label><input type="text" id="new-campo-nome" placeholder="es. Bar, VIP Area" /></div><button class="btn-add-tipo" onclick="aggiungiCampoRapporto()">Aggiungi campo</button></div>
       </div>
       <div class="settings-section" data-gruppo="Persone" id="collab-section" style="display: none">
-        <div class="sez-head"><div><h4>Gestione collaboratori</h4><p class="sez-desc">Anagrafica del settore aperto: nome, impiego, categoria, funzione, percentuale, lingue, date. Competenze e livelli si gestiscono in Formazione, preferenze e coperture nel Piano.</p></div></div>
+        <div class="sez-head"><div><h4>Gestione collaboratori</h4><p class="sez-desc">Anagrafica del settore aperto: clicca un nome per vederlo e modificarlo. Competenze e livelli si gestiscono in Formazione, le preferenze dei turni nel Piano.</p></div></div>
         <div id="collaboratori-list"></div>
         <div class="add-tipo-row sez-form"><div class="field"><label>Nome nuovo collaboratore</label><input type="text" id="new-collab-nome" placeholder="Cognome Nome" /></div><button class="btn-add-tipo" onclick="aggiungiCollaboratore()">Aggiungi</button><button class="btn-secondario" onclick="document.getElementById('import-collab-file').click()">Importa da Excel o CSV</button><input type="file" id="import-collab-file" accept=".xlsx,.xls,.csv,.txt" style="display: none" onchange="importaCollaboratori(this)" /></div>
       </div>
