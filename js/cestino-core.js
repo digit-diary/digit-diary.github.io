@@ -16,14 +16,30 @@
 
 let _cestinoModuli = [],
   _cestinoReg = [];
+// CHI USA IL CESTINO (decisione del titolare 11/10: "uno deve poter cestinare quello che
+// vuole cestinare"): chi puo cestinare puo anche ripristinare. Registrazioni del Diario:
+// tutti (il database mostra le righe del proprio settore); moduli: chi scrive i moduli.
+// Elimina definitivamente e Svuota: solo l amministratore (il database lo impone).
+function _cestinoVedeModuli() {
+  return isAdmin() || (typeof _puoScrivereModuli === 'function' && _puoScrivereModuli());
+}
+// filtro "Tipo": la voce Moduli solo a chi li vede
+function cestinoPreparaFiltri() {
+  const sel = document.getElementById('cestino-filt-tipo');
+  if (!sel) return;
+  const opMod = sel.querySelector('option[value="moduli"]');
+  if (opMod) opMod.hidden = !_cestinoVedeModuli();
+  if (sel.value === 'moduli' && !_cestinoVedeModuli()) sel.value = '';
+}
 async function caricaCestino() {
   const el = document.getElementById('cestino-content');
   if (!el) return;
+  cestinoPreparaFiltri();
   el.innerHTML = '<p style="color:var(--muted)">Caricamento...</p>';
   try {
-    const modDel = await secGet(
-      'moduli?eliminato=eq.true&reparto_dip=eq.' + currentReparto + '&order=eliminato_at.desc',
-    );
+    const modDel = !_cestinoVedeModuli()
+      ? []
+      : await secGet('moduli?eliminato=eq.true&reparto_dip=eq.' + currentReparto + '&order=eliminato_at.desc');
     const regDel = await secGet(
       'registrazioni?eliminato=eq.true&reparto_dip=eq.' + currentReparto + '&order=eliminato_at.desc',
     );
@@ -33,6 +49,10 @@ async function caricaCestino() {
   } catch (e) {
     el.innerHTML = '<p style="color:var(--accent)">Errore caricamento cestino</p>';
   }
+}
+// "Eliminato da X il ...": senza autore o data (voci vecchie) si scrive solo quello che c e
+function _cestinoChiQuando(chi, quando) {
+  return 'Eliminato' + (chi ? ' da ' + escP(chi) : '') + (quando ? ' il ' + quando : '');
 }
 function renderCestino() {
   const el = document.getElementById('cestino-content');
@@ -63,6 +83,16 @@ function renderCestino() {
       '</p>';
     return;
   }
+  const adm = isAdmin();
+  // Elimina definitivamente: solo l amministratore (all operatore il pulsante non c e)
+  const btnElimina = (tab, id) =>
+    adm
+      ? '<button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;background:var(--accent)" onclick="eliminaDefinitivo(\'' +
+        tab +
+        "'," +
+        id +
+        ')">Elimina</button>'
+      : '';
   let html = '';
   if (filtReg.length) {
     html += '<h5 style="margin:12px 0 8px;color:var(--ink)">Registrazioni (' + filtReg.length + ')</h5>';
@@ -83,15 +113,13 @@ function renderCestino() {
         d +
         '<div style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
         escP((r.testo || '').substring(0, 60)) +
-        '</div><div style="font-size:var(--fs-sm,.8125rem);color:var(--accent)">Eliminato da ' +
-        escP(r.eliminato_da || '') +
-        ' il ' +
-        delAt +
+        '</div><div style="font-size:var(--fs-sm,.8125rem);color:var(--accent)">' +
+        _cestinoChiQuando(r.eliminato_da, delAt) +
         '</div></div><button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px" onclick="ripristinaCestino(\'registrazioni\',' +
         r.id +
-        ')">Ripristina</button><button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;background:var(--accent)" onclick="eliminaDefinitivo(\'registrazioni\',' +
-        r.id +
-        ')">Elimina</button></div>';
+        ')">Ripristina</button>' +
+        btnElimina('registrazioni', r.id) +
+        '</div>';
     });
     html += '</div>';
   }
@@ -111,20 +139,19 @@ function renderCestino() {
         escP(m.tipo || '') +
         '</span> · ' +
         escP(m.data_modulo || '') +
-        '<div style="font-size:var(--fs-sm,.8125rem);color:var(--accent)">Eliminato da ' +
-        escP(m.eliminato_da || '') +
-        ' il ' +
-        delAt +
+        '<div style="font-size:var(--fs-sm,.8125rem);color:var(--accent)">' +
+        _cestinoChiQuando(m.eliminato_da, delAt) +
         '</div></div><button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px" onclick="ripristinaCestino(\'moduli\',' +
         m.id +
-        ')">Ripristina</button><button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;background:var(--accent)" onclick="eliminaDefinitivo(\'moduli\',' +
-        m.id +
-        ')">Elimina</button></div>';
+        ')">Ripristina</button>' +
+        btnElimina('moduli', m.id) +
+        '</div>';
     });
     html += '</div>';
   }
-  html +=
-    '<div style="margin-top:16px;display:flex;gap:8px"><button class="btn-salva" style="background:var(--accent);font-size:var(--fs-sm,.8125rem);padding:8px 16px" onclick="svuotaCestino()">Svuota cestino</button></div>';
+  html += adm
+    ? '<div style="margin-top:16px;display:flex;gap:8px"><button class="btn-salva" style="background:var(--accent);font-size:var(--fs-sm,.8125rem);padding:8px 16px" onclick="svuotaCestino()">Svuota cestino</button></div>'
+    : '<p style="margin-top:12px;font-size:var(--fs-sm,.8125rem);color:var(--muted)">L’eliminazione definitiva è riservata all’amministratore.</p>';
   el.innerHTML = html;
 }
 async function _cestinoRiallineaRegistrazione(r) {
@@ -138,7 +165,15 @@ async function _cestinoRiallineaRegistrazione(r) {
     toastErrore('Ripristinata, ma piano o Rapporto non allineati: ' + ((e && e.message) || e));
   }
 }
-async function ripristinaCestino(tabella, id) {
+// un ripristino alla volta: il doppio click ripeteva il riallineamento di piano e Rapporto
+function ripristinaCestino(tabella, id) {
+  return unaVoltaSola('cestino-ripristina|' + tabella + '|' + id, () => _ripristinaCestinoEsegui(tabella, id));
+}
+async function _ripristinaCestinoEsegui(tabella, id) {
+  if (tabella === 'moduli' && !_cestinoVedeModuli()) {
+    toast('Non hai il permesso');
+    return;
+  }
   if (!(await chiediConferma('Ripristinare questo elemento?'))) return;
   try {
     await secPatch(tabella, 'id=eq.' + id, { eliminato: false, eliminato_da: null, eliminato_at: null });
@@ -173,15 +208,15 @@ async function ripristinaCestino(tabella, id) {
     renderRischioAlerts();
     renderAmmonimentiAlerts();
     aggiornaModuliLista();
-    toast('Ripristinato!');
+    toast('Ripristinato');
   } catch (e) {
-    toast('Errore ripristino');
+    toastErrore('Non ripristinato: ' + ((e && e.message) || 'errore del database'));
   }
 }
 async function eliminaDefinitivo(tabella, id) {
   // il controllo era solo nell'interfaccia: la funzione resta richiamabile dalla console
   if (!isAdmin()) {
-    toast('Riservato all amministratore');
+    toast("Riservato all'amministratore");
     return;
   }
   // CONSERVAZIONE (regolamento aziendale / RAP): un record dell'archivio degli
@@ -211,7 +246,7 @@ async function eliminaDefinitivo(tabella, id) {
 }
 async function svuotaCestino() {
   if (!isAdmin()) {
-    toast('Riservato all amministratore');
+    toast("Riservato all'amministratore");
     return;
   }
   const tot = _cestinoModuli.length + _cestinoReg.length;
@@ -241,7 +276,7 @@ async function svuotaCestino() {
       'Svuotare il cestino? ' +
         (modOk.length + regOk.length) +
         ' element' +
-        (modOk.length + regOk.length === 1 ? 'o verra' : 'i verranno') +
+        (modOk.length + regOk.length === 1 ? 'o verrà' : 'i verranno') +
         ' eliminat' +
         (modOk.length + regOk.length === 1 ? 'o' : 'i') +
         ' DEFINITIVAMENTE.' +
@@ -355,7 +390,12 @@ async function salvaFixImpiego() {
   }
   const sel = [...document.querySelectorAll('[data-fix-imp]')];
   if (!sel.length) return;
-  if (!(await chiediConferma("Salvo l'impiego di " + sel.length + ' collaboratori?'))) return;
+  if (
+    !(await chiediConferma(
+      "Salvo l'impiego di " + sel.length + (sel.length === 1 ? ' collaboratore?' : ' collaboratori?'),
+    ))
+  )
+    return;
   let n = 0;
   const falliti = [];
   for (const s of sel) {
@@ -379,7 +419,7 @@ async function salvaFixImpiego() {
     'Impiego assegnato in blocco',
     n + ' collaboratori' + (falliti.length ? ', NON salvati: ' + falliti.join(', ') : ''),
   );
-  _esitoInBlocco('Impiego salvato per ' + n + ' collaboratori', falliti);
+  _esitoInBlocco('Impiego salvato per ' + n + (n === 1 ? ' collaboratore' : ' collaboratori'), falliti);
   controlloSalute();
 }
 // I disattivati con mesi interi di soli riposi (C/V/WD senza commento) sono
@@ -720,16 +760,23 @@ async function orfanoElimina(nome, n) {
   )
     return;
   if (
-    !(await chiediConferma("Confermi definitivamente l'eliminazione dei " + n + ' turni di "' + nome + '"?', {
-      pericolo: true,
-      ok: 'Elimina',
-    }))
+    !(await chiediConferma(
+      (n === 1
+        ? 'Confermi definitivamente l\'eliminazione del turno di "'
+        : "Confermi definitivamente l'eliminazione dei " + n + ' turni di "') +
+        nome +
+        '"?',
+      {
+        pericolo: true,
+        ok: 'Elimina',
+      },
+    ))
   )
     return;
   try {
     await secDel('piano', 'collaboratore=eq.' + encodeURIComponent(nome));
     logAzione('Turni orfani eliminati', nome + ' (' + n + ' righe)');
-    toast(n + ' turni eliminati');
+    toast(n + (n === 1 ? ' turno eliminato' : ' turni eliminati'));
     apriFixOrfani();
   } catch (e) {
     toast('Errore eliminazione');

@@ -523,7 +523,7 @@ async function applicaProfili() {
   if (!ok) return;
   if (!(await _applicaProfiliA(conProfilo))) return;
   renderVisibilitaUI();
-  toast('Profili applicati a ' + conProfilo.length + ' operatori');
+  toast('Profili applicati a ' + conProfilo.length + (conProfilo.length === 1 ? ' operatore' : ' operatori'));
   if (typeof logAzione === 'function') logAzione('Profili permessi applicati', elenco.replace(/\n/g, '; '));
 }
 function renderProfiliUI(opList) {
@@ -885,7 +885,7 @@ async function renderVisibilitaUI() {
 async function cambiaVisibilita(key, val) {
   // il controllo era solo nell'interfaccia: la funzione resta richiamabile dalla console
   if (!isAdmin()) {
-    toast('Riservato all amministratore');
+    toast("Riservato all'amministratore");
     return;
   }
   if (val === 'selezionati') {
@@ -905,7 +905,7 @@ async function cambiaVisibilita(key, val) {
 }
 async function aggiornaVisOps(key) {
   if (!isAdmin()) {
-    toast('Riservato all amministratore');
+    toast("Riservato all'amministratore");
     return;
   }
   const box = document.getElementById('vis-ops-' + key);
@@ -1297,7 +1297,8 @@ function renderOperatoriUI() {
             '">' +
             escP(n) +
             '</span>' +
-            repBadge +
+            // l admin cambia il settore dalla tendina qui a destra: il badge ripeteva la stessa cosa
+            (admin ? '' : repBadge) +
             (hasAuth
               ? '<span style="font-size:var(--fs-sm,.8125rem);color:var(--c-verde,#2c6e49);font-weight:600">Con password</span>'
               : '') +
@@ -1310,7 +1311,9 @@ function renderOperatoriUI() {
                   : '') +
                 '</button><select onchange="cambiaRepartoOperatore(\'' +
                 ne +
-                '\',this.value)" title="Settore dell operatore">' +
+                '\',this.value)" title="Settore dell\'operatore" aria-label="Settore di ' +
+                escP(n) +
+                '">' +
                 opzioniRepartoHtml(rep, true) +
                 '</select>'
               : '') +
@@ -1824,7 +1827,7 @@ function renderBuoniTipiUI() {
   h +=
     '<div class="add-tipo-row sez-form" style="margin-top:12px"><div class="field"><label>Nuova sigla</label><input id="bt-nuovo-cod" maxlength="6" placeholder="es. BR" style="width:90px;text-transform:uppercase"></div><div class="field"><label>Nome</label><input id="bt-nuovo-nome" placeholder="es. Buono Brunch"></div><div class="field"><label>Valore CHF</label><input id="bt-nuovo-val" type="number" min="0" step="0.5" style="width:90px"></div><div class="field"><label>Parole nel file (facoltative)</label><input id="bt-nuovo-parole" placeholder="es. brunch"></div><button class="btn-add-tipo" onclick="aggiungiBuonoTipo()">+ Aggiungi</button></div>';
   h +=
-    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:6px 0 0">La sigla non si può cambiare dopo l aggiunta: e scritta nelle registrazioni. Un tipo che non si usa più si disattiva: sparisce dai menu ma resta leggibile nello storico, nelle statistiche e negli export. Con le spunte dei Settori un buono compare solo nei menu di quei settori (nessuna spunta = in tutti).</p>';
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:6px 0 0">La sigla non si può cambiare dopo l\'aggiunta: è scritta nelle registrazioni. Un tipo che non si usa più si disattiva: sparisce dai menu ma resta leggibile nello storico, nelle statistiche e negli export. Con le spunte dei Settori un buono compare solo nei menu di quei settori (nessuna spunta = in tutti).</p>';
   box.innerHTML = h;
 }
 // settori con la Maison (buoni): quelli dove l inventario ha la categoria Buoni
@@ -2058,14 +2061,19 @@ function renderConservazioneUI() {
 async function salvaConservazioneAnni(v) {
   if (!isAdmin()) return;
   const n = Math.max(0, Math.min(30, parseInt(v) || 0));
-  if (n < 5 && !(await chiediConferma('Il regolamento chiede almeno 5 anni.\n\nConfermi comunque ' + n + ' anni?'))) {
+  if (
+    n < 5 &&
+    !(await chiediConferma(
+      'Il regolamento chiede almeno 5 anni.\n\nConfermi comunque ' + n + (n === 1 ? ' anno?' : ' anni?'),
+    ))
+  ) {
     renderConservazioneUI();
     return;
   }
   conservazioneAnniCfg = n;
   if (!(await salvaImp('conservazione_anni', String(n)))) return;
   logAzione('Conservazione dati', n ? 'minimo ' + n + ' anni' : 'protezione disattivata');
-  toast(n ? 'Conservazione: ' + n + ' anni' : 'Protezione conservazione disattivata');
+  toast(n ? 'Conservazione: ' + n + (n === 1 ? ' anno' : ' anni') : 'Protezione conservazione disattivata');
   renderConservazioneUI();
 }
 async function salvaConservazioneGrazia(v) {
@@ -2074,7 +2082,7 @@ async function salvaConservazioneGrazia(v) {
   conservazioneGraziaCfg = n;
   if (!(await salvaImp('conservazione_giorni_grazia', String(n)))) return;
   logAzione('Conservazione dati', 'finestra correzione ' + n + ' giorni');
-  toast('Correzione possibile entro ' + n + ' giorni');
+  toast('Correzione possibile entro ' + n + (n === 1 ? ' giorno' : ' giorni'));
   renderConservazioneUI();
 }
 async function salvaBackupAutoGiorni(v) {
@@ -2082,7 +2090,13 @@ async function salvaBackupAutoGiorni(v) {
   const n = Math.max(0, Math.min(90, parseInt(v) || 0));
   if (!(await salvaImp('backup_auto_giorni', String(n)))) return;
   logAzione('Backup automatico', n ? 'ogni ' + n + ' giorni' : 'disattivato');
-  toast(n ? 'Backup automatico: ogni ' + n + ' giorni' : 'Backup automatico disattivato');
+  toast(
+    n
+      ? n === 1
+        ? 'Backup automatico: ogni giorno'
+        : 'Backup automatico: ogni ' + n + ' giorni'
+      : 'Backup automatico disattivato',
+  );
 }
 // ================================================================
 // SETTORI (admin): aggiungi/rinomina/colore/disattiva + pagine per settore
@@ -2392,11 +2406,12 @@ function initSezioniRichiudibili(rootId) {
   } catch (e) {}
   // da OPERATORE le sezioni solo-admin non compaiono (sono inutilizzabili);
   // restano Gestione Collaboratori (si regola coi suoi permessi) e Sicurezza
-  // (impronta del dispositivo, personale)
+  // (impronta del dispositivo, personale), e il Cestino (chi cestina deve poter ripristinare,
+  // decisione del titolare 11/10)
   if (rootId === 'page-impostazioni' && !isAdmin()) {
     // il titolo sta dentro l intestazione della sezione (.sez-head): prima si cercava solo
     // un h4 figlio diretto e con un nome vecchio, cosi non si nascondeva nessuna sezione
-    const perOperatori = ['gestione collaboratori', 'collaboratori', 'sicurezza'];
+    const perOperatori = ['gestione collaboratori', 'collaboratori', 'sicurezza', 'cestino'];
     root.querySelectorAll('.settings-section').forEach((sec) => {
       const h = sec.querySelector('h4');
       if (!h) return;
@@ -2591,7 +2606,7 @@ function _schedaPermessiOperatori() {
 // modificabili, note, firme, Salva copia compilata), dal modello unico js/scheda-permessi.js
 function scaricaSchedaPermessiCompilabile() {
   if (!isAdmin()) {
-    toast('Riservato all amministratore');
+    toast("Riservato all'amministratore");
     return;
   }
   const nomiProf = Object.assign({}, PROFILI);
@@ -2621,7 +2636,7 @@ function scaricaSchedaPermessiCompilabile() {
 }
 function stampaSchedaPermessi() {
   if (!isAdmin()) {
-    toast('Riservato all amministratore');
+    toast("Riservato all'amministratore");
     return;
   }
   const ops = _schedaPermessiOperatori();
@@ -2655,7 +2670,7 @@ function stampaSchedaPermessi() {
     '<!DOCTYPE html><html lang="it"><head><meta charset="utf-8"><title>Scheda permessi</title><style>body{font-family:Georgia,serif;color:#1c1a17;margin:24px;font-size:13px}h1{font-size:var(--fs-xl,1.25rem);margin:0 0 4px}h2{font-size:var(--fs-lg,1.0625rem);margin:22px 0 6px;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid #000;padding-bottom:4px}table{border-collapse:collapse;width:100%;font-size:11.5px}th,td{border:1px solid #999;padding:3px 6px;text-align:center}th{background:#eee}td.l{text-align:left}tr.g td{background:#f3efe6;text-align:left;font-weight:700}.si{background:#e3f0e8;font-weight:700}.no{color:#999}p{margin:4px 0;color:#444}.nb{margin:12px 0}@media print{.nb{display:none}body{margin:10mm}table{font-size:10px}}@page{size:A4 landscape;margin:9mm}@media print{html,body{width:auto!important;margin:0!important}table{width:100%!important;table-layout:fixed;font-size:9px!important}td,th{overflow-wrap:anywhere;word-break:break-word;padding:2px 3px!important}thead{display:table-header-group}tr{break-inside:avoid}h2{break-after:avoid}}</style></head><body>' +
     '<h1>Diario Collaboratori · scheda dei permessi attuali</h1><p>Stato delle Impostazioni al ' +
     oggi +
-    '. Si = può (vedere la pagina o la scheda, oppure eseguire la funzione); vuoto = no. L amministratore può tutto ed e escluso dalla tabella.</p><div class="nb"><button onclick="window.print()">Stampa / PDF</button></div>';
+    '. Sì = può (vedere la pagina o la scheda, oppure eseguire la funzione); vuoto = no. L\'amministratore può tutto ed è escluso dalla tabella.</p><div class="nb"><button onclick="window.print()">Stampa / PDF</button></div>';
   h +=
     '<h2>Operatori, profilo e settori</h2><table><tr><th>Operatore</th><th>Profilo</th><th>Settori</th><th>Accessi extra</th></tr>';
   ops.forEach((o) => {
@@ -2687,7 +2702,7 @@ function stampaSchedaPermessi() {
         '</td><td style="font-size:10px;color:#555">' +
         escP(impostazione(k)) +
         '</td>' +
-        ops.map((o) => (concesso(k, o) ? '<td class="si">Si</td>' : '<td class="no"></td>')).join('') +
+        ops.map((o) => (concesso(k, o) ? '<td class="si">Sì</td>' : '<td class="no"></td>')).join('') +
         '</tr>';
     });
   });
@@ -2721,13 +2736,20 @@ const _GC_FUNZIONI_NOMI = {
 };
 function _gcFunzioneTesto(f) {
   const s = String(f || '').toUpperCase();
-  return s && _GC_FUNZIONI_NOMI[s] ? s + ' · ' + _GC_FUNZIONI_NOMI[s] : s;
+  // nome scritto in Piano › Impostazioni › Funzioni del settore, poi i nomi noti
+  const nome = (typeof funzioneNomeEsteso === 'function' && funzioneNomeEsteso(s)) || _GC_FUNZIONI_NOMI[s];
+  return s && nome ? s + ' · ' + nome : s;
 }
 function _gcSettoreTesto(rep) {
   return rep === 'entrambi' ? 'Tutti i settori' : repartoLabel(rep || 'slots');
 }
+// percentuale scritta com e salvata (0,875 = 87,5%): prima si arrotondava a 88% e ogni
+// Salva riscriveva 0,88 con un evento nello Storico HR
+function _gcPercValTesto(v) {
+  return String(Math.round((parseFloat(v) || 1) * 1000) / 10).replace('.', ',') + '%';
+}
 function _gcPercTesto(c) {
-  return Math.round((parseFloat(c.percentuale) || 1) * 100) + '%';
+  return _gcPercValTesto(c.percentuale);
 }
 function _gcDataIt(d) {
   return d ? String(d).substring(0, 10).split('-').reverse().join('.') : '';
@@ -2738,7 +2760,9 @@ function _gcPermessi() {
 }
 // righe dell elenco (sola lettura). p = permessi, lista = collaboratori attivi del settore
 function _gcElencoHtml(attivi, inattivi, p) {
-  const vedeCat = p.puoCat || (typeof puoVedereCategorie === 'function' && puoVedereCategorie());
+  const puoVedereCat = p.puoCat || (typeof puoVedereCategorie === 'function' && puoVedereCategorie());
+  // colonna Categoria solo se almeno una persona ce l ha: tutta "-" non diceva niente
+  const vedeCat = puoVedereCat && attivi.some((c) => c.categoria);
   const ordina = (arr) =>
     arr
       .slice()
@@ -2748,7 +2772,7 @@ function _gcElencoHtml(attivi, inattivi, p) {
           : a.nome.localeCompare(b.nome),
       );
   const testa =
-    '<thead><tr><th>Collaboratore</th><th>Funzione</th>' +
+    '<thead><tr><th>Collaboratore</th><th>Funzione nel piano</th>' +
     (vedeCat ? '<th>Categoria</th>' : '') +
     '<th class="num">Percentuale</th><th>Settore</th><th>Livello</th><th class="gc-col-apri"><span class="fz-sr">Apri</span></th></tr></thead>';
   const riga = (c) => {
@@ -2773,7 +2797,7 @@ function _gcElencoHtml(attivi, inattivi, p) {
       (cop.length
         ? '<span class="gc-sotto">Copre anche: ' + cop.map((k) => escP(repartoLabel(k))).join(', ') + '</span>'
         : '') +
-      '</td><td data-et="Funzione">' +
+      '</td><td data-et="Funzione nel piano">' +
       (c.funzione ? escP(_gcFunzioneTesto(c.funzione)) : '<span class="gc-manca">da indicare</span>') +
       '</td>' +
       (vedeCat
@@ -2804,7 +2828,12 @@ function _gcElencoHtml(attivi, inattivi, p) {
         '</tbody></table>'
       : '';
   let h =
-    '<p class="gc-intro">Clicca un nome per aprire la sua scheda: lì modifichi i dati e confermi con <b>Salva</b>. Vai a: <a href="#" onclick="switchPage(\'formazione\');return false">Formazione</a> · <a href="#" onclick="switchPage(\'piano\');if(typeof pianoCambiaTab===\'function\')pianoCambiaTab(\'impostazioni\');return false">Piano › Impostazioni</a></p>';
+    // l istruzione (clic sul nome, Salva) sta una volta sola, nella descrizione della sezione
+    '<p class="gc-intro">' +
+    (puoVedereCat && !vedeCat && attivi.length
+      ? 'Nessuno ha ancora la categoria: si indica nella scheda di ciascuno, poi compare la colonna. '
+      : '') +
+    'Vai a: <a href="#" onclick="switchPage(\'formazione\');return false">Formazione</a> · <a href="#" onclick="switchPage(\'piano\');if(typeof pianoCambiaTab===\'function\')pianoCambiaTab(\'impostazioni\');return false">Piano › Impostazioni</a></p>';
   if (attivi.length > 8)
     h +=
       '<input type="text" id="collab-cerca" placeholder="Cerca collaboratore..." aria-label="Cerca collaboratore" oninput="filtraCollaboratoriUI(this.value)" class="campo-cerca">';
@@ -2869,11 +2898,21 @@ function gcApriScheda(id) {
       ? _pianoFunzioniDi(c.reparto_dip || 'slots')
       : window._pianoFunzioni || ['RESP', 'SUP', 'BO', 'HOST'];
   if (c.funzione && !funzioni.includes(c.funzione)) funzioni.push(c.funzione);
-  const percCur = Math.round((parseFloat(c.percentuale) || 1) * 100);
-  const percOpz = [100, 90, 80, 70, 60, 50, 40, 30, 20];
-  if (!percOpz.includes(percCur)) percOpz.unshift(percCur);
-  let settOpz = opt('entrambi', 'Tutti i settori', c.reparto_dip || 'slots');
-  getReparti().forEach((r) => (settOpz += opt(r.key, escP(r.label), c.reparto_dip || 'slots')));
+  // PERCENTUALE: il valore salvato resta esatto (0,875 non diventa 0,88). Prima la
+  // scheda arrotondava al centesimo e ogni Salva lo riscriveva con un evento HR.
+  const percCur = parseFloat(c.percentuale) || 1;
+  const percOpz = [1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2];
+  if (!percOpz.some((v) => Math.abs(v - percCur) < 1e-9)) percOpz.unshift(percCur);
+  const percSel = String(percOpz.find((v) => Math.abs(v - percCur) < 1e-9));
+  // SETTORE: un settore disattivato non e fra quelli attivi ma resta quello della persona:
+  // si mostra "(disattivato)" e non cambia finche non lo si sceglie diverso. Prima la
+  // persona finiva su "Tutti i settori" al primo Salva senza accorgersene.
+  const repCur = c.reparto_dip || 'slots';
+  let settOpz = opt('entrambi', 'Tutti i settori', repCur);
+  const repAttivi = getReparti();
+  repAttivi.forEach((r) => (settOpz += opt(r.key, escP(r.label), repCur)));
+  if (repCur !== 'entrambi' && !repAttivi.some((r) => r.key === repCur))
+    settOpz += opt(repCur, escP(repartoLabel(repCur)) + ' (disattivato)', repCur);
   const lv = typeof livelloDiCollaboratore === 'function' ? livelloDiCollaboratore(c) : 0;
   let h =
     '<div class="fz-fin-testa"><div><h3 id="gc-titolo">' +
@@ -2908,18 +2947,18 @@ function gcApriScheda(id) {
     );
   if (p.puoImpiegoDati) {
     h += campo(
-      'Funzione',
+      'Funzione nel piano',
       sel(
         'gc-funzione',
         opt('', 'Da indicare', c.funzione || '') +
           funzioni.map((f) => opt(f, escP(_gcFunzioneTesto(f)), c.funzione || '')).join(''),
         true,
       ),
-      'Usata dal Piano di lavoro per le regole dei turni',
+      'La sigla usata dal Piano di lavoro per le regole dei turni (es. BO, SUP)',
     );
     h += campo(
       'Percentuale d’impiego',
-      sel('gc-perc', percOpz.map((n) => opt(n / 100, n + '%', percCur / 100)).join(''), true),
+      sel('gc-perc', percOpz.map((v) => opt(v, _gcPercValTesto(v), percSel)).join(''), true),
       'Per il saldo delle ore e i codici del contratto',
     );
     h += campo(
@@ -3073,22 +3112,35 @@ async function gcSalvaScheda(id) {
   }
   const b = document.getElementById('gc-salva');
   if (b) b.disabled = true;
+  // ogni campo cambiato passa dalla sua funzione (stessi controlli e storico di prima), in
+  // modo "scheda": niente messaggi sparsi, ritorna l esito e il motivo (opz.errore)
+  const esiti = {};
   for (const k of cambiati) {
-    if (k === 'impiego' && p.puoImp) await cambiaImpiegoCollaboratore(id, dopo.impiego);
-    else if (k === 'categoria' && p.puoCat) await cambiaCategoriaCollaboratore(id, dopo.categoria);
-    else if (k === 'funzione') await cambiaFunzioneCollaboratore(id, dopo.funzione);
-    else if (k === 'percentuale') await cambiaPercentualeCollaboratore(id, dopo.percentuale);
-    else if (k === 'lingue') await cambiaLingueCollaboratore(id, dopo.lingue);
-    else if (k === 'data_nascita' || k === 'data_assunzione') await cambiaDataCollaboratore(id, k, dopo[k]);
-    else if (k === 'reparto_dip' && p.adminFull) await cambiaRepartoCollaboratore(id, dopo.reparto_dip);
+    const opz = { scheda: true };
+    let ok = false;
+    if (k === 'impiego' && p.puoImp) ok = await cambiaImpiegoCollaboratore(id, dopo.impiego, opz);
+    else if (k === 'categoria' && p.puoCat) ok = await cambiaCategoriaCollaboratore(id, dopo.categoria, opz);
+    else if (k === 'funzione') ok = await cambiaFunzioneCollaboratore(id, dopo.funzione, opz);
+    else if (k === 'percentuale') ok = await cambiaPercentualeCollaboratore(id, dopo.percentuale, opz);
+    else if (k === 'lingue') ok = await cambiaLingueCollaboratore(id, dopo.lingue, opz);
+    else if (k === 'data_nascita' || k === 'data_assunzione') ok = await cambiaDataCollaboratore(id, k, dopo[k], opz);
+    else if (k === 'reparto_dip' && p.adminFull) ok = await cambiaRepartoCollaboratore(id, dopo.reparto_dip, opz);
+    else opz.errore = 'permesso';
+    esiti[k] = { ok: ok === true, errore: opz.errore };
   }
-  // verifica: rileggo dal database i campi cambiati
+  // verifica: rileggo dal database i campi cambiati. Una riga che non si rilegge e esclusa
+  // dai permessi (altro settore): non e salvato niente, anche se nessuno ha dato errore.
   let rec = null;
+  let letto = false;
   try {
     const r = await secGet('collaboratori?id=eq.' + id + '&limit=1');
-    rec = Array.isArray(r) ? r[0] : null;
+    rec = Array.isArray(r) ? r[0] || null : null;
+    letto = true;
   } catch (e) {}
   const nonSalvati = [];
+  cambiati.forEach((k) => {
+    if (!esiti[k].ok) nonSalvati.push(k);
+  });
   if (rec) {
     const ora = {
       impiego: rec.impiego || '',
@@ -3098,6 +3150,7 @@ async function gcSalvaScheda(id) {
       reparto_dip: rec.reparto_dip || 'slots',
     };
     cambiati.forEach((k) => {
+      if (nonSalvati.includes(k)) return;
       if (ora[k] !== undefined && ora[k] !== dopo[k]) nonSalvati.push(k);
       if (k === 'data_nascita' || k === 'data_assunzione') {
         // stessa lettura di cambiaDataCollaboratore: 12.01.1997, 12/01/1997, solo 12.01
@@ -3106,19 +3159,41 @@ async function gcSalvaScheda(id) {
       }
     });
     Object.assign(c, rec);
+    const inCache = (collaboratoriCache || []).find((x) => x.id === id);
+    if (inCache && inCache !== c) Object.assign(inCache, rec);
   }
   if (b) b.disabled = false;
+  const permesso = (letto && !rec) || cambiati.some((k) => !esiti[k].ok && collabErrorePermesso(esiti[k].errore));
+  if (permesso) {
+    // la scheda resta aperta: si vede cosa si voleva cambiare
+    toastErrore('Non hai il permesso di modificare questo collaboratore');
+    renderCollaboratoriUI();
+    return;
+  }
   if (nonSalvati.length) {
     const nomi = {
       impiego: 'impiego',
       categoria: 'categoria',
       funzione: 'funzione',
       percentuale: 'percentuale',
+      lingue: 'lingue',
       reparto_dip: 'settore',
       data_nascita: 'data di nascita',
       data_assunzione: 'inizio attività',
     };
-    toastErrore('Non salvato: ' + nonSalvati.map((k) => nomi[k] || k).join(', ') + '. Controlla e riprova.');
+    const salvati = cambiati.filter((k) => !nonSalvati.includes(k));
+    // una data che si e scelto di non cambiare (Annulla nella domanda) non e un errore
+    const soloAnnullati = nonSalvati.every((k) => esiti[k].errore === 'annullato');
+    const motivo = nonSalvati.map((k) => esiti[k].errore).find((e) => e && typeof e === 'object' && e.message);
+    if (soloAnnullati && !salvati.length) return;
+    toastErrore(
+      (salvati.length ? 'Salvato: ' + salvati.map((k) => nomi[k] || k).join(', ') + '. ' : '') +
+        'Non salvato: ' +
+        nonSalvati.map((k) => nomi[k] || k).join(', ') +
+        (motivo ? ' (' + String(motivo.message).substring(0, 120) + ')' : '') +
+        '. Controlla e riprova.',
+    );
+    renderCollaboratoriUI();
     return;
   }
   window._gcModificata = false;

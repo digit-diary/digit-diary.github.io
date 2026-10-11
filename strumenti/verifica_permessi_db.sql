@@ -7,6 +7,9 @@
 -- 5) tabelle o contatori con diritti diretti per anon/authenticated: il programma passa
 --    solo dalle funzioni (20260911)
 -- 6) diritti predefiniti che darebbero diritti diretti alle tabelle nuove
+-- 7) diritti predefiniti che renderebbero le funzioni NUOVE eseguibili da tutti (PUBLIC) o
+--    da anon/authenticated senza un GRANT esplicito della migrazione (20260895; dal
+--    20260913 1_prepara_database.sql non le concede piu)
 -- Le tabelle che cominciano con "_" sono copie di prova della copia locale (_bk_*,
 -- _ck_*, ...): compaiono come "di prova" e nel cloud non esistono.
 SELECT 'interna aperta' AS problema, p.oid::regprocedure::text AS oggetto, r AS ruolo
@@ -59,5 +62,23 @@ SELECT 'diritti predefiniti alle tabelle nuove', d.defaclrole::regrole::text || 
  WHERE d.defaclnamespace = 'public'::regnamespace
    AND d.defaclobjtype IN ('r', 'S')
    AND d.defaclrole IN (SELECT c.relowner FROM pg_class c WHERE c.relnamespace = 'public'::regnamespace)
+   AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r)
+   AND EXISTS (SELECT 1 FROM aclexplode(d.defaclacl) a WHERE a.grantee = (SELECT oid FROM pg_roles WHERE rolname = r))
+UNION ALL
+SELECT 'funzioni nuove eseguibili da tutti', o.rolname || ' (globale)', 'PUBLIC'
+  FROM (SELECT DISTINCT p.proowner FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace
+          AND NOT EXISTS (SELECT 1 FROM pg_depend e WHERE e.objid = p.oid AND e.deptype = 'e')) x
+  JOIN pg_roles o ON o.oid = x.proowner
+ WHERE NOT EXISTS (SELECT 1 FROM pg_default_acl d
+                    WHERE d.defaclrole = x.proowner AND d.defaclnamespace = 0 AND d.defaclobjtype = 'f'
+                      AND NOT EXISTS (SELECT 1 FROM aclexplode(d.defaclacl) a WHERE a.grantee = 0))
+UNION ALL
+SELECT 'diritti predefiniti alle funzioni nuove',
+       d.defaclrole::regrole::text || CASE WHEN d.defaclnamespace = 0 THEN ' (globale)' ELSE ' (public)' END, r
+  FROM pg_default_acl d, unnest(ARRAY['anon', 'authenticated']) AS r
+ WHERE d.defaclobjtype = 'f'
+   AND d.defaclnamespace IN (0, 'public'::regnamespace)
+   AND d.defaclrole IN (SELECT p.proowner FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace
+                          AND NOT EXISTS (SELECT 1 FROM pg_depend e WHERE e.objid = p.oid AND e.deptype = 'e'))
    AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r)
    AND EXISTS (SELECT 1 FROM aclexplode(d.defaclacl) a WHERE a.grantee = (SELECT oid FROM pg_roles WHERE rolname = r));

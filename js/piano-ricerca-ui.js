@@ -35,6 +35,14 @@
 // (punto percentuale di scarto)^2 / 100: spostare una persona da +30 a +25 punti sopra la
 // media vale ~8, come 4 ore verso l obiettivo; mai quanto un posto o una regola. Si cambia
 // con l impostazione del piano equita_notti_peso (0 = spenta).
+// VINCOLI (v450): il risultato non puo avere piu regole di legge di prima, tipo per tipo, ne
+// piu regole vere in tutto, piu posti scoperti, riservati o doppioni (RICERCA_VINCOLI, gli
+// stessi per il motore e per il controllo finale). La ricerca puo attraversare piani fuori
+// dai vincoli, ma restituisce il migliore che li rispetta; SFORO: ogni unita fuori dai
+// vincoli costa fino a 1.000.000 di punti, che crescono con la ricerca (0 all inizio, pieni
+// alla fine), e dal 30% della ricerca uno stato fuori dai vincoli si lascia per il migliore
+// ammesso: cosi la ricerca lavora fra i piani applicabili (prima finiva su un piano con 13
+// scoperti e una legge in piu, scartato tutto: restavano 41 scoperti).
 const RICERCA_PESI = {
   legge: 60000,
   regola: 20000,
@@ -44,6 +52,7 @@ const RICERCA_PESI = {
   scoperto: 300,
   oraObiettivo: 2,
   notti: 3,
+  sforo: 1000000,
 };
 // iterazioni al minuto del tempo scelto (circa un minuto su un PC d ufficio, novembre Slots:
 // ~700 al secondo). La ricerca conta le iterazioni, non i secondi: con lo stesso seme e lo
@@ -84,13 +93,93 @@ function _ricercaTurnoDiNotte(t) {
 // peso di un insieme di violazioni fra persone (regole e qualita)
 function _ricercaPesoGruppi(viol) {
   let c = 0;
-  viol.forEach((v) => (c += _ricercaRegolaDiQualita(v.msg) ? RICERCA_PESI.qualita : RICERCA_PESI.regola));
+  viol.forEach((v) => (c += _ricercaPuntiDi(v.msg)));
   return c;
 }
 function _ricercaRegolaDiLegge(msg) {
   return /di riposo dopo|giorni lavorativi consecutivi|riposo singolo dopo|lavorate nella settimana|domenica .*lavorata|domenica libera:|riposo di .* ore|preferenza: massimo \d+ a settimana/.test(
     String(msg || ''),
   );
+}
+// TIPO DI UNA VIOLAZIONE, UNA SOLA DEFINIZIONE per il punteggio della ricerca, i vincoli del
+// motore e il controllo finale (v450): oreSotto (ore del mese sotto il minimo), qualita
+// (livelli, competenze per fascia), legge_dom (domeniche libere dell anno), legge_riposo
+// (riposo di 11 ore), legge_sett (riposo attorno alla domenica), legge_altre (giorni di
+// fila, 4+1+1, ore della settimana, giorni a settimana), regola (tutte le altre).
+function _ricercaTipoViolazione(msg) {
+  const m = String(msg || '');
+  if (/ SOTTO il minimo /.test(m)) return 'oreSotto';
+  if (_ricercaRegolaDiQualita(m)) return 'qualita';
+  if (_ricercaRegolaDiLegge(m)) {
+    const o = _ricercaPesoOrdine(m);
+    return o >= 2 ? 'legge_dom' : o >= 1.5 ? 'legge_riposo' : o > 1 ? 'legge_sett' : 'legge_altre';
+  }
+  return 'regola';
+}
+const RICERCA_TIPI_LEGGE = ['legge_dom', 'legge_riposo', 'legge_sett', 'legge_altre'];
+// VINCOLI DI MIGLIORA (motore e controllo finale, la stessa lista): per ogni tipo di regola
+// di legge le segnalazioni non aumentano (una domenica libera non si scambia con un riposo di
+// 11 ore, ne il contrario); le DOMENICHE LIBERE MANCANTI in tutto non aumentano; le regole
+// vere tutte insieme (legge + altre regole) non aumentano. Si conta per tipo e non per
+// persona: una violazione puo passare da un collega a un altro, il numero no.
+// Prima il controllo finale guardava solo il totale delle leggi e il motore nessuna: il
+// migliore della ricerca poteva avere una legge in piu e veniva scartato tutto.
+const RICERCA_VINCOLI = RICERCA_TIPI_LEGGE.map((k) => [k]).concat([
+  ['legge_dom_mancanti'],
+  RICERCA_TIPI_LEGGE.concat(['regola']),
+]);
+// DOMENICHE LIBERE MANCANTI in una segnalazione (attese - avute; 0 se non e una domenica
+// libera): chi e gia indietro e ne perde un altra peggiora. Prima contava solo SE una persona
+// era indietro: Migliora toglieva una domenica libera a chi era gia sotto (Andrea Molinari da
+// 2 a 1) senza che ne il punteggio ne il controllo finale lo vedessero.
+function _ricercaDomMancanti(msg) {
+  const m = /domenica libera: (\d+) nell anno su (\d+) attese/.exec(String(msg || ''));
+  return m ? Math.max(1, parseInt(m[2], 10) - parseInt(m[1], 10)) : 0;
+}
+// violazioni contate per tipo: { legge_dom: n, legge_dom_mancanti: domeniche, legge_riposo: n,
+// ..., regola: n, qualita: n, oreSotto: n }
+function _ricercaContiDi(viol) {
+  const c = {};
+  (viol || []).forEach((v) => {
+    const k = _ricercaTipoViolazione(v.msg);
+    c[k] = (c[k] || 0) + 1;
+    const dm = _ricercaDomMancanti(v.msg);
+    if (dm) c.legge_dom_mancanti = (c.legge_dom_mancanti || 0) + dm;
+  });
+  return c;
+}
+// punti di una violazione nel punteggio della ricerca (priorita: legge > riservati > regole >
+// scoperti > ore; qualita sotto un posto scoperto)
+function _ricercaPuntiDi(msg) {
+  const k = _ricercaTipoViolazione(msg);
+  if (k === 'oreSotto') return RICERCA_PESI.oreSotto;
+  if (k === 'qualita') return RICERCA_PESI.qualita;
+  if (k === 'regola') return RICERCA_PESI.regola;
+  // le domeniche libere: per ogni domenica mancante
+  return RICERCA_PESI.legge * _ricercaPesoOrdine(msg) * Math.max(1, _ricercaDomMancanti(msg));
+}
+// VINCOLI ROTTI fra due misure ufficiali (_ricercaMisuraUfficiale): [] = il risultato si puo
+// usare. Stessi vincoli del motore (RICERCA_VINCOLI) piu posti scoperti, riservati e persone
+// oltre il fabbisogno (eccesso: dal motore, { prima, dopo })
+function _ricercaVincoliRotti(prima, dopo, eccesso) {
+  const rotti = [];
+  const somma = (c, g) => g.reduce((t, k) => t + ((c || {})[k] || 0), 0);
+  const NOMI = {
+    legge_dom: 'persone indietro con le domeniche libere',
+    legge_dom_mancanti: 'domeniche libere mancanti',
+    legge_riposo: 'riposo minimo fra due turni',
+    legge_sett: 'riposo attorno alla domenica',
+    legge_altre: 'altre regole di legge',
+  };
+  RICERCA_VINCOLI.forEach((g) => {
+    const a = somma(prima.conti, g);
+    const b = somma(dopo.conti, g);
+    if (b > a) rotti.push((g.length === 1 ? NOMI[g[0]] || g[0] : 'regole violate in tutto') + ' ' + a + ' → ' + b);
+  });
+  if (dopo.scoperti > prima.scoperti) rotti.push('posti scoperti ' + prima.scoperti + ' → ' + dopo.scoperti);
+  if (dopo.riservati > prima.riservati) rotti.push('posti riservati ' + prima.riservati + ' → ' + dopo.riservati);
+  if (eccesso && eccesso.dopo > eccesso.prima) rotti.push('doppioni ' + eccesso.prima + ' → ' + eccesso.dopo);
+  return rotti;
 }
 
 // prepara il problema del mese aperto (settore del piano). Ritorna { problema, ... }
@@ -318,18 +407,12 @@ async function _ricercaPrepara(opz) {
     const mese = righePersona(n, mappa);
     return _pianoViolazioniPersona(n, mese, mese.concat(bordoDi[n] || []), ctx);
   };
-  const costoPersona = (n, mappa) => {
+  // costo della persona e violazioni per tipo (stessi tipi del controllo finale)
+  const valutaPersona = (n, mappa) => {
     const mese = righePersona(n, mappa);
     const viol = _pianoViolazioniPersona(n, mese, mese.concat(bordoDi[n] || []), ctx);
     let costo = 0;
-    viol.forEach(
-      (v) =>
-        (costo += / SOTTO il minimo /.test(v.msg)
-          ? RICERCA_PESI.oreSotto
-          : _ricercaRegolaDiLegge(v.msg)
-            ? RICERCA_PESI.legge * _ricercaPesoOrdine(v.msg)
-            : RICERCA_PESI.regola),
-    );
+    viol.forEach((v) => (costo += _ricercaPuntiDi(v.msg)));
     if (obiettivo[n] != null) {
       const infoO = _pianoCollabInfo(n) || {};
       const pct = parseFloat(infoO.percentuale) || 1;
@@ -339,15 +422,16 @@ async function _ricercaPrepara(opz) {
       // buchi: costa solo andare oltre l 80% (decisione del titolare 08/10/2026)
       costo += RICERCA_PESI.oraObiettivo * (infoO.is_jolly ? Math.max(0, scarto) : scarto < 0 ? -2 * scarto : scarto);
     }
-    return costo;
+    return { costo: costo, conti: _ricercaContiDi(viol) };
   };
+  const costoPersona = (n, mappa) => valutaPersona(n, mappa).costo;
   // REGOLE FRA PERSONE nel giorno (accompagnamento, limiti per gruppo): solo se il
   // settore ne ha; quelle sul mese intero le controlla la verifica finale
   const conGruppi = (pianoRegoleGruppoCache || []).some(
     (r) => r.attivo !== false && (r.reparto_dip || 'slots') === rep,
   );
   const estranei = _pianoRighe.filter((r) => !nomiSet.has(r.collaboratore));
-  const costoGiorno = conGruppi
+  const valutaGiorno = conGruppi
     ? (d, perNome) => {
         const g = parseInt(d.substring(8, 10));
         const righe = estranei.filter((r) => String(r.data).startsWith(d));
@@ -358,9 +442,11 @@ async function _ricercaPrepara(opz) {
               righe.push({ collaboratore: n, data: d, codice: perNome[n], reparto_dip: rep });
           } else (righeDi[n + '|' + d] || []).forEach((r) => righe.push(r));
         });
-        return _ricercaPesoGruppi(_pianoViolazioniGruppi(righe, ctx).filter((v) => v.giorno === g));
+        const viol = _pianoViolazioniGruppi(righe, ctx).filter((v) => v.giorno === g);
+        return { costo: _ricercaPesoGruppi(viol), conti: _ricercaContiDi(viol) };
       }
     : null;
+  const costoGiorno = valutaGiorno ? (d, perNome) => valutaGiorno(d, perNome).costo : null;
   // regole di gruppo sul MESE intero (limite e minimo di una funzione nel mese)
   const conGruppiMese = (pianoRegoleGruppoCache || []).some(
     (r) =>
@@ -384,13 +470,15 @@ async function _ricercaPrepara(opz) {
       ),
   );
   const toccaMese = (n) => funzioniMese.has(String((_pianoCollabInfo(n) || {}).funzione || '').toUpperCase());
-  const costoMese = conGruppiMese
+  const valutaMese = conGruppiMese
     ? (statoTutto) => {
         const righe = estranei.slice();
         nomi.forEach((n) => righePersona(n, statoTutto[n]).forEach((r) => righe.push(r)));
-        return _ricercaPesoGruppi(_pianoViolazioniGruppi(righe, ctx).filter((v) => v.giorno === 0));
+        const viol = _pianoViolazioniGruppi(righe, ctx).filter((v) => v.giorno === 0);
+        return { costo: _ricercaPesoGruppi(viol), conti: _ricercaContiDi(viol) };
       }
     : null;
+  const costoMese = valutaMese ? (st) => valutaMese(st).costo : null;
   // solo peggioramenti: punteggio di partenza (piano di oggi, senza le celle obbligate)
   let cP = costoPersona;
   let cG = costoGiorno;
@@ -421,6 +509,9 @@ async function _ricercaPrepara(opz) {
     righeDi: righeDi,
     righePersona: righePersona,
     dettaglioPersona: dettaglioPersona,
+    // le regole con i conti per tipo ({ costo, conti }): le usa Migliora (pianoRicercaCalcola)
+    // per i vincoli del motore; il problema resta con i soli costi (formazioni)
+    valuta: opz.soloPeggioramenti ? null : { persona: valutaPersona, giorno: valutaGiorno, mese: valutaMese },
     // posti riservati: li usa pianoRicercaCalcola (vincolo di Migliora), non le formazioni
     riservati: riservati,
     problema: {
@@ -496,12 +587,16 @@ function _ricercaMisuraUfficiale(righe, fabbOriginale, riservati) {
         .trim();
       tipi[k] = (tipi[k] || 0) + 1;
     });
-    const sotto = v.lista.filter((x) => / SOTTO il minimo /.test(x.msg)).length;
+    // conti per tipo: la stessa definizione dei vincoli del motore (_ricercaTipoViolazione)
+    const conti = _ricercaContiDi(v.lista);
+    const sotto = conti.oreSotto || 0;
     return {
       violazioni: v.lista.length,
+      conti: conti,
+      // regole di legge violate (quante segnalazioni, come in Controlla le regole)
       legge: v.lista.filter((x) => _ricercaRegolaDiLegge(x.msg)).length,
       // regole di qualita (livelli, competenze per fascia): contano in regole, peso proprio
-      qualita: v.lista.filter((x) => _ricercaRegolaDiQualita(x.msg)).length,
+      qualita: conti.qualita || 0,
       riservati: _ricercaScopertiRiservati(righe, fabbOriginale, riservati),
       voci: v.lista.map((x) => x.nome + (x.giorno ? ' ' + x.giorno : '') + ': ' + x.msg),
       regole: v.lista.length - sotto,
@@ -525,13 +620,24 @@ async function pianoRicercaCalcola(secondi, onPasso, opz) {
   opz = opz || {};
   const prep = await _ricercaPrepara(opz.prepara);
   prep.problema.riservati = prep.riservati;
+  // REGOLE CON I CONTI PER TIPO: il motore tiene come migliore solo i piani che rispettano
+  // gli stessi vincoli del controllo finale (RICERCA_VINCOLI), cosi il migliore trovato e
+  // anche applicabile
+  if (prep.valuta) {
+    prep.problema.costoPersona = prep.valuta.persona;
+    prep.problema.costoGiorno = prep.valuta.giorno;
+    prep.problema.costoMese = prep.valuta.mese;
+  }
   // metro diverso per le persone (es. correzioni dopo l import: solo riposi e giorni
   // di fila): opz.costoPersona(prep) -> (nome, mappa) => costo; i gruppi non contano
   if (typeof opz.costoPersona === 'function') {
     const base = prep.problema.costoPersona;
     const extra = opz.costoPersona(prep);
     // il metro richiesto pesa di piu, le regole di sempre restano (non si peggiorano)
-    prep.problema.costoPersona = (n, mappa) => extra(n, mappa) + base(n, mappa);
+    prep.problema.costoPersona = (n, mappa) => {
+      const b = base(n, mappa);
+      return b && typeof b === 'object' ? { costo: extra(n, mappa) + b.costo, conti: b.conti } : extra(n, mappa) + b;
+    };
   }
   const fabbOriginale = {};
   // fabbisogno intero (con i posti coperti da altri settori) per il conteggio ufficiale
@@ -567,6 +673,13 @@ async function pianoRicercaCalcola(secondi, onPasso, opz) {
         pesoScoperto: RICERCA_PESI.scoperto,
         pesoRiservato: RICERCA_PESI.riservato,
         pesoNotti: pn >= 0 ? pn : RICERCA_PESI.notti,
+        vincoli: RICERCA_VINCOLI,
+        pesoSforo: RICERCA_PESI.sforo,
+        // sforo che cresce in linea retta e, dal 30% della ricerca, ritorno al migliore ammesso
+        // se lo stato corrente e fuori dai vincoli (Slots novembre 2026, stessa bozza e seme:
+        // 15 scoperti contro 17 con lo sforo pieno da subito, 19 in quadrato, 36 senza sforo)
+        sforoCurva: 'lineare',
+        tornaAlMigliore: 0.3,
         seme: seme,
       },
       opz.motore || {},
@@ -595,16 +708,14 @@ async function pianoRicercaCalcola(secondi, onPasso, opz) {
   const ris = motore.risultato();
   const righeDopo = _ricercaRigheDa(prep, ris.stato);
   const dopo = _ricercaMisuraUfficiale(righeDopo, fabbOriginale, prep.riservati);
-  // si usa solo se nessuna regola peggiora, i posti scoperti (e i riservati) non aumentano;
-  // le regole di qualita hanno il loro peso nel punteggio (possono cedere a un posto coperto)
-  const regoleVere = (x) => x.regole - (x.qualita || 0);
+  // si usa solo se non rompe nessun vincolo (gli stessi del motore: nessun tipo di regola di
+  // legge aumenta, le regole vere in tutto nemmeno, posti scoperti, riservati e doppioni
+  // non aumentano) e qualcosa migliora; le regole di qualita hanno il loro peso nel
+  // punteggio (possono cedere a un posto coperto)
+  const eccesso = { prima: ris.prima.eccesso || 0, dopo: ris.dopo.eccesso || 0 };
+  const motivi = _ricercaVincoliRotti(prima, dopo, eccesso);
   const migliore =
-    // mai persone in piu del fabbisogno rispetto a prima (doppioni)
-    (ris.dopo.eccesso || 0) <= (ris.prima.eccesso || 0) &&
-    dopo.legge <= prima.legge &&
-    regoleVere(dopo) <= regoleVere(prima) &&
-    dopo.scoperti <= prima.scoperti &&
-    dopo.riservati <= prima.riservati &&
+    !motivi.length &&
     (dopo.regole < prima.regole ||
       dopo.scoperti < prima.scoperti ||
       dopo.oreSotto < prima.oreSotto ||
@@ -616,9 +727,12 @@ async function pianoRicercaCalcola(secondi, onPasso, opz) {
     cambi: ris.cambi,
     iterazioni: ris.iterazioni,
     punteggio: { prima: ris.prima.punteggio, dopo: ris.dopo.punteggio },
-    eccesso: { prima: ris.prima.eccesso || 0, dopo: ris.dopo.eccesso || 0 },
+    eccesso: eccesso,
     notti: { prima: ris.prima.notti || 0, dopo: ris.dopo.notti || 0 },
     migliore: migliore,
+    // vincoli rotti dal risultato (vuoto se applicabile): il motore restituisce solo piani
+    // ammessi, quindi qui resta qualcosa solo se il conteggio ufficiale vede altro
+    motivi: motivi,
     seme: seme,
     variante: variante,
     // ripetibile: lavoro completo (non fermato, non frenato dal tempo)
@@ -760,7 +874,9 @@ async function pianoMigliora(opz) {
     const esito = await _ricercaFinestraEsito(
       titoloEsito,
       riepilogo +
-        "\n\nNessun miglioramento sicuro: il piano resta com'è. (Si applica solo se nessuna regola peggiora e i posti scoperti non aumentano.) Un altro tentativo parte da combinazioni diverse e può trovare di meglio.",
+        "\n\nNessun miglioramento sicuro: il piano resta com'è. (Si applica solo se nessuna regola peggiora e i posti scoperti non aumentano" +
+        (res.motivi && res.motivi.length ? '; qui: ' + res.motivi.join(', ') : '') +
+        '.) Un altro tentativo parte da combinazioni diverse e può trovare di meglio.',
       [{ valore: 'chiudi', testo: 'Ho capito', annulla: true }, Object.assign({ primario: true }, RIPROVA)],
     );
     if (esito === 'riprova') return pianoMiglioraRiprova();
@@ -859,139 +975,136 @@ async function pianoMiglioraRiprova() {
   return pianoMigliora({ variante: _ricercaVarianti[k], minuti: _ricercaUltimiMinuti[k] });
 }
 
-// scrive le celle cambiate (solo celle generate o vuote), con la fotografia per Annulla
+// SCRIVE LE CELLE CAMBIATE (solo celle generate o vuote), con la fotografia per Annulla.
+// Dalla v450 passa da _pianoScriviCelle (piano_scrivi_celle, migrazione 20260912): UNA
+// transazione, tutto o niente, e ogni cella si scrive solo se e ancora come la ricerca l ha
+// letta (sigla, protetto, blocco, generata, nota; vuota per le celle nuove). Prima tre
+// giri di scritture separate (cancella, modifica, inserisci): un errore a meta lasciava il
+// piano mezzo cambiato. Se un collega ha cambiato qualche cella mentre la ricerca lavorava
+// non si scrive niente e si avvisa con chi e cosa: si sceglie se applicare gli altri cambi
+// (le sue celle restano come le ha scritte) o lasciare tutto; la generazione automatica
+// applica gli altri e le elenca (res.saltate), come prima.
+// Ritorna true se ha scritto (anche in parte), false se niente.
 async function _ricercaScrivi(res) {
   const prep = res.prep;
   const op = getOperatore();
   const ora = new Date().toISOString();
-  _pianoUndoSnap('migliora bozza ' + prep.ym);
-  const nuove = [];
-  let cambia = [];
-  let togli = [];
-  const attesa = {}; // id -> cella come la ricerca l ha letta (codice, generato, nome, data)
+  const auto = !!window._pianoAutoInCorso;
+  const ops = [];
   res.cambi.forEach((c) => {
     const r = (prep.righeDi[c.nome + '|' + c.data] || [])[0];
     const cod = c.dopo || (prep.conRiempimento ? 'C' : '');
     if (r) {
-      attesa[r.id] = {
-        codice: r.codice,
-        generato: r.generato,
-        protetto: !!r.protetto,
-        blocco: r.motivo_blocco || '',
-        commento: r.commento || '',
-        nome: c.nome,
-        data: c.data,
-      };
-      if (!cod) togli.push(r.id);
-      else if (cod !== r.codice) cambia.push({ id: r.id, codice: cod });
-    } else if (cod)
-      nuove.push({
+      if (cod === r.codice) return;
+      ops.push({
         collaboratore: c.nome,
         data: c.data,
-        codice: cod,
-        protetto: false,
-        generato: true,
-        reparto_dip: prep.reparto,
+        // la cella come l ha letta la ricerca: si scrive solo se e ancora cosi
+        atteso: Object.assign(_pianoAttesoDi(r), { generato: !!r.generato, commento: r.commento || null }),
+        dati: cod ? { codice: cod, operatore: op, updated_at: ora } : null,
+      });
+    } else if (cod)
+      ops.push({
+        collaboratore: c.nome,
+        data: c.data,
+        atteso: null, // vuota quando la ricerca l ha letta
+        dati: {
+          codice: cod,
+          protetto: false,
+          generato: true,
+          reparto_dip: prep.reparto,
+          operatore: op,
+          updated_at: ora,
+        },
       });
   });
-  // SCRITTURA PRUDENTE: la ricerca ha lavorato per minuti su una fotografia del mese.
-  // Una cella cambiata nel frattempo (da un collega, a mano) non si tocca: vince la
-  // modifica fatta a mano. Le celle nuove le protegge gia il database (una cella per
-  // persona e giorno: se nel frattempo c e, l inserimento si scarta).
-  const saltate = [];
+  res.saltate = [];
+  if (!ops.length) return false;
+  const passo = _pianoUndoSnap('migliora bozza ' + prep.ym);
+  const chiave = (x) => x.collaboratore + '|' + String(x.data).substring(0, 10);
+  let scritte = 0;
+  const fatte = []; // operazioni scritte davvero
+  let lasciaTutto = false;
   try {
-    const ids = togli.concat(cambia.map((x) => x.id));
-    const ora2 = {};
-    for (let i = 0; i < ids.length; i += 150) {
-      const righe =
-        (await secGet(
-          'piano?id=in.(' +
-            ids.slice(i, i + 150).join(',') +
-            ')&select=id,codice,generato,protetto,motivo_blocco,commento&limit=1000',
-        )) || [];
-      righe.forEach((r) => (ora2[r.id] = r));
+    // al massimo 2500 celle per transazione (il database ne accetta 3000)
+    for (let i = 0; i < ops.length && !lasciaTutto; i += 2500) {
+      let blocco = ops.slice(i, i + 2500);
+      for (let giro = 0; blocco.length && giro < 4; giro++) {
+        const es = await _pianoScriviCelle(blocco);
+        if (es.ok) {
+          scritte += blocco.length;
+          blocco.forEach((o) => fatte.push(o));
+          blocco = [];
+          break;
+        }
+        const conf = es.conflitti || [];
+        const via = new Set(conf.map(chiave));
+        if (!via.size) throw _pianoErroreConflitto(conf);
+        conf.forEach((c) => res.saltate.push({ nome: c.collaboratore, data: String(c.data).substring(0, 10) }));
+        const applica =
+          auto ||
+          (await chiediConferma(
+            'Mentre la ricerca lavorava un collega ha cambiato ' +
+              (conf.length === 1 ? '1 cella' : conf.length + ' celle') +
+              ' che Migliora voleva modificare:\n\n• ' +
+              conf.slice(0, 12).map(_pianoConflittoTesto).join('\n• ') +
+              (conf.length > 12 ? '\n... e altre ' + (conf.length - 12) : '') +
+              '\n\nNon ho scritto niente. Conferma = applico gli altri cambi e le sue celle restano come le ha scritte (poi conviene ricontrollare le regole). Annulla = lascio il piano com era (puoi rifare Migliora).',
+            { titolo: 'Piano cambiato da un collega' },
+          ));
+        if (!applica) {
+          lasciaTutto = true;
+          blocco = [];
+          break;
+        }
+        blocco = blocco.filter((o) => !via.has(chiave(o)));
+      }
+      if (blocco.length) throw new Error('celle cambiate di continuo da un collega: riprova fra poco');
     }
-    const intatta = (id) => {
-      const a = attesa[id];
-      const c = ora2[id];
-      // intatta = stesso codice, ancora del programma, non protetta, non bloccata e con la
-      // stessa nota di quando la ricerca l ha letta (prima si guardava solo il codice: una
-      // cella bloccata o protetta nel frattempo veniva sovrascritta)
-      return !!(
-        a &&
-        c &&
-        c.codice === a.codice &&
-        !(a.generato && c.generato === false) &&
-        !!c.protetto === a.protetto &&
-        (c.motivo_blocco || '') === a.blocco &&
-        (c.commento || '') === a.commento
-      );
-    };
-    ids.filter((id) => !intatta(id)).forEach((id) => saltate.push(attesa[id]));
-    togli = togli.filter(intatta);
-    cambia = cambia.filter((x) => intatta(x.id));
   } catch (e) {
-    toastErrore('Controllo delle celle non riuscito: ' + (e.message || e) + '. Niente scritto.');
-    return;
-  }
-  res.saltate = saltate;
-  try {
-    for (let i = 0; i < togli.length; i += 50)
-      await secDel('piano', 'id=in.(' + togli.slice(i, i + 50).join(',') + ')');
-    for (let i = 0; i < cambia.length; i += 10)
-      await Promise.all(
-        cambia
-          .slice(i, i + 10)
-          // anche qui solo se la cella ha ancora il codice letto (un cambio arrivato
-          // nell ultimo istante non viene sovrascritto)
-          .map((x) =>
-            secPatch(
-              'piano',
-              'id=eq.' +
-                x.id +
-                '&codice=eq.' +
-                encodeURIComponent(attesa[x.id].codice) +
-                '&motivo_blocco=is.null&protetto=eq.' +
-                attesa[x.id].protetto,
-              {
-                codice: x.codice,
-                operatore: op,
-                updated_at: ora,
-              },
-            ),
-          ),
-      );
-    for (let i = 0; i < nuove.length; i += 2500)
-      await _rpcSicura('piano_bulk_upsert', { p_token: getOpToken(), p_rows: nuove.slice(i, i + 2500) });
-    logAzione(
-      'Piano: bozza migliorata',
-      prep.ym +
-        ' ' +
-        prep.reparto +
-        ' · ' +
-        res.cambi.length +
-        ' celle (' +
-        cambia.length +
-        ' cambiate, ' +
-        nuove.length +
-        ' nuove, ' +
-        togli.length +
-        ' tolte' +
-        (saltate.length ? ', ' + saltate.length + ' lasciate perché modificate nel frattempo' : '') +
-        ')',
+    if (!scritte) _pianoUndoScarta(passo);
+    if (auto) throw e;
+    _pianoErroreScrittura(
+      scritte ? 'Scrittura interrotta (con Annulla del piano si torna a prima): ' : 'Bozza NON migliorata: ',
+      e,
     );
-    if (!window._pianoAutoInCorso)
-      toast(
-        'Bozza migliorata: ' +
-          (res.cambi.length - saltate.length) +
-          ' celle' +
-          (saltate.length ? ' · ' + saltate.length + ' lasciate come sono perché modificate a mano nel frattempo' : ''),
-      );
-  } catch (e) {
-    if (window._pianoAutoInCorso) throw e;
-    toastErrore('Scrittura interrotta: ' + (e.message || e) + '. Con Annulla del piano si torna a prima.');
+    await renderPiano();
+    return scritte > 0;
   }
+  if (!scritte) {
+    _pianoUndoScarta(passo);
+    await renderPiano();
+    return false;
+  }
+  const n = { cambiate: 0, nuove: 0, tolte: 0 };
+  fatte.forEach((o) => (o.atteso === null ? n.nuove++ : o.dati === null ? n.tolte++ : n.cambiate++));
+  const saltate = res.saltate;
+  logAzione(
+    'Piano: bozza migliorata',
+    prep.ym +
+      ' ' +
+      prep.reparto +
+      ' · ' +
+      scritte +
+      ' celle (' +
+      n.cambiate +
+      ' cambiate, ' +
+      n.nuove +
+      ' nuove, ' +
+      n.tolte +
+      ' tolte' +
+      (saltate.length ? ', ' + saltate.length + ' lasciate perché modificate nel frattempo' : '') +
+      ')',
+  );
+  if (!auto)
+    toast(
+      'Bozza migliorata: ' +
+        scritte +
+        ' celle' +
+        (saltate.length ? ' · ' + saltate.length + ' lasciate come sono perché modificate a mano nel frattempo' : ''),
+    );
   _pianoViolCelle = {};
   _pianoViolLista = null;
   await renderPiano();
+  return true;
 }

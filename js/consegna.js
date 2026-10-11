@@ -407,7 +407,7 @@ function renderDashboard() {
       '">' +
       pmMiei.length +
       '</div><div class="stat-label">Promemoria' +
-      (pmScaduti.length ? ' (' + pmScaduti.length + ' scaduti)' : '') +
+      (pmScaduti.length ? ' (' + pmScaduti.length + (pmScaduti.length === 1 ? ' scaduto)' : ' scaduti)') : '') +
       '</div></div>';
   if (isVis('note_collega'))
     statsH +=

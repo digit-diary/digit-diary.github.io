@@ -600,7 +600,7 @@ function mostraPromemoriaLogin() {
   if (scaduti.length) {
     mostraNotifBanner(
       'promemoria',
-      'Promemoria scaduti',
+      scaduti.length === 1 ? 'Promemoria scaduto' : 'Promemoria scaduti',
       scaduti.length +
         ' scadut' +
         (scaduti.length === 1 ? 'o' : 'i') +
@@ -612,7 +612,7 @@ function mostraPromemoriaLogin() {
       () => switchPage('promemoria'),
     );
     inviaNotifica(
-      'Promemoria scaduti',
+      scaduti.length === 1 ? 'Promemoria scaduto' : 'Promemoria scaduti',
       scaduti.length +
         ' promemoria scadut' +
         (scaduti.length === 1 ? 'o' : 'i') +
@@ -1494,7 +1494,7 @@ async function caricaMaisonFile(input, forzaSostituisci) {
       msg = '<span style="color:var(--muted)">Nessun dato nuovo trovato</span>';
     if (giorniFalliti.length)
       msg +=
-        '<br><span style="color:var(--c-rosso,#c0392b);font-weight:600"><i class="icx icx-avviso"></i> Giorni NON importati (restano com erano): ' +
+        '<br><span style="color:var(--c-rosso,#c0392b);font-weight:600"><i class="icx icx-avviso"></i> Giorni NON importati (restano com\'erano): ' +
         escP(giorniFalliti.join(', ')) +
         '</span>';
     if (dupCount) {
@@ -1520,7 +1520,11 @@ async function caricaMaisonFile(input, forzaSostituisci) {
     if (totalRows) {
       toast(totalRows + ' righe importate');
       logAzione('Import Maison', totalRows + ' righe da ' + f.name);
-    } else if (giorniSaltati.length) toast(giorniSaltati.length + ' giorni già presenti (saltati)');
+    } else if (giorniSaltati.length)
+      toast(
+        giorniSaltati.length +
+          (giorniSaltati.length === 1 ? ' giorno già presente (saltato)' : ' giorni già presenti (saltati)'),
+      );
     renderMaisonDashboard();
     renderMaisonBudgetUI();
     renderMaisonBudgetAlerts();

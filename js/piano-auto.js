@@ -141,16 +141,22 @@ async function _pianoAutoEsegui(rep, ym, minuti) {
   // lunghezza, ma la pila ha un tetto di 15 passi: con la pila piena il passo della
   // generazione spingeva fuori il piu vecchio dell utente e restava al suo posto.
   // La finestra dell ultima operazione a mano si chiude qui: le scritture della
-  // generazione non entrano nel suo Annulla.
+  // generazione non entrano nel suo Annulla. "Annulla tutto" annulla solo le finestre
+  // delle operazioni di chi lavora (non questa): prima annullava da inizio sessione a
+  // adesso, bozza della generazione compresa.
+  if (typeof _pianoUndoChiudiAperto === 'function') _pianoUndoChiudiAperto();
   const pilaU = window._pianoUndo || [];
-  const ultimoU = pilaU[pilaU.length - 1];
-  if (ultimoU && ultimoU.t0 && !ultimoU.t1 && typeof _pianoOraServer === 'function') ultimoU.t1 = _pianoOraServer();
   const prima = {
     mese: _pianoMeseSel,
     rep: _pianoRepartoSel,
     undo: pilaU.slice(),
     redo: (window._pianoRedo || []).slice(),
-    sess: Object.fromEntries(Object.entries(window._pianoSessSnap || {}).map(([k, v]) => [k, Object.assign({}, v)])),
+    sess: Object.fromEntries(
+      Object.entries(window._pianoSessSnap || {}).map(([k, v]) => [
+        k,
+        Object.assign({}, v, { finestre: (v.finestre || []).slice() }),
+      ]),
+    ),
   };
   const auto = { rep: rep, ym: ym, inizio: Date.now(), fase: '' };
   window._pianoAutoInCorso = auto;
@@ -360,6 +366,8 @@ async function _pianoAutoEsegui(rep, ym, minuti) {
   } finally {
     // la fotografia per Annulla resta solo a chi la fa a mano: pile e "Annulla tutto"
     // tornano come prima della generazione
+    // il passo della generazione (se aperto) non resta aperto per chi lavora dopo
+    if (typeof _pianoUndoChiudiAperto === 'function') _pianoUndoChiudiAperto();
     window._pianoUndo = prima.undo;
     window._pianoRedo = prima.redo;
     window._pianoSessSnap = prima.sess;

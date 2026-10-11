@@ -3227,10 +3227,10 @@
             margin-bottom: 4px;
           "
         >
-          Progetto Multidisciplinarità
+          Formazione e competenze
         </h2>
         <p style="color: var(--muted); font-size: var(--fs-md,.875rem)">
-          Mappatura competenze, livelli di formazione e sistema punti
+          Chi sa fare cosa: livelli, specialità e punti
         </p>
       </div>
       <div id="formazione-content"></div>
@@ -3504,7 +3504,7 @@
         <div class="add-tipo-row sez-form"><div class="field"><label>Nome nuovo campo</label><input type="text" id="new-campo-nome" placeholder="es. Bar, VIP Area" /></div><button class="btn-add-tipo" onclick="aggiungiCampoRapporto()">Aggiungi campo</button></div>
       </div>
       <div class="settings-section" data-gruppo="Persone" id="collab-section" style="display: none">
-        <div class="sez-head"><div><h4>Gestione collaboratori</h4><p class="sez-desc">Anagrafica del settore aperto: clicca un nome per vederlo e modificarlo. Competenze e livelli si gestiscono in Formazione, le preferenze dei turni nel Piano.</p></div></div>
+        <div class="sez-head"><div><h4>Gestione collaboratori</h4><p class="sez-desc">Anagrafica del settore aperto: clicca un nome per aprire la sua scheda, cambia quello che serve e conferma con Salva. Livelli e specialità si gestiscono in Formazione, le preferenze dei turni nel Piano.</p></div></div>
         <div id="collaboratori-list"></div>
         <div class="add-tipo-row sez-form"><div class="field"><label>Nome nuovo collaboratore</label><input type="text" id="new-collab-nome" placeholder="Cognome Nome" /></div><button class="btn-add-tipo" onclick="aggiungiCollaboratore()">Aggiungi</button><button class="btn-secondario" onclick="document.getElementById('import-collab-file').click()">Importa da Excel o CSV</button><input type="file" id="import-collab-file" accept=".xlsx,.xls,.csv,.txt" style="display: none" onchange="importaCollaboratori(this)" /></div>
       </div>
@@ -3576,7 +3576,7 @@
         <div id="db-stats-content"><button class="btn-secondario" onclick="caricaDbStats()">Verifica spazio</button></div>
       </div>
       <div class="settings-section" data-gruppo="Dati" id="cestino-section" style="display: none">
-        <div class="sez-head"><div><h4>Cestino</h4><p class="sez-desc">Le voci eliminate: si ripristinano o, se il periodo di conservazione lo consente, si eliminano definitivamente.</p></div></div>
+        <div class="sez-head"><div><h4>Cestino</h4><p class="sez-desc" id="cestino-desc">Le registrazioni del Diario e i moduli eliminati del settore aperto: si ripristinano da qui. L’eliminazione definitiva è riservata all’amministratore e solo se il periodo di conservazione lo consente.</p></div></div>
         <div class="add-tipo-row sez-form sez-filtri"><button class="btn-add-tipo" onclick="caricaCestino()">Carica cestino</button><div class="field"><label>Tipo</label><select id="cestino-filt-tipo" onchange="renderCestino()"><option value="">Tutti i tipi</option><option value="registrazioni">Registrazioni</option><option value="moduli">Moduli</option></select></div><div class="field"><label>Nome</label><input class="campo-cerca" type="text" id="cestino-filt-nome" placeholder="Cerca nome..." aria-label="Cerca nome" oninput="renderCestino()" /></div><div class="field"><label>Eliminato da</label><input type="text" id="cestino-filt-chi" placeholder="Operatore" oninput="renderCestino()" /></div><button class="btn-secondario" onclick="document.getElementById('cestino-filt-tipo').value='';document.getElementById('cestino-filt-nome').value='';document.getElementById('cestino-filt-chi').value='';renderCestino();">Azzera filtri</button></div>
         <div id="cestino-content"></div>
       </div>

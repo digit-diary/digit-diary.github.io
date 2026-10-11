@@ -729,16 +729,17 @@ async function _confermaCercaCambioLiberoEsegui() {
   }
   _pianoMemoriaDopo(esito.ops, esito.righe);
   try {
-    logAzione(
-      'Piano: scambio turno',
+    const logCambio =
       _ccDati.nome +
-        ' (giorno libero il ' +
-        _ccDati.data +
-        ' coperto da ' +
-        cand.nome +
-        (dataRest ? ', restituzione ' + dataRest : ', senza restituzione') +
-        ')',
-    );
+      ' (giorno libero il ' +
+      _ccDati.data +
+      ' coperto da ' +
+      cand.nome +
+      (dataRest ? ', restituzione ' + dataRest : ', senza restituzione') +
+      ')';
+    logAzione('Piano: scambio turno', logCambio);
+    // Annulla di questo cambio: anche foglio archiviato e conteggio dei cambi
+    if (passo) passo.seguito = { log: logCambio, foglio: null };
     document.getElementById('pwd-modal').classList.add('hidden');
     // FORMULARIO gia' compilato, con la spunta Autorizzato: si stampa e si firma
     if (!window.jspdf) await caricaJsPDF();
@@ -779,7 +780,8 @@ async function _confermaCercaCambioLiberoEsegui() {
       };
       const doc = _pdfCambioTurno(datiPdf);
       mostraPdfPreview(doc, 'cambio_turno_' + _ccDati.data + '.pdf', 'Cambio turno ' + _ccDati.data);
-      await _salvaFoglioCambio(datiPdf, _ccDati.nome, _ccDati.data);
+      const idFoglio = await _salvaFoglioCambio(datiPdf, _ccDati.nome, _ccDati.data);
+      if (passo && passo.seguito) passo.seguito.foglio = idFoglio;
     }
     toast('Cambio applicato' + (rInfo ? ' con restituzione' : ''));
     _ccDati = null;
@@ -806,8 +808,10 @@ async function _salvaFoglioCambio(datiPdf, collaboratore, dataCambio) {
     };
     const saved = await secPost('moduli', rec);
     if (saved && saved[0] && typeof moduliCache !== 'undefined') moduliCache.unshift(saved[0]);
+    return saved && saved[0] ? saved[0].id : null;
   } catch (e) {
     console.error('archivio foglio cambio', e);
+    return null;
   }
 }
 async function ristampaFoglioCambio(nome, dstr) {
@@ -948,9 +952,10 @@ async function apriScambioTurno() {
     '<div class="pwd-modal-btns" style="margin-top:14px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="confermaScambioTurno()">Scambia</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
 }
-// scambio in corso: la generazione automatica aspetta (anche durante le conferme)
+// scambio in corso: la generazione automatica aspetta (anche durante le conferme).
+// Uno scambio alla volta: il doppio click su "Scambia" lo faceva partire due volte
 function confermaScambioTurno() {
-  return _pianoConScrittura(() => _confermaScambioTurnoEsegui());
+  return unaVoltaSola('piano-scambio-turno', () => _pianoConScrittura(() => _confermaScambioTurnoEsegui()));
 }
 async function _confermaScambioTurnoEsegui() {
   const avvisoRete = !!window._sessioneScadutaAvvisata;
@@ -1172,7 +1177,10 @@ async function _confermaScambioTurnoEsegui() {
   _pianoMemoriaDopo(esito.ops, esito.righe);
   try {
     if (dataRest) logAzione('Piano: restituzione programmata', sel.nome + ' <-> ' + collega + ' il ' + dataRest);
-    logAzione('Piano: scambio turno', sel.nome + ' (' + c1 + ') <-> ' + collega + ' (' + c2 + ') il ' + sel.data);
+    const logScambio = sel.nome + ' (' + c1 + ') <-> ' + collega + ' (' + c2 + ') il ' + sel.data;
+    logAzione('Piano: scambio turno', logScambio);
+    // Annulla di questo scambio: anche foglio archiviato e conteggio dei cambi
+    if (passo) passo.seguito = { log: logScambio, foglio: null };
     if (window._pianoDerogaDaRegistrare) {
       logAzione('Piano: scambio autorizzato oltre limite', window._pianoDerogaDaRegistrare);
       window._pianoDerogaDaRegistrare = null;
@@ -1208,7 +1216,8 @@ async function _confermaScambioTurnoEsegui() {
       };
       const doc = _pdfCambioTurno(datiPdf);
       mostraPdfPreview(doc, 'cambio_turno_' + sel.data + '.pdf', 'Cambio turno ' + sel.data);
-      await _salvaFoglioCambio(datiPdf, sel.nome, sel.data);
+      const idFoglio = await _salvaFoglioCambio(datiPdf, sel.nome, sel.data);
+      if (passo && passo.seguito) passo.seguito.foglio = idFoglio;
     }
     renderPiano();
   } catch (e) {
@@ -1821,7 +1830,10 @@ async function _pianoMalattiaNelDiario(nome, dal, al, chiedi, codiceSostituito) 
   if (!giorniNuovi.length) return 0;
   // TUTTO COLLEGATO: come se la malattia fosse scritta nel Rapporto del primo giorno
   // (Rapporto + Diario). Solo se il Piano aperto e del settore del Diario.
-  const viaRapporto = typeof _rapportoAggiungiAssenza === 'function' && currentReparto === _pianoReparto();
+  const viaRapporto =
+    typeof _rapportoAggiungiAssenza === 'function' &&
+    currentReparto === _pianoReparto() &&
+    (typeof isVis !== 'function' || isVis('rapporto')); // senza la pagina Rapporto il database non lo lascia scrivere
   if (viaRapporto) {
     const tInfo = codiceSostituito ? _pianoTurnoInfo(codiceSostituito) : null;
     const tr = tInfo && String(tInfo.tipo || '').toUpperCase() === 'NOTTURNO' ? 'NOTTE' : 'PRESTO';
@@ -2000,12 +2012,19 @@ async function _pianoMalattiaViaDiario(nome, giorniDstr) {
   const now = new Date().toISOString();
   let tolte = 0;
   const nonTolte = [];
+  const rapportiTolti = [];
   for (const e of daTogliere) {
     try {
       await secPatch('registrazioni', 'id=eq.' + e.id, { eliminato: true, eliminato_da: op, eliminato_at: now });
       e.eliminato = true;
       _diarioTogliArchivioLeggero(e.id);
       tolte++;
+      // nata dal Rapporto giornaliero: la persona sparisce anche da li, come quando la
+      // registrazione si cestina dal Diario (prima il Rapporto diceva ancora "malato")
+      if (typeof _rapportoTogliRegistrazione === 'function') {
+        const rap = await _rapportoTogliRegistrazione(e);
+        if (rap) rapportiTolti.push(rap.turno + ' del ' + rap.ds.split('-').reverse().join('.'));
+      }
     } catch (err) {
       nonTolte.push(String(e.data).substring(8, 10) + '/' + String(e.data).substring(5, 7));
     }
@@ -2015,7 +2034,13 @@ async function _pianoMalattiaViaDiario(nome, giorniDstr) {
   datiCache = datiCache.filter((e) => !e.eliminato);
   if (tolte) {
     logAzione('Malattia tolta dal piano', nome + ' · ' + tolte + ' giorni spostati nel cestino del Diario');
-    toast('Diario aggiornato: ' + tolte + (tolte === 1 ? ' giorno' : ' giorni') + ' di malattia nel Cestino');
+    toast(
+      'Diario aggiornato: ' +
+        tolte +
+        (tolte === 1 ? ' giorno' : ' giorni') +
+        ' di malattia nel Cestino' +
+        (rapportiTolti.length ? ' · tolto anche dal Rapporto ' + [...new Set(rapportiTolti)].join(', ') : ''),
+    );
   }
   return tolte;
 }

@@ -140,7 +140,7 @@ function _lvBadge(lv, rep, extraTitle) {
   if (!n)
     return (
       '<span class="fz-lv fz-lv-nessuno" title="' +
-      _escAttr(extraTitle || 'Non ha ancora la prima competenza della scala: da classificare') +
+      _escAttr(extraTitle || 'Non ha ancora il primo livello della scala: da classificare') +
       '">Senza livello</span>'
     );
   const t = _lvTono(n, rep);
@@ -151,7 +151,7 @@ function _lvBadge(lv, rep, extraTitle) {
     t.fg +
     '" title="' +
     _escAttr(
-      (extraTitle ? extraTitle + ' · ' : '') + 'Gradino ' + n + ' di ' + Math.max(_lvMaxReale(rep), n) + ' della scala',
+      (extraTitle ? extraTitle + ' · ' : '') + 'Livello ' + n + ' di ' + Math.max(_lvMaxReale(rep), n) + ' della scala',
     ) +
     '">' +
     escP(livelloNome(n, rep)) +
@@ -349,7 +349,7 @@ function livelloBadgeHtml(lv, c) {
     if (l.maxCert > lv && l.mancanti.length) {
       const testo = 'ha ' + livelloNome(l.maxCert) + ', manca ' + l.mancanti.map((k) => k.label).join(', ');
       return (
-        _lvBadge(lv, null, lv ? '' : 'Ha competenze della scala ma non la prima') +
+        _lvBadge(lv, null, lv ? '' : 'Ha livelli alti della scala ma non il primo') +
         ' <span class="fz-lv-lacuna" title="' +
         _escAttr('Scala incompleta: ' + testo + '. Il livello resta quello completo finché manca.') +
         '"><i class="icx icx-avviso"></i> ' +
@@ -568,7 +568,7 @@ function _renderProtocolliCard() {
   let h =
     '<div class="main-card"><div class="card-header">Protocolli di formazione (formulari ufficiali)</div><div style="padding:10px 16px">';
   h +=
-    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">I protocolli sono i documenti Word originali di <b>Piano &gt; Formulari</b> (cartella <b>Formazione</b>): si aprono identici, si stampano e il formatore li compila e li firma con l allievo. Un formulario caricato o sostituito in quella cartella compare subito anche qui. Il foglio firmato si allega alla scheda del collaboratore (Allegati HR).</p>';
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">I protocolli sono i documenti Word originali di <b>Piano &gt; Formulari</b> (cartella <b>Formazione</b>): si aprono identici, si stampano e il formatore li compila e li firma con l\'allievo. Un formulario caricato o sostituito in quella cartella compare subito anche qui. Il foglio firmato si allega alla scheda del collaboratore (Allegati HR).</p>';
   // riempito dopo il disegno: i formulari si leggono dal database
   h += '<div id="prot-formulari" style="font-size:var(--fs-md,.875rem);color:var(--muted)">Carico i formulari...</div>';
   if (chiavi.length) {
@@ -929,13 +929,93 @@ function _fzAvvisoScollegate() {
   const scollegate = _pianoCompetenzeScollegate(rep);
   if (!scollegate.length) return '';
   return (
-    '<div class="fz-avviso"><i class="icx icx-avviso"></i> ' +
+    '<div class="fz-avviso"><i class="icx icx-avviso"></i> <span>' +
     (scollegate.length === 1
-      ? 'Questa competenza non è collegata a un gruppo di turni: il Piano non la usa. Collegala'
-      : 'Queste competenze non sono collegate a un gruppo di turni: il Piano non le usa. Collegale') +
-    ' in Piano › Impostazioni, riquadro Impostazioni piano, voce <b>Competenze Formazione → aree del piano</b>: ' +
-    scollegate.map((k) => escP(k.label)).join(', ') +
-    '.</div>'
+      ? 'Per questo livello non è indicato quali turni può fare, quindi il Piano non lo usa: '
+      : 'Per questi livelli non è indicato quali turni possono fare, quindi il Piano non li usa: ') +
+    scollegate.map((k) => '<b>' + escP(k.label) + '</b>').join(', ') +
+    '.</span> <button type="button" class="btn-secondario fz-btn-piccolo" onclick="fzApriConfigScala()">Indica i turni</button></div>'
+  );
+}
+// PRIMO PASSO GUIDATO: settore con la scala vuota o con quasi tutti "Senza livello"
+// (almeno 8 su 10). Tre passi in ordine, con i pulsanti che li fanno; sparisce da solo
+// quando la maggior parte delle persone ha un livello.
+function _fzComeIniziare(comps, collabs, adm, puoProporre) {
+  if (!adm && !puoProporre) return '';
+  const scala = comps.filter((k) => (parseInt(k.livello) || 0) >= 1);
+  const senza = collabs.filter((c) => livelloDiCollaboratore(c) === 0).length;
+  const quasiTutti = collabs.length > 0 && senza / collabs.length >= 0.8;
+  if (scala.length && !quasiTutti) return '';
+  const rep = currentReparto;
+  const passo = (n, titolo, testo, azioni, fatto) =>
+    '<li class="fz-inizio-passo' +
+    (fatto ? ' fz-inizio-fatto' : '') +
+    '"><span class="fz-num">' +
+    (fatto ? '<i class="icx icx-check" aria-hidden="true"></i><span class="fz-sr">fatto</span>' : n) +
+    '</span><div><b>' +
+    titolo +
+    '</b><span>' +
+    testo +
+    '</span>' +
+    (azioni ? '<div class="fz-inizio-azioni">' + azioni + '</div>' : '') +
+    '</div></li>';
+  // il passo da fare e il pulsante pieno; un passo gia fatto resta rivedibile
+  const p1 = adm
+    ? scala.length
+      ? '<button type="button" class="btn-secondario fz-btn-piccolo" onclick="fzApriConfigScala()">Rivedi la scala</button>'
+      : '<button type="button" class="btn-add-tipo fz-btn-piccolo" onclick="fzApriConfigScala()">Imposta la scala dei livelli</button>'
+    : '';
+  const p2 =
+    (puoProporre
+      ? '<button type="button" class="btn-secondario fz-btn-piccolo" onclick="formLivelliDaTurni()">Proponi livelli in base ai turni fatti</button>'
+      : '') +
+    (adm
+      ? '<label class="btn-secondario fz-btn-piccolo fz-inizio-file">Importa da Excel<input type="file" accept=".xlsx,.xls,.xlsm" class="fz-sr" onchange="formImportaMatrice(this,\'' +
+        rep +
+        '\')"></label>'
+      : '');
+  const p3 = senza
+    ? '<button type="button" class="btn-secondario fz-btn-piccolo" onclick="fzFiltraLivello(\'0\')">Mostra chi è senza livello (' +
+      senza +
+      ')</button>'
+    : '';
+  return (
+    '<section class="main-card fz-inizio" aria-labelledby="fz-inizio-titolo"><h3 id="fz-inizio-titolo">Come iniziare</h3>' +
+    '<p>' +
+    (scala.length
+      ? senza +
+        (senza === 1 ? ' persona su ' : ' persone su ') +
+        collabs.length +
+        ' in ' +
+        escP(repartoLabel(rep)) +
+        (senza === 1
+          ? ' è ancora senza livello. Tre passi per classificarla:'
+          : ' sono ancora senza livello. Tre passi per classificarle:')
+      : 'Il settore ' + escP(repartoLabel(rep)) + ' non ha ancora una scala dei livelli. Tre passi per partire:') +
+    '</p><ol class="fz-inizio-passi">' +
+    passo(
+      1,
+      'Imposta la scala dei livelli',
+      'L’ordine in cui si impara il lavoro: ogni livello comprende quelli sotto.' +
+        (adm ? '' : ' La imposta l’amministratore.'),
+      p1,
+      scala.length > 0,
+    ) +
+    passo(
+      2,
+      'Dai i livelli alle persone',
+      'Il programma propone i livelli guardando i turni fatti negli ultimi 12 mesi (decidi tu persona per persona), oppure li importi da un file Excel.',
+      scala.length ? p2 : '',
+      false,
+    ) +
+    passo(
+      3,
+      'Controlla chi resta senza livello',
+      'Per chi rimane, metti le spunte a mano nella tabella qui sotto.',
+      scala.length ? p3 : '',
+      false,
+    ) +
+    '</ol></section>'
   );
 }
 function renderFormazione() {
@@ -949,15 +1029,16 @@ function renderFormazione() {
   const collabs = _formOrdineComePiano(getCollaboratoriReparto().filter((c) => c.attivo !== false));
   // COMANDI IN TESTA: configurazione della scala del settore aperto e proposta dai turni
   const puoProporre = adm || (typeof puoModificare === 'function' && puoModificare('gestione_formazioni'));
-  let html = '';
-  if (adm || puoProporre)
+  // con il riquadro "Come iniziare" i comandi stanno nei suoi passi: niente doppioni sopra
+  let html = _fzComeIniziare(comps, collabs, adm, puoProporre);
+  if (!html && (adm || puoProporre))
     html +=
       '<div class="fz-comandi">' +
       (adm
-        ? '<button class="btn-add-tipo" onclick="fzApriConfigScala()"><i class="icx icx-settings"></i> Imposta livelli e competenze</button>'
+        ? '<button class="btn-add-tipo" onclick="fzApriConfigScala()"><i class="icx icx-settings"></i> Imposta livelli e specialità</button>'
         : '') +
       (puoProporre
-        ? '<button class="btn-secondario" onclick="formLivelliDaTurni()" title="Guarda i turni fatti negli ultimi 12 mesi (e il piano già scritto): chi lavora in un’area per cui non risulta formato viene proposto per la competenza. Nulla cambia senza la tua conferma.">Proponi livelli in base ai turni fatti</button>'
+        ? '<button class="btn-secondario" onclick="formLivelliDaTurni()" title="Guarda i turni fatti negli ultimi 12 mesi (e il piano già scritto): chi lavora in un’area per cui non risulta formato viene proposto per quel livello. Nulla cambia senza la tua conferma.">Proponi livelli in base ai turni fatti</button>'
         : '') +
       '</div>';
   if (adm) html += _fzAvvisoScollegate();
@@ -1002,7 +1083,7 @@ function renderFormazione() {
       '<span class="fz-lv fz-lv-nessuno">Senza livello</span>',
       perLivello[0] || 0,
       (perLivello[0] || 0) > 0 ? 'fz-conta-avviso' : '',
-      'Persone che non hanno ancora la prima competenza della scala: da classificare',
+      'Persone che non hanno ancora il primo livello della scala: da classificare',
     );
     for (let l = 1; l <= lvMax; l++) {
       if (!_lvCompetenzeDi(l).length) continue; // gradino vuoto (es. L1, L2, L4 senza L3)
@@ -1020,18 +1101,18 @@ function renderFormazione() {
         '<span class="fz-lv-lacuna"><i class="icx icx-avviso"></i> Scala incompleta</span>',
         incompleti,
         'fz-conta-avviso',
-        'Hanno una competenza di un gradino alto ma ne manca una sotto: il livello resta quello completo',
+        'Hanno un livello alto ma ne manca uno sotto: vale il livello completo',
       );
   } else
     html +=
       '<span class="fz-vuoto">Questo settore non ha ancora una scala dei livelli.' +
-      (adm ? ' Usa <b>Imposta livelli e competenze</b> qui sopra.' : '') +
+      (adm ? ' Usa <b>Imposta livelli e specialità</b> qui sopra.' : '') +
       '</span>';
   html += '</div></div>';
 
   // MATRICE COMPETENZE
   html += _renderProtocolliCard();
-  html += '<div class="main-card"><div class="card-header"><span>Matrice competenze · chi sa fare cosa</span></div>';
+  html += '<div class="main-card"><div class="card-header"><span>Chi sa fare cosa · livelli e specialità</span></div>';
   html +=
     '<div class="filters" style="padding:10px 16px"><div class="filter-group filter-cerca"><span class="filter-label">Cerca</span><input type="text" id="form-matr-cerca" class="campo-cerca" placeholder="Cerca collaboratore..." aria-label="Cerca collaboratore" oninput="_filtraMatrice()"></div>' +
     '<div class="export-btns"><button class="btn-export" onclick="esportaMatriceCSV()">CSV</button><button class="btn-export btn-export-pdf" onclick="esportaMatricePDF()">PDF</button></div></div>';
@@ -1051,7 +1132,7 @@ function renderFormazione() {
     (scala.length && special.length
       ? '<tr class="fz-gruppi"><th></th><th colspan="' +
         scala.length +
-        '" class="fz-gruppo-scala">Scala dei livelli <span>dal primo all’ultimo gradino</span></th><th colspan="' +
+        '" class="fz-gruppo-scala">Scala dei livelli <span>dal primo all’ultimo</span></th><th colspan="' +
         special.length +
         '" class="fz-gruppo-spec">Specialità <span>senza livello</span></th><th colspan="2"></th></tr>'
       : '') +
@@ -1069,7 +1150,7 @@ function renderFormazione() {
       '"' +
       (cc ? ' style="background:' + cc + ' !important;color:#000"' : '') +
       ' title="' +
-      _escAttr(lvK ? 'Gradino ' + lvK + ' della scala' : 'Specialità: non conta per il livello') +
+      _escAttr(lvK ? 'Livello ' + lvK + ' della scala' : 'Specialità: non conta per il livello') +
       '">' +
       escP(k.label) +
       (sotto ? '<span class="fz-th-sotto">' + escP(sotto) + '</span>' : '') +
@@ -1146,7 +1227,7 @@ function renderFormazione() {
   // mescolati ai livelli e sembravano in conflitto con i conteggi per livello)
   if (comps.length)
     html +=
-      '<tfoot><tr><th>Persone con la competenza</th>' +
+      '<tfoot><tr><th>Persone che lo sanno fare</th>' +
       comps
         .map(
           (k) =>
@@ -1462,7 +1543,7 @@ function renderFormazione() {
   el.innerHTML = html;
   if (typeof initSezioniRichiudibili === 'function') initSezioniRichiudibili('formazione-content');
   if (typeof initCardRichiudibili === 'function')
-    initCardRichiudibili('formazione-content', ['Matrice competenze', 'Persone per livello', 'Punti']);
+    initCardRichiudibili('formazione-content', ['Chi sa fare cosa', 'Persone per livello', 'Punti']);
   if (window._fzFiltroLv != null) _filtraMatrice();
   // la finestra "Imposta livelli e competenze", se aperta, segue le modifiche
   if (document.getElementById('fz-cfg-velo')) fzDisegnaConfigScala();
@@ -1647,7 +1728,18 @@ function fzFiltraLivello(val) {
 }
 
 // Toggle spunta competenza (admin) + punti automatici + rilevamento passaggio livello
-async function toggleCompetenza(collabId, key, cb) {
+// Una spunta alla volta per persona e competenza: il doppio click salvava due volte, con
+// due eventi nello Storico HR e le domande (formatore, punti) ripetute. Mentre si salva la
+// casella resta bloccata; un secondo clic arrivato comunque viene annullato.
+function toggleCompetenza(collabId, key, cb) {
+  const chiave = 'fz-competenza|' + collabId + '|' + key;
+  if (typeof _salvataggiInCorso !== 'undefined' && _salvataggiInCorso.has(chiave)) {
+    if (cb) cb.checked = !cb.checked;
+    return;
+  }
+  return unaVoltaSola(chiave, () => _toggleCompetenzaEsegui(collabId, key, cb), cb || null);
+}
+async function _toggleCompetenzaEsegui(collabId, key, cb) {
   if (typeof puoModificare === 'function' && !puoModificare('gestione_competenze')) {
     cb.checked = !cb.checked;
     toast('Non hai il permesso di certificare competenze');
@@ -1687,7 +1779,7 @@ async function toggleCompetenza(collabId, key, cb) {
           c.nome +
           '?' +
           (area
-            ? '\n\nDa quel momento il Piano non gli proporrà più i turni dell area ' +
+            ? "\n\nDa quel momento il Piano non gli proporrà più i turni dell'area " +
               String(area).toUpperCase() +
               ' (bozza, cambi, coperture).'
             : ''),
@@ -1803,12 +1895,12 @@ async function toggleCompetenza(collabId, key, cb) {
     }
     if (dopo > prima && dopo >= 2) {
       const premio = getPuntiConfig().premi_livello[String(dopo)];
-      logAzione('Passaggio livello', c.nome + ' → ' + livelloNome(dopo) + ' (gradino ' + dopo + ')');
+      logAzione('Passaggio livello', c.nome + ' → ' + livelloNome(dopo) + ' (livello ' + dopo + ' della scala)');
       if (typeof _insertHrEvento === 'function')
         _insertHrEvento(
           c.nome,
           'livello',
-          'Raggiunto il livello ' + livelloNome(dopo) + ' (gradino ' + dopo + ' della scala)',
+          'Raggiunto il livello ' + livelloNome(dopo) + ' (livello ' + dopo + ' della scala)',
         );
       await _proponiContrattoFisso(c, dopo);
       _notificaIncentivo(
@@ -1824,9 +1916,9 @@ async function toggleCompetenza(collabId, key, cb) {
         escP(livelloNome(dopo)) +
         '</h3><p style="margin-bottom:14px">Ha completato la scala fino a ' +
         escP(livelloNome(dopo)) +
-        ' (gradino ' +
+        ' (livello ' +
         dopo +
-        ').</p>' +
+        ' della scala).</p>' +
         (premio
           ? '<p style="margin-bottom:16px">Premio previsto: <strong>' +
             escP(premio) +
@@ -1870,6 +1962,12 @@ async function _insertPuntiEvento(nome, punti, azione, descrizione) {
   const _fmtIt = (d) => (d ? String(d).split('-').reverse().join('/') : '');
   const _stessoMotivo = _desc ? _giaDati.find((x) => (x.descrizione || '').trim() === _desc) : null;
   if (_stessoMotivo) {
+    // il secondo accredito per lo stesso motivo lo fa solo chi ha Punti e premi (il database
+    // lo rifiuta comunque, migrazione 20260913): si dice subito invece di chiedere
+    if (typeof puoModificare === 'function' && !puoModificare('gestione_punti')) {
+      toast('Punti già assegnati a ' + nome + ' per questo motivo: un secondo accredito lo fa chi ha Punti e premi');
+      return false;
+    }
     if (
       !(await chiediConferma(
         'ATTENZIONE: punti già assegnati.\n\n' +
@@ -2361,9 +2459,9 @@ function _renderFormazioneConfig() {
   // livelli e competenze: si impostano nella finestra apposita, solo per il settore aperto
   // (prima erano qui in fondo, con le competenze di tutti i settori insieme)
   html +=
-    '<div class="fz-cfg-rimando"><span>Livelli, nomi dei livelli, competenze e specialità di <b>' +
+    '<div class="fz-cfg-rimando"><span>Livelli, nomi dei livelli e specialità di <b>' +
     escP(repartoLabel(currentReparto)) +
-    '</b> si impostano in una finestra apposita.</span><button class="btn-secondario" onclick="fzApriConfigScala()">Imposta livelli e competenze</button></div>';
+    '</b> si impostano in una finestra apposita.</span><button class="btn-secondario" onclick="fzApriConfigScala()">Imposta livelli e specialità</button></div>';
   // INTERRUTTORE GENERALE del sistema incentivi
   html +=
     '<p style="font-size:var(--fs-sm,.8125rem);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Sistema incentivi</p>' +
@@ -2376,7 +2474,7 @@ function _renderFormazioneConfig() {
   // punti azioni (ciascuna con la sua spunta attiva/disattiva)
   html +=
     '<p style="font-size:var(--fs-sm,.8125rem);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Azioni e punti</p>' +
-    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:0 0 6px">La spunta a sinistra accende o spegne la singola azione. Il numero sono i punti. Se il sistema qui sopra e spento, tutte le azioni sono spente.</p>';
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:0 0 6px">La spunta a sinistra accende o spegne la singola azione. Il numero sono i punti. Se il sistema qui sopra è spento, tutte le azioni sono spente.</p>';
   cfgP.azioni.forEach((a, i) => {
     const attiva = a.attiva !== false;
     html +=
@@ -2566,7 +2664,7 @@ function _compFuoriOrdine(lista) {
   return lista.some((k, i) => i > 0 && _compPosto(k) < _compPosto(lista[i - 1]));
 }
 function _compLvTesto(lv) {
-  return (parseInt(lv) || 0) > 0 ? 'gradino ' + parseInt(lv) : 'specialità (senza livello)';
+  return (parseInt(lv) || 0) > 0 ? 'livello ' + parseInt(lv) : 'specialità (senza livello)';
 }
 // cambia il livello di una competenza: cambia anche il livello dei collaboratori
 // (L(n) = tutte le competenze fino a n), quindi si chiede conferma
@@ -2584,7 +2682,7 @@ async function cambiaLivelloCompetenzaCfg(rep, idx, val) {
         _compLvTesto(k.livello) +
         '\nDopo: ' +
         _compLvTesto(lv) +
-        '\n\nIl livello dei collaboratori si ricalcola (un livello richiede tutte le competenze dei gradini sotto). Le spunte già date restano.',
+        '\n\nIl livello dei collaboratori si ricalcola (un livello richiede tutti quelli sotto). Le spunte già date restano.',
     ))
   ) {
     renderFormazione();
@@ -2632,6 +2730,19 @@ function fzApriConfigScala() {
   fzDisegnaConfigScala();
   const t = document.getElementById('fz-cfg-chiudi');
   if (t) t.focus();
+  // "Turni che può fare" legge i turni e i collegamenti del Piano: se il Piano non e
+  // ancora stato aperto si caricano adesso e la finestra si ridisegna
+  if (!_fzPianoPronto() && typeof _pianoCaricaCfg === 'function')
+    _pianoCaricaCfg()
+      .then(() => {
+        if (document.getElementById('fz-cfg-velo')) fzDisegnaConfigScala();
+      })
+      .catch(() => {
+        const r = document.querySelectorAll('.fz-turni-attesa');
+        r.forEach(
+          (x) => (x.textContent = 'Turni che può fare: impostazioni del Piano non caricate, riapri la finestra'),
+        );
+      });
 }
 function _fzCfgTasti(e) {
   // Esc chiude solo se non c e sopra una domanda (le finestre di conferma gestiscono Esc da sole)
@@ -2642,12 +2753,97 @@ function fzChiudiConfigScala() {
   if (v) v.remove();
   document.removeEventListener('keydown', _fzCfgTasti, true);
 }
-function _fzVoceComp(rep, lista, k, comandiOrdine, senzaNome) {
+// ---- collegamento ai turni (lo stesso dato di Piano › Impostazioni, "Competenze
+// Formazione → aree del piano": impostazione piano_competenze_gruppi, salvata da
+// salvaCompetenzaGruppo in piano-impostazioni.js). Un dato solo, due posti per cambiarlo.
+function _fzPianoPronto() {
+  return typeof _pianoCfgCaricata !== 'undefined' && _pianoCfgCaricata === true;
+}
+function _fzGruppiTurni(rep) {
+  if (typeof pianoTurniCache === 'undefined') return [];
+  return [
+    ...new Set(
+      pianoTurniCache
+        .filter((t) => t.attivo !== false && _repartoDi(t) === rep)
+        .map((t) => String(t.gruppo || '').toUpperCase())
+        .filter(Boolean),
+    ),
+  ].sort();
+}
+function _fzTurniRiga(rep, k) {
+  if (typeof salvaCompetenzaGruppo !== 'function' || typeof _pianoCompetenzeGruppiGrezze !== 'function') return '';
+  if (!_fzPianoPronto()) return '<div class="fz-turni fz-turni-attesa">Turni che può fare: caricamento…</div>';
+  const gruppi = _fzGruppiTurni(rep);
+  const cur = String(_pianoCompetenzeGruppiGrezze()[k.key] || '');
+  if (!gruppi.length)
+    return '<div class="fz-turni">Turni che può fare: questo settore non ha ancora turni nel Piano.</div>';
+  const valido = !cur || gruppi.includes(cur.toUpperCase());
+  return (
+    '<label class="fz-turni">Turni che può fare <select aria-label="Turni che può fare: ' +
+    _escAttr(k.label) +
+    '" onchange="fzSalvaTurniLivello(\'' +
+    _jsArg(k.key) +
+    '\',this.value)"><option value="">Nessun gruppo collegato</option>' +
+    gruppi
+      .map(
+        (g) =>
+          '<option value="' +
+          escP(g) +
+          '"' +
+          (cur.toUpperCase() === g ? ' selected' : '') +
+          '>' +
+          escP(g) +
+          '</option>',
+      )
+      .join('') +
+    (valido
+      ? ''
+      : '<option selected value="' +
+        escP(cur) +
+        '">' +
+        escP(cur) +
+        ' (non è un gruppo di questo settore: non vale)</option>') +
+    '</select></label>' +
+    (cur && valido ? '' : '<span class="fz-turni-nota">senza gruppo il Piano non usa questa voce</span>')
+  );
+}
+async function fzSalvaTurniLivello(chiave, gruppo) {
+  if (!_soloAdminCfg() || !_fzPianoPronto()) return;
+  await salvaCompetenzaGruppo(chiave, gruppo);
+  renderFormazione();
+  fzDisegnaConfigScala();
+}
+// FUNZIONE NEL PIANO accanto al livello (CR, BO, SUP...): solo se si ricava con certezza
+// dal nome. Sigla fra parentesi alla fine ("Back Office (BO)"), nome uguale alla sigla o
+// al nome per esteso della funzione ("Croupier" = CR), e la funzione esiste nel settore.
+function _fzSiglaFunzione(k, rep) {
+  const funz = typeof _pianoFunzioniDi === 'function' ? _pianoFunzioniDi(rep) : [];
+  if (!funz.length) return '';
+  const lab = String(k.label || '').trim();
+  const par = lab.match(/\(([A-Za-z]{1,8})\)\s*$/);
+  if (par && funz.includes(par[1].toUpperCase())) return par[1].toUpperCase();
+  const tutto = lab.toUpperCase();
+  if (funz.includes(tutto)) return tutto;
+  const nomi = typeof _GC_FUNZIONI_NOMI !== 'undefined' ? _GC_FUNZIONI_NOMI : {};
+  return funz.find((f) => nomi[f] && nomi[f].toUpperCase() === tutto) || '';
+}
+function _fzSiglaHtml(k, rep) {
+  const s = _fzSiglaFunzione(k, rep);
+  return s
+    ? '<span class="fz-sigla" title="Funzione nel piano: ' +
+        _escAttr(s) +
+        '">Funzione nel piano: <b>' +
+        escP(s) +
+        '</b></span>'
+    : '';
+}
+// comandi di una voce (frecce d ordine, Sposta in, Rinomina, Rimuovi): colonne fisse,
+// cosi i pulsanti restano allineati anche con nomi lunghi
+function _fzComandiVoce(rep, lista, k, comandiOrdine) {
   const i = lista.indexOf(k);
   const lvK = parseInt(k.livello) || 0;
   const max = Math.max(_lvMaxReale(rep), lvK);
-  const doppi = lista.filter((x, j) => j !== i && _compNomeNorm(x.label) === _compNomeNorm(k.label));
-  // "Sposta in": i gradini esistenti, uno nuovo in cima, oppure fra le specialita
+  // "Sposta in": i livelli esistenti, uno nuovo in cima, oppure fra le specialita
   let opz = '';
   for (let n = 1; n <= max + 1; n++)
     opz +=
@@ -2657,8 +2853,8 @@ function _fzVoceComp(rep, lista, k, comandiOrdine, senzaNome) {
       (n === lvK ? ' selected' : '') +
       '>' +
       (n <= max
-        ? 'Gradino ' + n + (_lvCompetenzeDi(n, rep).length ? ' · ' + livelloNome(n, rep) : '')
-        : 'Nuovo gradino ' + n) +
+        ? 'Livello ' + n + (_lvCompetenzeDi(n, rep).length ? ' · ' + livelloNome(n, rep) : '')
+        : 'Nuovo livello ' + n) +
       '</option>';
   opz += '<option value="0"' + (lvK ? '' : ' selected') + '>Specialità (senza livello)</option>';
   const freccia = (dir, attiva, testo, icona) =>
@@ -2680,22 +2876,13 @@ function _fzVoceComp(rep, lista, k, comandiOrdine, senzaNome) {
   const su = i > 0 && (parseInt(lista[i - 1].livello) || 0) === lvK;
   const giu = i < lista.length - 1 && (parseInt(lista[i + 1].livello) || 0) === lvK;
   return (
-    '<div class="fz-comp' +
-    (senzaNome !== undefined ? ' fz-comp-inline' : '') +
-    '">' +
-    '<span class="fz-comp-nome">' +
-    (senzaNome
-      ? '<span class="fz-sr">' + escP(k.label) + '</span>'
-      : senzaNome === false
-        ? 'Competenza: ' + escP(k.label)
-        : escP(k.label)) +
-    '</span>' +
+    '<div class="fz-comp-comandi">' +
+    '<span class="fz-comp-ordine">' +
     (comandiOrdine && (su || giu)
-      ? '<span class="fz-comp-ordine">' +
-        freccia(-1, su, 'Sposta a sinistra nella matrice', '&#9664;') +
-        freccia(1, giu, 'Sposta a destra nella matrice', '&#9654;') +
-        '</span>'
+      ? freccia(-1, su, 'Sposta a sinistra nella tabella', '&#9664;') +
+        freccia(1, giu, 'Sposta a destra nella tabella', '&#9654;')
       : '') +
+    '</span>' +
     '<label class="fz-comp-sposta">Sposta in <select aria-label="Sposta ' +
     _escAttr(k.label) +
     '" onchange="cambiaLivelloCompetenzaCfg(\'' +
@@ -2714,16 +2901,32 @@ function _fzVoceComp(rep, lista, k, comandiOrdine, senzaNome) {
     rep +
     "'," +
     i +
-    ')">Rimuovi</button>' +
-    (doppi.length
-      ? '<div class="fz-comp-doppio"><i class="icx icx-avviso"></i> Stesso nome di ' +
+    ')">Rimuovi</button></div>'
+  );
+}
+function _fzDoppioVoce(rep, lista, k) {
+  const i = lista.indexOf(k);
+  const doppi = lista.filter((x, j) => j !== i && _compNomeNorm(x.label) === _compNomeNorm(k.label));
+  return doppi.length
+    ? '<div class="fz-comp-doppio"><i class="icx icx-avviso"></i> Stesso nome di ' +
         doppi.map((x) => escP(x.label) + ' (' + _compLvTesto(x.livello) + ')').join(', ') +
         ' <button type="button" class="btn-secondario fz-btn-piccolo" title="Tiene questa (nome e livello), le passa le spunte dell’altra e toglie l’altra" onclick="unisciCompetenzaCfg(\'' +
         rep +
         "'," +
         i +
         ')">Tieni questa</button></div>'
-      : '') +
+    : '';
+}
+// una voce dentro un livello con piu voci, o una specialita: nome | comandi, poi i turni
+function _fzVoceComp(rep, lista, k, comandiOrdine) {
+  return (
+    '<div class="fz-comp"><span class="fz-comp-nome">' +
+    escP(k.label) +
+    _fzSiglaHtml(k, rep) +
+    '</span>' +
+    _fzComandiVoce(rep, lista, k, comandiOrdine) +
+    _fzTurniRiga(rep, k) +
+    _fzDoppioVoce(rep, lista, k) +
     '</div>'
   );
 }
@@ -2736,21 +2939,21 @@ function fzDisegnaConfigScala() {
   const scala = lista.filter((k) => (parseInt(k.livello) || 0) >= 1);
   const special = lista.filter((k) => !(parseInt(k.livello) || 0));
   let h =
-    '<div class="fz-fin-testa"><div><h3 id="fz-cfg-titolo">Livelli e competenze · ' +
+    '<div class="fz-fin-testa"><div><h3 id="fz-cfg-titolo">Livelli e specialità · ' +
     escP(repartoLabel(rep)) +
-    '</h3><p>La <b>scala dei livelli</b> è l’ordine in cui si impara: chi ha un gradino ha anche quelli sotto. Il nome del livello è quello della sua competenza; se un gradino ha più competenze puoi dargli un nome tuo. Le <b>specialità</b> non contano per il livello. Vale solo per il settore ' +
+    '</h3><p>La <b>scala dei livelli</b> è l’ordine in cui si impara il lavoro: chi ha un livello ha anche quelli sotto. Le <b>specialità</b> non fanno salire di livello. Per ogni voce scegli i <b>turni che può fare</b> nel Piano. Vale solo per il settore ' +
     escP(repartoLabel(rep)) +
     ': per un altro settore cambialo in alto e riapri.</p></div>' +
     '<button type="button" id="fz-cfg-chiudi" class="fz-chiudi" aria-label="Chiudi" onclick="fzChiudiConfigScala()">&times;</button></div>';
   if (_compFuoriOrdine(lista))
     h +=
-      '<div class="fz-avviso"><i class="icx icx-avviso"></i> L’elenco salvato non è in ordine di gradino. <button type="button" class="btn-secondario fz-btn-piccolo" onclick="ordinaCompetenzeCfg(\'' +
+      '<div class="fz-avviso"><i class="icx icx-avviso"></i> L’elenco salvato non è in ordine di livello. <button type="button" class="btn-secondario fz-btn-piccolo" onclick="ordinaCompetenzeCfg(\'' +
       rep +
       '\')">Rimetti in ordine</button></div>';
   // 1. SCALA
   h += '<section class="fz-blocco"><h4>Scala dei livelli</h4>';
   if (!scala.length)
-    h += '<p class="fz-vuoto">Nessun gradino: aggiungi qui sotto la prima competenza scegliendo «Nuovo gradino 1».</p>';
+    h += '<p class="fz-vuoto">Nessun livello: aggiungi qui sotto il primo scegliendo «Nuovo livello 1».</p>';
   for (let n = 1; n <= max; n++) {
     const comps = lista.filter((k) => (parseInt(k.livello) || 0) === n);
     if (!comps.length) {
@@ -2758,9 +2961,9 @@ function fzDisegnaConfigScala() {
         h +=
           '<div class="fz-gradino fz-gradino-vuoto"><span class="fz-num">' +
           n +
-          '</span><span class="fz-vuoto">Gradino ' +
+          '</span><span class="fz-vuoto">Livello ' +
           n +
-          ' senza competenze: viene saltato nel calcolo del livello.</span></div>';
+          ' vuoto: viene saltato nel calcolo.</span></div>';
       continue;
     }
     const man = _lvNomeManuale(n, rep);
@@ -2776,11 +2979,9 @@ function fzDisegnaConfigScala() {
       n +
       ',this.value)"></label><span class="fz-nome-aiuto">vuoto = «' +
       escP(auto) +
-      '»' +
-      (comps.length === 1 ? ', come la competenza' : '') +
-      '</span>';
-    const testa =
-      '<span class="fz-num" title="Gradino ' +
+      '»</span>';
+    const badge =
+      '<span class="fz-num" title="Livello ' +
       n +
       '">' +
       n +
@@ -2789,24 +2990,33 @@ function fzDisegnaConfigScala() {
       '" class="fz-prev">' +
       _lvBadge(n, rep) +
       '</span>';
-    if (comps.length === 1)
-      // un gradino = una competenza: una sola riga, il nome del livello e quello della
-      // competenza; un nome diverso si scrive solo se serve (riquadro che si apre)
+    if (comps.length === 1) {
+      // un livello = una voce: una sola riga (numero e nome | comandi), sotto i turni;
+      // un nome del livello diverso si scrive solo se serve (riquadro che si apre)
+      const k = comps[0];
       h +=
-        '<div class="fz-gradino"><div class="fz-gradino-testa fz-gradino-uno">' +
-        testa +
-        _fzVoceComp(rep, lista, comps[0], false, !man) +
-        '</div><details class="fz-nome-altro"' +
+        '<div class="fz-gradino"><div class="fz-gradino-riga"><span class="fz-gradino-nome">' +
+        badge +
+        '<span class="fz-sr">' +
+        escP(k.label) +
+        '</span>' +
+        _fzSiglaHtml(k, rep) +
+        '</span>' +
+        _fzComandiVoce(rep, lista, k, false) +
+        '</div>' +
+        _fzTurniRiga(rep, k) +
+        _fzDoppioVoce(rep, lista, k) +
+        '<details class="fz-nome-altro"' +
         (man ? ' open' : '') +
         '><summary>' +
-        (man ? 'Nome del livello diverso dalla competenza' : 'Dai al livello un nome diverso dalla competenza') +
+        (man ? 'Nome del livello scritto a mano' : 'Scrivi un nome diverso per il livello') +
         '</summary><div class="fz-gradino-testa">' +
         campoNome +
         '</div></details></div>';
-    else
+    } else
       h +=
         '<div class="fz-gradino"><div class="fz-gradino-testa">' +
-        testa +
+        badge +
         campoNome +
         '</div>' +
         comps.map((k) => _fzVoceComp(rep, lista, k, true)).join('') +
@@ -2815,7 +3025,7 @@ function fzDisegnaConfigScala() {
   h += '</section>';
   // 2. SPECIALITA
   h +=
-    '<section class="fz-blocco fz-blocco-spec"><h4>Specialità <span>(senza livello)</span></h4><p class="fz-nota">Competenze che non fanno salire di livello (per esempio un gioco particolare). Nella matrice hanno una colonna a parte' +
+    '<section class="fz-blocco fz-blocco-spec"><h4>Specialità <span>(senza livello)</span></h4><p class="fz-nota">Non fanno salire di livello (per esempio un gioco particolare). Nella tabella hanno una colonna a parte' +
     (special.length > 1 ? '; con le frecce scegli in che ordine compaiono' : '') +
     '.</p>';
   if (!special.length) h += '<p class="fz-vuoto">Nessuna specialità.</p>';
@@ -2825,22 +3035,23 @@ function fzDisegnaConfigScala() {
   let dove = '';
   for (let n = 1; n <= max; n++)
     if (lista.some((k) => (parseInt(k.livello) || 0) === n))
-      dove += '<option value="' + n + '">Nel gradino ' + n + ' · ' + escP(livelloNome(n, rep)) + '</option>';
+      dove += '<option value="' + n + '">Dentro il livello ' + n + ' · ' + escP(livelloNome(n, rep)) + '</option>';
   const nuovoLv = scala.length ? max + 1 : 1;
   dove +=
     '<option value="' +
     nuovoLv +
     '"' +
-    ' selected>Nuovo gradino ' +
+    ' selected>Nuovo livello ' +
     nuovoLv +
     ' (in cima alla scala)</option><option value="0">Specialità (senza livello)</option>';
+  // esempi separati: un livello e una specialita sono due cose diverse
+  const esempio =
+    rep === 'tavoli' ? 'Es. livello: Ispettore 1 · Es. specialità: Punto Banco' : 'Es. livello: Reception';
   h +=
-    '<section class="fz-blocco"><h4>Aggiungi una competenza</h4><div class="fz-aggiungi">' +
+    '<section class="fz-blocco"><h4>Aggiungi un livello o una specialità</h4><div class="fz-aggiungi">' +
     '<label class="fz-campo">Nome<input type="text" id="cfg-comp-nome-' +
     rep +
-    '" maxlength="40" placeholder="Es: ' +
-    (rep === 'tavoli' ? 'ISP 1, Punto Banco' : 'Reception') +
-    '" oninput="fzAnteprimaNuova()"></label>' +
+    '" maxlength="40" aria-describedby="fz-esempio-nome" oninput="fzAnteprimaNuova()"></label>' +
     '<label class="fz-campo">Dove<select id="cfg-comp-lv-' +
     rep +
     '" onchange="fzAnteprimaNuova()">' +
@@ -2848,10 +3059,12 @@ function fzDisegnaConfigScala() {
     '</select></label>' +
     '<button type="button" class="btn-add-tipo" onclick="aggiungiCompetenzaCfg(\'' +
     rep +
-    '\')">Aggiungi</button></div><div class="fz-anteprima" id="fz-prev-nuova"></div></section>';
+    '\')">Aggiungi</button></div><p class="fz-nota fz-esempio" id="fz-esempio-nome">' +
+    esempio +
+    '</p><div class="fz-anteprima" id="fz-prev-nuova"></div></section>';
   // 4. IMPORTA DA EXCEL (v429)
   h +=
-    '<section class="fz-blocco"><h4>Importa le spunte da Excel</h4><p class="fz-nota">Un collaboratore per riga, una competenza per colonna, X = la sa fare. Prima di salvare vedi un’anteprima.</p><div class="fz-aggiungi">' +
+    '<section class="fz-blocco"><h4>Importa le spunte da Excel</h4><p class="fz-nota">Un collaboratore per riga, un livello o una specialità per colonna, X = la sa fare. Prima di salvare vedi un’anteprima.</p><div class="fz-aggiungi">' +
     '<label class="btn-secondario" style="cursor:pointer;margin:0">Scegli il file Excel<input type="file" accept=".xlsx,.xls,.xlsm" style="display:none" onchange="formImportaMatrice(this,\'' +
     rep +
     '\')"></label>' +
@@ -2866,7 +3079,10 @@ function fzDisegnaConfigScala() {
   // il campo che si stava scrivendo resta dov era dopo il ridisegno
   const att = document.activeElement;
   const idAtt = att && corpo.contains(att) && att.id ? att.id : '';
+  const scorri = corpo.closest('.fz-finestra');
+  const top = scorri ? scorri.scrollTop : 0;
   corpo.innerHTML = h;
+  if (scorri) scorri.scrollTop = top;
   if (idAtt && document.getElementById(idAtt)) document.getElementById(idAtt).focus();
   fzAnteprimaNuova();
 }
@@ -2910,7 +3126,7 @@ function fzAnteprimaNuova() {
     '">' +
     escP(gia.length >= 3 && !_lvNomeManuale(lv, rep) ? 'Livello ' + lv : nomeLv) +
     '</span>' +
-    (gia.length ? ' · il gradino ' + lv + ' avrà ' + (gia.length + 1) + ' competenze: puoi dargli un nome tuo' : '');
+    (gia.length ? ' · il livello ' + lv + ' comprenderà ' + (gia.length + 1) + ' voci: puoi dargli un nome tuo' : '');
 }
 async function ordinaCompetenzeCfg(rep) {
   if (!_soloAdminCfg()) return;
@@ -3065,7 +3281,11 @@ async function unisciCompetenzaCfg(rep, idx) {
   }
   if (errori) {
     // configurazione lasciata com e: si puo ripetere senza perdere niente
-    toast('Unione non completata: ' + errori + ' collaboratori non aggiornati. Riprova.');
+    toast(
+      'Unione non completata: ' +
+        errori +
+        (errori === 1 ? ' collaboratore non aggiornato. Riprova.' : ' collaboratori non aggiornati. Riprova.'),
+    );
     return;
   }
   // gruppo di turni e modello delle Formazioni (per settore) e mappa competenza -> gruppo
@@ -3535,7 +3755,7 @@ function _renderPopupCopertura() {
       .join('') +
     '</select>' +
     (ctx.turnoAssente
-      ? '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:5px">Accanto a ogni nome: che turno ha quel giorno e se e formato per il turno scoperto. Chi non e formato si può scegliere lo stesso, ma resta scritto nel registro.</p>'
+      ? '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:5px">Accanto a ogni nome: che turno ha quel giorno e se è formato per il turno scoperto. Chi non è formato si può scegliere lo stesso, ma resta scritto nel registro.</p>'
       : '') +
     '</div>';
   if (azNeg) {

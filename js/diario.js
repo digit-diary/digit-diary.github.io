@@ -164,7 +164,7 @@ async function _salvaEsegui() {
     if (typeof _pianoEJolly === 'function' && _pianoCollabInfo(nome) && !_pianoEJolly(nome)) {
       await mostraAvviso(
         nome +
-          ' non e un jolly: la non disponibilità (ND) vale solo per i jolly. Per un collaboratore fisso si usa un congedo o un cambio turno.',
+          ' non è un jolly: la non disponibilità (ND) vale solo per i jolly. Per un collaboratore fisso si usa un congedo o un cambio turno.',
         { titolo: 'Non disponibilità' },
       );
       return;
@@ -174,7 +174,7 @@ async function _salvaEsegui() {
     if (typeof _pianoCollabInfo === 'function' && !_pianoCollabInfo(nome)) {
       await mostraAvviso(
         nome +
-          ' non e fra i collaboratori attivi. La non disponibilità vale solo per i jolly: crealo prima come jolly in Gestione collaboratori (o controlla il nome), poi registra la ND.',
+          ' non è fra i collaboratori attivi. La non disponibilità vale solo per i jolly: crealo prima come jolly in Gestione collaboratori (o controlla il nome), poi registra la ND.',
         { titolo: 'Non disponibilità' },
       );
       return;
@@ -190,7 +190,7 @@ async function _salvaEsegui() {
         !(await chiediConferma(
           '\u26a0 ' +
             fuoriT.length +
-            (fuoriT.length === 1 ? " giorno e'" : ' giorni sono') +
+            (fuoriT.length === 1 ? ' giorno è' : ' giorni sono') +
             ' FUORI TEMPO (il termine di consegna era già passato):\n\n' +
             fuoriT.map((ds) => '\u2022 ' + new Date(ds + 'T12:00:00').toLocaleDateString('it-IT')).join('\n') +
             '\n\nRegistro comunque? La nota "fuori termine" restera\' scritta.',
@@ -268,7 +268,13 @@ async function _salvaEsegui() {
   );
   if (dupSimile.length) {
     const tipoAmm = nomeCorrente('Ammonimento Verbale');
-    let msg = nome + ' ha già ' + dupSimile.length + ' registrazione/i "' + tipoSelezionato + '" oggi.';
+    let msg =
+      nome +
+      ' ha già ' +
+      dupSimile.length +
+      (dupSimile.length === 1 ? ' registrazione "' : ' registrazioni "') +
+      tipoSelezionato +
+      '" oggi.';
     if (tipoSelezionato === tipoAmm && dupSimile.length >= 1) {
       const _ammSimili = dupSimile.filter((d) => _motivoSimile(d.testo, testo, nome));
       if (_ammSimili.length >= 1)
@@ -434,7 +440,7 @@ async function elimina(id) {
       try {
         await sincronizzaMalattiaPiano(_e.nome, _e.testo || '', _e.data, '');
       } catch (e2) {
-        toastErrore('Registrazione nel cestino, ma il piano non e allineato: ' + ((e2 && e2.message) || e2));
+        toastErrore('Registrazione nel cestino, ma il piano non è allineato: ' + ((e2 && e2.message) || e2));
       }
     }
     // nata dal Rapporto giornaliero: la persona sparisce anche da li
@@ -881,7 +887,7 @@ async function confermaCambioTipo() {
     _pianoCollabInfo(e0.nome) &&
     !_pianoEJolly(e0.nome)
   ) {
-    toastErrore(e0.nome + ' e fisso: la non disponibilità vale solo per i jolly.');
+    toastErrore(e0.nome + ' è fisso: la non disponibilità vale solo per i jolly.');
     return;
   }
   try {
@@ -1021,7 +1027,7 @@ async function chiediOmonimo(testo, nomi, contesto, chiave) {
     return n + ' (' + [rep, c.funzione].filter(Boolean).join(', ') + ')';
   };
   const r = await chiediModulo(
-    '"' + testo + '"' + (contesto ? ' ' + contesto : '') + ' corrisponde a più collaboratori. Chi e?',
+    '"' + testo + '"' + (contesto ? ' ' + contesto : '') + ' corrisponde a più collaboratori. Chi è?',
     [
       {
         titolo: 'Collaboratore',

@@ -4,6 +4,32 @@
  * App: routing, init, renderPostLogin, tipi
  */
 
+// SCHEDA PROFILO (#profilo-modal: collaboratore con Panoramica/Diario/HR, cliente Maison):
+// si chiude con Esc e cambiando pagina. Prima restava aperta sopra le altre pagine.
+function chiudiSchedaProfilo() {
+  const pm = document.getElementById('profilo-modal');
+  if (!pm || pm.classList.contains('hidden')) return false;
+  pm.classList.add('hidden');
+  if (typeof _destroySchedaCharts === 'function') _destroySchedaCharts();
+  return true;
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || e.defaultPrevented) return;
+  const pm = document.getElementById('profilo-modal');
+  if (!pm || pm.classList.contains('hidden')) return;
+  // sopra la scheda c e un altra finestra (domanda, anteprima, modifica): Esc chiude quella
+  const pwd = document.getElementById('pwd-modal');
+  if (pwd && !pwd.classList.contains('hidden')) return;
+  if (
+    document.querySelector(
+      '.finestra-velo:not([hidden]), .fz-velo, #modal-overlay:not(.hidden), #note-modal:not(.hidden), #operatore-modal:not(.hidden)',
+    )
+  )
+    return;
+  e.preventDefault();
+  chiudiSchedaProfilo();
+});
+
 function switchPage(name) {
   flushRapportoSave();
   if (typeof _pianoFlushSalva === 'function') _pianoFlushSalva();
@@ -13,6 +39,8 @@ function switchPage(name) {
   if (!_pagesAlwaysVisible.includes(name) && typeof isVis === 'function' && !isVis(_visKey)) {
     name = 'dashboard';
   }
+  // la scheda del collaboratore (o di un cliente Maison) non resta aperta sopra la pagina nuova
+  chiudiSchedaProfilo();
   var _epf = document.getElementById('early-page-fix');
   if (_epf) _epf.remove();
   document.querySelectorAll('.page').forEach((p) => p.classList.remove('active'));
@@ -141,8 +169,12 @@ function switchPage(name) {
       consSec.style.display = isAdmin() ? '' : 'none';
       if (isAdmin() && typeof renderConservazioneUI === 'function') renderConservazioneUI();
     }
+    // CESTINO anche per gli operatori (decisione del titolare: chi cestina deve poter
+    // ripristinare). Vedono le voci del loro settore; "Elimina definitivamente" e "Svuota"
+    // restano all amministratore (lo impone anche il database).
     const cestSec = document.getElementById('cestino-section');
-    if (cestSec) cestSec.style.display = isAdmin() ? '' : 'none';
+    if (cestSec) cestSec.style.display = '';
+    if (typeof cestinoPreparaFiltri === 'function') cestinoPreparaFiltri();
     const setSec = document.getElementById('settori-section');
     if (setSec) {
       setSec.style.display = isAdmin() ? '' : 'none';

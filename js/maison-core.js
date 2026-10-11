@@ -1058,7 +1058,7 @@ async function _confermaEliminaRigaMaison(id, domanda) {
     return await chiediConferma(
       'Questa voce fa parte della riga condivisa "' +
         rec.nome +
-        '": verra\' eliminata la riga originale con entrambi i nomi (' +
+        '": verrà eliminata la riga originale con entrambi i nomi (' +
         fmtCHF(rec.costo) +
         ' CHF). Continuare?',
     );
@@ -1081,7 +1081,10 @@ async function eliminaMaisonRigaGd(id) {
 }
 async function eliminaMaisonGruppoGd(idsStr) {
   const ids = idsStr.split(',').map(Number);
-  if (!(await chiediConferma('Eliminare questo gruppo (' + ids.length + ' righe)?'))) return;
+  if (
+    !(await chiediConferma('Eliminare questo gruppo (' + ids.length + (ids.length === 1 ? ' riga' : ' righe') + ')?'))
+  )
+    return;
   try {
     for (const id of ids) {
       await secDel('costi_maison', 'id=eq.' + id);
@@ -2805,7 +2808,11 @@ async function eliminaMaisonCliente(nome) {
   }
   if (
     !(await chiediConferma(
-      'Eliminare tutte le ' + count + ' registrazioni di "' + nome + '" (' + currentReparto + ')?',
+      (count === 1 ? 'Eliminare la registrazione di "' : 'Eliminare tutte le ' + count + ' registrazioni di "') +
+        nome +
+        '" (' +
+        currentReparto +
+        ')?',
     ))
   )
     return;
@@ -2815,7 +2822,7 @@ async function eliminaMaisonCliente(nome) {
     logAzione('Maison: eliminato cliente', nome + ' (' + count + ' righe, ' + currentReparto + ')');
     renderMaisonDashboard();
     renderMaisonBudgetAlerts();
-    toast(nome + ' eliminato (' + count + ' righe)');
+    toast(nome + ' eliminato (' + count + (count === 1 ? ' riga' : ' righe') + ')');
   } catch (e) {
     toast('Errore eliminazione cliente');
   }
@@ -2867,7 +2874,7 @@ async function _eseguiEliminaCondiviso(nome, entrambi) {
       }
       maisonCache = maisonCache.filter((r) => !ids.includes(r.id));
       logAzione('Maison: eliminato condiviso', orig.join(', ') + ' (' + ids.length + ' righe)');
-      toast(orig.join(', ') + ' eliminati (' + ids.length + ' righe)');
+      toast(orig.join(', ') + ' eliminati (' + ids.length + (ids.length === 1 ? ' riga' : ' righe') + ')');
     } else {
       for (const id of ids) {
         const rec = maisonCache.find((r) => r.id === id);
@@ -3196,7 +3203,11 @@ async function eliminaMaisonGiorno() {
   const count = getMaisonReparto().filter((r) => r.data_giornata === giorno).length;
   if (
     !(await chiediConferma(
-      'Eliminare tutte le ' + count + ' registrazioni del ' + label + ' (' + currentReparto + ')?',
+      (count === 1 ? 'Eliminare la registrazione del ' : 'Eliminare tutte le ' + count + ' registrazioni del ') +
+        label +
+        ' (' +
+        currentReparto +
+        ')?',
     ))
   )
     return;
@@ -3239,7 +3250,13 @@ async function eliminaMaisonMese() {
     return;
   }
   if (
-    !(await chiediConferma('Eliminare tutte le ' + count + ' registrazioni di ' + label + ' (' + currentReparto + ')?'))
+    !(await chiediConferma(
+      (count === 1 ? 'Eliminare la registrazione di ' : 'Eliminare tutte le ' + count + ' registrazioni di ') +
+        label +
+        ' (' +
+        currentReparto +
+        ')?',
+    ))
   )
     return;
   try {
@@ -3251,10 +3268,101 @@ async function eliminaMaisonMese() {
     logAzione('Maison: eliminato mese', label + ' (' + count + ' righe, ' + currentReparto + ')');
     renderMaisonDashboard();
     renderMaisonBudgetAlerts();
-    toast(label + ' eliminato (' + count + ' righe)');
+    toast(label + ' eliminato (' + count + (count === 1 ? ' riga' : ' righe') + ')');
   } catch (e) {
     toast('Errore eliminazione mese');
   }
 }
 
 // Budget
+
+// INSERIMENTO A MANO IN MAISON DA TASTIERA (richiesta del titolare 12/10/2026): con le frecce
+// ci si sposta fra Cliente, PX, Importo, Tipo, N buoni e Data senza mouse.
+//   sinistra/destra: casella prima/dopo (nel nome del cliente solo con il cursore all inizio
+//                    o alla fine, cosi si puo ancora correggere il testo);
+//   su/giu: casella prima/dopo; con l elenco dei clienti aperto scorrono i nomi proposti e
+//           Invio sceglie quello evidenziato (come il clic).
+const _MAISON_MAN_CAMPI = [
+  'maison-man-nome',
+  'maison-man-px',
+  'maison-man-importo',
+  'maison-man-tipo',
+  'maison-man-qty',
+  'maison-man-data',
+];
+function _maisonManCampiVisibili() {
+  return _MAISON_MAN_CAMPI
+    .map((id) => {
+      const el = document.getElementById(id);
+      if (!el) return null;
+      // la data usa il campo visibile del calendario (flatpickr con altInput)
+      const vis = el._flatpickr && el._flatpickr.altInput ? el._flatpickr.altInput : el;
+      return vis.offsetParent ? vis : null;
+    })
+    .filter(Boolean);
+}
+function _maisonManVai(da, passo) {
+  const campi = _maisonManCampiVisibili();
+  const i = campi.indexOf(da);
+  if (i < 0) return false;
+  const dest = campi[i + passo];
+  if (!dest) return false;
+  dest.focus();
+  if (dest.select && dest.type !== 'date') {
+    try {
+      dest.select();
+    } catch (e) {}
+  }
+  return true;
+}
+document.addEventListener('keydown', (e) => {
+  if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  const t = e.target;
+  if (!t || !t.closest || !t.closest('#page-maison')) return;
+  const campi = _maisonManCampiVisibili();
+  if (!campi.includes(t)) return;
+  // elenco dei clienti proposti aperto: frecce e Invio scelgono il nome
+  const drop = document.getElementById('ac-maison-man');
+  if (t.id === 'maison-man-nome' && drop && drop.classList.contains('show') && drop.children.length) {
+    const voci = [...drop.children];
+    let k = voci.findIndex((v) => v.classList.contains('ac-attivo'));
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (k >= 0) voci[k].classList.remove('ac-attivo');
+      k = e.key === 'ArrowDown' ? Math.min(voci.length - 1, k + 1) : Math.max(0, k - 1);
+      voci[k].classList.add('ac-attivo');
+      voci[k].scrollIntoView({ block: 'nearest' });
+      return;
+    }
+    if (e.key === 'Enter' && k >= 0) {
+      e.preventDefault();
+      voci[k].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+      _maisonManVai(t, 1);
+      return;
+    }
+    if (e.key === 'Escape') {
+      drop.classList.remove('show');
+      return;
+    }
+  }
+  let passo = 0;
+  if (e.key === 'ArrowDown') passo = 1;
+  else if (e.key === 'ArrowUp') passo = -1;
+  else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+    // nei campi di testo si salta solo con il cursore in fondo (destra) o all inizio (sinistra)
+    let inizio = null;
+    let fine = null;
+    try {
+      inizio = t.selectionStart;
+      fine = t.selectionEnd;
+    } catch (err) {}
+    const testo = t.tagName === 'INPUT' && inizio != null;
+    if (e.key === 'ArrowRight' && (!testo || (inizio === fine && fine === t.value.length))) passo = 1;
+    if (e.key === 'ArrowLeft' && (!testo || (inizio === fine && inizio === 0))) passo = -1;
+  }
+  if (!passo) return;
+  if (_maisonManVai(t, passo)) {
+    e.preventDefault();
+    if (drop) drop.classList.remove('show');
+  }
+});

@@ -1684,38 +1684,59 @@ function _renderPianoCorsiCard() {
     '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:10px">Scegli il corso, la data, l&#39;orario e i partecipanti: la sigla viene scritta da sola nelle loro celle del piano (protetta, con orario e ore contate).</p>';
   h += '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px">';
   h +=
-    '<div class="field"><label>Corso</label><select id="corso-cod" style="padding:8px" onchange="corsoPrefillOrari()">' +
+    '<div class="field"><label>Corso</label><select id="corso-cod" style="padding:8px" onchange="corsoPrefillOrari();corsoAggiornaStati()">' +
     corsi.map((c) => '<option' + (c.codice === 'CS' ? ' selected' : '') + '>' + escP(c.codice) + '</option>').join('') +
     '</select></div>';
-  h += '<div class="field"><label>Data</label><input type="date" id="corso-data"></div>';
+  h +=
+    '<div class="field"><label>Data</label><input type="date" id="corso-data" onchange="corsoAggiornaStati()"></div>';
   const preCS = ((window._pianoCorsiOrari || {})['CS'] || '14:30-17:30').split('-');
   h +=
-    '<div class="field"><label>Inizio</label><input type="time" id="corso-inizio" value="' +
+    '<div class="field"><label>Inizio</label><input type="time" id="corso-inizio" onchange="corsoAggiornaStati()" value="' +
     (preCS[0] || '') +
     '"></div>';
   h +=
-    '<div class="field"><label>Fine</label><input type="time" id="corso-fine" value="' + (preCS[1] || '') + '"></div>';
+    '<div class="field"><label>Fine</label><input type="time" id="corso-fine" onchange="corsoAggiornaStati()" value="' +
+    (preCS[1] || '') +
+    '"></div>';
   h +=
     '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px" title="La prossima volta questo corso partirà con questo orario" onclick="corsoSalvaOrarioDefault()">Salva orario predefinito</button>';
   h += '</div>';
+  // PARTECIPANTI (richiesta del titolare 12/10/2026: elenco piu professionale): divisi per
+  // funzione, per ognuno com e quel giorno nel piano (libero, turno e se si sovrappone al
+  // corso, vacanza, malattia) e se ha gia fatto il corso; filtri e spunta per gruppo.
   h +=
-    '<div style="margin-bottom:6px;font-size:var(--fs-sm,.8125rem)"><b>Partecipanti</b> · <span style="cursor:pointer;color:var(--c-blu,#1a4a7a);text-decoration:underline" onclick="document.querySelectorAll(\'.corso-part\').forEach(c=>c.checked=true);corsoContaPartecipanti()">tutti</span> / <span style="cursor:pointer;color:var(--c-blu,#1a4a7a);text-decoration:underline" onclick="document.querySelectorAll(\'.corso-part\').forEach(c=>c.checked=false);corsoContaPartecipanti()">nessuno</span></div>';
-  // ricerca: filtra l elenco mentre si scrive (anche cognome e nome invertiti)
+    '<div class="corso-part-testa"><b>Partecipanti</b><span id="corso-sel-n" class="corso-part-n">0 selezionati</span>' +
+    '<button type="button" class="corso-link" onclick="corsoSpuntaVisibili(true)">Seleziona i visibili</button>' +
+    '<button type="button" class="corso-link" onclick="corsoSpuntaVisibili(false)">Togli tutti</button></div>';
   h +=
-    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><input type="search" id="corso-cerca" placeholder="Cerca collaboratore..." autocomplete="off" oninput="corsoFiltraPartecipanti(this.value)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();corsoSpuntaPrimo()}" style="padding:6px 10px;min-width:220px"><span id="corso-cerca-info" style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">Invio spunta il primo trovato</span><span id="corso-sel-n" style="font-size:var(--fs-sm,.8125rem);margin-left:auto">0 selezionati</span></div>';
-  h +=
-    '<div id="corso-part-elenco" onchange="corsoContaPartecipanti()" style="max-height:180px;overflow-y:auto;border:1px solid var(--border,#ccc);padding:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:2px 12px;font-size:var(--fs-md,.875rem)">';
-  collabs.forEach((c) => {
-    h +=
-      '<label data-nome="' +
-      escP(c.nome) +
-      '" style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="corso-part" value="' +
-      escP(c.nome) +
-      '">' +
-      escP(c.nome) +
-      '</label>';
-  });
+    '<div class="corso-part-filtri"><input type="search" id="corso-cerca" placeholder="Cerca collaboratore..." autocomplete="off" aria-label="Cerca collaboratore" oninput="corsoFiltraPartecipanti(this.value)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();corsoSpuntaPrimo()}">' +
+    '<span id="corso-cerca-info" class="corso-part-info">Invio spunta il primo trovato</span>' +
+    '<span class="corso-filtri" role="group" aria-label="Mostra">' +
+    [
+      ['tutti', 'Tutti'],
+      ['liberi', 'Liberi quel giorno'],
+      ['mai', 'Non hanno ancora fatto il corso'],
+    ]
+      .map(
+        ([k, t]) =>
+          '<button type="button" class="corso-filtro' +
+          ((window._corsoFiltro || 'tutti') === k ? ' attivo' : '') +
+          '" data-filtro="' +
+          k +
+          '" onclick="corsoScegliFiltro(\'' +
+          k +
+          '\')">' +
+          t +
+          '</button>',
+      )
+      .join('') +
+    '</span></div>';
+  h += '<div id="corso-part-elenco" class="corso-elenco" onchange="corsoContaPartecipanti()">';
+  h += _corsoElencoHtml(collabs);
   h += '</div>';
+  h +=
+    '<p class="corso-part-nota">Lo stato del giorno e lo storico del corso si leggono dal piano: scegli la data per vederli.</p>';
+  setTimeout(() => corsoAggiornaStati(), 0);
   h +=
     '<button class="btn-export" style="font-size:var(--fs-md,.875rem);padding:6px 16px;margin-top:10px" onclick="pianoInserisciCorso()">Inserisci nel piano</button>';
   // gestione della LISTA corsi (admin): aggiungi sigla, rinomina, rimuovi
@@ -1746,6 +1767,146 @@ function _renderPianoCorsiCard() {
   h += '</div></div>';
   return h;
 }
+// elenco dei partecipanti diviso per funzione (RESP e SUP in cima, poi in ordine alfabetico)
+function _corsoElencoHtml(collabs) {
+  const nomeFz = (fz) =>
+    (typeof funzioneNomeEsteso === 'function' && funzioneNomeEsteso(fz)) ||
+    (typeof _GC_FUNZIONI_NOMI !== 'undefined' ? _GC_FUNZIONI_NOMI[fz] : '');
+  const ordine = ['RESP', 'SUP'];
+  const gruppi = {};
+  collabs.forEach((c) => {
+    const fz = String(c.funzione || '').toUpperCase() || '-';
+    (gruppi[fz] = gruppi[fz] || []).push(c);
+  });
+  const chiavi = Object.keys(gruppi).sort((a, b) => {
+    const ia = ordine.indexOf(a);
+    const ib = ordine.indexOf(b);
+    if (ia >= 0 || ib >= 0) return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    if (a === '-') return 1;
+    if (b === '-') return -1;
+    return a.localeCompare(b);
+  });
+  return chiavi
+    .map((fz) => {
+      const tit = fz === '-' ? 'Senza funzione' : nomeFz(fz) ? nomeFz(fz) + ' (' + fz + ')' : fz;
+      return (
+        '<section class="corso-gruppo" data-gruppo="' +
+        escP(fz) +
+        '"><div class="corso-gruppo-tit"><span>' +
+        escP(tit) +
+        ' · <span class="corso-gruppo-n">' +
+        gruppi[fz].length +
+        '</span></span><button type="button" class="corso-link" onclick="corsoSpuntaGruppo(this)">Seleziona il gruppo</button></div>' +
+        gruppi[fz]
+          .map(
+            (c) =>
+              '<label class="corso-riga" data-nome="' +
+              escP(c.nome) +
+              '"><input type="checkbox" class="corso-part" value="' +
+              escP(c.nome) +
+              '"><span class="corso-nome">' +
+              escP(c.nome) +
+              '</span><span class="corso-stato" data-stato=""></span><span class="corso-fatto"></span></label>',
+          )
+          .join('') +
+        '</section>'
+      );
+    })
+    .join('');
+}
+// stato di ognuno nel giorno scelto e storico del corso (una lettura per giorno e per corso)
+async function corsoAggiornaStati() {
+  const data = (document.getElementById('corso-data') || {}).value;
+  const cod = (document.getElementById('corso-cod') || {}).value;
+  const ci = _pianoOra((document.getElementById('corso-inizio') || {}).value);
+  const cf = _pianoOra((document.getElementById('corso-fine') || {}).value);
+  const righe = [...document.querySelectorAll('#corso-part-elenco .corso-riga')];
+  if (!righe.length) return;
+  const cache = (window._corsoCache = window._corsoCache || { giorni: {}, storico: {} });
+  try {
+    if (data && !cache.giorni[data]) cache.giorni[data] = (await secGet('piano?data=eq.' + data + '&limit=2000')) || [];
+    if (cod && !cache.storico[cod])
+      cache.storico[cod] =
+        (await secGet(
+          'piano?codice=eq.' + encodeURIComponent(cod) + '&select=collaboratore,data&order=data.desc&limit=5000',
+        )) || [];
+  } catch (e) {
+    /* senza rete l elenco resta senza stati: si puo comunque scegliere */
+  }
+  const giorno = data ? cache.giorni[data] || [] : null;
+  const storico = cod ? cache.storico[cod] || [] : [];
+  const oggi = typeof oggiLocale === 'function' ? oggiLocale() : '';
+  righe.forEach((l) => {
+    const nome = l.dataset.nome;
+    const st = l.querySelector('.corso-stato');
+    const fatto = l.querySelector('.corso-fatto');
+    let testo = '';
+    let tipo = '';
+    if (giorno) {
+      if (typeof _pianoOperativoIl === 'function' && !_pianoOperativoIl(nome, data)) {
+        testo = 'Fuori contratto';
+        tipo = 'no';
+      } else {
+        const r = giorno.find((x) => x.collaboratore === nome);
+        const t = r ? _pianoTurnoInfo(r.codice) : null;
+        if (!r || !r.codice) {
+          testo = 'Libero';
+          tipo = 'ok';
+        } else if (t) {
+          const ti = _pianoOra(r.ora_inizio || t.ora_inizio);
+          let tf = _pianoOra(r.ora_fine || t.ora_fine);
+          if (ti != null && tf != null && tf <= ti) tf += 24;
+          const orario =
+            (r.ora_inizio || t.ora_inizio || '').slice(0, 5) + '–' + (r.ora_fine || t.ora_fine || '').slice(0, 5);
+          const sovr = ci != null && cf != null && ti != null && tf != null && ci < tf && ti < cf;
+          testo = 'Turno ' + r.codice + ' ' + orario + (sovr ? ' · si sovrappone al corso' : ' · compatibile');
+          tipo = sovr ? 'avviso' : 'ok';
+        } else {
+          const c = String(r.codice).toUpperCase();
+          const info = typeof _pianoCodiceInfo === 'function' ? _pianoCodiceInfo(r.codice) : null;
+          testo =
+            c === 'V'
+              ? 'Vacanza'
+              : c === 'M'
+                ? 'Malattia'
+                : c === 'C'
+                  ? 'Riposo'
+                  : c === cod
+                    ? 'Già iscritto a questo corso'
+                    : (info && info.descrizione) || r.codice;
+          tipo = c === 'C' ? 'ok' : c === cod ? 'fatto' : 'no';
+        }
+      }
+    }
+    st.textContent = testo;
+    st.dataset.stato = tipo;
+    l.dataset.libero = tipo === 'ok' ? '1' : '';
+    // storico: ultima volta che ha fatto questo corso (prima di oggi)
+    const g = storico.find((x) => x.collaboratore === nome && String(x.data).slice(0, 10) < (data || oggi));
+    fatto.textContent = g ? 'Fatto il ' + String(g.data).slice(0, 10).split('-').reverse().join('.') : 'Mai fatto';
+    fatto.classList.toggle('mai', !g);
+    l.dataset.mai = g ? '' : '1';
+  });
+  corsoFiltraPartecipanti((document.getElementById('corso-cerca') || {}).value || '');
+}
+function corsoScegliFiltro(k) {
+  window._corsoFiltro = k;
+  document.querySelectorAll('.corso-filtro').forEach((b) => b.classList.toggle('attivo', b.dataset.filtro === k));
+  corsoFiltraPartecipanti((document.getElementById('corso-cerca') || {}).value || '');
+}
+function corsoSpuntaGruppo(btn) {
+  const sez = btn.closest('.corso-gruppo');
+  const vis = [...sez.querySelectorAll('.corso-riga')].filter((l) => l.style.display !== 'none');
+  const tutti = vis.every((l) => l.querySelector('input').checked);
+  vis.forEach((l) => (l.querySelector('input').checked = !tutti));
+  corsoContaPartecipanti();
+}
+function corsoSpuntaVisibili(si) {
+  document.querySelectorAll('#corso-part-elenco .corso-riga').forEach((l) => {
+    if (!si || l.style.display !== 'none') l.querySelector('input').checked = !!si;
+  });
+  corsoContaPartecipanti();
+}
 // ricerca nell elenco dei partecipanti: tutte le parole scritte, in qualsiasi ordine
 function corsoFiltraPartecipanti(testo) {
   const parole = String(testo || '')
@@ -1755,9 +1916,19 @@ function corsoFiltraPartecipanti(testo) {
   let n = 0;
   document.querySelectorAll('#corso-part-elenco label[data-nome]').forEach((l) => {
     const nome = (l.dataset.nome || '').toLowerCase();
-    const ok = parole.every((p) => nome.includes(p));
+    const filtro = window._corsoFiltro || 'tutti';
+    const ok =
+      parole.every((p) => nome.includes(p)) &&
+      (filtro !== 'liberi' || l.dataset.libero === '1') &&
+      (filtro !== 'mai' || l.dataset.mai === '1');
     l.style.display = ok ? '' : 'none';
     if (ok) n++;
+  });
+  document.querySelectorAll('#corso-part-elenco .corso-gruppo').forEach((g) => {
+    const vis = [...g.querySelectorAll('.corso-riga')].filter((l) => l.style.display !== 'none').length;
+    g.style.display = vis ? '' : 'none';
+    const nn = g.querySelector('.corso-gruppo-n');
+    if (nn) nn.textContent = vis;
   });
   const info = document.getElementById('corso-cerca-info');
   if (info)

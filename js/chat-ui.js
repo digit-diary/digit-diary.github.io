@@ -853,7 +853,12 @@ function apriConversazione(partner) {
         aggiornaNoteBadge();
         const pg = localStorage.getItem('pagina_corrente');
         if (pg === 'note-collega') renderNoteCollega();
-        toast(failed.length + ' messaggi non marcati letti (errore rete)');
+        toast(
+          failed.length +
+            (failed.length === 1
+              ? ' messaggio non segnato come letto (errore di rete)'
+              : ' messaggi non segnati come letti (errore di rete)'),
+        );
       }
     })();
   }
@@ -2246,7 +2251,7 @@ function apriSchedaCollaboratore(nome) {
     // segnaposto di "solo giorno e mese": non si mostra, cosi' non sembra un
     // errore. La modifica passa da Gestione collaboratori (con conferma).
     html +=
-      '<b style="font-size:var(--fs-md,.875rem)" title="Si modifica in Gestione collaboratori, dove sta l anagrafica">' +
+      '<b style="font-size:var(--fs-md,.875rem)" title="Si modifica in Gestione collaboratori, dove sta l\'anagrafica">' +
       escP(dataNascitaLabel(dataNascita)) +
       '</b>';
   } else if (!_hrMod) {
@@ -2254,7 +2259,7 @@ function apriSchedaCollaboratore(nome) {
   } else {
     // DATA MANCANTE: campo e Salva compaiono solo qui, per inserirla al volo
     html +=
-      '<input type="text" id="scheda-nascita" value="" data-iso-value="" placeholder="12.01 o 12.01.1997" title="Basta giorno e mese per il compleanno; l anno solo se lo conosci" style="padding:4px 10px;border:1px solid var(--line);border-radius:2px;font-size:var(--fs-sm,.8125rem);background:var(--paper2);color:var(--ink);width:120px">';
+      '<input type="text" id="scheda-nascita" value="" data-iso-value="" placeholder="12.01 o 12.01.1997" title="Basta giorno e mese per il compleanno; l\'anno solo se lo conosci" style="padding:4px 10px;border:1px solid var(--line);border-radius:2px;font-size:var(--fs-sm,.8125rem);background:var(--paper2);color:var(--ink);width:120px">';
     html +=
       '<button class="btn-salva" onclick="salvaSchedaNascita(\'' +
       neS +
@@ -3213,7 +3218,7 @@ function _renderStoricoHrSezione(nome) {
     // pulsante la apre. Dal giorno dopo non e piu operativo nel Piano; il resto resta.
     var dataFine = (c && c.data_fine_rapporto ? String(c.data_fine_rapporto).substring(0, 10) : '') || '';
     var spiegaFine =
-      'Ultimo giorno di lavoro: dal giorno dopo non e più nel calendario, nella bozza, nelle coperture e nei cambi e non ha ore dovute. Diario, scheda, storico, vacanze e CGF restano.';
+      'Ultimo giorno di lavoro: dal giorno dopo non è più nel calendario, nella bozza, nelle coperture e nei cambi e non ha ore dovute. Diario, scheda, storico, vacanze e CGF restano.';
     html +=
       '<div id="hr-fine-riga" style="display:' +
       (dataFine ? 'flex' : 'none') +
@@ -3384,11 +3389,11 @@ async function _salvaFineContratto(nome, val, togli) {
   });
   if (!c) return false;
   if (!togli && !val) {
-    toast('Scegli l ultimo giorno di lavoro');
+    toast("Scegli l'ultimo giorno di lavoro");
     return false;
   }
   if (val && c.data_assunzione && val < String(c.data_assunzione).substring(0, 10)) {
-    toastErrore('La fine del contratto e prima dell inizio del contratto');
+    toastErrore("La fine del contratto è prima dell'inizio del contratto");
     return false;
   }
   // turni gia scritti nel piano dopo la fine: si dicono (non si cancellano da soli)
@@ -3410,7 +3415,7 @@ async function _salvaFineContratto(nome, val, togli) {
       nome +
       ': ultimo giorno ' +
       val.split('-').reverse().join('.') +
-      '.\n\nDal giorno dopo non e più nel calendario, nella bozza, nelle coperture e nei cambi e non ha ore dovute. Diario, scheda, storico, vacanze e CGF restano.' +
+      '.\n\nDal giorno dopo non è più nel calendario, nella bozza, nelle coperture e nei cambi e non ha ore dovute. Diario, scheda, storico, vacanze e CGF restano.' +
       (dopo.length
         ? '\n\nATTENZIONE: ha ancora ' +
           dopo.length +
@@ -3721,7 +3726,7 @@ async function salvaSchedaNascita(nome) {
     }
   }
   if (!coll) {
-    toast(nome + ' non e nell anagrafica: aggiungilo da Gestione collaboratori');
+    toast(nome + " non è nell'anagrafica: aggiungilo da Gestione collaboratori");
     return;
   }
   // La data di nascita e' un dato personale: modificarla o cancellarla
@@ -3841,7 +3846,7 @@ async function stampaSchedaPDF(nome) {
   if (cRec && cRec.data_nascita)
     anag.push(
       _pdfHr && String(cRec.data_nascita).substring(0, 4) > '1900'
-        ? 'Nato/a il ' + compleannoLabel(cRec.data_nascita)
+        ? 'Data di nascita: ' + compleannoLabel(cRec.data_nascita)
         : 'Compleanno ' + String(cRec.data_nascita).substring(8, 10) + '.' + String(cRec.data_nascita).substring(5, 7),
     );
   anag.push('Reparto ' + currentReparto.charAt(0).toUpperCase() + currentReparto.slice(1));
@@ -4388,7 +4393,7 @@ async function pollNuoveNote() {
     aggiornaNoteBadge();
     const nuoveNonLette = noteColleghiCache.filter((n) => n.a_operatore === op && !n.letta && !n.nascosta_dest).length;
     if (nuoveNonLette > vecchieNonLette) {
-      toast('Hai ' + nuoveNonLette + ' nota/e non letta/e!');
+      toast('Hai ' + nuoveNonLette + (nuoveNonLette === 1 ? ' nota non letta' : ' note non lette'));
       const nuoveArr = noteColleghiCache.filter((n) => n.a_operatore === op && !n.letta && !n.nascosta_dest);
       if (nuoveArr.length)
         inviaNotifica('Nuova nota da ' + nuoveArr[0].da_operatore, (nuoveArr[0].messaggio || '').substring(0, 80));
@@ -4429,7 +4434,8 @@ function mostraNoteNonLette() {
   mc.innerHTML =
     '<h3 style="margin-bottom:4px">Hai ' +
     nonLette.length +
-    ' nota/e non letta/e</h3><p style="color:var(--muted);font-size:var(--fs-sm,.8125rem);margin-bottom:16px">Messaggi dai tuoi colleghi</p>' +
+    (nonLette.length === 1 ? ' nota non letta' : ' note non lette') +
+    '</h3><p style="color:var(--muted);font-size:var(--fs-sm,.8125rem);margin-bottom:16px">Messaggi dai tuoi colleghi</p>' +
     nonLette
       .map((n) => {
         const testoPulito = _pulisciTesto(n.messaggio);
@@ -4478,7 +4484,13 @@ async function segnaNoteLette() {
       failed.push(mid);
     }
   }
-  if (failed.length) toast(failed.length + ' note non marcate lette (errore rete)');
+  if (failed.length)
+    toast(
+      failed.length +
+        (failed.length === 1
+          ? ' nota non segnata come letta (errore di rete)'
+          : ' note non segnate come lette (errore di rete)'),
+    );
   _chatBuildNoteCache();
   renderNoteCollega();
 }

@@ -1528,7 +1528,7 @@ async function eliminaSpeseExtraMese() {
     );
     logAzione('Spese extra: eliminato mese', label + ' (' + count + ' righe, ' + currentReparto + ')');
     renderSpeseExtra();
-    toast('Spese extra di ' + label + ' eliminate (' + count + ' righe)');
+    toast('Spese extra di ' + label + ' eliminate (' + count + (count === 1 ? ' riga' : ' righe') + ')');
   } catch (e) {
     toast('Errore eliminazione spese extra');
   }
@@ -1706,7 +1706,7 @@ async function eseguiRinominaSE(vecchio) {
     logAzione('Rinomina spese extra', vecchio + ' → ' + nuovo + ' (' + ids.length + ' righe)');
     document.getElementById('pwd-modal').classList.add('hidden');
     renderSpeseExtra();
-    toast(vecchio + ' → ' + nuovo + ' (' + ids.length + ' righe)');
+    toast(vecchio + ' → ' + nuovo + ' (' + ids.length + (ids.length === 1 ? ' riga' : ' righe') + ')');
   } catch (e) {
     toast('Errore rinomina');
   }

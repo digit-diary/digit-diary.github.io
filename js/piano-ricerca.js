@@ -27,6 +27,9 @@
  *   costoPersona  (nome, mappa) -> numero    regole della persona (mappa = { dstr: codice })
  *   costoGiorno   (dstr, perNome) -> numero  (facoltativo) regole fra persone nel giorno
  *   costoMese     (stato) -> numero          (facoltativo) regole sul mese intero
+ *                 Le tre funzioni possono anche ritornare { costo, conti }: conti = { chiave:
+ *                 numero } (es. { legge_dom: 1, regola: 2 }), le violazioni contate per tipo
+ *                 con lo stesso metro del controllo finale. Vedi l opzione vincoli.
  *   toccaMese     (nome) -> bool             (facoltativo) la persona conta per le regole del mese
  *   fissi         { nome: { dstr: codice } } (facoltativo) celle obbligate (formazioni)
  *   riservati     { dstr: { codice: true } } (facoltativo) POSTI RISERVATI: turni che possono
@@ -58,6 +61,27 @@
  *                 (default: quelli di partenza). Vincolo duro come maxScoperti: dalla v444 i
  *                 posti rari pesavano al massimo 5 volte un posto normale, una regola di legge
  *                 60.000: Migliora lasciava un giorno dei Tavoli con un solo SUP.
+ *   maxEccesso    il risultato non puo avere piu persone oltre il fabbisogno di cosi
+ *                 (default: quelle di partenza)
+ *   vincoli       [[chiave, ...], ...] gruppi di chiavi dei conti: per ogni gruppo la somma
+ *                 nel risultato non puo superare quella di partenza (default: ogni chiave da
+ *                 sola). Es. le regole di legge per tipo e, insieme, tutte le regole vere.
+ *   pesoSforo     punti per ogni unita oltre un vincolo (scoperti, riservati, eccesso,
+ *                 conti), che crescono con l avanzare della ricerca (0 all inizio, il valore
+ *                 pieno alla fine, in quadrato): all inizio la ricerca puo attraversare stati
+ *                 non ammessi, alla fine ci torna dentro e migliora fra quelli ammessi
+ *                 (default 0 = solo il filtro sul migliore). Senza, una ricerca entrata in
+ *                 uno stato non ammesso con meno punti non ne usciva piu: il migliore
+ *                 ammesso restava quello di prima.
+ *   sforoCurva    come cresce il peso dello sforo: 'quadrato' (default), 'lineare', 'subito'
+ *                 (pieno dall inizio: la ricerca resta sempre fra gli stati ammessi)
+ *   tornaAlMigliore frazione della ricerca (0-1) dopo la quale uno stato fuori dai vincoli si
+ *                 abbandona e si riparte dal migliore ammesso (default: mai)
+ *   IL MIGLIORE: la ricerca puo passare da stati che violano i vincoli (maxScoperti,
+ *   maxRiservati, maxEccesso, vincoli), ma il piano restituito e sempre il migliore fra
+ *   quelli che li rispettano TUTTI (dalla v450; prima solo scoperti e riservati: Migliora
+ *   restituiva un piano con una domenica libera in meno e il controllo finale lo scartava
+ *   tutto, anche se durante la ricerca era passata da piani buoni e legali).
  *   pesoNotti     punti per l equita delle notti (default 0 = spenta): somma, per gruppo
  *                 di persone comparabili, dei quadrati degli scarti della quota di notti
  *                 dalla media del gruppo (punti percentuali al quadrato / 100; vedi scartoNotti)
@@ -133,6 +157,11 @@
     return h || 1;
   }
 
+  // somma i conti c nell oggetto tot
+  function aggiungiA(tot, c) {
+    if (c) Object.keys(c).forEach((k) => (tot[k] = (tot[k] || 0) + (c[k] || 0)));
+  }
+
   function crea(problema, opzioni) {
     const P = problema;
     const o = Object.assign(
@@ -143,6 +172,7 @@
         pesoRaro: 5,
         pesoRiservato: 0,
         pesoNotti: 0,
+        pesoSforo: 0,
         minTurniNotti: 8,
         seme: 1,
       },
@@ -301,6 +331,21 @@
       persone.forEach((n) => (x[n] = stato[n][d] || ''));
       return x;
     };
+    // costo e conti per tipo di una funzione delle regole (numero oppure { costo, conti })
+    const leggi = (x) =>
+      x && typeof x === 'object' ? { costo: +x.costo || 0, conti: x.conti || null } : { costo: +x || 0, conti: null };
+    const valP = (n) => leggi(P.costoPersona(n, stato[n]));
+    const valG = (d) => (P.costoGiorno ? leggi(P.costoGiorno(d, perNomeGiorno(d))) : { costo: 0, conti: null });
+    const valM = (st) => (P.costoMese ? leggi(P.costoMese(st)) : { costo: 0, conti: null });
+    // CONTI PER TIPO (violazioni contate come le conta il controllo finale): per persona, per
+    // giorno, per il mese, e la somma di tutto il piano
+    const contiP = {};
+    const contiG = {};
+    let contiM = null;
+    const contiTot = {};
+    const aggiungiConti = (c, segno) => {
+      if (c) Object.keys(c).forEach((k) => (contiTot[k] = (contiTot[k] || 0) + segno * (c[k] || 0)));
+    };
     const costoP = {};
     const costoG = {};
     const scopG = {};
@@ -308,15 +353,32 @@
     const eccG = {};
     const risG = {}; // posti riservati scoperti per giorno
     // regole sul mese intero (facoltative): ricalcolate a ogni mossa
-    let costoM = P.costoMese ? P.costoMese(stato) : 0;
-    persone.forEach((n) => (costoP[n] = P.costoPersona(n, stato[n]) + o.pesoCambio * cambiPersona(n)));
-    giorni.forEach((d) => {
-      costoG[d] = P.costoGiorno ? P.costoGiorno(d, perNomeGiorno(d)) : 0;
-      scopG[d] = scopertiGiorno(d);
-      scopW[d] = scopertiPesoGiorno(d);
-      eccG[d] = eccessoGiorno(d);
-      risG[d] = riservatiGiorno(d);
-    });
+    let costoM = 0;
+    // costi e conti da capo (partenza e ricarica del migliore)
+    function calcolaDaCapo() {
+      Object.keys(contiTot).forEach((k) => delete contiTot[k]);
+      const m = valM(stato);
+      costoM = m.costo;
+      contiM = m.conti;
+      aggiungiConti(contiM, 1);
+      persone.forEach((n) => {
+        const v = valP(n);
+        costoP[n] = v.costo + o.pesoCambio * cambiPersona(n);
+        contiP[n] = v.conti;
+        aggiungiConti(v.conti, 1);
+      });
+      giorni.forEach((d) => {
+        const v = valG(d);
+        costoG[d] = v.costo;
+        contiG[d] = v.conti;
+        aggiungiConti(v.conti, 1);
+        scopG[d] = scopertiGiorno(d);
+        scopW[d] = scopertiPesoGiorno(d);
+        eccG[d] = eccessoGiorno(d);
+        risG[d] = riservatiGiorno(d);
+      });
+    }
+    calcolaDaCapo();
     const somma = (obj) => Object.keys(obj).reduce((t, k) => t + obj[k], 0);
     const ricalcolaNotti = () => {
       if (!conNotti) return;
@@ -332,7 +394,11 @@
       o.pesoEccesso * somma(eccG) +
       o.pesoRiservato * somma(risG) +
       o.pesoNotti * somma(costoNG);
-    let totale = totaleDaCapo();
+    const copiaConti = () => {
+      const c = {};
+      Object.keys(contiTot).forEach((k) => (c[k] = contiTot[k]));
+      return c;
+    };
     const misura = () => ({
       punteggio: totale,
       scoperti: somma(scopG),
@@ -340,11 +406,40 @@
       riservati: somma(risG),
       notti: Math.round(somma(costoNG) * 100) / 100,
       regole: somma(costoP) + somma(costoG) + costoM,
+      conti: copiaConti(),
+      sforo: sforoOra,
     });
+    // VINCOLI DEL RISULTATO: posti scoperti, riservati, persone in piu e conti per tipo non
+    // oltre i limiti (di default quelli di partenza). sforo = di quanto si e fuori in tutto
+    // (0 = stato ammesso)
+    const contiIniziali = copiaConti();
+    const maxScop = o.maxScoperti != null ? o.maxScoperti : somma(scopG);
+    const maxRis = o.maxRiservati != null ? o.maxRiservati : somma(risG);
+    const maxEcc = o.maxEccesso != null ? o.maxEccesso : somma(eccG);
+    const gruppiVincoli = Array.isArray(o.vincoli) ? o.vincoli.map((g) => [].concat(g)) : null;
+    const sommaGruppo = (c, g) => g.reduce((t, k) => t + (c[k] || 0), 0);
+    const limitiVincoli = gruppiVincoli ? gruppiVincoli.map((g) => sommaGruppo(contiIniziali, g)) : null;
+    const sforoConti = (c) => {
+      let s = 0;
+      if (gruppiVincoli) gruppiVincoli.forEach((g, i) => (s += Math.max(0, sommaGruppo(c, g) - limitiVincoli[i])));
+      else Object.keys(c).forEach((k) => (s += Math.max(0, (c[k] || 0) - (contiIniziali[k] || 0))));
+      return s;
+    };
+    const sforoDi = (scop, ris, ecc, conti) =>
+      Math.max(0, scop - maxScop) + Math.max(0, ris - maxRis) + Math.max(0, ecc - maxEcc) + sforoConti(conti);
+    let sforoOra = sforoDi(somma(scopG), somma(risG), somma(eccG), contiTot);
+    // peso dello sforo in questo momento della ricerca (cresce fino a pesoSforo alla fine)
+    let pesoSforoOra = 0;
+    let totale = totaleDaCapo() + pesoSforoOra * sforoOra;
     const iniziale = misura();
-    const maxScop = o.maxScoperti != null ? o.maxScoperti : iniziale.scoperti;
-    const maxRis = o.maxRiservati != null ? o.maxRiservati : iniziale.riservati;
-    let migliore = { punteggio: totale, stato: JSON.parse(JSON.stringify(stato)) };
+    // il piano di partenza e il migliore finche non se ne trova uno ammesso con meno punti
+    // (se la partenza non e ammessa, es. maxScoperti piu basso, vince il primo ammesso)
+    let migliore = { punteggio: totale, stato: JSON.parse(JSON.stringify(stato)), ammesso: sforoOra === 0 };
+    const aggiornaMigliore = () => {
+      if (sforoOra > 0) return;
+      if (migliore.ammesso && !(totale < migliore.punteggio - 1e-9)) return;
+      migliore = { punteggio: totale, stato: JSON.parse(JSON.stringify(stato)), ammesso: true };
+    };
     let iterazioni = 0;
     let accettate = 0;
 
@@ -366,9 +461,12 @@
         if (m.c) assegnati[m.d][m.c] = (assegnati[m.d][m.c] || 0) + 1;
         stato[m.n][m.d] = m.c;
       });
-      const dopoP = nomi.map((n) => P.costoPersona(n, stato[n]) + o.pesoCambio * cambiPersona(n));
-      const dopoG = gg.map((d) => (P.costoGiorno ? P.costoGiorno(d, perNomeGiorno(d)) : 0));
+      const valDopoP = nomi.map((n) => valP(n));
+      const valDopoG = gg.map((d) => valG(d));
+      const dopoP = nomi.map((n, i) => valDopoP[i].costo + o.pesoCambio * cambiPersona(n));
+      const dopoG = valDopoG.map((v) => v.costo);
       const dopoS = gg.map((d) => scopertiPesoGiorno(d));
+      const dopoSN = gg.map((d) => scopertiGiorno(d));
       const dopoE = gg.map((d) => eccessoGiorno(d));
       const dopoR = gg.map((d) => riservatiGiorno(d));
       // equita delle notti: solo i gruppi delle persone toccate
@@ -382,8 +480,37 @@
         dopoNG = gruppiN.map((k) => costoGruppoDa(k, contiN));
       }
       // regole del mese: solo se la mossa tocca chi conta (es. le funzioni con un limite nel mese)
-      const dopoM = P.costoMese && (!P.toccaMese || nomi.some((n) => P.toccaMese(n))) ? P.costoMese(stato) : costoM;
-      let delta = dopoM - costoM;
+      const valDopoM =
+        P.costoMese && (!P.toccaMese || nomi.some((n) => P.toccaMese(n)))
+          ? valM(stato)
+          : { costo: costoM, conti: contiM };
+      const dopoM = valDopoM.costo;
+      // conti per tipo dopo la mossa (provvisori: si tolgono se la mossa non si tiene)
+      nomi.forEach((n, i) => {
+        aggiungiConti(contiP[n], -1);
+        aggiungiConti(valDopoP[i].conti, 1);
+      });
+      gg.forEach((d, i) => {
+        aggiungiConti(contiG[d], -1);
+        aggiungiConti(valDopoG[i].conti, 1);
+      });
+      aggiungiConti(contiM, -1);
+      aggiungiConti(valDopoM.conti, 1);
+      let scopT = 0;
+      let risT = 0;
+      let eccT = 0;
+      giorni.forEach((d) => {
+        scopT += scopG[d];
+        risT += risG[d];
+        eccT += eccG[d];
+      });
+      gg.forEach((d, i) => {
+        scopT += dopoSN[i] - scopG[d];
+        risT += dopoR[i] - risG[d];
+        eccT += dopoE[i] - eccG[d];
+      });
+      const sforoDopo = sforoDi(scopT, risT, eccT, contiTot);
+      let delta = dopoM - costoM + pesoSforoOra * (sforoDopo - sforoOra);
       nomi.forEach((n, i) => (delta += dopoP[i] - primaP[i]));
       gg.forEach(
         (d, i) =>
@@ -403,24 +530,39 @@
           stato[m.n][m.d] = vecchi[i];
         });
         if (conNotti) nomi.forEach((n, i) => (contiN[n] = primaCN[i]));
+        aggiungiConti(valDopoM.conti, -1);
+        aggiungiConti(contiM, 1);
+        gg.forEach((d, i) => {
+          aggiungiConti(valDopoG[i].conti, -1);
+          aggiungiConti(contiG[d], 1);
+        });
+        nomi.forEach((n, i) => {
+          aggiungiConti(valDopoP[i].conti, -1);
+          aggiungiConti(contiP[n], 1);
+        });
         return false;
       }
-      nomi.forEach((n, i) => (costoP[n] = dopoP[i]));
+      nomi.forEach((n, i) => {
+        costoP[n] = dopoP[i];
+        contiP[n] = valDopoP[i].conti;
+      });
       costoM = dopoM;
+      contiM = valDopoM.conti;
+      sforoOra = sforoDopo;
       gg.forEach((d, i) => {
         costoG[d] = dopoG[i];
+        contiG[d] = valDopoG[i].conti;
         scopW[d] = dopoS[i];
-        scopG[d] = scopertiGiorno(d);
+        scopG[d] = dopoSN[i];
         eccG[d] = dopoE[i];
         risG[d] = dopoR[i];
       });
       if (conNotti) gruppiN.forEach((k, i) => (costoNG[k] = dopoNG[i]));
       totale += delta;
       accettate++;
-      // il migliore si sceglie solo fra i piani che non scoprono piu posti (e piu posti
-      // riservati) di quelli di partenza
-      if (totale < migliore.punteggio - 1e-9 && somma(scopG) <= maxScop && somma(risG) <= maxRis)
-        migliore = { punteggio: totale, stato: JSON.parse(JSON.stringify(stato)) };
+      // il migliore si sceglie solo fra i piani AMMESSI: nessun vincolo oltre il limite
+      // (posti scoperti, riservati, persone in piu, regole per tipo come il controllo finale)
+      aggiornaMigliore();
       return true;
     }
 
@@ -550,17 +692,10 @@
           if (c) assegnati[d][c] = (assegnati[d][c] || 0) + 1;
         });
       });
-      persone.forEach((n) => (costoP[n] = P.costoPersona(n, stato[n]) + o.pesoCambio * cambiPersona(n)));
-      giorni.forEach((d) => {
-        costoG[d] = P.costoGiorno ? P.costoGiorno(d, perNomeGiorno(d)) : 0;
-        scopG[d] = scopertiGiorno(d);
-        scopW[d] = scopertiPesoGiorno(d);
-        eccG[d] = eccessoGiorno(d);
-        risG[d] = riservatiGiorno(d);
-      });
-      costoM = P.costoMese ? P.costoMese(stato) : 0;
+      calcolaDaCapo();
       ricalcolaNotti();
-      totale = totaleDaCapo();
+      sforoOra = sforoDi(somma(scopG), somma(risG), somma(eccG), contiTot);
+      totale = totaleDaCapo() + pesoSforoOra * sforoOra;
     }
     // RIFINITURA: ogni cella cambiata prova a tornare com era (da sola, poi insieme a
     // un altra cella cambiata dello stesso giorno, come negli scambi): resta solo se
@@ -610,6 +745,17 @@
       // peggiori per uscire dai vicoli ciechi), poi scende a zero
       const f0 = 1 - Math.min(1, Math.max(0, frazione || 0));
       const t0 = (o.temperatura != null ? o.temperatura : 600) * f0 * f0;
+      // peso dello sforo dei vincoli in questo momento (vedi sforoCurva)
+      const fr = 1 - f0;
+      const ps = (o.pesoSforo || 0) * (o.sforoCurva === 'subito' ? 1 : o.sforoCurva === 'lineare' ? fr : fr * fr);
+      if (ps !== pesoSforoOra) {
+        totale += (ps - pesoSforoOra) * sforoOra;
+        pesoSforoOra = ps;
+      }
+      // TORNA AL MIGLIORE: dopo questa frazione della ricerca, uno stato fuori dai vincoli si
+      // lascia e si riparte dal migliore ammesso (una legge in piu spesso non si ripara con
+      // le mosse semplici: servono piu celle insieme)
+      if (o.tornaAlMigliore != null && fr >= o.tornaAlMigliore && sforoOra > 0 && migliore.ammesso) ricaricaMigliore();
       let k = 0;
       while ((maxIter ? k < maxIter : Date.now() < fine) && totale > 0) {
         const mossa = scegli(MOSSE)();
@@ -631,8 +777,13 @@
       );
       // misura del migliore, ricalcolata da capo
       const s = migliore.stato;
-      let regole = P.costoMese ? P.costoMese(s) : 0;
-      persone.forEach((n) => (regole += P.costoPersona(n, s[n])));
+      const conti = {};
+      const somma1 = (v) => {
+        aggiungiA(conti, v.conti);
+        return v.costo;
+      };
+      let regole = P.costoMese ? somma1(leggi(P.costoMese(s))) : 0;
+      persone.forEach((n) => (regole += somma1(leggi(P.costoPersona(n, s[n])))));
       let scop = 0;
       let scopPeso = 0;
       let ecc = 0;
@@ -640,7 +791,7 @@
       giorni.forEach((d) => {
         const x = {};
         persone.forEach((n) => (x[n] = s[n][d] || ''));
-        if (P.costoGiorno) regole += P.costoGiorno(d, x);
+        if (P.costoGiorno) regole += somma1(leggi(P.costoGiorno(d, x)));
         const f = fab[d] || {};
         const cnt = {};
         persone.forEach((n) => {
@@ -660,12 +811,15 @@
         stato: s,
         cambi: cambi,
         prima: iniziale,
+        // ammesso: rispetta tutti i vincoli (sempre, se la partenza li rispettava)
+        ammesso: sforoDi(scop, ris, ecc, conti) === 0,
         dopo: {
           scoperti: scop,
           eccesso: ecc,
           riservati: ris,
           notti: Math.round(notti * 100) / 100,
           regole: regole,
+          conti: conti,
           punteggio:
             regole +
             o.pesoScoperto * scopPeso +

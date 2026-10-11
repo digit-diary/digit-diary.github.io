@@ -7,6 +7,166 @@
 // ================================================================
 // MAPPATURE TURNO-FUNZIONE + IMPOSTAZIONI PIANO (personalizzabili)
 // ================================================================
+// FUNZIONI DEL SETTORE (richiesta del titolare 12/10/2026): elenco vero al posto della casella
+// con le virgole. Per ogni funzione: sigla, nome per esteso (modificabile), quante persone del
+// settore la hanno e i turni che fa (Turni per funzione). Si aggiunge con sigla e nome, si
+// toglie con un avviso se qualcuno la usa ancora. L elenco si salva con salvaPianoFunzioni
+// (stessi controlli di prima), i nomi in piano_funzioni_nomi (validi per tutti i settori).
+function _renderPianoFunzioniCard() {
+  if (!isAdmin()) return '';
+  const rep = _pianoReparto();
+  const lista = _pianoFunzioniDi(rep);
+  const salvate = _pianoFunzioniConfig(rep);
+  const mapp = (pianoMappatureCache || []).filter((m) => (m.reparto_dip || 'slots') === rep);
+  let h =
+    '<div class="main-card" style="margin-top:16px"><div class="card-header">Funzioni del settore · ' +
+    escP(repartoLabel(rep)) +
+    '</div><div style="padding:10px 14px">' +
+    '<p class="fz-sett-intro">La funzione è il ruolo che ogni collaboratore ha nel piano (es. Supervisore, Croupier). Si assegna nella scheda del collaboratore (Impostazioni generali › Gestione collaboratori); i turni di ogni funzione si indicano qui sotto in <b>Turni per funzione</b>.</p>';
+  h +=
+    '<div style="overflow-x:auto"><table class="piano-table fz-sett-tab"><thead><tr><th style="text-align:left">Sigla</th><th style="text-align:left">Nome per esteso</th><th>Persone</th><th style="text-align:left">Turni che fa (da Turni per funzione)</th><th></th></tr></thead><tbody>';
+  lista.forEach((f) => {
+    const n = collaboratoriCache.filter(
+      (c) => c.attivo !== false && _repartoDi(c) === rep && String(c.funzione || '').toUpperCase() === f,
+    ).length;
+    const suoi = mapp.filter((m) => String(m.funzione).toUpperCase() === f);
+    // per tipo, con le parole per esteso: PRINCIPALE e AMMESSO limitano la funzione a quei
+    // turni; PREFERITO e solo una preferenza (fa comunque tutti i turni del settore)
+    const perTipo = (tipo) =>
+      suoi
+        .filter((m) => m.tipo === tipo)
+        .map((m) => String(m.turno_codice))
+        .sort((a, b) => a.localeCompare(b, 'it', { numeric: true }));
+    const chip = (cod, cls) => '<span class="fz-sett-turno ' + cls + '">' + escP(cod) + '</span>';
+    const princ = perTipo('PRINCIPALE');
+    const amm = perTipo('AMMESSO');
+    const pref = perTipo('PREFERITO');
+    const limitata = princ.length || amm.length;
+    let turni = limitata
+      ? '<span class="fz-sett-cosa">Solo questi turni</span>'
+      : '<span class="fz-sett-cosa">Tutti i turni del settore</span>';
+    if (princ.length)
+      turni +=
+        '<div class="fz-sett-riga"><span class="fz-sett-et">principali</span> ' +
+        princ.map((c) => chip(c, 'princ')).join(' ') +
+        '</div>';
+    if (amm.length)
+      turni +=
+        '<div class="fz-sett-riga"><span class="fz-sett-et">se mancano ore</span> ' +
+        amm.map((c) => chip(c, 'amm')).join(' ') +
+        '</div>';
+    if (pref.length)
+      turni +=
+        '<div class="fz-sett-riga"><span class="fz-sett-et">preferiti</span> ' +
+        pref.map((c) => chip(c, 'pref')).join(' ') +
+        '</div>';
+    const soloDaiDati = !salvate.includes(f);
+    h +=
+      '<tr><td style="text-align:left"><b>' +
+      escP(f) +
+      '</b>' +
+      (soloDaiDati
+        ? ' <span class="fz-sett-vuoto" title="Non è nell elenco salvato: compare perché qualcuno ce l ha">(dai collaboratori)</span>'
+        : '') +
+      '</td><td style="text-align:left"><input type="text" class="fz-sett-nome" value="' +
+      escP(funzioneNomeEsteso(f, true)) +
+      '" placeholder="es. Supervisore" maxlength="40" aria-label="Nome per esteso di ' +
+      escP(f) +
+      '" onchange="pianoFunzioneNome(\'' +
+      escP(f) +
+      '\',this.value)"></td><td class="fz-sett-n">' +
+      n +
+      '</td><td style="text-align:left">' +
+      turni +
+      '</td><td><button type="button" class="btn-del-tipo pericolo" onclick="pianoFunzioneRimuovi(\'' +
+      escP(f) +
+      '\')">Togli</button></td></tr>';
+  });
+  if (!lista.length)
+    h +=
+      '<tr><td colspan="5" class="fz-sett-vuoto" style="text-align:left">Nessuna funzione: aggiungine una qui sotto.</td></tr>';
+  h += '</tbody></table></div>';
+  h +=
+    '<div class="fz-sett-nuova"><div class="field"><label for="fz-nuova-sigla">Sigla</label><input type="text" id="fz-nuova-sigla" maxlength="12" placeholder="es. DI" onkeydown="if(event.key===\'Enter\'){event.preventDefault();pianoFunzioneAggiungi()}"></div>' +
+    '<div class="field" style="flex:1;min-width:200px"><label for="fz-nuova-nome">Nome per esteso</label><input type="text" id="fz-nuova-nome" maxlength="40" placeholder="es. Ispettore di gioco" onkeydown="if(event.key===\'Enter\'){event.preventDefault();pianoFunzioneAggiungi()}"></div>' +
+    '<button type="button" class="btn-add-tipo" onclick="pianoFunzioneAggiungi()">Aggiungi funzione</button></div>' +
+    '<p class="fz-sett-vuoto" style="margin:6px 0 0">Sigla: lettere e cifre, al massimo 12 (es. SUP, CR, ISP1). Il nome per esteso compare nelle schede e negli elenchi.</p>';
+  h += '</div></div>';
+  return h;
+}
+async function pianoFunzioneAggiungi() {
+  if (!isAdmin()) return;
+  const sigla = String((document.getElementById('fz-nuova-sigla') || {}).value || '')
+    .trim()
+    .toUpperCase();
+  const nome = String((document.getElementById('fz-nuova-nome') || {}).value || '').trim();
+  if (!sigla) {
+    toastErrore('Scrivi la sigla della funzione (es. DI)');
+    return;
+  }
+  if (!/^[A-Z0-9_]{1,12}$/.test(sigla)) {
+    toastErrore('Sigla non valida: solo lettere, cifre e _, al massimo 12');
+    return;
+  }
+  const rep = _pianoReparto();
+  const lista = _pianoFunzioniDi(rep);
+  if (lista.includes(sigla) && _pianoFunzioniConfig(rep).includes(sigla)) {
+    toastErrore('La funzione ' + sigla + ' c è già in ' + repartoLabel(rep));
+    return;
+  }
+  if (nome) await _pianoFunzioneSalvaNome(sigla, nome);
+  await salvaPianoFunzioni([...new Set(_pianoFunzioniConfig(rep).concat(lista, [sigla]))].join(','));
+  toast('Funzione aggiunta: ' + sigla + (nome ? ' · ' + nome : ''));
+  renderPiano();
+}
+async function pianoFunzioneRimuovi(sigla) {
+  if (!isAdmin()) return;
+  const rep = _pianoReparto();
+  const n = collaboratoriCache.filter(
+    (c) => c.attivo !== false && _repartoDi(c) === rep && String(c.funzione || '').toUpperCase() === sigla,
+  ).length;
+  const nMapp = (pianoMappatureCache || []).filter(
+    (m) => (m.reparto_dip || 'slots') === rep && String(m.funzione).toUpperCase() === sigla,
+  ).length;
+  if (
+    !(await chiediConferma(
+      'Togliere la funzione ' +
+        sigla +
+        ' da ' +
+        repartoLabel(rep) +
+        '?' +
+        (n
+          ? '\n\n' +
+            n +
+            (n === 1 ? ' collaboratore la ha' : ' collaboratori la hanno') +
+            ' ancora: resta nei loro dati e negli elenchi finché non la cambi nella loro scheda.'
+          : '') +
+        (nMapp ? '\n\nI suoi ' + nMapp + ' turni in Turni per funzione restano: toglili lì se non servono più.' : ''),
+    ))
+  )
+    return;
+  const resto = _pianoFunzioniConfig(rep).filter((f) => f !== sigla);
+  if (!resto.length) {
+    toastErrore('Nel settore deve restare almeno una funzione');
+    return;
+  }
+  await salvaPianoFunzioni(resto.join(','));
+  renderPiano();
+}
+async function pianoFunzioneNome(sigla, nome) {
+  if (!isAdmin()) return;
+  await _pianoFunzioneSalvaNome(sigla, String(nome || '').trim());
+  toast('Nome salvato: ' + sigla + (nome ? ' · ' + String(nome).trim() : ''));
+}
+async function _pianoFunzioneSalvaNome(sigla, nome) {
+  const nomi = Object.assign({}, window._pianoFunzioniNomi || {});
+  if (nome) nomi[sigla] = nome;
+  else delete nomi[sigla];
+  if (!(await salvaImp('piano_funzioni_nomi', JSON.stringify(nomi)))) return false;
+  window._pianoFunzioniNomi = nomi;
+  logAzione('Piano: nome funzione', sigla + ' = ' + (nome || '(nessuno)'));
+  return true;
+}
 function _renderPianoMappatureCard() {
   if (!isAdmin()) return '';
   let h =
@@ -217,11 +377,6 @@ function _renderPianoImpostazioniCard() {
     '<div class="add-tipo-row"><div class="field"><label>Ore settimanali contratto (per il saldo ore)</label><input type="number" step="0.5" id="pi-ore-sett" value="' +
     _pianoOreSett +
     '" style="width:90px" onchange="salvaOreSettimanali(this.value)"></div>' +
-    '<div class="field" style="flex:1;min-width:220px"><label>Funzioni disponibili · ' +
-    escP(repartoLabel(_pianoReparto())) +
-    ' (separate da virgola)</label><input type="text" id="pi-funzioni" value="' +
-    escP(_pianoFunzioniDi(_pianoReparto()).join(', ')) +
-    '" onchange="salvaPianoFunzioni(this.value)"></div>' +
     '<div class="field"><label title="0 = illimitati">Max cambi turno al mese</label><input type="number" min="0" max="99" value="' +
     _pianoMaxCambi() +
     '" style="width:80px" onchange="salvaMaxCambi(this.value)"></div>' +
@@ -302,18 +457,26 @@ function _renderPianoImpostazioniCard() {
 // Cambi RICHIESTI nel mese per collaboratore (dal Registro: nel log dello
 // scambio il richiedente è il primo nome). Chi ACCETTA non consuma il limite.
 async function _pianoCambiRichiesti(ym) {
-  const logs =
+  // gli scambi annullati (Annulla del Piano scrive "Piano: scambio turno annullato" con
+  // lo stesso dettaglio) non contano piu
+  const leggi = async (azione) =>
     (await secGet(
       'log_attivita?azione=eq.' +
-        encodeURIComponent('Piano: scambio turno') +
+        encodeURIComponent(azione) +
         '&dettaglio=like.' +
         encodeURIComponent('%il ' + ym + '-%') +
         '&limit=1000',
     )) || [];
+  const [logs, annullati] = await Promise.all([leggi('Piano: scambio turno'), leggi('Piano: scambio turno annullato')]);
   const conta = {};
-  logs.forEach((l) => {
+  const segno = (l, n) => {
     const nome = (l.dettaglio || '').split(' (')[0].trim();
-    if (nome) conta[nome] = (conta[nome] || 0) + 1;
+    if (nome) conta[nome] = (conta[nome] || 0) + n;
+  };
+  logs.forEach((l) => segno(l, 1));
+  annullati.forEach((l) => segno(l, -1));
+  Object.keys(conta).forEach((n) => {
+    if (conta[n] <= 0) delete conta[n];
   });
   return conta;
 }

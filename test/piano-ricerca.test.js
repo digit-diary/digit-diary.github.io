@@ -312,6 +312,208 @@ console.log('== posti riservati: vincolo duro ==');
   ok(r.dopo.scoperti === 1 && r.dopo.riservati === 1, 'S resta scoperto (nessuno puo), M si copre lo stesso');
 }
 
+console.log('== il migliore e sempre ammesso (vincoli come il controllo finale) ==');
+{
+  // 3 giorni, un posto X al giorno. Bruno puo solo il giorno 1, Carla solo il 2; il giorno 3
+  // lo puo fare solo Anna, ma per lei ogni giorno di lavoro e una regola di legge (es. una
+  // domenica libera in meno). Coprire il posto vale piu della regola (pesoScoperto alto): il
+  // punteggio piu basso e con Anna al lavoro il giorno 3 (una legge in piu), che il controllo
+  // finale scarterebbe. Il motore deve restituire il migliore AMMESSO: Bruno il 1, Carla il 2,
+  // il 3 scoperto, nessuna legge in piu.
+  const gg = ['2026-11-01', '2026-11-02', '2026-11-03'];
+  const pp = ['Anna', 'Bruno', 'Carla'];
+  const stato0 = {};
+  pp.forEach((n) => {
+    stato0[n] = {};
+    gg.forEach((d) => (stato0[n][d] = ''));
+  });
+  const puo = { Anna: [gg[2]], Bruno: [gg[0]], Carla: [gg[1]] };
+  const costo = (n, mappa) => {
+    const lav = gg.filter((d) => mappa[d] === 'X').length;
+    return n === 'Anna' ? { costo: 60000 * lav, conti: { legge_dom: lav } } : { costo: 0, conti: {} };
+  };
+  const prob = () => ({
+    giorni: gg,
+    persone: pp,
+    stato: JSON.parse(JSON.stringify(stato0)),
+    riposo: '',
+    fabbisogno: { [gg[0]]: { X: 1 }, [gg[1]]: { X: 1 }, [gg[2]]: { X: 1 } },
+    modificabile: () => true,
+    ammessi: (n, d) => (puo[n].includes(d) ? ['X', ''] : ['']),
+    costoPersona: costo,
+  });
+  // pesoSforo: alla fine della ricerca uscire dai vincoli costa piu di ogni posto coperto
+  const opz = (seme, sforo) => ({
+    pesoScoperto: 100000,
+    pesoRaro: 1,
+    seme: seme,
+    vincoli: [['legge_dom']],
+    pesoSforo: sforo == null ? 1000000 : sforo,
+  });
+  // anche SENZA peso dello sforo il risultato e sempre ammesso (il filtro sul migliore)
+  let sempreAmmesso = true;
+  for (let seme = 1; seme <= 5; seme++) {
+    const x = R.cerca(prob(), opz(seme, 0), 400);
+    if (!x.ammesso || x.stato.Anna[gg[2]] === 'X') sempreAmmesso = false;
+  }
+  ok(sempreAmmesso, 'senza peso dello sforo: risultato sempre ammesso (5 semi)');
+  // la ricerca passa davvero da uno stato non ammesso (Anna al lavoro), poi restituisce l ammesso
+  let passata = false;
+  let restituito = null;
+  for (let seme = 1; seme <= 5 && !passata; seme++) {
+    const r = R.crea(prob(), opz(seme));
+    for (let i = 0; i < 400; i++) {
+      const m = r.passo(0, i / 400, 1);
+      if (m.sforo > 0) passata = true;
+    }
+    restituito = r.risultato();
+  }
+  ok(passata, 'la ricerca attraversa uno stato con una legge in piu (Anna il giorno 3)');
+  ok(restituito.ammesso === true, 'il risultato e ammesso');
+  ok(restituito.stato.Anna[gg[2]] !== 'X', 'Anna non lavora: nessuna legge in piu');
+  ok(
+    restituito.stato.Bruno[gg[0]] === 'X' && restituito.stato.Carla[gg[1]] === 'X',
+    'il migliore ammesso: Bruno il 1 e Carla il 2 coperti (' + restituito.dopo.scoperti + ' scoperto)',
+  );
+  ok(
+    restituito.dopo.scoperti === 1 && (restituito.dopo.conti.legge_dom || 0) === 0,
+    'un solo posto scoperto (quello che solo Anna puo fare), zero leggi',
+  );
+  ok(restituito.dopo.punteggio < restituito.prima.punteggio, 'e migliore della partenza');
+  // senza vincoli sui conti il migliore sarebbe quello con la legge in piu (com era prima)
+  const libero = R.cerca(prob(), { pesoScoperto: 100000, pesoRaro: 1, seme: 3, vincoli: [] }, 400);
+  ok(libero.stato.Anna[gg[2]] === 'X', 'controprova: senza vincoli il punteggio sceglie Anna al lavoro');
+  // i conti di default (senza vincoli espliciti): ogni chiave da sola
+  const def = R.cerca(prob(), { pesoScoperto: 100000, pesoRaro: 1, seme: 3 }, 400);
+  ok(def.ammesso && def.stato.Anna[gg[2]] !== 'X', 'senza vincoli espliciti: ogni tipo non aumenta');
+}
+{
+  // TIPI DIVERSI: scambiare una legge di un tipo con una di un altro non e ammesso, anche se
+  // il punteggio scende (vincoli per tipo, come il controllo finale)
+  const gg = ['2026-11-01', '2026-11-02'];
+  const pp = ['Anna', 'Bruno'];
+  // Anna al lavoro il 1: un riposo corto (legge_riposo); Bruno al lavoro il 1: una domenica
+  // libera in meno (legge_dom), che pesa meno nel punteggio di prova
+  const costo = (n, mappa) => {
+    const lav = mappa[gg[0]] === 'X' ? 1 : 0;
+    if (n === 'Anna') return { costo: 90000 * lav, conti: { legge_riposo: lav } };
+    return { costo: 60000 * lav, conti: { legge_dom: lav } };
+  };
+  const tutti = [['legge_dom'], ['legge_riposo'], ['legge_dom', 'legge_riposo', 'regola']];
+  for (let seme = 1; seme <= 5; seme++) {
+    const r = R.cerca(
+      {
+        giorni: gg,
+        persone: pp,
+        stato: { Anna: { [gg[0]]: 'X', [gg[1]]: '' }, Bruno: { [gg[0]]: '', [gg[1]]: '' } },
+        riposo: '',
+        fabbisogno: { [gg[0]]: { X: 1 } },
+        modificabile: () => true,
+        ammessi: (n, d) => (d === gg[0] ? ['X', ''] : ['']),
+        costoPersona: costo,
+      },
+      { seme: seme, vincoli: tutti },
+      300,
+    );
+    if (r.stato.Bruno[gg[0]] === 'X' || !r.ammesso) {
+      ok(false, 'seme ' + seme + ': un riposo corto scambiato con una domenica libera');
+      break;
+    }
+    if (seme === 5) ok(true, 'una legge non si scambia con una di un altro tipo (5 semi)');
+  }
+}
+{
+  // SU UN PROBLEMA PIU GRANDE, molti semi: il risultato rispetta sempre tutti i vincoli
+  const conti = (n, mappa) => {
+    const v = violazioni(n, mappa);
+    return { costo: 60000 * v + 2 * Math.abs(ore(mappa) - 48), conti: { legge_altre: v } };
+  };
+  let sempre = true;
+  for (let seme = 1; seme <= 8; seme++) {
+    const st = {};
+    persone.forEach((n, i) => {
+      st[n] = {};
+      // partenza con qualche violazione: tutti lavorano 3 giorni di fila a cavallo
+      giorni.forEach((d, k) => (st[n][d] = (k + i) % 5 < 3 ? (k % 2 ? 'M' : 'N') : 'C'));
+    });
+    const r = R.crea(problema({ stato: st, costoPersona: conti }), {
+      seme: seme,
+      vincoli: [['legge_altre']],
+      maxScoperti: 20,
+    });
+    const p0 = r.misura();
+    for (let i = 0; i < 20; i++) r.passo(0, i / 20, 200);
+    const fin = r.risultato();
+    const legge0 = p0.conti.legge_altre || 0;
+    if (!fin.ammesso || (fin.dopo.conti.legge_altre || 0) > legge0 || fin.dopo.scoperti > Math.max(20, 0)) {
+      sempre = false;
+      console.log('    seme', seme, 'legge', legge0, '->', fin.dopo.conti.legge_altre, 'scoperti', fin.dopo.scoperti);
+    }
+  }
+  ok(sempre, 'otto semi: il migliore restituito e sempre ammesso (leggi e scoperti entro i limiti)');
+}
+{
+  // PESO DELLO SFORO: con pesoSforo la ricerca, alla fine, torna dentro i vincoli anche nello
+  // stato corrente (non solo nel migliore restituito)
+  const gg = ['2026-11-01', '2026-11-02', '2026-11-03'];
+  const r = R.crea(
+    {
+      giorni: gg,
+      persone: ['Anna', 'Bruno'],
+      stato: { Anna: {}, Bruno: {} },
+      riposo: '',
+      fabbisogno: { [gg[2]]: { X: 1 }, [gg[0]]: { X: 1 } },
+      modificabile: () => true,
+      ammessi: (n, d) => (n === 'Anna' ? ['X', ''] : d === gg[0] ? ['X', ''] : ['']),
+      costoPersona: (n, m) => {
+        const lav = n === 'Anna' && m[gg[2]] === 'X' ? 1 : 0;
+        return { costo: 60000 * lav, conti: { legge_dom: lav } };
+      },
+    },
+    { pesoScoperto: 100000, pesoRaro: 1, seme: 4, vincoli: [['legge_dom']], pesoSforo: 1000000 },
+  );
+  for (let i = 0; i < 20; i++) r.passo(0, i / 20, 30);
+  const fine = r.passo(0, 1, 30);
+  ok(fine.sforo === 0, 'con pesoSforo lo stato finale della ricerca e ammesso (sforo ' + fine.sforo + ')');
+  ok(r.risultato().ammesso, 'e il risultato anche');
+}
+
+{
+  // TORNA AL MIGLIORE: dopo la frazione indicata, uno stato fuori dai vincoli si lascia e si
+  // riparte dal migliore ammesso (Anna al lavoro il giorno 3 = una legge in piu)
+  const gg = ['2026-11-01', '2026-11-02', '2026-11-03'];
+  const puo = { Anna: [gg[2]], Bruno: [gg[0]], Carla: [gg[1]] };
+  let fuori = 0;
+  let tornato = true;
+  for (let seme = 1; seme <= 5; seme++) {
+    const r = R.crea(
+      {
+        giorni: gg,
+        persone: ['Anna', 'Bruno', 'Carla'],
+        stato: { Anna: {}, Bruno: {}, Carla: {} },
+        riposo: '',
+        fabbisogno: { [gg[0]]: { X: 1 }, [gg[1]]: { X: 1 }, [gg[2]]: { X: 1 } },
+        modificabile: () => true,
+        ammessi: (n, d) => (puo[n].includes(d) ? ['X', ''] : ['']),
+        costoPersona: (n, m) => {
+          const lav = gg.filter((d) => m[d] === 'X').length;
+          return n === 'Anna' ? { costo: 60000 * lav, conti: { legge_dom: lav } } : { costo: 0, conti: {} };
+        },
+      },
+      { pesoScoperto: 100000, pesoRaro: 1, seme: seme, vincoli: [['legge_dom']], tornaAlMigliore: 0.5 },
+    );
+    let uscito = false;
+    for (let i = 0; i < 40 && !uscito; i++) uscito = r.passo(0, i / 100, 5).sforo > 0;
+    if (!uscito) continue;
+    fuori++;
+    // dalla meta in poi la prima cosa che fa ogni passo e tornare al migliore ammesso
+    // (passo senza iterazioni: solo il ritorno)
+    if (r.passo(0, 0.6, 0).sforo !== 0 || !r.risultato().ammesso) tornato = false;
+  }
+  ok(fuori > 0, 'nella prima meta la ricerca esce dai vincoli (' + fuori + ' volte su 5 semi)');
+  ok(tornato, 'dopo la meta torna al migliore ammesso; il risultato e ammesso');
+}
+
 console.log('== non peggiora mai ==');
 ok(
   r1.dopo.punteggio <= r1.prima.punteggio && r2.dopo.punteggio <= r2.prima.punteggio,

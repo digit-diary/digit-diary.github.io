@@ -777,6 +777,12 @@ async function _pianoCaricaCfg() {
   try {
     window._pianoFunzioni = funzioni ? JSON.parse(funzioni) : null;
   } catch (e) {}
+  // nomi per esteso delle funzioni (Piano › Impostazioni › Funzioni del settore)
+  try {
+    window._pianoFunzioniNomi = JSON.parse((await getImp('piano_funzioni_nomi')) || '{}') || {};
+  } catch (e) {
+    window._pianoFunzioniNomi = window._pianoFunzioniNomi || {};
+  }
   // elenco (formato di prima, vale per le Slot) oppure oggetto per settore
   const fzCfg = window._pianoFunzioni;
   const fzOggetto = fzCfg && typeof fzCfg === 'object' && !Array.isArray(fzCfg);
@@ -788,6 +794,22 @@ async function _pianoCaricaCfg() {
 // (un elenco), che vale solo per le Slots. Ogni altro settore, anche nuovo, parte
 // dall elenco vuoto piu le funzioni che i suoi collaboratori hanno gia (_pianoFunzioniDi)
 const _PIANO_FUNZIONI_SLOTS_PREDEFINITE = ['RESP', 'SUP', 'BO', 'HOST'];
+// NOME PER ESTESO DI UNA FUNZIONE: quello scritto in Funzioni del settore, altrimenti i nomi
+// noti; soloScritto = true restituisce vuoto se non c e un nome (per la casella da compilare)
+const _PIANO_FUNZIONI_NOMI_NOTI = {
+  RESP: 'Responsabile',
+  SUP: 'Supervisore',
+  BO: 'Back Office',
+  HOST: 'Host',
+  CR: 'Croupier',
+  ISP: 'Ispettore',
+};
+function funzioneNomeEsteso(sigla, soloScritto) {
+  const f = String(sigla || '').toUpperCase();
+  const scritto = (window._pianoFunzioniNomi || {})[f];
+  if (scritto) return scritto;
+  return _PIANO_FUNZIONI_NOMI_NOTI[f] || (soloScritto ? '' : '');
+}
 // COLORE DELLA RIGA PER FUNZIONE nel calendario: SUP verdino e BO arancio chiaro come
 // sempre (Turnivo); un altra funzione che ha un gruppo di turni con lo stesso nome nel
 // settore (per esempio in un settore nuovo) prende il colore di quel gruppo, se ne ha uno.
@@ -1331,8 +1353,6 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
     if (!daTogliere.length && !daMettere.length) return null;
     const info = collaboratoriCache.find((c) => c.nome.toLowerCase() === String(nome).toLowerCase());
     const rep = (info && info.reparto_dip) || 'slots';
-    let tolte = 0;
-    let messe = 0;
     // via le M salvate nei giorni sbagliati, MA solo se nessun'altra
     // registrazione di malattia copre ancora quel giorno: un periodo lungo e'
     // salvato nel Diario come una registrazione per giorno, e accorciarne una
@@ -1348,74 +1368,103 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
           String(e.data || '').substring(0, 10) !== dataVecchiaStr &&
           _pianoDateMalattia(e.testo || '', e.data).includes(d),
       );
-    for (const d of daTogliere) {
-      if (copertoAltrove(d)) continue;
-      const righe =
-        (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=eq.' + d + '&codice=in.(M,M1)')) ||
-        [];
-      for (const r of righe) {
+    // le scritture del Diario non entrano nell Annulla dell ultima operazione del Piano
+    _pianoFuoriDalPasso();
+    const festCgf = typeof _pianoFestiviCgfSet === 'function' ? _pianoFestiviCgfSet() : new Set();
+    // giorni chiusi: un inserimento li chiede come sempre (le M sopra una sigla no)
+    const nuoveSenzaCella = [];
+    // LE CELLE DA SCRIVERE, dalla lettura appena fatta: tolte e messe in UNA scrittura
+    // (tutto o niente) e solo se le celle sono ancora come lette. Prima erano scritture
+    // una alla volta senza controllo: un errore a meta lasciava meta periodo in M e la
+    // nota "Ex" scritta su una sigla vecchia se un collega l aveva appena cambiata.
+    const prepara = async () => {
+      const ops = [];
+      const festiviPersi = []; // festivi con diritto al recupero persi per la malattia
+      const cgfPersi = []; // giorni di CGF caduti in malattia: il recupero va rimesso
+      let tolte = 0;
+      let messe = 0;
+      const op = getOperatore();
+      const ora = new Date().toISOString();
+      const daLeggere = [...new Set(daTogliere.filter((d) => !copertoAltrove(d)).concat(daMettere))];
+      const lette = await Promise.all(
+        daLeggere.map((d) =>
+          secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=eq.' + d + '&limit=2').then(
+            (x) => (x || [])[0] || null,
+          ),
+        ),
+      );
+      const cellaDi = new Map(daLeggere.map((d, i) => [d, lette[i]]));
+      for (const d of daTogliere) {
+        if (copertoAltrove(d)) continue;
+        const r = cellaDi.get(d);
+        if (!r || (r.codice !== 'M' && r.codice !== 'M1')) continue;
         // la M aveva coperto un altra sigla (turno, V, CGF, JG...): quella torna al suo posto
         // nota "Ex C0 - operatore" (dal 30.09) o quella vecchia "Malattia dal Diario · era C0"
+        // (torna la cella com era: bozza o a mano, protetta, nota, blocco)
         const era = String(r.commento || '').match(/^(?:Malattia dal Diario \u00b7 era|Ex) ([A-Z0-9]+)\b/);
-        if (era && era[1] && era[1] !== 'M') {
-          // torna la cella com era (bozza o a mano, protetta, nota, blocco): prima tornava
-          // sempre "scritta a mano" e la generazione automatica non la toccava piu
-          await secPatch(
-            'piano',
-            'id=eq.' + r.id,
-            Object.assign(_pianoRitornoDaMalattia(r, era[1]), {
-              operatore: getOperatore(),
-              updated_at: new Date().toISOString(),
-            }),
-          );
-        } else await secDel('piano', 'id=eq.' + r.id);
+        ops.push({
+          collaboratore: r.collaboratore,
+          data: d,
+          atteso: _pianoAttesoDi(r),
+          dati:
+            era && era[1] && era[1] !== 'M'
+              ? Object.assign(_pianoRitornoDaMalattia(r, era[1]), { operatore: op, updated_at: ora })
+              : null,
+        });
         tolte++;
       }
-    }
-    // M protetta su QUALSIASI sigla del giorno: turno, vacanza V, CGF, JG, C...
-    // La malattia prevale (regola del casino): il giorno di vacanza viene
-    // restituito, il CGF resta a credito, il turno perso diventa malattia.
-    // La sigla coperta resta scritta nel commento ("Ex V - operatore") cosi, se la
-    // malattia viene tolta dal Diario, torna al suo posto. Senza cella si scrive la M
-    // (decisione del titolare 08/10/2026: la malattia conta come M, anche nei giorni
-    // senza turno; prima restava la M solo disegnata e valeva 0 ore). Togliendo la
-    // malattia dal Diario la M senza nota si cancella (sopra).
-    // festivi con diritto al recupero che si perdono per la malattia (c era un turno)
-    const festiviPersi = [];
-    const cgfPersi = []; // giorni di CGF caduti in malattia: il recupero va rimesso
-    const festCgf = typeof _pianoFestiviCgfSet === 'function' ? _pianoFestiviCgfSet() : new Set();
-    for (const d of daMettere) {
-      const righe = (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=eq.' + d)) || [];
-      const r = righe[0];
-      if (r && festCgf.has(d) && _pianoTurnoInfo(r.codice)) festiviPersi.push(d);
-      if (r && r.codice === 'CGF') cgfPersi.push(d);
-      if (r && r.codice !== 'M' && r.codice !== 'M1') {
-        const pM = {
-          codice: 'M',
-          protetto: true,
-          generato: false,
-          motivo_blocco: null, // la malattia scioglie il blocco con motivo
-          commento: ('Ex ' + r.codice + ' - ' + getOperatore()).substring(0, 400),
-          operatore: getOperatore(),
-          updated_at: new Date().toISOString(),
-        };
-        // com era la cella sotto la malattia: torna tale e quale quando la malattia si toglie
-        if (r.prima_malattia !== undefined) pM.prima_malattia = _pianoPrimaMalattiaDi(r);
-        await secPatch('piano', 'id=eq.' + r.id, pM);
-        messe++;
-      } else if (!r && (typeof _pianoOperativoIl !== 'function' || _pianoOperativoIl(nome, d))) {
-        await _pianoInserisciCella({
-          collaboratore: info ? info.nome : nome,
-          data: d,
-          codice: 'M',
-          protetto: true,
-          generato: false,
-          reparto_dip: rep,
-          operatore: getOperatore(),
-        });
-        messe++;
+      // M protetta su QUALSIASI sigla del giorno: turno, vacanza V, CGF, JG, C...
+      // La malattia prevale (regola del casino): il giorno di vacanza viene
+      // restituito, il CGF resta a credito, il turno perso diventa malattia.
+      // La sigla coperta resta scritta nel commento ("Ex V - operatore") cosi, se la
+      // malattia viene tolta dal Diario, torna al suo posto. Senza cella si scrive la M
+      // (decisione del titolare 08/10/2026: la malattia conta come M, anche nei giorni
+      // senza turno; prima restava la M solo disegnata e valeva 0 ore). Togliendo la
+      // malattia dal Diario la M senza nota si cancella (sopra).
+      for (const d of daMettere) {
+        const r = cellaDi.get(d);
+        if (r && festCgf.has(d) && _pianoTurnoInfo(r.codice)) festiviPersi.push(d);
+        if (r && r.codice === 'CGF') cgfPersi.push(d);
+        if (r && r.codice !== 'M' && r.codice !== 'M1') {
+          const pM = {
+            codice: 'M',
+            protetto: true,
+            generato: false,
+            motivo_blocco: null, // la malattia scioglie il blocco con motivo
+            commento: ('Ex ' + r.codice + ' - ' + op).substring(0, 400),
+            operatore: op,
+            updated_at: ora,
+          };
+          // com era la cella sotto la malattia: torna tale e quale quando la malattia si toglie
+          if (r.prima_malattia !== undefined) pM.prima_malattia = _pianoPrimaMalattiaDi(r);
+          ops.push({ collaboratore: r.collaboratore, data: d, atteso: _pianoAttesoDi(r), dati: pM });
+          messe++;
+        } else if (!r && (typeof _pianoOperativoIl !== 'function' || _pianoOperativoIl(nome, d))) {
+          ops.push({
+            collaboratore: info ? info.nome : nome,
+            data: d,
+            atteso: null,
+            dati: { codice: 'M', protetto: true, generato: false, reparto_dip: rep, operatore: op },
+          });
+          nuoveSenzaCella.push(d);
+          messe++;
+        }
       }
+      return { ops, festiviPersi, cgfPersi, tolte, messe };
+    };
+    let p = await prepara();
+    for (const d of [...new Set(nuoveSenzaCella)])
+      if (!(await _pianoConsentiScrittura(d))) throw new Error('giorno chiuso: ' + d);
+    let es = await _pianoScriviCelle(p.ops);
+    // una cella cambiata da un collega fra la lettura e la scrittura: si rilegge e si
+    // riprova UNA volta (la malattia prevale, la nota "Ex" prende la sigla nuova)
+    if (!es.ok) {
+      p = await prepara();
+      es = await _pianoScriviCelle(p.ops);
+      if (!es.ok) throw _pianoErroreConflitto(es.conflitti);
     }
+    const { festiviPersi, cgfPersi, tolte, messe } = p;
+    if (typeof _pianoRighe !== 'undefined') _pianoMemoriaDopo(es.ops, es.righe);
     // festivo saltato per malattia: i recuperi automatici in piu' tornano C
     for (const ymM of new Set(festiviPersi.map((d) => d.substring(0, 7))))
       await _pianoRiconciliaCgf(nome, ymM, { festivi: festiviPersi.filter((d) => d.startsWith(ymM)) });
@@ -1424,12 +1473,7 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
       for (const d of cgfPersi) await _pianoRimettiCgf(nome, d);
     if (tolte || messe) {
       logAzione('Malattia: piano allineato', nome + ' · ' + tolte + ' M tolte, ' + messe + ' celle diventate M');
-      if (typeof _pianoRighe !== 'undefined' && _pianoRighe.length && typeof renderPiano === 'function') {
-        _pianoRighe = _pianoRighe.filter(
-          (r) => !(r.collaboratore === nome && r.codice === 'M' && daTogliere.includes(r.data)),
-        );
-        renderPiano();
-      }
+      if (typeof _pianoRighe !== 'undefined' && _pianoRighe.length && typeof renderPiano === 'function') renderPiano();
     }
     return { tolte: tolte, messe: messe };
   } catch (e) {
@@ -1461,24 +1505,36 @@ async function ndAllineaPiano(nome, ym) {
     typeof _pianoGiornoBloccato === 'function' && _pianoGiornoBloccato(d) && !_pianoGiornoSbloccato(d);
   const op = getOperatore();
   const out = { messe: 0, tolte: 0, scoperti: [], riservate: [] };
+  // le scritture del Diario non entrano nell Annulla dell ultima operazione del Piano
+  _pianoFuoriDalPasso();
+  // tutte le celle del mese in UNA scrittura (tutto o niente), solo se sono ancora come
+  // lette: prima una alla volta, un errore a meta lasciava meta delle ND
+  const ops = [];
+  const ora = new Date().toISOString();
   for (const r of righe) {
     const d = String(r.data).substring(0, 10);
     if (chiuso(d)) continue;
     const mia = r.codice === 'ND' && String(r.commento || '').includes(_ND_NOTA_DIARIO);
     if (mia && !voluti.has(d)) {
       const era = String(r.commento || '').match(/^Ex ([A-Z0-9]+)\b/);
-      if (era && era[1] !== 'ND')
-        await secPatch('piano', 'id=eq.' + r.id, {
-          codice: era[1],
-          protetto: false,
-          // "(bozza)" = era una cella scritta dal programma: torna tale (Cancella piano,
-          // Migliora la possono ancora spostare)
-          generato: /\(bozza\)/.test(String(r.commento || '')),
-          commento: '',
-          operatore: op,
-          updated_at: new Date().toISOString(),
-        });
-      else await secDel('piano', 'id=eq.' + r.id);
+      ops.push({
+        collaboratore: r.collaboratore,
+        data: d,
+        atteso: _pianoAttesoDi(r),
+        dati:
+          era && era[1] !== 'ND'
+            ? {
+                codice: era[1],
+                protetto: false,
+                // "(bozza)" = era una cella scritta dal programma: torna tale (Cancella piano,
+                // Migliora la possono ancora spostare)
+                generato: /\(bozza\)/.test(String(r.commento || '')),
+                commento: '',
+                operatore: op,
+                updated_at: ora,
+              }
+            : null,
+      });
       out.tolte++;
     } else if (!mia && voluti.has(d) && r.codice !== 'ND' && _pianoIsLavoro(r.codice)) {
       // cella con lucchetto (visita medica, corso...): resta, si segnala
@@ -1486,22 +1542,34 @@ async function ndAllineaPiano(nome, ym) {
         out.riservate.push({ data: d, codice: r.codice, motivo: _pianoCellaRiservata(r) });
         continue;
       }
-      await secPatch('piano', 'id=eq.' + r.id, {
-        codice: 'ND',
-        protetto: true,
-        generato: false,
-        motivo_blocco: null,
-        commento: ('Ex ' + r.codice + ' - ' + _ND_NOTA_DIARIO + (r.generato ? ' (bozza)' : '') + ' - ' + op).substring(
-          0,
-          400,
-        ),
-        operatore: op,
-        updated_at: new Date().toISOString(),
+      ops.push({
+        collaboratore: r.collaboratore,
+        data: d,
+        atteso: _pianoAttesoDi(r),
+        dati: {
+          codice: 'ND',
+          protetto: true,
+          generato: false,
+          motivo_blocco: null,
+          commento: (
+            'Ex ' +
+            r.codice +
+            ' - ' +
+            _ND_NOTA_DIARIO +
+            (r.generato ? ' (bozza)' : '') +
+            ' - ' +
+            op
+          ).substring(0, 400),
+          operatore: op,
+          updated_at: ora,
+        },
       });
       out.messe++;
       out.scoperti.push({ data: d, codice: r.codice, reparto: _repartoDi(r) });
     }
   }
+  const es = await _pianoScriviOps(ops);
+  if (typeof _pianoRighe !== 'undefined') _pianoMemoriaDopo(es.ops, es.righe);
   if (out.messe || out.tolte)
     logAzione(
       'ND: piano allineato',
@@ -1563,7 +1631,8 @@ const _PIANO_TABS = [
   [
     'recupero',
     'Recupero ore',
-    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z"/><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0"/></svg>',
+    // freccia che torna indietro: le ore che si recuperano (prima aveva l orologio dei Turni)
+    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2z"/><path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466"/></svg>',
   ],
   [
     'calendario',
@@ -1617,7 +1686,9 @@ const _PIANO_TABS = [
   ],
   [
     'formazioni',
-    'Formazioni',
+    // etichetta "Affiancamenti" (revisione UX 11/10): "Formazioni" si confondeva con la
+    // pagina Formazione e competenze. L id resta 'formazioni' (codice, permessi, prove)
+    'Affiancamenti',
     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 7.14V13a1 1 0 0 0-1 1v2h3v-2a1 1 0 0 0-1-1V6.739l.686-.275a.5.5 0 0 0 .025-.917zM8 8.46 1.758 5.965 8 3.052l6.242 2.913z"/><path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466zm-.068 1.873.22-.748 3.496 1.311a.5.5 0 0 0 .352 0l3.496-1.311.22.748L8 12.46z"/></svg>',
   ],
   [
@@ -1666,48 +1737,335 @@ const PIANO_TAB_GRUPPI = [
   ['Archivio', ['storico', 'statistiche', 'formulari']],
   ['Configurazione', ['turni', 'regole', 'impostazioni', 'guida']],
 ];
+// CONTATORE UNICO DEGLI AVVISI (revisione UX 11/10). Prima la campanella (92), la riga
+// "In sintesi" (153) e la sotto-scheda Regole del mese (99+) contavano cose diverse.
+// Ora tutti i numeri vengono da qui, con la stessa definizione:
+//  - da risolvere (rosso): ore della settimana oltre il massimo, riposo attorno alla
+//    domenica, regole di legge del mese (riposi, giorni di fila), chiusura dell anno in
+//    rosso, posti scoperti, malattie oltre il 14. giorno;
+//  - da controllare (arancio): le altre regole del mese (ore del mese, preferenze,
+//    formazione), chiusura dell anno in arancio, vacanze non nel piano.
+// Il numero sulla scheda Avvisi e sulla voce Piano e quello rosso; le sotto-schede
+// mostrano la loro parte rossa e quella arancio, che sommate danno i due totali.
+// v = _pianoAvvisiVeloci(), l = _pianoAvvisiLenti() (null se non ancora calcolate)
+function _pianoProblemiMese(v, l) {
+  const regL = (v.regole || []).filter((x) => _pianoViolDiLegge(x.msg)).length;
+  const anno = l ? l.anno.length : 0;
+  const annoG = l ? l.anno.filter((x) => x.voci.some((y) => y.grave)).length : 0;
+  const per = {
+    sett: { r: v.sett.length, c: 0 },
+    riposo: { r: v.riposo.length, c: 0 },
+    regole: { r: regL, c: (v.regole || []).length - regL },
+    anno: { r: annoG, c: anno - annoG },
+    scoperti: { r: l ? l.scoperti.length : 0, c: 0 },
+    malattie: { r: l ? l.malattie.filter((m) => m.giorno > 14).length : 0, c: 0 },
+    vacanze: { r: 0, c: l && l.vacanze ? l.vacanze.length : 0 },
+  };
+  let r = 0;
+  let c = 0;
+  Object.values(per).forEach((x) => {
+    r += x.r;
+    c += x.c;
+  });
+  return { daRisolvere: r, daControllare: c, per: per, completo: !!l };
+}
+// la spiegazione che compare al passaggio del mouse, uguale ovunque
+function _pianoProblemiSpiega(p) {
+  const n = (x, uno, molti) => x + ' ' + (x === 1 ? uno : molti);
+  return (
+    n(p.daRisolvere, 'problema da risolvere', 'problemi da risolvere') +
+    ' (regole di legge, posti scoperti, malattie lunghe, chiusura anno in rosso) + ' +
+    n(p.daControllare, 'cosa da controllare', 'cose da controllare') +
+    ' nel mese. Il numero rosso conta solo i problemi da risolvere.'
+  );
+}
+
+// RIGA DEGLI AVVISI DEL MESE (revisione UX 11/10) ---------------------------------
+function _pianoAvvisiMeseAperta() {
+  try {
+    return sessionStorage.getItem('piano_avvisi_mese_aperta') === '1';
+  } catch (e) {
+    return false;
+  }
+}
+function _pianoAvvisiMeseInizio() {
+  const aperta = _pianoAvvisiMeseAperta();
+  return (
+    '<div class="pam' +
+    (aperta ? ' aperta' : '') +
+    '" id="piano-avvisi-mese" hidden><button type="button" class="pam-riga" aria-expanded="' +
+    aperta +
+    '" aria-controls="pam-corpo" onclick="pianoAvvisiMeseApri()"><i class="icx icx-avviso" aria-hidden="true"></i>' +
+    '<span class="pam-tit">Avvisi del mese</span><span class="pam-sommario" id="pam-sommario"></span>' +
+    '<span class="pam-azione">' +
+    (aperta ? 'Nascondi' : 'Mostra') +
+    '</span><i class="icx icx-giu pam-freccia" aria-hidden="true"></i></button>' +
+    '<div class="pam-corpo" id="pam-corpo"' +
+    (aperta ? '' : ' hidden') +
+    '><div id="pam-avvisi"></div><div id="pam-compleanno"></div><div id="pam-segn"></div>'
+  );
+}
+// apre o chiude la riga (forza = true: la apre, per esempio dopo Controlla le regole)
+function pianoAvvisiMeseApri(forza) {
+  const box = document.getElementById('piano-avvisi-mese');
+  const aperta = forza === true ? true : !_pianoAvvisiMeseAperta();
+  try {
+    sessionStorage.setItem('piano_avvisi_mese_aperta', aperta ? '1' : '0');
+  } catch (e) {}
+  if (!aperta) document.body.classList.remove('piano-segn-mostra');
+  if (!box) return;
+  box.classList.toggle('aperta', aperta);
+  const corpo = document.getElementById('pam-corpo');
+  if (corpo) corpo.hidden = !aperta;
+  const btn = box.querySelector('.pam-riga');
+  if (btn) btn.setAttribute('aria-expanded', String(aperta));
+  const az = box.querySelector('.pam-azione');
+  if (az) az.textContent = aperta ? 'Nascondi' : 'Mostra';
+  if (aperta) box.hidden = false;
+}
+// il compleanno di oggi (la fascia in cima alla pagina, nel Piano si nasconde: vedi CSS)
+function _pianoCompleanniOggi() {
+  const b = document.getElementById('compleanni-banner');
+  if (!b || b.classList.contains('hidden') || b.style.display === 'none') return '';
+  const t = b.querySelector('.compleanni-testo');
+  return t ? t.textContent.trim() : '';
+}
+// scrive solo se cambia: l osservatore della riga non deve ripartire per niente
+function _pianoScriviSeDiverso(el, html) {
+  if (el._pamHtml === html) return;
+  el._pamHtml = html;
+  el.innerHTML = html;
+}
+// riassunto della riga: numeri del contatore unico, segnalazioni, compleanno
+function _pianoAvvisiMeseSommario() {
+  const box = document.getElementById('piano-avvisi-mese');
+  const som = document.getElementById('pam-sommario');
+  if (!box || !som) return;
+  const parti = [];
+  let grave = false;
+  const p = window._pianoProblemiUltimi;
+  if (p && (p.daRisolvere || p.daControllare)) {
+    const spiega = escP(_pianoProblemiSpiega(p));
+    if (p.daRisolvere) {
+      grave = true;
+      parti.push('<span class="pavv-chip pavv-legge" title="' + spiega + '">' + p.daRisolvere + ' da risolvere</span>');
+    }
+    if (p.daControllare)
+      parti.push(
+        '<span class="pavv-chip pavv-contr" title="' + spiega + '">' + p.daControllare + ' da controllare</span>',
+      );
+  }
+  // i numeri sono quelli della scheda Avvisi: di la l elenco completo
+  const aEl = document.getElementById('pam-avvisi');
+  if (aEl)
+    _pianoScriviSeDiverso(
+      aEl,
+      p && (p.daRisolvere || p.daControllare) && pianoTabVisibile('avvisi')
+        ? '<div class="pam-compleanno">' +
+            escP(_pianoProblemiSpiega(p)) +
+            ' <button type="button" class="btn-act" onclick="pianoCambiaTab(\'avvisi\')">Apri la scheda Avvisi</button></div>'
+        : '',
+    );
+  // segnalazioni scritte nella riga: controllo delle regole, confine, generazione, non disponibilita
+  const corpo = document.getElementById('pam-corpo');
+  let seg = 0;
+  if (corpo)
+    [...corpo.children].forEach((c) => {
+      if (c.id === 'pam-compleanno' || c.id === 'pam-segn' || c.id === 'pam-avvisi') return;
+      const blocchi = c.matches('.pavv,[style]') ? [c] : [...c.children];
+      blocchi.forEach((x) => {
+        if (x.offsetParent === null && !x.textContent.trim()) return;
+        if (x.classList && x.classList.contains('pavv-ok')) return;
+        if (x.textContent.trim()) seg++;
+      });
+    });
+  if (seg) parti.push('<span class="pam-voce">' + seg + (seg === 1 ? ' segnalazione' : ' segnalazioni') + '</span>');
+  // segnalazioni operative (cassa, rischio): nel calendario la striscia in cima si
+  // nasconde (vedi CSS) e si apre da qui
+  const nOp = typeof _navContaSegnalazioni === 'function' ? _navContaSegnalazioni() : 0;
+  const sEl = document.getElementById('pam-segn');
+  if (sEl)
+    _pianoScriviSeDiverso(
+      sEl,
+      nOp
+        ? '<div class="pam-compleanno"><i class="icx icx-avviso" aria-hidden="true"></i> ' +
+            (nOp === 1 ? '1 segnalazione operativa' : nOp + ' segnalazioni operative') +
+            ' (cassa e rischio) <button type="button" class="btn-act" onclick="pianoSegnalazioniMostra()">Mostra in cima alla pagina</button></div>'
+        : '',
+    );
+  if (nOp)
+    parti.push(
+      '<span class="pam-voce">' +
+        (nOp === 1 ? '1 segnalazione operativa' : nOp + ' segnalazioni operative') +
+        '</span>',
+    );
+  const comp = _pianoCompleanniOggi();
+  const cEl = document.getElementById('pam-compleanno');
+  if (cEl)
+    _pianoScriviSeDiverso(
+      cEl,
+      comp
+        ? '<div class="pam-compleanno"><i class="icx icx-torta" aria-hidden="true"></i> ' + escP(comp) + '</div>'
+        : '',
+    );
+  if (comp)
+    parti.push(
+      '<span class="pam-voce pam-comp"><i class="icx icx-torta" aria-hidden="true"></i>' +
+        escP(comp.replace(/^Buon compleanno a\s*/i, '').replace(/!$/, '')) +
+        '</span>',
+    );
+  som.innerHTML = parti.join('');
+  box.classList.toggle('pam-grave', grave);
+  // niente da dire: la riga non compare (resta visibile se l utente l ha aperta)
+  box.hidden = !parti.length && !box.classList.contains('aperta');
+  if (parti.length) box.hidden = false;
+}
+// rimette in vista le segnalazioni operative in cima alla pagina (aperte)
+function pianoSegnalazioniMostra() {
+  document.body.classList.add('piano-segn-mostra');
+  window._alertEspansi = true;
+  if (typeof renderAlertCompatti === 'function') renderAlertCompatti();
+  const el = document.getElementById('alert-compatto') || document.getElementById('cassa-alerts-container');
+  if (el) el.scrollIntoView({ block: 'nearest' });
+}
+// dopo ogni disegno del calendario: riassunto subito e ogni volta che un pezzo cambia
+// (confine, controllo delle regole e generazione scrivono da soli nei loro riquadri)
+function _pianoAvvisiMeseAvvia() {
+  const corpo = document.getElementById('pam-corpo');
+  if (!corpo) return;
+  _pianoAvvisiMeseSommario();
+  // compleanno e segnalazioni operative arrivano anche dopo: un solo osservatore per sessione
+  if (window.MutationObserver && !window._pianoAvvisiMeseOss) {
+    let t2 = null;
+    window._pianoAvvisiMeseOss = new MutationObserver(() => {
+      clearTimeout(t2);
+      t2 = setTimeout(_pianoAvvisiMeseSommario, 120);
+    });
+    ['compleanni-banner', 'cassa-alerts-container', 'rischio-alerts-container'].forEach((id) => {
+      const x = document.getElementById(id);
+      if (x)
+        window._pianoAvvisiMeseOss.observe(x, {
+          childList: true,
+          subtree: true,
+          attributes: id === 'compleanni-banner',
+          attributeFilter: id === 'compleanni-banner' ? ['class', 'style'] : undefined,
+        });
+    });
+  }
+  if (window.MutationObserver) {
+    let t = null;
+    new MutationObserver(() => {
+      clearTimeout(t);
+      t = setTimeout(_pianoAvvisiMeseSommario, 60);
+    }).observe(corpo, { childList: true, subtree: true, characterData: true });
+  }
+}
+// SETTORE: al computer la barra in alto (Slots, Tavoli...) e gia visibile, la tendina del
+// Piano diceva la stessa cosa. Si mostra solo quando quella barra non si vede.
+function _pianoSettoreDoppio() {
+  const sel = document.querySelector('#piano-content .pbar-settore-scelta');
+  if (!sel) return;
+  const sw = document.getElementById('reparto-switch');
+  const visibile = !!(sw && sw.offsetParent !== null && sw.getBoundingClientRect().height > 0);
+  sel.hidden = visibile;
+}
+if (typeof window !== 'undefined' && window.addEventListener) {
+  let _pianoRidT = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(_pianoRidT);
+    _pianoRidT = setTimeout(() => {
+      _pianoSettoreDoppio();
+      const att = document.querySelector('#piano-content .piano-tab.attiva');
+      if (att) _pianoTabInVista(att);
+    }, 150);
+  });
+}
+
+// BARRA DELLE SCHEDE (revisione UX 11/10): ogni scheda e un <button role="tab">, si
+// raggiunge con Tab (si entra sulla scheda aperta), le frecce passano alle altre e
+// Invio o Spazio la aprono. Al telefono la barra scorre da sola fino alla scheda aperta.
 function _pianoTabBar() {
   const tabHtml = (k) => {
     const t = _PIANO_TABS.find((x) => x[0] === k);
     if (!t) return '';
     if (!pianoTabVisibile(k)) return ''; // scheda nascosta a questo operatore
     if (k === 'organico' && typeof organicoAttivo === 'function' && !organicoAttivo()) return ''; // disattivata
+    const att = k === _pianoTab;
     return (
-      '<span class="piano-tab' +
-      (k === _pianoTab ? ' attiva' : '') +
+      '<button type="button" role="tab" class="piano-tab' +
+      (att ? ' attiva' : '') +
+      '" data-tab="' +
+      k +
+      '" aria-selected="' +
+      (att ? 'true' : 'false') +
+      '" tabindex="' +
+      (att ? '0' : '-1') +
       '" onclick="pianoCambiaTab(\'' +
       k +
       '\')">' +
       (t[2] || '') +
       ' ' +
       t[1] +
-      '</span>'
+      '</button>'
     );
   };
+  const gruppo = (lbl, dentro) =>
+    '<div class="piano-tabgroup" role="presentation"><span class="piano-tabgroup-label" aria-hidden="true">' +
+    lbl +
+    '</span><div class="piano-tabgroup-tabs" role="presentation">' +
+    dentro +
+    '</div></div>';
   const inGruppi = PIANO_TAB_GRUPPI.flatMap(([, keys]) => keys);
   const fuori = _PIANO_TABS.map(([k]) => k).filter((k) => !inGruppi.includes(k));
   return (
-    '<div class="piano-tabs">' +
+    // l id cambia con la scheda: posizione.js rimette lo scorrimento della barra solo se
+    // si ridisegna la stessa scheda (aprendone un altra la barra va su quella aperta)
+    '<div class="piano-tabs" id="piano-tabs-' +
+    _pianoTab +
+    '" role="tablist" aria-label="Schede del Piano" onkeydown="_pianoTabTasti(event)">' +
     PIANO_TAB_GRUPPI.map(([lbl, keys]) => {
       const dentro = keys.map(tabHtml).join('');
       if (!dentro) return ''; // nessuna scheda visibile in questo gruppo
-      return (
-        '<div class="piano-tabgroup"><span class="piano-tabgroup-label">' +
-        lbl +
-        '</span><div class="piano-tabgroup-tabs">' +
-        dentro +
-        '</div></div>'
-      );
+      return gruppo(lbl, dentro);
     })
       .filter(Boolean)
-      .join('<div class="piano-tabsep"></div>') +
+      .join('<div class="piano-tabsep" aria-hidden="true"></div>') +
     (fuori.length
-      ? '<div class="piano-tabsep"></div><div class="piano-tabgroup"><span class="piano-tabgroup-label">&nbsp;</span><div class="piano-tabgroup-tabs">' +
-        fuori.map(tabHtml).join('') +
-        '</div></div>'
+      ? '<div class="piano-tabsep" aria-hidden="true"></div>' + gruppo('&nbsp;', fuori.map(tabHtml).join(''))
       : '') +
     '</div>'
   );
+}
+// frecce, Inizio e Fine spostano il fuoco fra le schede; Invio e Spazio le aprono (sono pulsanti)
+function _pianoTabTasti(ev) {
+  const tasti = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1, Home: 'inizio', End: 'fine' };
+  const mossa = tasti[ev.key];
+  if (!mossa || !ev.target.classList || !ev.target.classList.contains('piano-tab')) return;
+  const tutte = [...ev.currentTarget.querySelectorAll('.piano-tab')];
+  const i = tutte.indexOf(ev.target);
+  if (i < 0) return;
+  ev.preventDefault();
+  const n = mossa === 'inizio' ? 0 : mossa === 'fine' ? tutte.length - 1 : (i + mossa + tutte.length) % tutte.length;
+  tutte.forEach((b, x) => (b.tabIndex = x === n ? 0 : -1));
+  tutte[n].focus();
+  _pianoTabInVista(tutte[n]);
+}
+// porta in vista una scheda dentro la barra (che al telefono scorre di lato), senza
+// muovere la pagina
+function _pianoTabInVista(tab) {
+  const bar = tab && tab.closest('.piano-tabs');
+  if (!bar || bar.scrollWidth <= bar.clientWidth + 1) return;
+  const b = bar.getBoundingClientRect();
+  const r = tab.getBoundingClientRect();
+  if (r.left >= b.left + 8 && r.right <= b.right - 8) return;
+  bar.scrollLeft += r.left - b.left - (b.width - r.width) / 2;
+}
+// dopo ogni disegno: la scheda aperta in vista nella barra e il fuoco rimesso se era su una scheda
+function _pianoTabBarDopo(fuocoSuScheda) {
+  const att = document.querySelector('#piano-content .piano-tab.attiva');
+  if (!att) return;
+  _pianoTabInVista(att);
+  if (fuocoSuScheda) att.focus({ preventScroll: true });
 }
 
 // ORE REALI DEL MESE scritte a mano (tabella piano_ore_mese). Finche' la
@@ -2052,14 +2410,35 @@ function _pianoCelleUguali(a, b) {
   return PIANO_CAMPI_CELLA.every((k) => _pianoValNorm(a[k]) === _pianoValNorm(b[k]));
 }
 // stessa cella due volte nella stessa scrittura (es. catena e sostituto nello stesso
-// giorno): resta UNA operazione, con il controllo della prima e i dati dell ultima
+// giorno): resta UNA operazione, con il controllo della prima e i dati dell ultima.
+// CANCELLA POI SCRIVE la stessa cella: la cella nuova SOSTITUISCE quella vecchia (i campi
+// non scritti tornano vuoti). Prima diventava una modifica parziale: commento, blocco,
+// protezione e "com era sotto la malattia" della cella cancellata restavano.
+const PIANO_CELLA_VUOTA = {
+  codice: '',
+  protetto: false,
+  generato: false,
+  ora_inizio: null,
+  ora_fine: null,
+  commento: null,
+  colore: null,
+  motivo_blocco: null,
+  fasce: null,
+  prima_malattia: null,
+};
 function _pianoOpsUnisci(ops) {
   const per = new Map();
   ops.forEach((o) => {
     const k = o.collaboratore + '|' + String(o.data).substring(0, 10);
     const g = per.get(k);
     if (!g) per.set(k, Object.assign({}, o));
-    else g.dati = o.dati === null ? null : Object.assign({}, g.dati || {}, o.dati);
+    else if (o.dati === null) {
+      g.dati = null;
+      delete g.sostituisce;
+    } else if (g.dati === null) {
+      g.dati = Object.assign({}, PIANO_CELLA_VUOTA, o.dati);
+      g.sostituisce = true;
+    } else g.dati = Object.assign({}, g.dati, o.dati);
   });
   return [...per.values()];
 }
@@ -2131,29 +2510,123 @@ async function _pianoScriviCelle(ops) {
   ops = _pianoOpsUnisci(ops || []);
   if (!ops.length) return { ok: true, righe: [] };
   const tk = getOpToken();
-  if (tk && !_pianoScriviCelleManca) {
-    try {
-      const r = await _conSessione(
-        (t) => _rpcSicura('piano_scrivi_celle', { p_token: t, p_ops: ops }),
-        tk,
-        true, // rete caduta: niente secondo tentativo alla cieca (la prima potrebbe essere arrivata)
-      );
-      if (!r || typeof r.ok !== 'boolean') throw new Error('il database non ha confermato la scrittura del piano');
-      r.ops = ops;
-      return r;
-    } catch (e) {
-      const manca =
-        e && (e.status === 404 || /piano_scrivi_celle|PGRST202|Could not find the function/i.test(e.message || ''));
-      if (!manca) throw _pianoErroreRete(e);
-      _pianoScriviCelleManca = true;
-      console.warn('[piano] piano_scrivi_celle assente (migrazione 20260912 da lanciare): strada di prima');
+  if (tk && !_pianoFunzioneAssente('scrivi')) {
+    const inviate = ops.map((o) => {
+      const x = Object.assign({}, o);
+      delete x.sostituisce;
+      return x;
+    });
+    // FUNZIONE NON TROVATA (404, PGRST202): succede anche per pochi secondi mentre il
+    // database rilegge l elenco delle funzioni (dopo un aggiornamento). Niente e stato
+    // scritto: si riprova dopo un attimo. Prima un 404 passeggero spegneva la strada
+    // sicura per tutta la sessione.
+    for (let tentativo = 0; ; tentativo++) {
+      try {
+        const r = await _conSessione(
+          (t) => _rpcSicura('piano_scrivi_celle', { p_token: t, p_ops: inviate }),
+          tk,
+          true, // rete caduta: niente secondo tentativo alla cieca (la prima potrebbe essere arrivata)
+        );
+        if (!r || typeof r.ok !== 'boolean') throw new Error('il database non ha confermato la scrittura del piano');
+        _pianoFunzionePresente('scrivi');
+        r.ops = ops;
+        if (r.ok && typeof _pianoPassoRegistra === 'function') _pianoPassoRegistra(ops, r.fine);
+        return r;
+      } catch (e) {
+        if (!_pianoErroreFunzioneAssente(e)) throw _pianoErroreRete(e);
+        if (tentativo < PIANO_RIPROVE_FUNZIONE.length) {
+          await new Promise((x) => setTimeout(x, PIANO_RIPROVE_FUNZIONE[tentativo]));
+          continue;
+        }
+        _pianoFunzioneMancante('scrivi');
+        break;
+      }
     }
   }
   try {
-    return await _pianoScriviCelleVecchio(ops);
+    const r = await _pianoScriviCelleVecchio(ops);
+    if (r.ok && typeof _pianoPassoRegistra === 'function') _pianoPassoRegistra(ops, null);
+    return r;
   } catch (e) {
     throw _pianoErroreRete(e);
   }
+}
+// FUNZIONI DEL DATABASE PER IL PIANO (piano_scrivi_celle, piano_ora): assenti solo se lo
+// restano dopo qualche secondo; e anche allora si ricontrolla ogni 5 minuti (migrazione
+// lanciata mentre il programma e aperto). L assenza si dice in modo visibile, una volta.
+const PIANO_RIPROVE_FUNZIONE = [700, 1500, 2500];
+const _pianoFunzioniAssenti = {}; // { scrivi: ms, ora: ms }
+let _pianoAvvisoFunzioneAssente = false;
+function _pianoErroreFunzioneAssente(e) {
+  return !!(e && (e.status === 404 || /PGRST202|Could not find the function/i.test(e.message || '')));
+}
+function _pianoFunzioneAssente(k) {
+  const t = _pianoFunzioniAssenti[k];
+  if (!t) return false;
+  if (Date.now() - t > 5 * 60 * 1000) {
+    delete _pianoFunzioniAssenti[k];
+    return false;
+  }
+  return true;
+}
+function _pianoFunzionePresente(k) {
+  delete _pianoFunzioniAssenti[k];
+  if (k === 'scrivi') _pianoScriviCelleManca = false;
+}
+function _pianoFunzioneMancante(k) {
+  _pianoFunzioniAssenti[k] = Date.now();
+  if (k === 'scrivi') _pianoScriviCelleManca = true;
+  console.warn('[piano] funzione del database assente (' + k + '): migrazione 20260912 da lanciare');
+  if (_pianoAvvisoFunzioneAssente) return;
+  _pianoAvvisoFunzioneAssente = true;
+  if (typeof toastErrore === 'function')
+    toastErrore(
+      k === 'scrivi'
+        ? 'Database non aggiornato (manca la scrittura sicura del piano, migrazione 20260912): le modifiche del piano non controllano quelle dei colleghi su altri PC. Avvisa l IT.'
+        : 'Database non aggiornato (manca l ora del database, migrazione 20260912): Annulla del piano usa la fotografia del mese. Avvisa l IT.',
+      15000,
+    );
+}
+// SCRITTURA VERIFICATA: celle scritte (o cancellate) davvero. Il canale del database
+// scarta in silenzio una modifica fuori dai permessi (0 righe toccate): qui diventa
+// "Permesso mancante" invece di un "salvato" falso.
+function _pianoVerificaScritte(ops, righe) {
+  const ignora = ['updated_at', 'operatore'];
+  ops.forEach((o, i) => {
+    const r = righe[i];
+    const giusta =
+      o.dati === null
+        ? !r
+        : !!r &&
+          Object.keys(o.dati)
+            .filter((k) => !ignora.includes(k) && k in r)
+            .every((k) => _pianoValNorm(r[k]) === _pianoValNorm(o.dati[k]));
+    if (!giusta)
+      throw new Error(
+        'Permesso mancante: cella di ' +
+          o.collaboratore +
+          ' il ' +
+          String(o.data).substring(0, 10).split('-').reverse().join('.') +
+          ' non scritta',
+      );
+  });
+}
+// UNA O PIU CELLE, tutto o niente: una cella cambiata da un collega e un errore
+// (niente scritto, con chi e cosa)
+async function _pianoScriviOps(ops) {
+  const es = await _pianoScriviCelle(ops);
+  if (!es.ok) throw _pianoErroreConflitto(es.conflitti);
+  return es;
+}
+// MODIFICA DI UNA CELLA come la vede chi scrive (r): se un collega l ha cambiata
+// nel frattempo niente e scritto (errore con chi e cosa); la cella nuova torna e va
+// anche in memoria
+async function _pianoAggiornaCella(r, dati) {
+  const es = await _pianoScriviOps([
+    { collaboratore: r.collaboratore, data: String(r.data).substring(0, 10), atteso: _pianoAttesoDi(r), dati: dati },
+  ]);
+  _pianoMemoriaDopo(es.ops, es.righe);
+  return es.righe && es.righe[0] ? es.righe[0] : null;
 }
 // database non aggiornato: controllo letto subito prima e scritture una alla volta
 async function _pianoScriviCelleVecchio(ops) {
@@ -2173,17 +2646,25 @@ async function _pianoScriviCelleVecchio(ops) {
   if (conflitti.length) return { ok: false, conflitti: conflitti, ops: ops };
   for (let i = 0; i < ops.length; i++) {
     const o = ops[i];
-    const cur = attuali[i];
-    if (o.dati === null) {
+    let cur = attuali[i];
+    // cancella poi scrive: si cancella davvero e si inserisce la cella nuova
+    let dati = o.dati;
+    if (o.sostituisce && dati) {
       if (cur) await secDel('piano', 'id=eq.' + cur.id);
-    } else if (cur) await secPatch('piano', 'id=eq.' + cur.id, o.dati);
+      cur = null;
+      dati = Object.fromEntries(Object.entries(dati).filter(([, v]) => v !== null));
+    }
+    if (dati === null) {
+      if (cur) await secDel('piano', 'id=eq.' + cur.id);
+    } else if (cur) await secPatch('piano', 'id=eq.' + cur.id, dati);
     else
       await secPost(
         'piano',
-        Object.assign({}, o.dati, { collaboratore: o.collaboratore, data: String(o.data).substring(0, 10) }),
+        Object.assign({}, dati, { collaboratore: o.collaboratore, data: String(o.data).substring(0, 10) }),
       );
   }
   const righe = await Promise.all(ops.map((o) => secGet('piano?' + filtro(o) + '&limit=1').then((x) => x[0] || null)));
+  _pianoVerificaScritte(ops, righe);
   return { ok: true, righe: righe, ops: ops };
 }
 // celle cambiate da un collega: un solo avviso con chi e cosa, poi si ricarica
@@ -2245,10 +2726,31 @@ async function _pianoConScrittura(fn) {
   }
   _pianoScrittureInCorso++;
   try {
-    return await fn();
+    return await _pianoOperazione(fn);
   } finally {
     _pianoScrittureInCorso--;
   }
+}
+// UN OPERAZIONE DEL PIANO (scambio, cella, colore, incolla, Sistema le ore...): alla
+// fine il suo passo di Annulla si CHIUDE. Prima restava aperto fino all operazione
+// dopo: le scritture fatte nel frattempo da questa sessione fuori dal Piano (malattia
+// dal Diario, generazione automatica) finivano nel suo Annulla e tornavano indietro.
+let _pianoOperazioniInCorso = 0;
+async function _pianoOperazione(fn) {
+  _pianoOperazioniInCorso++;
+  try {
+    return await fn();
+  } finally {
+    _pianoOperazioniInCorso--;
+    if (!_pianoOperazioniInCorso && typeof _pianoUndoChiudiAperto === 'function') _pianoUndoChiudiAperto();
+  }
+}
+// SCRITTURE DEL PIANO FUORI DA UN OPERAZIONE DEL PIANO (Diario, congedi, generazione
+// automatica): il passo di Annulla rimasto aperto si chiude prima, se nessuna
+// operazione del Piano e in corso (una malattia scritta dal Piano passa anche dal
+// Diario: quelle scritture restano dell operazione)
+function _pianoFuoriDalPasso() {
+  if (!_pianoOperazioniInCorso && typeof _pianoUndoChiudiAperto === 'function') _pianoUndoChiudiAperto();
 }
 async function _pianoAttendiScritture(massimoMs) {
   const fine = Date.now() + (massimoMs || 10 * 60 * 1000);
@@ -2450,7 +2952,7 @@ async function _renderPianoCore() {
       const repVisibili = getReparti().filter((rp) => ammessiRep.includes(rp.key));
       if (repVisibili.length > 1) {
         h +=
-          '<label class="pbar-settore" title="Settore del piano: è lo stesso della barra in alto, cambiarlo qui lo cambia anche lì"><span class="pbar-settore-lbl">Settore</span><select onchange="pianoCambiaReparto(this.value)">';
+          '<label class="pbar-settore pbar-settore-scelta" title="Settore del piano: è lo stesso della barra in alto, cambiarlo qui lo cambia anche lì"><span class="pbar-settore-lbl">Settore</span><select onchange="pianoCambiaReparto(this.value)">';
         repVisibili.forEach((rp) => {
           h +=
             '<option value="' +
@@ -2518,7 +3020,7 @@ async function _renderPianoCore() {
           (puoAuto
             ? voce(
                 'Controlla le regole',
-                'validaPiano()',
+                'pianoAvvisiMeseApri(true);validaPiano()',
                 'Cerca nel mese i turni che non rispettano riposi, ore e regole del settore e li colora in rosso',
               )
             : '') +
@@ -2610,9 +3112,14 @@ async function _renderPianoCore() {
         _pianoRighe.length +
         ' assegnazioni' +
         (puoMod
-          ? ' · doppio clic su una cella per cambiarla · trascina o Shift+clic per selezionarne più di una'
+          ? '<span class="pbar-suggerimento"> · doppio clic su una cella per cambiarla · trascina o Shift+clic per selezionarne più di una</span>'
           : ' · sola lettura') +
         '</span></div></div>';
+      // AVVISI DEL MESE IN UNA RIGA (revisione UX 11/10): compleanno, controllo delle regole,
+      // confine con i mesi vicini, generazione in corso e non disponibilita stanno in una
+      // sola riga richiudibile, cosi la griglia si vede subito. Aperta o chiusa resta
+      // ricordato per la sessione (_pianoAvvisiMeseSommario scrive il riassunto).
+      h += _pianoAvvisiMeseInizio();
       h += '<div id="piano-violazioni"></div><div id="piano-auto-avviso"></div><div id="piano-confine"></div>';
 
       // NON DISPONIBILITA' JOLLY: promemoria discreto (una riga, chiudibile),
@@ -2655,6 +3162,7 @@ async function _renderPianoCore() {
             '\');renderPiano();return false" title="Nascondi per questo mese">\u2715</a></div>';
         }
       }
+      h += '</div></div>'; // fine riga degli avvisi del mese
       // GRIGLIA
       // le festivita' servono PRIMA di disegnare l'intestazione: e' li' che
       // compare il marcatore di chiusura (CH5/CH7) sopra il numero del giorno
@@ -3377,14 +3885,21 @@ async function _renderPianoCore() {
       h +=
         '<div id="piano-config">' +
         _renderPianoImportExportCard() +
+        (typeof _renderPianoFunzioniCard === 'function' ? _renderPianoFunzioniCard() : '') +
         _renderPianoMappatureCard() +
         _renderPianoPreferenzeCard() +
         _renderPianoImpostazioniCard() +
         (typeof _renderOrganicoInterruttoreCard === 'function' ? _renderOrganicoInterruttoreCard() : '') +
         '</div>';
     }
+    // chi naviga con la tastiera resta sulla scheda appena aperta
+    const ae = document.activeElement;
+    const fuocoSuScheda = !!(ae && ae.classList && ae.classList.contains('piano-tab') && el.contains(ae));
     el.innerHTML = h;
     el.style.opacity = '';
+    _pianoTabBarDopo(fuocoSuScheda);
+    _pianoSettoreDoppio();
+    _pianoAvvisiMeseAvvia();
     if (scrollPrec) requestAnimationFrame(() => window.scrollTo(0, scrollPrec));
     // numero degli avvisi sulla scheda Avvisi e sulla voce Piano del menu
     if (_pianoTab !== 'avvisi' && typeof _pianoAvvisiAggiornaBadge === 'function')
@@ -3454,7 +3969,11 @@ function pianoCambiaMese(delta) {
 
 // (la vecchia finestra di modifica cella è stata sostituita dalla
 // scrittura diretta nella cella · pianoCellaInline / pianoSalvaCella)
-async function rimuoviPianoCella(giaChiuso) {
+// un operazione del Piano: alla fine il suo passo di Annulla si chiude
+function rimuoviPianoCella(giaChiuso) {
+  return _pianoOperazione(() => _rimuoviPianoCellaEsegui(giaChiuso));
+}
+async function _rimuoviPianoCellaEsegui(giaChiuso) {
   const avvisoRete = !!window._sessioneScadutaAvvisata;
   const sel = _pianoCellaSel;
   if (!sel) return;

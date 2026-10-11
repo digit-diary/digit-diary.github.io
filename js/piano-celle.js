@@ -198,17 +198,14 @@ async function _pianoNotaRapida(nome, dstr) {
       });
       if (nuovo) _pianoRighe.push(Array.isArray(nuovo) ? nuovo[0] : nuovo);
     } else {
-      await secPatch('piano', 'id=eq.' + r.id, {
-        commento: commento || null,
-        operatore: op,
-        updated_at: new Date().toISOString(),
-      });
-      r.commento = commento;
+      // solo se la cella e ancora quella mostrata (e con il permesso): errore con il motivo
+      await _pianoAggiornaCella(r, { commento: commento || null, operatore: op, updated_at: new Date().toISOString() });
     }
     if (commento) logAzione('Piano: commento', nome + ' ' + dstr + ': "' + commento + '"');
     renderPiano();
   } catch (e) {
-    toast('Errore salvataggio nota');
+    toastErrore('Nota NON salvata: ' + ((e && e.message) || e));
+    if (e && e.pianoConflitto) renderPiano();
   }
 }
 
@@ -432,15 +429,19 @@ async function pianoBloccaCella(nome, dstr, blocca) {
       return;
     }
     try {
-      await secPatch('piano', 'id=eq.' + r.id, { protetto: true, motivo_blocco: testo });
-      r.protetto = true;
-      r.motivo_blocco = testo;
+      await _pianoAggiornaCella(r, {
+        protetto: true,
+        motivo_blocco: testo,
+        operatore: getOperatore(),
+        updated_at: new Date().toISOString(),
+      });
       logAzione('Piano: cella bloccata', nome + ' ' + dstr + ' (' + (r.codice || '') + '): ' + testo);
       toast('Cella bloccata: ' + testo);
       renderPiano();
     } catch (e) {
       console.error('blocco cella', e);
-      toast('Errore nel salvataggio del blocco');
+      toastErrore('Blocco NON salvato: ' + ((e && e.message) || e));
+      if (e && e.pianoConflitto) renderPiano();
     }
     return;
   }
@@ -458,15 +459,19 @@ async function pianoBloccaCella(nome, dstr, blocca) {
   )
     return;
   try {
-    await secPatch('piano', 'id=eq.' + r.id, { protetto: false, motivo_blocco: null });
+    await _pianoAggiornaCella(r, {
+      protetto: false,
+      motivo_blocco: null,
+      operatore: getOperatore(),
+      updated_at: new Date().toISOString(),
+    });
     logAzione('Piano: cella sbloccata', nome + ' ' + dstr + (r.motivo_blocco ? ' (era: ' + r.motivo_blocco + ')' : ''));
-    r.protetto = false;
-    r.motivo_blocco = null;
     toast('Cella sbloccata');
     renderPiano();
   } catch (e) {
     console.error('sblocco cella', e);
-    toast('Errore nello sblocco');
+    toastErrore('Sblocco NON salvato: ' + ((e && e.message) || e));
+    if (e && e.pianoConflitto) renderPiano();
   }
 }
 async function pianoCtxAzione(azione) {
@@ -485,13 +490,17 @@ async function pianoCtxAzione(azione) {
       const r = _pianoRighe.find((x) => x.collaboratore === sel.nome && x.data === sel.data);
       if (!r || !(await chiediConferma('Eliminare il commento di ' + sel.nome + ' del ' + sel.data + '?'))) return;
       try {
-        await secPatch('piano', 'id=eq.' + r.id, { commento: null });
-        r.commento = null;
+        await _pianoAggiornaCella(r, {
+          commento: null,
+          operatore: getOperatore(),
+          updated_at: new Date().toISOString(),
+        });
         logAzione('Piano: commento eliminato', sel.nome + ' ' + sel.data);
         toast('Commento eliminato');
         renderPiano();
       } catch (e) {
-        toast('Errore eliminazione commento');
+        toastErrore('Commento NON eliminato: ' + ((e && e.message) || e));
+        if (e && e.pianoConflitto) renderPiano();
       }
     })();
   } else if (azione === 'blocca' || azione === 'sblocca') {
@@ -597,7 +606,13 @@ function apriCambioEsigenze(nome, dstr) {
     '<div class="pwd-modal-btns" style="margin-top:14px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="confermaCambioEsigenze()">Cambia turno</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
 }
-async function confermaCambioEsigenze() {
+// un cambio alla volta (il doppio click lo applicava due volte) e la generazione
+// automatica aspetta finche e in corso
+function confermaCambioEsigenze() {
+  return unaVoltaSola('piano-cambio-esigenze', () => _pianoConScrittura(() => _confermaCambioEsigenzeEsegui()));
+}
+async function _confermaCambioEsigenzeEsegui() {
+  const avvisoRete = !!window._sessioneScadutaAvvisata;
   const sel = _pianoCtxSel;
   const nuovo = (document.getElementById('esig-turno') || {}).value;
   const motivo = ((document.getElementById('esig-motivo') || {}).value || '').trim();
@@ -606,12 +621,12 @@ async function confermaCambioEsigenze() {
   if (!(await _pianoConsentiScrittura(sel.data))) return; // giorno chiuso: stessa regola degli altri flussi
   const r = _pianoRighe.find((x) => x.collaboratore === sel.nome && x.data === sel.data);
   if (!r) return;
+  if (r.codice === nuovo) return; // gia fatto (secondo click)
   if (
     r.motivo_blocco &&
     !(await chiediConferma('La cella è bloccata per: ' + r.motivo_blocco + '\n\nLa cambi lo stesso?'))
   )
     return;
-  _pianoUndoSnap('cambio per esigenze ' + sel.data);
   const vecchio = r.codice;
   // STESSE REGOLE DEL PIANO MANUALE: se il nuovo turno viola riposo 11h,
   // consecutivi o le altre regole, avviso + conferma e violazione a verbale
@@ -639,33 +654,52 @@ async function confermaCambioEsigenze() {
       notaRegole = 'Avviso: ' + avvisi.join(' · ') + ' · ';
     }
   }
+  // la fotografia per Annulla si prende solo ora, dopo le conferme: una rinuncia non
+  // lascia piu un passo vuoto
+  const passo = _pianoUndoSnap('cambio per esigenze ' + sel.data);
+  // SCRITTURA CONDIZIONATA: la cella deve essere ancora quella mostrata (sigla, protetta,
+  // blocco). Prima si scriveva per numero di riga senza guardare: il turno messo da un
+  // collega nel frattempo spariva sotto il cambio.
+  let esito;
   try {
-    await secPatch('piano', 'id=eq.' + r.id, {
-      codice: nuovo,
-      protetto: true,
-      commento: (
-        notaRegole +
-        (vecchio ? 'Ex ' + vecchio + ' - ' : '') +
-        'cambio per esigenze operative - ' +
-        getOperatore()
-      ).substring(0, 400),
-      operatore: getOperatore(),
-      updated_at: new Date().toISOString(),
-    });
-    r.codice = nuovo;
-    r.protetto = true;
-    logAzione('Piano: cambio per esigenze', sel.nome + ' ' + sel.data + ': ' + vecchio + ' -> ' + nuovo);
-    toast('Turno cambiato: ' + vecchio + ' -> ' + nuovo);
-    // incentivi: chi accetta il cambio prende i punti "Cambio turno
-    // accettato", chi ha rifiutato si segna nello stesso popup
-    if (typeof apriPopupCopertura === 'function')
-      setTimeout(() => apriPopupCopertura(sel.nome, sel.data, 'cambio'), 400);
-    // niente formulario: e' una decisione dell'operatore, basta il commento
-    renderPiano();
+    esito = await _pianoScriviCelle([
+      {
+        collaboratore: sel.nome,
+        data: sel.data,
+        atteso: _pianoAttesoDi(r),
+        dati: {
+          codice: nuovo,
+          protetto: true,
+          commento: (
+            notaRegole +
+            (vecchio ? 'Ex ' + vecchio + ' - ' : '') +
+            'cambio per esigenze operative - ' +
+            getOperatore()
+          ).substring(0, 400),
+          operatore: getOperatore(),
+          updated_at: new Date().toISOString(),
+        },
+      },
+    ]);
   } catch (e) {
+    _pianoUndoScarta(passo);
     console.error(e);
-    toast('Errore cambio turno');
+    _pianoErroreScrittura('Cambio per esigenze NON fatto: ', e, avvisoRete);
+    return;
   }
+  if (!esito.ok) {
+    _pianoUndoScarta(passo);
+    await _pianoAvvisaConflitti(esito.conflitti, 'Cambio per esigenze non fatto');
+    return;
+  }
+  _pianoMemoriaDopo(esito.ops, esito.righe);
+  logAzione('Piano: cambio per esigenze', sel.nome + ' ' + sel.data + ': ' + vecchio + ' -> ' + nuovo);
+  toast('Turno cambiato: ' + vecchio + ' -> ' + nuovo);
+  // incentivi: chi accetta il cambio prende i punti "Cambio turno
+  // accettato", chi ha rifiutato si segna nello stesso popup
+  if (typeof apriPopupCopertura === 'function') setTimeout(() => apriPopupCopertura(sel.nome, sel.data, 'cambio'), 400);
+  // niente formulario: e' una decisione dell'operatore, basta il commento
+  renderPiano();
 }
 
 // ================================================================
@@ -1015,20 +1049,21 @@ async function _pianoNdChiamata(nome, dstr) {
   }
   const r0 = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
   const prima = r0 ? r0.codice : '';
-  const ok = await _pianoSalvaCellaBase(nome, dstr, 'ND');
-  if (ok === false) return false;
+  // la ND e il suo commento sono UNA operazione (un passo di Annulla)
+  return _pianoOperazione(async () => {
+    const ok = await _pianoSalvaCellaBase(nome, dstr, 'ND');
+    if (ok === false) return false;
+    return _pianoNdChiamataNota(nome, dstr, prima);
+  });
+}
+async function _pianoNdChiamataNota(nome, dstr, prima) {
   // la cella e davvero ND? (es. sovrascrittura di una protetta annullata)
   const ora =
     (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=eq.' + dstr + '&codice=eq.ND')) || [];
   if (!ora.length) return false;
   const commento = 'Ex ' + (prima || '-') + ' - chiamata ma non disponibile - ' + getOperatore();
   try {
-    await secPatch('piano', 'collaboratore=eq.' + encodeURIComponent(nome) + '&data=eq.' + dstr + '&codice=eq.ND', {
-      commento: commento,
-      updated_at: new Date().toISOString(),
-    });
-    const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
-    if (r) r.commento = commento;
+    await _pianoAggiornaCella(ora[0], { commento: commento, updated_at: new Date().toISOString() });
     logAzione('Piano: ND chiamata ma non disponibile', nome + ' ' + dstr + ' (era ' + (prima || 'vuoto') + ')');
     if (typeof ndSincronizzaPersona === 'function') await ndSincronizzaPersona(nome, dstr.substring(0, 7));
     renderPiano();

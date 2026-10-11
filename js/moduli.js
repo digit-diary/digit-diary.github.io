@@ -1062,12 +1062,27 @@ async function eliminaModulo(id) {
 // Salva data di nascita o inizio contratto dalla riga di Gestione collaboratori.
 // Sono i due dati da cui dipendono compleanni, anzianita, giubilei e giorni di
 // vacanza: si correggono qui, dove sta l'anagrafica, e si leggono nella scheda.
-async function cambiaDataCollaboratore(id, campo, valore) {
-  if (campo !== 'data_nascita' && campo !== 'data_assunzione') return;
+// SCHEDA DI GESTIONE COLLABORATORI (gcSalvaScheda in settings.js): le funzioni cambia...
+// ricevono opz = { scheda: true }; allora non mostrano messaggi e non ridisegnano l elenco,
+// ritornano true (salvato) o false e lasciano il motivo in opz.errore. Il messaggio unico,
+// con l esito vero, lo da la scheda. Senza opz si comportano come sempre.
+function _collabEsito(opz, errore, testo) {
+  if (opz) opz.errore = errore;
+  if (!(opz && opz.scheda) && testo) toast(testo);
+  return false;
+}
+// rifiuto del database per permessi (riga di un altro settore, permesso mancante)
+function collabErrorePermesso(e) {
+  const m = String((e && e.message) || e || '');
+  return e === 'permesso' || /permess|non tuo|non autorizzat|permission|denied|42501|esclus/i.test(m);
+}
+async function cambiaDataCollaboratore(id, campo, valore, opz) {
+  if (campo !== 'data_nascita' && campo !== 'data_assunzione') return false;
+  const muto = !!(opz && opz.scheda);
   if (!puoModificareStoricoHr()) {
-    toast('Non hai il permesso');
-    renderCollaboratoriUI();
-    return;
+    _collabEsito(opz, 'permesso', 'Non hai il permesso');
+    if (!muto) renderCollaboratoriUI();
+    return false;
   }
   const c = (collaboratoriCache || []).find((x) => x.id === id);
   const etichetta = campo === 'data_nascita' ? 'Data di nascita' : 'Inizio attività';
@@ -1076,14 +1091,17 @@ async function cambiaDataCollaboratore(id, campo, valore) {
   // solo 12.01 (anno non noto). Per l'inizio attivita l'anno serve sempre.
   const val = testo ? _parseDataNascita(testo) : null;
   if (testo && !val) {
+    // anche dalla scheda: dice cosa scrivere
     toast('Data non valida: scrivi 12.01.1997' + (campo === 'data_nascita' ? ' oppure solo 12.01' : ''));
-    renderCollaboratoriUI();
-    return;
+    if (opz) opz.errore = 'data';
+    if (!muto) renderCollaboratoriUI();
+    return false;
   }
   if (campo === 'data_assunzione' && val && val.startsWith('1900-')) {
-    toast('Per l inizio attività serve anche l anno (es. 01.05.2024)');
-    renderCollaboratoriUI();
-    return;
+    toast("Per l'inizio attività serve anche l'anno (es. 01.05.2024)");
+    if (opz) opz.errore = 'data';
+    if (!muto) renderCollaboratoriUI();
+    return false;
   }
   if (
     c &&
@@ -1105,8 +1123,9 @@ async function cambiaDataCollaboratore(id, campo, valore) {
         '\n\nConfermi la modifica?',
     ))
   ) {
-    renderCollaboratoriUI();
-    return;
+    if (opz) opz.errore = 'annullato';
+    if (!muto) renderCollaboratoriUI();
+    return false;
   }
   try {
     const patch = {};
@@ -1114,10 +1133,12 @@ async function cambiaDataCollaboratore(id, campo, valore) {
     await secPatch('collaboratori', 'id=eq.' + id, patch);
     if (c) c[campo] = val;
     logAzione(etichetta + ' modificata', (c ? c.nome : id) + ': ' + (val || 'tolta'));
-    toast(etichetta + ' aggiornata');
+    if (!muto) toast(etichetta + ' aggiornata');
+    return true;
   } catch (e) {
-    toast('Errore nel salvataggio');
-    renderCollaboratoriUI();
+    _collabEsito(opz, e, 'Errore nel salvataggio');
+    if (!muto) renderCollaboratoriUI();
+    return false;
   }
 }
 async function renderCollaboratoriUI() {
@@ -1178,7 +1199,12 @@ function _soloAdminAnagrafica() {
   toast('Non hai il permesso');
   return false;
 }
-async function aggiungiCollaboratore() {
+// un salvataggio alla volta: il doppio click creava il collaboratore e poi dava
+// "Nome già esistente" (errore 409 dal database) dopo "Collaboratore aggiunto"
+function aggiungiCollaboratore() {
+  return unaVoltaSola('collab-aggiungi', () => _aggiungiCollaboratoreEsegui());
+}
+async function _aggiungiCollaboratoreEsegui() {
   if (!_soloAdminAnagrafica()) return;
   const nome = capitalizzaNome(document.getElementById('new-collab-nome').value.trim());
   if (!nome) {
@@ -1263,7 +1289,7 @@ async function _rinominaBriefingFuturi(vecchio, nuovo) {
 // { eOperatore, nonRiuscite } o lancia l errore del database.
 async function _rinominaCollaboratoreTutto(vecchio, nuovo) {
   // CHAT: e legata al NOME DI ACCESSO dell operatore, non all anagrafica. Se chi si
-  // rinomina e anche un operatore del programma, la chat resta al nome di accesso.
+  // rinomina è anche un operatore del programma, la chat resta al nome di accesso.
   let eOperatore = false;
   try {
     eOperatore = (JSON.parse((await getImp('operatori_lista')) || '[]') || []).includes(vecchio);
@@ -1414,7 +1440,7 @@ async function salvaRinominaCollaboratore(vecchio) {
   if (esito.eOperatore)
     await mostraAvviso(
       vecchio +
-        ' e anche un operatore del programma. Anagrafica, Diario, Piano e schede sono passati a "' +
+        ' è anche un operatore del programma. Anagrafica, Diario, Piano e schede sono passati a "' +
         nuovo +
         '"; il nome di ACCESSO e la chat restano "' +
         vecchio +
@@ -1465,7 +1491,7 @@ function apriCoperturaCollab(id) {
     '</b> &middot; settore: <b>' +
     escP(repartoLabel(principale)) +
     '</b></p>' +
-    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:12px">Il contratto e le ore dovute restano nel suo settore. Qui indichi dove può andare a coprire i buchi: comparira\' anche in quei piani e la generazione automatica potra\' usarlo, entro i limiti che imposti.</p>';
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:12px">Il contratto e le ore dovute restano nel suo settore. Qui indichi dove può andare a coprire i buchi: comparirà anche in quei piani e la generazione automatica potrà usarlo, entro i limiti che imposti.</p>';
   getReparti()
     .filter((r) => r.key !== principale)
     .forEach((r) => {
@@ -1570,28 +1596,34 @@ async function salvaCoperturaCollab(id) {
     toast('Errore salvataggio copertura');
   }
 }
-async function cambiaRepartoCollaboratore(id, rep) {
-  if (!_soloAdminAnagrafica()) {
-    renderCollaboratoriUI();
-    return;
+async function cambiaRepartoCollaboratore(id, rep, opz) {
+  const muto = !!(opz && opz.scheda);
+  if (!isAdmin()) {
+    _collabEsito(opz, 'permesso', 'Non hai il permesso');
+    if (!muto) renderCollaboratoriUI();
+    return false;
   }
   try {
     await secPatch('collaboratori', 'id=eq.' + id, { reparto_dip: rep });
     const c = collaboratoriCache.find((x) => x.id === id);
     if (c) c.reparto_dip = rep;
     logAzione('Reparto collaboratore', (c ? c.nome : 'ID ' + id) + ' → ' + rep);
-    renderCollaboratoriUI();
     aggiornaNomi();
-    toast('Settore aggiornato: ' + repartoLabel(rep));
+    if (!muto) {
+      renderCollaboratoriUI();
+      toast('Settore aggiornato: ' + repartoLabel(rep));
+    }
+    return true;
   } catch (e) {
-    toast('Errore cambio settore');
+    return _collabEsito(opz, e, 'Errore cambio settore');
   }
 }
-async function cambiaImpiegoCollaboratore(id, imp) {
+async function cambiaImpiegoCollaboratore(id, imp, opz) {
+  const muto = !!(opz && opz.scheda);
   if (typeof puoModificare === 'function' && !puoModificare('gestione_impiego')) {
-    toast("Non hai il permesso di modificare l'impiego");
-    renderCollaboratoriUI();
-    return;
+    _collabEsito(opz, 'permesso', "Non hai il permesso di modificare l'impiego");
+    if (!muto) renderCollaboratoriUI();
+    return false;
   }
   try {
     const c = collaboratoriCache.find((x) => x.id === id);
@@ -1602,17 +1634,21 @@ async function cambiaImpiegoCollaboratore(id, imp) {
     logAzione('Impiego collaboratore', (c ? c.nome : 'ID ' + id) + ' → ' + lbl(imp));
     if (c && imp && imp !== prima && typeof _insertHrEvento === 'function')
       _insertHrEvento(c.nome, 'impiego', 'Impiego: ' + lbl(imp) + (prima ? ' (era ' + lbl(prima) + ')' : ''));
-    renderCollaboratoriUI();
-    toast('Impiego aggiornato');
+    if (!muto) {
+      renderCollaboratoriUI();
+      toast('Impiego aggiornato');
+    }
+    return true;
   } catch (e) {
-    toast('Errore cambio impiego');
+    return _collabEsito(opz, e, 'Errore cambio impiego');
   }
 }
-async function cambiaCategoriaCollaboratore(id, cat) {
+async function cambiaCategoriaCollaboratore(id, cat, opz) {
+  const muto = !!(opz && opz.scheda);
   if (typeof puoModificare === 'function' && !puoModificare('gestione_categorie')) {
-    toast('Non hai il permesso di modificare la categoria');
-    renderCollaboratoriUI();
-    return;
+    _collabEsito(opz, 'permesso', 'Non hai il permesso di modificare la categoria');
+    if (!muto) renderCollaboratoriUI();
+    return false;
   }
   try {
     const n = parseInt(cat) || null;
@@ -1627,10 +1663,13 @@ async function cambiaCategoriaCollaboratore(id, cat) {
         'categoria',
         'Categoria assegnata: ' + n + 'ª' + (prima ? ' (era ' + prima + 'ª)' : ' (prima assegnazione)'),
       );
-    renderCollaboratoriUI();
-    toast('Categoria aggiornata');
+    if (!muto) {
+      renderCollaboratoriUI();
+      toast('Categoria aggiornata');
+    }
+    return true;
   } catch (e) {
-    toast('Errore cambio categoria');
+    return _collabEsito(opz, e, 'Errore cambio categoria');
   }
 }
 // DISATTIVA (07.10, richiesta del titolare): chi lascia si ferma DA UNA DATA, non sparisce.
@@ -1665,11 +1704,11 @@ async function disattivaCollaboratore(nome) {
               {
                 valore: 'fine',
                 etichetta:
-                  'Fine contratto da questa data (consigliato): fino a quel giorno resta tutto (piano, ore, Diario, storico); dal giorno dopo non e più nel piano, nella bozza e nelle ore dovute',
+                  'Fine contratto da questa data (consigliato): fino a quel giorno resta tutto (piano, ore, Diario, storico); dal giorno dopo non è più nel piano, nella bozza e nelle ore dovute',
               },
               {
                 valore: 'tutto',
-                etichetta: 'Rimuovi del tutto: solo per chi non e mai entrato o e stato inserito per errore',
+                etichetta: 'Rimuovi del tutto: solo per chi non è mai entrato o è stato inserito per errore',
               },
             ].concat(
               // la data si cambia qui (scegli un altro giorno e Avanti) o si toglie
@@ -1695,7 +1734,7 @@ async function disattivaCollaboratore(nome) {
     return;
   }
   if (r.modo !== 'tutto') {
-    if (!r.data) return toast('Scegli l ultimo giorno di lavoro');
+    if (!r.data) return toast("Scegli l'ultimo giorno di lavoro");
     if (typeof _salvaFineContratto === 'function' && (await _salvaFineContratto(nome, r.data, false))) {
       renderCollaboratoriUI();
       aggiornaNomi();
@@ -1991,9 +2030,14 @@ async function importaCollaboratori(input) {
   input.value = '';
   toast(aggiunti + ' collaboratori importati' + (duplicati ? ' (' + duplicati + ' già esistenti)' : ''));
   if (errori.length)
-    await mostraAvviso(errori.length + ' nomi non importati per un errore:\n' + errori.slice(0, 15).join('\n'), {
-      titolo: 'Import collaboratori',
-    });
+    await mostraAvviso(
+      errori.length +
+        (errori.length === 1 ? ' nome non importato per un errore:\n' : ' nomi non importati per un errore:\n') +
+        errori.slice(0, 15).join('\n'),
+      {
+        titolo: 'Import collaboratori',
+      },
+    );
   if (aggiunti) logAzione('Importa collaboratori', aggiunti + ' nomi importati da ' + file.name);
 }
 
@@ -2146,13 +2190,13 @@ async function generaModuloAI(tipo) {
   let sysPrompt = '';
   if (tipo === 'allineamento' || tipo === 'rdi') {
     sysPrompt =
-      "Sei un assistente aziendale esperto per Casinò Lugano SA (casa da gioco in Svizzera, regolata dalla CFCG - Commissione Federale delle Case da Gioco). Genera un \"Rilevamento di non conformità e colloquio di allineamento\".\nTesto: formale, chiaro, oggettivo, solo fatti.\n\nABBREVIAZIONI: DIR=Direttore, CO=Compliance, RLRD=Resp.LRD, RCS=Resp.Concezione Sociale, RSS=Resp.Sicurezza&Sorveglianza, R_FBS=Resp.FoBoSlot, SUP_FBS=Supervisor FoBoSlot, SUP_LG=Supervisor Live Game, R_LG=Resp.Live Game, CAS=Cassiere, REC=Receptionist, SA=Slot Attendant, GUARD=Guardaroba, BOK=Back Office, CR=Croupier, ISP=Ispettore tavolo, SIC=Sicurezza, SURV=Sorveglianza, CT=Counting Team, VP=Valet Parking, SECC=Sistema elettronico conteggio/controllo, AAGA=Apparecchi automatici da gioco, IR=Incident Report, SOL=Surveillance Operator Log, TRAKA=sistema gestione chiavi, QM=Quality Management, GD=giornata di gioco, CD=Cassa/Differenza cassa, PLG=prodotto lordo giochi, RDI=Rapporto Disciplinare Interno. Il programma cassa si chiama Asterix. Il programma controllo documenti alla reception si chiama Reception. Le postazioni NRT si chiamano Kiosk.\n\nCONTESTO NORMATIVO E PROCEDURALE DEL CASINÒ (usa per spiegare PERCHÉ una condotta è non conforme, citando la procedura QM specifica):\n\n• LRD - IDENTIFICAZIONE (QM 3-002): obbligo documento identità valido per transazioni a partire da CHF 3'000 (da CHF 3'000 in su, sotto i CHF 3'000 non si identifica), apertura deposito gettoni e carta Lugano Class (senza soglia). CAS deve verificare se cliente già identificato nel programma LRD, richiedere documento, registrare dati anagrafici completi, scansionare documento, far firmare Form I/II per avente economicamente diritto, chiedere esplicitamente se è PEP. Se transazione ≥CHF 15'000: SIC verifica KYC/PEP immediata. Se acquisto crediti/cambio valuta ≥CHF 30'000: chiarimento speciale con SUP_FBS prima di procedere. Se riscossione ≥CHF 50'000: idem. Smurfing (frazionamento per aggirare soglia) VIETATO. Al tavolo: CR deve avvisare ISP se importo da CHF 3'000 in su; se ≥CHF 30'000 rifiutare e indirizzare a cassa.\n\n• LRD - REGISTRAZIONE (QM 3-003): Form III obbligatorio per riscossioni ≥CHF 4'000, acquisti gettoni/cashless ≥CHF 30'000, movimenti deposito (senza soglia). Tutti i collaboratori devono segnalare comportamenti sospetti (Red Flags LRD) a SUP_FBS e RLRD.\n\n• CASSA (QM 5-001/5-002/5-003/5-004): CAS deve timbrare in divisa, recarsi alla postazione per via più breve senza soste. Pulizia mani obbligatoria (sfregamento palmi verso alto) ogni volta che tocca valori/corpo/entra-esce postazione. Valori sempre nel carrello quando si allontana. Apertura cassa con doppia chiave (CAS+SUP_FBS), conteggio fisico obbligatorio, confronto con formulario chiusura precedente. Discrepanza >CHF 10: contatta SUP_FBS. Transazioni sotto copertura CCTV (art.33 OCG-DFGP). Principio quattro occhi per transazioni interne. Verifica autenticità banconote con lampada UV. Carte credito: verificare autenticità, firma, documento; rifiutare carte aziendali. Hand Pay/Jackpot: documento identità obbligatorio, ricevuta firmata da cliente+CAS+SUP_FBS. Deposito gettoni: procedura LRD senza soglia, avvisare SURV e SUP_FBS.\n\n• RECEPTION (QM 4-001/4-002/4-004): REC deve verificare volto visibile, stato di decoro, no alterazione. Documento identità valido obbligatorio (≥18 anni). Inserimento dati nel sistema Reception (VETO). Divieto accesso assoluto: negare ingresso, informare SUP_FBS e SIC. Accesso con divieto gioco: compilare registro visitatori, targhetta Visitor, informare SUP_FBS e SURV. Carta Lugano Class: verifica periodica annuale obbligatoria, disabilitazione immediata se esclusione.\n\n• GUARDAROBA (QM 4-003): targhetta numerata per ogni capo, mostrare al cliente cosa si inserisce nel sacchetto. Convalida autosilo: verificare coincidenza orario ingresso autosilo/CLSA, importi >CHF 30: avvisare SUP_FBS. VIETATO convalidare biglietto autosilo per uso personale (nessun collaboratore). Cassa Ward: cassetta trasferita sempre chiusa.\n\n• CROUPIER/LIVE GAME (QM 8-001/8-002/8-003/8-014): CR deve presentarsi in divisa, pulizia mani obbligatoria (entrata/uscita tavolo, prima di toccare dolly, prima di scalinare numero, dopo prelevare gettoni da chipping machine, dopo aver toccato corpo). Apertura/chiusura tavolo: autorizzazione SURV, conta fisica ad alta voce, formulario firmato da ISP+CR, copia nel Drop Box. Principio quattro occhi (Gaming+SURV). Fill/Credit: conteggio ad alta voce, formulario firmato, corrispondenza sistema. Banconote CHF 200/1'000 e TUTTE le EUR: controllo UV una a una. Gettoni mai passati mano a mano al cliente. Cambio gettoni colore ≥CHF 20: controllo chipping machine; ≥CHF 50: taglio stecche da 5. Errori pagamento/dispute: notifica SUP_LG e SURV, decisione solo dopo verifica CCTV. Circostanze particolari: SURV redige IR e salva immagini.\n\n• MATERIALE DI GIOCO (QM 8-011): accesso locale carte con doppio badge, SURV informata. Trasporto carte sotto CCTV con almeno 2 membri staff. Controllo carte prima del gioco: completezza, danni, lampada UV, marchio sicurezza. Carta danneggiata: SUP_LG taglia a metà, avvisa SURV. Distruzione carte: SIC+SUP_LG presenti, monitoraggio SURV. Gettoni colore: verifica giornaliera, differenza >10 pezzi: avviso SURV, indagine. Caduta materiale: annuncio ad alta voce, ISP chiama SURV.\n\n• SLOTS/AAGA (QM 7-001/7-002/7-003): SA deve mantenersi in movimento nell'area assegnata, no soste non autorizzate. Mance: mostrare platealmente palmo verso alto verso CCTV, recarsi immediatamente al box raccolta, pulizia mani dopo. Hand Pay: verificare display AAGA, informare SURV e SUP_FBS per ≥CHF 15'000. Jackpot: comunicare tipologia/numero AAGA/importo a SUP_FBS, richiedere documento identità. Swiss Jackpot: SURV e CFCG da avvisare, AAGA sigillata. Carte cashless: autorizzazione SUP_FBS per raccolta, separare con/senza credito. Contestazioni Kiosk: trattenere carta cashless, chiedere ricevuta failed, contattare SUP_FBS. Rimborso >CHF 2'000: conferma collega/R_FBS. Jackpot >CHF 50'000: modulo fax CFCG entro fine giornata.\n\n• CONCEZIONE SOCIALE (QM 2-001/2-002) - LGD 2017: Art.52: vietato giocare a minorenni, esclusi, impiegati, CDA/CFCG. Ingresso minorenne/escluso: notifica immediata SUP_FBS, SURV verifica video, IR dettagliato, comunicazione CFCG obbligatoria (art.43 LGD). Opuscoli: generici (≥26 residenti TI=Progetto Residenti), giovani (<25=Progetto Giovani). Riconoscimento precoce: notifica per criteri A (gravi: problemi finanziari, richiesta prestiti) e B (frequenza, recupero). Cassetta piano 0/spogliatoi o ufficio CS. Coinvolgere Supervisor per criteri A. Ogni notifica va fatta anche se cliente già segnalato. Monitoraggio: 8 settimane (max 16), osservazione mirata, REC avvisa colleghi ingresso monitorato. Colloqui: prevenzione (Supervisor) e comportamento (RCS/SRCS). Esclusione imposta (art.80 cpv 1/2): debiti, poste sproporzionate, servizi sociali. Esclusione volontaria (art.80 cpv 5): revoca dopo 3 mesi. Revoca (art.81): documentazione finanziaria+IRGA+Direzione, monitoraggio 8 sett. post-revoca. Allarme TI 50K: identificare possessore cashcard anonima.\n\n• SICUREZZA (QM 13-001/13-003/13-006/13-007/13-008): SIC in divisa, badge, chiavi TRAKA. Ronde regolari. Accesso locali solo con autorizzazione e badge personale. Chiavi: registrazione ogni transazione, restituzione TRAKA fine turno, perdita chiave=informare RSS immediatamente. Personale esterno: solo con comunicazione scritta del Resp.settore. Esclusioni: inserimento VETO immediato con motivo e articolo di legge. Gestione conflitti: CR resta concentrato sul gioco, SUP_LG/SUP_FBS informano SURV e SIC prima di intervenire, colloquio in VIP Room. Denaro falso: segnalare immediatamente a SIC, trattenere banconota e cliente, chiamare Polizia, VIETATO restituire banconota falsa.\n\n• SORVEGLIANZA/CCTV (QM 14-001/14-002/14-003/14-004): SURV deve monitorare attività di gioco, redigere IR per ogni irregolarità/mancanza procedurale, salvare filmati CCTV. Camera check obbligatorio ogni turno. Guasto CCTV prima apertura: tavoli/AAGA NON in esercizio. Guasto durante giornata: interrompere esercizio fine unità di gioco. Guasto CCTV: comunicazione CFCG il giorno stesso. Accesso locale CCTV solo SURV/SIC. Registrazioni conservate minimo 4 settimane, VIETATO cancellare senza autorizzazione CFCG. Mancata segnalazione anomalie=negligenza/coinvolgimento diretto=procedimento disciplinare.\n\n• PRESENZE/HR (QM 16-003/16-005): timbratura entrata/uscita obbligatoria. Malattia: informare tempestivamente + certificato medico. Corsi aggiornamento obbligatori. Sistema disciplinare: allineamento verbale → allineamento scritto → RDI 1° → RDI 2° (può portare a disdetta). Dal 3° allineamento stesso motivo scatta RDI automatico.\n\n• CAVEAU/BACKOFFICE (QM 6-002): apertura sempre con principio quattro occhi (BOK+SIC). Conteggio fisico, confronto formulario chiusura precedente. Trapasso straordinario: avvisare SURV e SIC prima, registrare nel sistema. Assegni pre-firmati: accesso solo a 2 persone delegate. Chiavi nel TRAKA prima di uscire.\n\n• VALET PARKING: verifica tagliando/numero prima della consegna veicolo. Errore=rischio patrimoniale/sicurezza cliente.\n\n• REGOLE GENERALI: tutte le operazioni sotto CCTV. Obblighi comunicazione (art.43 LGD): segnalare immediatamente eventi che pregiudicano sicurezza/trasparenza giochi. Nuovi dipendenti: formazione LRD prima dell'impiego, refresh biennale. Dati personali (QM 1-002): documentazione buona reputazione obbligatoria, mancata presentazione=disdetta contratto.\n\nCAMPO non_conformita (STRINGA):\n- PIÙ PARAGRAFI separati da \\n\\n\n- Par 1: Descrizione del FATTO (cosa, quando, dove, chi)\n- Par 2: Spiega PERCHÉ è una non conformità, citando il regolamento/procedura/legge specifica violata (LRD, procedure interne, organigramma, ecc.)\n- Par 3 (SOLO se LOG/IR nei dati): \"Per i dettagli operativi si faccia riferimento al LOG / IR {numero}.\" Se NON c'è LOG/IR: ometti questo paragrafo, NON scrivere \"non disponibile\"\n- NON inventare fatti non presenti nei dati\n- Se CCTV nei dati: \"Dalla revisione delle immagini CCTV risulta che...\"\n\nCAMPO obiettivo (STRINGA):\n- Inizia con \"Si invita formalmente il collaboratore a:\"\n- Elenco puntato con \\n- per ogni punto\n- Minimo 3 punti SPECIFICI alla situazione\n- RIPRENDI OGNI dettaglio/indicazione dell'operatore come punto\n\nCAMPO scadenza: SEMPRE \"A partire da subito\"\nCAMPO collaboratore: Sig./Sig.ra + il segnaposto [COLLABORATORE] così com'e' (il nome vero lo rimette il programma)" +
+      "Sei un assistente aziendale esperto per Casinò Lugano SA (casa da gioco in Svizzera, regolata dalla CFCG - Commissione Federale delle Case da Gioco). Genera un \"Rilevamento di non conformità e colloquio di allineamento\".\nTesto: formale, chiaro, oggettivo, solo fatti.\n\nABBREVIAZIONI: DIR=Direttore, CO=Compliance, RLRD=Resp.LRD, RCS=Resp.Concezione Sociale, RSS=Resp.Sicurezza&Sorveglianza, R_FBS=Resp.FoBoSlot, SUP_FBS=Supervisor FoBoSlot, SUP_LG=Supervisor Live Game, R_LG=Resp.Live Game, CAS=Cassiere, REC=Receptionist, SA=Slot Attendant, GUARD=Guardaroba, BOK=Back Office, CR=Croupier, ISP=Ispettore tavolo, SIC=Sicurezza, SURV=Sorveglianza, CT=Counting Team, VP=Valet Parking, SECC=Sistema elettronico conteggio/controllo, AAGA=Apparecchi automatici da gioco, IR=Incident Report, SOL=Surveillance Operator Log, TRAKA=sistema gestione chiavi, QM=Quality Management, GD=giornata di gioco, CD=Cassa/Differenza cassa, PLG=prodotto lordo giochi, RDI=Rapporto Disciplinare Interno. Il programma cassa si chiama Asterix. Il programma controllo documenti alla reception si chiama Reception. Le postazioni NRT si chiamano Kiosk.\n\nCONTESTO NORMATIVO E PROCEDURALE DEL CASINÒ (usa per spiegare PERCHÉ una condotta è non conforme, citando la procedura QM specifica):\n\n• LRD - IDENTIFICAZIONE (QM 3-002): obbligo documento identità valido per transazioni a partire da CHF 3'000 (da CHF 3'000 in su, sotto i CHF 3'000 non si identifica), apertura deposito gettoni e carta Lugano Class (senza soglia). CAS deve verificare se cliente già identificato nel programma LRD, richiedere documento, registrare dati anagrafici completi, scansionare documento, far firmare Form I/II per avente economicamente diritto, chiedere esplicitamente se è PEP. Se transazione ≥CHF 15'000: SIC verifica KYC/PEP immediata. Se acquisto crediti/cambio valuta ≥CHF 30'000: chiarimento speciale con SUP_FBS prima di procedere. Se riscossione ≥CHF 50'000: idem. Smurfing (frazionamento per aggirare soglia) VIETATO. Al tavolo: CR deve avvisare ISP se importo da CHF 3'000 in su; se ≥CHF 30'000 rifiutare e indirizzare a cassa.\n\n• LRD - REGISTRAZIONE (QM 3-003): Form III obbligatorio per riscossioni ≥CHF 4'000, acquisti gettoni/cashless ≥CHF 30'000, movimenti deposito (senza soglia). Tutti i collaboratori devono segnalare comportamenti sospetti (Red Flags LRD) a SUP_FBS e RLRD.\n\n• CASSA (QM 5-001/5-002/5-003/5-004): CAS deve timbrare in divisa, recarsi alla postazione per via più breve senza soste. Pulizia mani obbligatoria (sfregamento palmi verso alto) ogni volta che tocca valori/corpo/entra-esce postazione. Valori sempre nel carrello quando si allontana. Apertura cassa con doppia chiave (CAS+SUP_FBS), conteggio fisico obbligatorio, confronto con formulario chiusura precedente. Discrepanza >CHF 10: contatta SUP_FBS. Transazioni sotto copertura CCTV (art.33 OCG-DFGP). Principio quattro occhi per transazioni interne. Verifica autenticità banconote con lampada UV. Carte credito: verificare autenticità, firma, documento; rifiutare carte aziendali. Hand Pay/Jackpot: documento identità obbligatorio, ricevuta firmata da cliente+CAS+SUP_FBS. Deposito gettoni: procedura LRD senza soglia, avvisare SURV e SUP_FBS.\n\n• RECEPTION (QM 4-001/4-002/4-004): REC deve verificare volto visibile, stato di decoro, no alterazione. Documento identità valido obbligatorio (≥18 anni). Inserimento dati nel sistema Reception (VETO). Divieto accesso assoluto: negare ingresso, informare SUP_FBS e SIC. Accesso con divieto gioco: compilare registro visitatori, targhetta Visitor, informare SUP_FBS e SURV. Carta Lugano Class: verifica periodica annuale obbligatoria, disabilitazione immediata se esclusione.\n\n• GUARDAROBA (QM 4-003): targhetta numerata per ogni capo, mostrare al cliente cosa si inserisce nel sacchetto. Convalida autosilo: verificare coincidenza orario ingresso autosilo/CLSA, importi >CHF 30: avvisare SUP_FBS. VIETATO convalidare biglietto autosilo per uso personale (nessun collaboratore). Cassa Ward: cassetta trasferita sempre chiusa.\n\n• CROUPIER/LIVE GAME (QM 8-001/8-002/8-003/8-014): CR deve presentarsi in divisa, pulizia mani obbligatoria (entrata/uscita tavolo, prima di toccare dolly, prima di scalinare numero, dopo prelevare gettoni da chipping machine, dopo aver toccato corpo). Apertura/chiusura tavolo: autorizzazione SURV, conta fisica ad alta voce, formulario firmato da ISP+CR, copia nel Drop Box. Principio quattro occhi (Gaming+SURV). Fill/Credit: conteggio ad alta voce, formulario firmato, corrispondenza sistema. Banconote CHF 200/1'000 e TUTTE le EUR: controllo UV una a una. Gettoni mai passati mano a mano al cliente. Cambio gettoni colore ≥CHF 20: controllo chipping machine; ≥CHF 50: taglio stecche da 5. Errori pagamento/dispute: notifica SUP_LG e SURV, decisione solo dopo verifica CCTV. Circostanze particolari: SURV redige IR e salva immagini.\n\n• MATERIALE DI GIOCO (QM 8-011): accesso locale carte con doppio badge, SURV informata. Trasporto carte sotto CCTV con almeno 2 membri staff. Controllo carte prima del gioco: completezza, danni, lampada UV, marchio sicurezza. Carta danneggiata: SUP_LG taglia a metà, avvisa SURV. Distruzione carte: SIC+SUP_LG presenti, monitoraggio SURV. Gettoni colore: verifica giornaliera, differenza >10 pezzi: avviso SURV, indagine. Caduta materiale: annuncio ad alta voce, ISP chiama SURV.\n\n• SLOTS/AAGA (QM 7-001/7-002/7-003): SA deve mantenersi in movimento nell'area assegnata, no soste non autorizzate. Mance: mostrare platealmente palmo verso alto verso CCTV, recarsi immediatamente al box raccolta, pulizia mani dopo. Hand Pay: verificare display AAGA, informare SURV e SUP_FBS per ≥CHF 15'000. Jackpot: comunicare tipologia/numero AAGA/importo a SUP_FBS, richiedere documento identità. Swiss Jackpot: SURV e CFCG da avvisare, AAGA sigillata. Carte cashless: autorizzazione SUP_FBS per raccolta, separare con/senza credito. Contestazioni Kiosk: trattenere carta cashless, chiedere ricevuta failed, contattare SUP_FBS. Rimborso >CHF 2'000: conferma collega/R_FBS. Jackpot >CHF 50'000: modulo fax CFCG entro fine giornata.\n\n• CONCEZIONE SOCIALE (QM 2-001/2-002) - LGD 2017: Art.52: vietato giocare a minorenni, esclusi, impiegati, CDA/CFCG. Ingresso minorenne/escluso: notifica immediata SUP_FBS, SURV verifica video, IR dettagliato, comunicazione CFCG obbligatoria (art.43 LGD). Opuscoli: generici (≥26 residenti TI=Progetto Residenti), giovani (<25=Progetto Giovani). Riconoscimento precoce: notifica per criteri A (gravi: problemi finanziari, richiesta prestiti) e B (frequenza, recupero). Cassetta piano 0/spogliatoi o ufficio CS. Coinvolgere Supervisor per criteri A. Ogni notifica va fatta anche se cliente già segnalato. Monitoraggio: 8 settimane (max 16), osservazione mirata, REC avvisa colleghi ingresso monitorato. Colloqui: prevenzione (Supervisor) e comportamento (RCS/SRCS). Esclusione imposta (art.80 cpv 1/2): debiti, poste sproporzionate, servizi sociali. Esclusione volontaria (art.80 cpv 5): revoca dopo 3 mesi. Revoca (art.81): documentazione finanziaria+IRGA+Direzione, monitoraggio 8 sett. post-revoca. Allarme TI 50K: identificare possessore cashcard anonima.\n\n• SICUREZZA (QM 13-001/13-003/13-006/13-007/13-008): SIC in divisa, badge, chiavi TRAKA. Ronde regolari. Accesso locali solo con autorizzazione e badge personale. Chiavi: registrazione ogni transazione, restituzione TRAKA fine turno, perdita chiave=informare RSS immediatamente. Personale esterno: solo con comunicazione scritta del Resp.settore. Esclusioni: inserimento VETO immediato con motivo e articolo di legge. Gestione conflitti: CR resta concentrato sul gioco, SUP_LG/SUP_FBS informano SURV e SIC prima di intervenire, colloquio in VIP Room. Denaro falso: segnalare immediatamente a SIC, trattenere banconota e cliente, chiamare Polizia, VIETATO restituire banconota falsa.\n\n• SORVEGLIANZA/CCTV (QM 14-001/14-002/14-003/14-004): SURV deve monitorare attività di gioco, redigere IR per ogni irregolarità/mancanza procedurale, salvare filmati CCTV. Camera check obbligatorio ogni turno. Guasto CCTV prima apertura: tavoli/AAGA NON in esercizio. Guasto durante giornata: interrompere esercizio fine unità di gioco. Guasto CCTV: comunicazione CFCG il giorno stesso. Accesso locale CCTV solo SURV/SIC. Registrazioni conservate minimo 4 settimane, VIETATO cancellare senza autorizzazione CFCG. Mancata segnalazione anomalie=negligenza/coinvolgimento diretto=procedimento disciplinare.\n\n• PRESENZE/HR (QM 16-003/16-005): timbratura entrata/uscita obbligatoria. Malattia: informare tempestivamente + certificato medico. Corsi aggiornamento obbligatori. Sistema disciplinare: allineamento verbale → allineamento scritto → RDI 1° → RDI 2° (può portare a disdetta). Dal 3° allineamento stesso motivo scatta RDI automatico.\n\n• CAVEAU/BACKOFFICE (QM 6-002): apertura sempre con principio quattro occhi (BOK+SIC). Conteggio fisico, confronto formulario chiusura precedente. Trapasso straordinario: avvisare SURV e SIC prima, registrare nel sistema. Assegni pre-firmati: accesso solo a 2 persone delegate. Chiavi nel TRAKA prima di uscire.\n\n• VALET PARKING: verifica tagliando/numero prima della consegna veicolo. Errore=rischio patrimoniale/sicurezza cliente.\n\n• REGOLE GENERALI: tutte le operazioni sotto CCTV. Obblighi comunicazione (art.43 LGD): segnalare immediatamente eventi che pregiudicano sicurezza/trasparenza giochi. Nuovi dipendenti: formazione LRD prima dell'impiego, refresh biennale. Dati personali (QM 1-002): documentazione buona reputazione obbligatoria, mancata presentazione=disdetta contratto.\n\nCAMPO non_conformita (STRINGA):\n- PIÙ PARAGRAFI separati da \\n\\n\n- Par 1: Descrizione del FATTO (cosa, quando, dove, chi)\n- Par 2: Spiega PERCHÉ è una non conformità, citando il regolamento/procedura/legge specifica violata (LRD, procedure interne, organigramma, ecc.)\n- Par 3 (SOLO se LOG/IR nei dati): \"Per i dettagli operativi si faccia riferimento al LOG / IR {numero}.\" Se NON c'è LOG/IR: ometti questo paragrafo, NON scrivere \"non disponibile\"\n- NON inventare fatti non presenti nei dati\n- Se CCTV nei dati: \"Dalla revisione delle immagini CCTV risulta che...\"\n\nCAMPO obiettivo (STRINGA):\n- Inizia con \"Si invita formalmente il collaboratore a:\"\n- Elenco puntato con \\n- per ogni punto\n- Minimo 3 punti SPECIFICI alla situazione\n- RIPRENDI OGNI dettaglio/indicazione dell'operatore come punto\n\nCAMPO scadenza: SEMPRE \"A partire da subito\"\nCAMPO collaboratore: Sig./Sig.ra + il segnaposto [COLLABORATORE] così com'è (il nome vero lo rimette il programma)" +
       _AI_REGOLA_SEGNAPOSTO +
       '\n\nREGOLE: donna→la collaboratrice/l\'impiegata, uomo→il collaboratore/l\'impiegato. Menziona reparto. Importi: CHF X\'XXX.·\nScrivi come un RESPONSABILE DI SETTORE esperto che lavora nel casinò ogni giorno, NON come un\'intelligenza artificiale. Il testo deve sembrare scritto da una persona reale. Evita frasi generiche o troppo perfette. Usa il linguaggio naturale e diretto di chi conosce le procedure. Per le soglie usa SEMPRE "pari o superiore a" (MAI "superiore a")\n\nFORMATO: JSON con 4 campi STRINGA: {"collaboratore":"...","non_conformita":"...","obiettivo":"...","scadenza":"..."}\n\nDATI:\n' +
       prompt;
   } else if (tipo === 'apprezzamento') {
     sysPrompt =
-      "Sei un responsabile di settore esperto del Casinò Lugano SA (CLSA). Scrivi come una persona REALE, NON come un'AI. Genera un \"Colloquio di apprezzamento\" (procedura QM 16-005).\nTono: formale ma naturale, sintetico, professionale. Evidenzia il contributo positivo con fatti concreti. Frasi brevi e dirette come le scriverebbe un responsabile di settore.\n\nAbbreviazioni: DIR=Direttore, SUP_FBS=Supervisor FoBoSlot, SUP_LG=Supervisor Live Game, CAS=Cassiere, REC=Receptionist, SA=Slot Attendant, CR=Croupier, ISP=Ispettore, SIC=Sicurezza, SURV=Sorveglianza, AAGA=Apparecchi automatici da gioco.\n\nRispondi SOLO con un JSON valido con questi campi:\n- collaboratore: Sig./Sig.ra + il segnaposto [COLLABORATORE] così com'e' (il nome vero lo rimette il programma)\n- descrizione: testo del merito/apprezzamento\n- osservazioni: breve nota di apprezzamento del Resp. Settore" +
+      'Sei un responsabile di settore esperto del Casinò Lugano SA (CLSA). Scrivi come una persona REALE, NON come un\'AI. Genera un "Colloquio di apprezzamento" (procedura QM 16-005).\nTono: formale ma naturale, sintetico, professionale. Evidenzia il contributo positivo con fatti concreti. Frasi brevi e dirette come le scriverebbe un responsabile di settore.\n\nAbbreviazioni: DIR=Direttore, SUP_FBS=Supervisor FoBoSlot, SUP_LG=Supervisor Live Game, CAS=Cassiere, REC=Receptionist, SA=Slot Attendant, CR=Croupier, ISP=Ispettore, SIC=Sicurezza, SURV=Sorveglianza, AAGA=Apparecchi automatici da gioco.\n\nRispondi SOLO con un JSON valido con questi campi:\n- collaboratore: Sig./Sig.ra + il segnaposto [COLLABORATORE] così com\'è (il nome vero lo rimette il programma)\n- descrizione: testo del merito/apprezzamento\n- osservazioni: breve nota di apprezzamento del Resp. Settore' +
       _AI_REGOLA_SEGNAPOSTO +
       '\n\nDATI DA ELABORARE:\n' +
       prompt;
@@ -2579,7 +2623,11 @@ async function diarioMostraArchivio() {
     const n = await diarioCaricaTutto();
     render();
     updateStats();
-    toast(n ? n + ' registrazioni dall archivio' : 'Nessuna registrazione più vecchia');
+    toast(
+      n
+        ? n + (n === 1 ? " registrazione dall'archivio" : " registrazioni dall'archivio")
+        : 'Nessuna registrazione più vecchia',
+    );
   } catch (e) {
     toastErrore('Archivio non caricato: ' + ((e && e.message) || e));
   }
@@ -2905,33 +2953,32 @@ function updateStats() {
 }
 
 // Funzione e percentuale d'impiego (per il Piano di lavoro e il saldo ore)
-async function cambiaFunzioneCollaboratore(id, funzione) {
+async function cambiaFunzioneCollaboratore(id, funzione, opz) {
   if (
     !isAdmin() &&
     !(typeof puoModificare === 'function' && puoModificare('gestione_impiego')) &&
     !puoModificareStoricoHr()
   ) {
-    toast('Non hai il permesso');
-    return;
+    return _collabEsito(opz, 'permesso', 'Non hai il permesso');
   }
   try {
     await secPatch('collaboratori', 'id=eq.' + id, { funzione: funzione || null });
     const c = collaboratoriCache.find((x) => x.id === id);
     if (c) c.funzione = funzione || null;
     logAzione('Funzione collaboratore', (c ? c.nome : id) + ' -> ' + (funzione || 'nessuna'));
-    toast('Funzione aggiornata');
+    if (!(opz && opz.scheda)) toast('Funzione aggiornata');
+    return true;
   } catch (e) {
-    toast('Errore salvataggio funzione');
+    return _collabEsito(opz, e, 'Errore salvataggio funzione');
   }
 }
-async function cambiaLingueCollaboratore(id, lingue) {
+async function cambiaLingueCollaboratore(id, lingue, opz) {
   if (
     !isAdmin() &&
     !(typeof puoModificare === 'function' && puoModificare('gestione_impiego')) &&
     !puoModificareStoricoHr()
   ) {
-    toast('Non hai il permesso');
-    return;
+    return _collabEsito(opz, 'permesso', 'Non hai il permesso');
   }
   try {
     // normalizza: bandierine emoji -> lettere, tutto in sigle maiuscole
@@ -2944,30 +2991,39 @@ async function cambiaLingueCollaboratore(id, lingue) {
     const c = collaboratoriCache.find((x) => x.id === id);
     if (c) c.lingue = v;
     logAzione('Lingue collaboratore', (c ? c.nome : id) + ' -> ' + v);
-    toast('Lingue aggiornate');
+    if (!(opz && opz.scheda)) toast('Lingue aggiornate');
+    return true;
   } catch (e) {
-    toast('Errore salvataggio lingue');
+    return _collabEsito(opz, e, 'Errore salvataggio lingue');
   }
 }
-async function cambiaPercentualeCollaboratore(id, perc) {
+async function cambiaPercentualeCollaboratore(id, perc, opz) {
   if (
     !isAdmin() &&
     !(typeof puoModificare === 'function' && puoModificare('gestione_impiego')) &&
     !puoModificareStoricoHr()
   ) {
-    toast('Non hai il permesso');
-    return;
+    return _collabEsito(opz, 'permesso', 'Non hai il permesso');
   }
   try {
     const p = parseFloat(perc) || 1;
-    await secPatch('collaboratori', 'id=eq.' + id, { percentuale: p });
     const c = collaboratoriCache.find((x) => x.id === id);
+    const prima = c ? parseFloat(c.percentuale) || 1 : null;
+    // stessa percentuale: niente da scrivere e niente evento nello Storico HR
+    if (prima !== null && Math.abs(prima - p) < 1e-9) return true;
+    await secPatch('collaboratori', 'id=eq.' + id, { percentuale: p });
     if (c) c.percentuale = p;
+    const pct = (v) => String(Math.round(v * 1000) / 10).replace('.', ',') + '%';
     if (typeof _insertHrEvento === 'function' && c)
-      _insertHrEvento(c.nome, 'nota', 'Percentuale impiego: ' + Math.round(p * 100) + '%');
-    logAzione('Percentuale collaboratore', (c ? c.nome : id) + ' -> ' + Math.round(p * 100) + '%');
-    toast('Percentuale aggiornata');
+      _insertHrEvento(
+        c.nome,
+        'nota',
+        'Percentuale impiego: ' + pct(p) + (prima !== null ? ' (era ' + pct(prima) + ')' : ''),
+      );
+    logAzione('Percentuale collaboratore', (c ? c.nome : id) + ' -> ' + pct(p));
+    if (!(opz && opz.scheda)) toast('Percentuale aggiornata');
+    return true;
   } catch (e) {
-    toast('Errore salvataggio percentuale');
+    return _collabEsito(opz, e, 'Errore salvataggio percentuale');
   }
 }

@@ -162,7 +162,7 @@ function capitalizzaNome(s) {
 const _ERRORI_IN_CHIARO = [
   [/duplicate key value violates unique constraint\s*"?[\w.]*"?/gi, 'esiste già (dato doppio)'],
   [/(TypeError:\s*)?(Failed to fetch|NetworkError[^\s.,;:)]*|Load failed)/gi, 'connessione assente'],
-  [/violates foreign key constraint\s*"?[\w.]*"?/gi, 'e collegato ad altri dati'],
+  [/violates foreign key constraint\s*"?[\w.]*"?/gi, 'è collegato ad altri dati'],
   [/null value in column "?(\w+)"?[^,.;]*violates not-null constraint/gi, 'manca un dato obbligatorio ($1)'],
   [/violates not-null constraint/gi, 'manca un dato obbligatorio'],
   [/value too long for type[^,.;)]*/gi, 'testo troppo lungo'],
@@ -170,7 +170,7 @@ const _ERRORI_IN_CHIARO = [
   [/permission denied[^,.;)]*/gi, 'permesso negato dal database'],
   [/JWT expired/gi, 'sessione scaduta: esci e rientra'],
   [/canceling statement due to statement timeout|statement timeout/gi, 'il database ha impiegato troppo: riprova'],
-  [/Could not find the function[^,;)]*/gi, 'funzione non presente sul server: serve l aggiornamento (avvisa l IT)'],
+  [/Could not find the function[^,;)]*/gi, "funzione non presente sul server: serve l'aggiornamento (avvisa l'IT)"],
 ];
 function erroreInChiaro(m) {
   let t = String(m == null ? '' : m);
@@ -615,7 +615,7 @@ async function _verificaNome(nome, annullabile) {
     b.innerHTML =
       '<h3>Collaboratore non trovato</h3><p style="margin-bottom:16px"><strong>"' +
       escP(nome) +
-      '"</strong> non e nella lista collaboratori.</p><div style="text-align:center;margin-bottom:16px"><button class="btn-salva" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\');document.querySelector(\'[data-verify-resolve]\').dataset.result=\'add\';document.querySelector(\'[data-verify-resolve]\').click()" style="padding:12px 24px;font-size:var(--fs-base,.9375rem)">Aggiungi "' +
+      '"</strong> non è nella lista collaboratori.</p><div style="text-align:center;margin-bottom:16px"><button class="btn-salva" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\');document.querySelector(\'[data-verify-resolve]\').dataset.result=\'add\';document.querySelector(\'[data-verify-resolve]\').click()" style="padding:12px 24px;font-size:var(--fs-base,.9375rem)">Aggiungi "' +
       escP(nome) +
       "\" alla lista</button></div><div style=\"text-align:center\"><button class=\"btn-salva\" onclick=\"document.getElementById('pwd-modal').classList.add('hidden');document.querySelector('[data-verify-resolve]').dataset.result='use';document.querySelector('[data-verify-resolve]').click()\" style=\"background:var(--paper2);color:var(--muted);border:1px solid var(--line);padding:10px 20px;font-size:var(--fs-md,.875rem);box-shadow:none\">Usa senza aggiungere</button></div>";
     const resolver = document.createElement('button');

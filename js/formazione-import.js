@@ -59,7 +59,7 @@ function _fziCollabDelSettore(rep) {
 
 async function formImportaMatrice(input, rep) {
   if (!isAdmin()) {
-    toast('Solo l amministratore importa le competenze da file');
+    toast("Solo l'amministratore importa le competenze da file");
     input.value = '';
     return;
   }
@@ -466,9 +466,9 @@ function _fziAvvisoGruppi(z) {
   const senza = _fziSenzaGruppo(z);
   if (!senza.length) return '';
   return (
-    '<p style="margin:0 0 8px;padding:8px 10px;border-radius:3px;background:var(--paper2);border-left:3px solid var(--c-rosso,#c0392b)"><b>Da fare dopo l import:</b> ' +
+    '<p style="margin:0 0 8px;padding:8px 10px;border-radius:3px;background:var(--paper2);border-left:3px solid var(--c-rosso,#c0392b)"><b>Da fare dopo l\'import:</b> ' +
     escP(senza.map((k) => k.label).join(', ')) +
-    (senza.length === 1 ? ' non e collegata' : ' non sono collegate') +
+    (senza.length === 1 ? ' non è collegata' : ' non sono collegate') +
     ' a un gruppo di turni. Finché non le colleghi (Piano &gt; Impostazioni, competenze e gruppi, per esempio al gruppo ' +
     escP(
       [...new Set((pianoTurniCache || []).filter((t) => (t.reparto_dip || 'slots') === z.rep).map((t) => t.gruppo))]
@@ -581,13 +581,13 @@ async function formAnnullaUltimoImport() {
   const creati = u.backup.filter((b) => !b.prima).map((b) => b.nome);
   if (
     !(await chiediConferma(
-      'Annullare l import di ' +
+      "Annullare l'import di " +
         u.file +
         ' (' +
         new Date(u.quando).toLocaleString('it-IT') +
         ')?\n\nLe competenze di ' +
         daRipristinare.length +
-        ' collaboratori tornano com erano.' +
+        " collaboratori tornano com'erano." +
         (creati.length
           ? '\nI collaboratori creati restano (' + creati.join(', ') + '): si disattivano a mano se servono.'
           : ''),
@@ -631,10 +631,10 @@ async function formAnnullaUltimoImport() {
     toastErrore(
       'Non ripristinati: ' +
         nonRipristinati.map((b) => b.nome).join(', ') +
-        '. Premi di nuovo Annulla l ultimo import.',
+        ". Premi di nuovo Annulla l'ultimo import.",
       10000,
     );
-  else toast('Import annullato: ' + ok + ' collaboratori come prima');
+  else toast('Import annullato: ' + ok + (ok === 1 ? ' collaboratore come prima' : ' collaboratori come prima'));
   if (typeof renderFormazione === 'function') renderFormazione();
 }
 function _fziUltimoImport() {

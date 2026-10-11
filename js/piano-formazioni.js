@@ -315,9 +315,9 @@ async function _renderPianoFormazioniTab() {
   const tutte = _formTutte().sort((a, b) => String(b.data_modulo).localeCompare(String(a.data_modulo)));
   const oggi = oggiLocale();
   let h =
-    '<div class="main-card" style="margin-bottom:14px"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Formazioni' +
+    '<div class="main-card" style="margin-bottom:14px"><div class="card-header" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Affiancamenti' +
     (puo
-      ? ' <button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 12px" onclick="formazioneNuova()">Nuova formazione</button>'
+      ? ' <button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:3px 12px" onclick="formazioneNuova()">Nuovo affiancamento</button>'
       : '') +
     '</div><div style="padding:12px 14px">';
   h +=

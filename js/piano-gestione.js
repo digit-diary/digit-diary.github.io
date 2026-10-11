@@ -3114,7 +3114,8 @@ async function _pianoRimettiCgf(nome, dstr) {
       return 0;
     const nota = ((r ? 'Ex ' + r.codice + ' - ' : '') + getOperatore()).substring(0, 400);
     if (r) {
-      await secPatch('piano', 'id=eq.' + r.id, {
+      // solo se il giorno e ancora com era letto (un collega puo averlo cambiato)
+      await _pianoAggiornaCella(r, {
         codice: 'CGF',
         generato: true,
         protetto: false,
@@ -3122,8 +3123,6 @@ async function _pianoRimettiCgf(nome, dstr) {
         operatore: getOperatore(),
         updated_at: new Date().toISOString(),
       });
-      const inMem = (typeof _pianoRighe !== 'undefined' ? _pianoRighe : []).find((x) => x.id === r.id);
-      if (inMem) Object.assign(inMem, { codice: 'CGF', generato: true, protetto: false, commento: nota });
     } else {
       const nuovo = await _pianoInserisciCella({
         collaboratore: nome,
@@ -3135,12 +3134,14 @@ async function _pianoRimettiCgf(nome, dstr) {
         reparto_dip: (r && r.reparto_dip) || _pianoReparto(),
         operatore: getOperatore(),
       });
-      if (nuovo && typeof _pianoRighe !== 'undefined') _pianoRighe.push(Array.isArray(nuovo) ? nuovo[0] : nuovo);
+      if (nuovo && typeof _pianoRighe !== 'undefined') _pianoMemoriaDopo([{ collaboratore: nome, data: d }], [nuovo]);
     }
     logAzione('Piano: CGF rimesso dopo malattia', nome + ' · ' + dstr + ' -> ' + d);
     return 1;
   } catch (e) {
+    // prima l errore restava in console: il CGF sembrava rimesso
     console.error('rimetti CGF', e);
+    toastErrore('CGF NON rimesso: ' + ((e && e.message) || e));
     return 0;
   }
 }
@@ -3234,25 +3235,22 @@ async function _pianoRiconciliaCgf(nome, ym, opz) {
       ))
     )
       return 0;
-    let fatte = 0;
-    for (const r of candidati) {
-      const nota =
-        'CGF tolto: festivo non lavorato' +
-        (opz.manuali ? '' : ' (malattia)') +
-        (opz.manuali || aMano ? ' - ' + getOperatore() : '');
-      await secPatch('piano', 'id=eq.' + r.id, {
-        codice: 'C',
-        commento: nota,
-        operatore: getOperatore(),
-        updated_at: new Date().toISOString(),
-      });
-      const inMem = _pianoRighe.find((x) => x.id === r.id);
-      if (inMem) {
-        inMem.codice = 'C';
-        inMem.commento = nota;
-      }
-      fatte++;
-    }
+    // tutti i CGF in UNA scrittura (tutto o niente), solo se sono ancora come letti
+    const nota =
+      'CGF tolto: festivo non lavorato' +
+      (opz.manuali ? '' : ' (malattia)') +
+      (opz.manuali || aMano ? ' - ' + getOperatore() : '');
+    const ora = new Date().toISOString();
+    const es = await _pianoScriviOps(
+      candidati.map((r) => ({
+        collaboratore: r.collaboratore,
+        data: String(r.data).substring(0, 10),
+        atteso: _pianoAttesoDi(r),
+        dati: { codice: 'C', commento: nota, operatore: getOperatore(), updated_at: ora },
+      })),
+    );
+    _pianoMemoriaDopo(es.ops, es.righe);
+    const fatte = candidati.length;
     if (fatte) {
       logAzione('Piano: CGF tolti (festivo in malattia)', nome + ' ' + ym + ' · ' + fatte);
       toast(
@@ -3269,6 +3267,7 @@ async function _pianoRiconciliaCgf(nome, ym, opz) {
     return fatte;
   } catch (e) {
     console.error('riconcilia CGF', e);
+    toastErrore('CGF in più NON tolti: ' + ((e && e.message) || e));
     return 0;
   }
 }
@@ -3286,19 +3285,31 @@ async function _pianoSincronizzaCongedoNp(c, rimuovi) {
     n++;
   }
   const op = getOperatore();
-  let fatte = 0;
+  // le scritture dei congedi non entrano nell Annulla dell ultima operazione del Piano
+  if (typeof _pianoFuoriDalPasso === 'function') _pianoFuoriDalPasso();
+  // TUTTI I GIORNI IN UNA SCRITTURA (tutto o niente), solo se le celle sono ancora come
+  // lette: prima una alla volta, un errore a meta lasciava meta periodo in CNP
+  const lette = giorni.length
+    ? (await secGet(
+        'piano?collaboratore=eq.' +
+          encodeURIComponent(c.collaboratore) +
+          '&data=gte.' +
+          giorni[0] +
+          '&data=lte.' +
+          giorni[giorni.length - 1],
+      )) || []
+    : [];
+  const cellaDi = new Map(lette.map((r) => [String(r.data).substring(0, 10), r]));
+  const ora = new Date().toISOString();
+  const ops = [];
   for (const d of giorni) {
-    const righe =
-      (await secGet('piano?collaboratore=eq.' + encodeURIComponent(c.collaboratore) + '&data=eq.' + d + '&limit=2')) ||
-      [];
-    const r = righe[0];
+    const r = cellaDi.get(d) || null;
     if (rimuovi) {
-      if (r && r.codice === 'CNP') {
-        await secDel('piano', 'id=eq.' + r.id);
-        fatte++;
-      }
+      if (r && r.codice === 'CNP')
+        ops.push({ collaboratore: r.collaboratore, data: d, atteso: _pianoAttesoDi(r), dati: null });
       continue;
     }
+    if (r && r.codice === 'CNP') continue;
     const body = {
       codice: 'CNP',
       protetto: true,
@@ -3306,19 +3317,13 @@ async function _pianoSincronizzaCongedoNp(c, rimuovi) {
       commento: ('Congedo non pagato' + (c.motivo ? ': ' + c.motivo : '')).substring(0, 400),
       operatore: op,
     };
-    if (r) {
-      if (r.codice === 'CNP') continue;
-      body.updated_at = new Date().toISOString();
-      await secPatch('piano', 'id=eq.' + r.id, body);
-    } else {
-      await secPost(
-        'piano',
-        Object.assign({ collaboratore: c.collaboratore, data: d, reparto_dip: c.reparto_dip || _pianoReparto() }, body),
-      );
-    }
-    fatte++;
+    if (r) body.updated_at = ora;
+    else body.reparto_dip = c.reparto_dip || _pianoReparto();
+    ops.push({ collaboratore: r ? r.collaboratore : c.collaboratore, data: d, atteso: _pianoAttesoDi(r), dati: body });
   }
-  return fatte;
+  const es = await _pianoScriviOps(ops);
+  if (typeof _pianoRighe !== 'undefined') _pianoMemoriaDopo(es.ops, es.righe);
+  return ops.length;
 }
 // DOMENICHE LIBERE: una domenica passata in vacanza o in malattia non e' un
 // riposo settimanale concesso dal piano: non conta ne' come libera ne' come
