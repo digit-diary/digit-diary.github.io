@@ -92,6 +92,8 @@ function GUIDA_CAPITOLI() {
         "Promemoria con data e ora, assegnabili a te o ad altri operatori, con avviso all'apertura del programma e notifica sul telefono.",
         'Quelli scaduti o di oggi compaiono in un riquadro in Home finché non li completi.',
         'Sono divisi per settore: ognuno vede quelli del proprio.',
+        "<b>Fatto</b> vale per tutti quelli a cui è assegnato: se lo segna un collega, sparisce anche dagli altri PC (l'elenco si aggiorna aprendo la pagina e ogni 5 minuti). Se lo segni fatto su un PC che non si era ancora aggiornato, il programma te lo dice e non lo rifà.",
+        "<b>Promemoria che si ripetono</b> (ogni giorno, settimana, mese...): con Fatto nasce il prossimo, con la prima data della serie dopo oggi, anche se era scaduto da giorni. <b>Riattiva</b> rimette aperto quello fatto e avvisa se il prossimo c'è già.",
       ],
     },
     {

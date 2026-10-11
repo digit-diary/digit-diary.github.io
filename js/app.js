@@ -189,6 +189,8 @@ function switchPage(name) {
   if (name === 'promemoria') {
     renderPromemoria();
     initPromemoriaUI();
+    // subito l elenco che c e, poi quello aggiornato dal database
+    if (typeof aggiornaPromemoriaDalServer === 'function') aggiornaPromemoriaDalServer();
   }
   if (name === 'dashboard') renderDashboard();
   if (name === 'consegna') {

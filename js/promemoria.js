@@ -147,7 +147,7 @@ async function _salvaPromemoriaEsegui() {
             .filter((s) => s);
     inviaPush(pushDests, 'Promemoria: ' + titolo, (descrizione || titolo).substring(0, 120), 'promemoria', true);
   } catch (e) {
-    toast('Errore creazione promemoria');
+    toastErrore('Promemoria non creato: ' + ((e && e.message) || e));
   }
 }
 // Somma n mesi tenendo l'ultimo giorno del mese se il giorno non esiste
@@ -162,41 +162,90 @@ function _aggiungiMesi(data, n) {
   return d;
 }
 const _pmCompletaInCorso = new Set();
+// PROSSIMA DATA di un promemoria che si ripete: la prima della serie DOPO oggi. Prima si
+// partiva dalla scadenza: un giornaliero scaduto da 5 giorni, segnato Fatto, ne creava uno
+// scaduto da 4 giorni che ricompariva subito come SCADUTO (sembrava che Fatto non funzionasse).
+function _pmProssimaData(p, oggi) {
+  const passo = (d) => {
+    if (p.ripetizione === 'giornaliero') d.setDate(d.getDate() + 1);
+    else if (p.ripetizione === 'settimanale') d.setDate(d.getDate() + 7);
+    else if (p.ripetizione === 'mensile') d = _aggiungiMesi(d, 1);
+    else if (p.ripetizione === 'semestrale') d = _aggiungiMesi(d, 6);
+    else if (p.ripetizione === 'annuale') d = _aggiungiMesi(d, 12);
+    return d;
+  };
+  // i mesi si contano sempre dalla scadenza originale (31.01 -> 28.02 -> 31.03, non 28.03)
+  const base = new Date(p.data_scadenza + 'T12:00:00');
+  let d = new Date(base.getTime());
+  for (let n = 1; n <= 2000; n++) {
+    if (/mensile|semestrale|annuale/.test(p.ripetizione)) {
+      const mesi = { mensile: 1, semestrale: 6, annuale: 12 }[p.ripetizione] * n;
+      d = _aggiungiMesi(base, mesi);
+    } else d = passo(d);
+    if (dataLocaleISO(d) > oggi) break;
+  }
+  return dataLocaleISO(d);
+}
 // un salvataggio alla volta: il doppio click creava righe doppie (unaVoltaSola in utils.js)
 function completaPromemoria(id) {
   return unaVoltaSola('promemoria-completa|' + id, () => _completaPromemoriaEsegui(id));
 }
 async function _completaPromemoriaEsegui(id) {
   const op = getOperatore();
-  const p = promemoriaCache.find((x) => x.id === id);
+  let p = promemoriaCache.find((x) => x.id === id);
   // Guardia: un secondo click (o un doppio click) creava un'altra occorrenza del ripetitivo
   if ((p && p.completata) || _pmCompletaInCorso.has(id)) return;
   _pmCompletaInCorso.add(id);
   try {
+    // STATO VERO dal database: un altro PC (o un collega) puo averlo gia segnato fatto o
+    // eliminato. Prima si rifaceva e per i ripetitivi nasceva un secondo "prossimo".
+    const ora = (await secGet('promemoria?id=eq.' + id)) || [];
+    if (!ora.length) {
+      promemoriaCache = promemoriaCache.filter((x) => x.id !== id);
+      renderPromemoria();
+      aggiornaPromemoriaBadge();
+      toast("Questo promemoria non c'è più: eliminato da un altro operatore");
+      return;
+    }
+    if (ora[0].completata) {
+      if (p) Object.assign(p, ora[0]);
+      await aggiornaPromemoriaDalServer();
+      toast(
+        'Era già fatto: ' +
+          (ora[0].completata_da || '?') +
+          (ora[0].completata_at ? ' il ' + new Date(ora[0].completata_at).toLocaleDateString('it-IT') : ''),
+      );
+      return;
+    }
+    p = p || ora[0];
     await secPatch('promemoria', 'id=eq.' + id, {
       completata: true,
       completata_da: op,
       completata_at: new Date().toISOString(),
     });
-    if (p) {
-      p.completata = true;
-      p.completata_da = op;
-      p.completata_at = new Date().toISOString();
-      // Se ripetitivo → crea prossima occorrenza
-      if (p.ripetizione) {
-        let d = new Date(p.data_scadenza + 'T12:00:00');
-        if (p.ripetizione === 'giornaliero') d.setDate(d.getDate() + 1);
-        else if (p.ripetizione === 'settimanale') d.setDate(d.getDate() + 7);
-        else if (p.ripetizione === 'mensile') d = _aggiungiMesi(d, 1);
-        else if (p.ripetizione === 'semestrale') d = _aggiungiMesi(d, 6);
-        else if (p.ripetizione === 'annuale') d = _aggiungiMesi(d, 12);
-        const nuovaData =
-          d.getFullYear() +
-          '-' +
-          String(d.getMonth() + 1).padStart(2, '0') +
-          '-' +
-          String(d.getDate()).padStart(2, '0');
-        try {
+    p.completata = true;
+    p.completata_da = op;
+    p.completata_at = new Date().toISOString();
+    if (!promemoriaCache.includes(p)) promemoriaCache.push(p);
+    // Se ripetitivo → crea la prossima occorrenza (dopo oggi, una sola)
+    if (p.ripetizione) {
+      const nuovaData = _pmProssimaData(p, oggiLocale());
+      try {
+        const rep = p.reparto_dip || currentReparto;
+        const gia =
+          (await secGet(
+            'promemoria?titolo=eq.' +
+              encodeURIComponent(p.titolo) +
+              '&ripetizione=eq.' +
+              encodeURIComponent(p.ripetizione) +
+              '&completata=eq.false&data_scadenza=gte.' +
+              nuovaData +
+              '&reparto_dip=eq.' +
+              encodeURIComponent(rep),
+          )) || [];
+        if (gia.length) {
+          toast("Fatto. Il prossimo c'è già: " + gia[0].data_scadenza.split('-').reverse().join('.'));
+        } else {
           const nr = await secPost('promemoria', {
             titolo: p.titolo,
             descrizione: p.descrizione,
@@ -204,48 +253,103 @@ async function _completaPromemoriaEsegui(id) {
             assegnato_a: p.assegnato_a,
             creato_da: p.creato_da,
             ripetizione: p.ripetizione,
-            reparto_dip: p.reparto_dip || currentReparto,
+            reparto_dip: rep,
           });
           if (nr && nr[0]) promemoriaCache.push(nr[0]);
-          toast('Prossimo: ' + nuovaData);
-        } catch (e) {
-          // la serie si fermerebbe senza dirlo: si avvisa con la data da ricreare
-          toastErrore(
-            'Completato, ma il prossimo promemoria (' +
-              nuovaData.split('-').reverse().join('.') +
-              ') non e stato creato: ' +
-              ((e && e.message) || e) +
-              '. Crealo a mano.',
-            10000,
-          );
+          toast('Fatto. Prossimo: ' + nuovaData.split('-').reverse().join('.'));
         }
+      } catch (e) {
+        // la serie si fermerebbe senza dirlo: si avvisa con la data da ricreare
+        toastErrore(
+          'Completato, ma il prossimo promemoria (' +
+            nuovaData.split('-').reverse().join('.') +
+            ') non è stato creato: ' +
+            ((e && e.message) || e) +
+            '. Crealo a mano.',
+          10000,
+        );
       }
-    }
-    logAzione('Promemoria completato', p ? p.titolo : '');
+    } else toast('Fatto');
+    promemoriaCache.sort((a, b) => a.data_scadenza.localeCompare(b.data_scadenza));
+    logAzione('Promemoria completato', p.titolo || '');
     renderPromemoria();
     aggiornaPromemoriaBadge();
-    toast('Completato!');
   } catch (e) {
-    toast('Errore completamento');
+    toastErrore('Promemoria non segnato come fatto: ' + ((e && e.message) || e));
   } finally {
     _pmCompletaInCorso.delete(id);
   }
 }
 async function riattivaPromemoria(id) {
+  const p = promemoriaCache.find((x) => x.id === id);
+  // ripetitivo: segnandolo fatto e nato il prossimo; riattivandolo ce ne sarebbero due
+  if (p && p.ripetizione) {
+    const prossimo = promemoriaCache.find(
+      (x) =>
+        x.id !== id &&
+        !x.completata &&
+        x.titolo === p.titolo &&
+        x.ripetizione === p.ripetizione &&
+        (x.reparto_dip || '') === (p.reparto_dip || '') &&
+        x.data_scadenza > p.data_scadenza,
+    );
+    if (
+      prossimo &&
+      !(await chiediConferma(
+        "Di questo promemoria c'è già il prossimo, del " +
+          prossimo.data_scadenza.split('-').reverse().join('.') +
+          '. Riattivandolo ne avrai due aperti. Riattivare comunque?',
+      ))
+    )
+      return;
+  }
   try {
-    await secPatch('promemoria', 'id=eq.' + id, { completata: false, completata_da: null, completata_at: null });
-    const p = promemoriaCache.find((x) => x.id === id);
+    // push_sent_at vuoto: la notifica parte di nuovo
+    await secPatch('promemoria', 'id=eq.' + id, {
+      completata: false,
+      completata_da: null,
+      completata_at: null,
+      push_sent_at: null,
+    });
     if (p) {
       p.completata = false;
       p.completata_da = null;
       p.completata_at = null;
+      p.push_sent_at = null;
     }
+    logAzione('Promemoria riattivato', p ? p.titolo : 'ID ' + id);
     renderPromemoria();
     aggiornaPromemoriaBadge();
+    toast('Promemoria riattivato');
   } catch (e) {
-    toast('Errore aggiornamento promemoria');
+    toastErrore('Promemoria non riattivato: ' + ((e && e.message) || e));
   }
 }
+// ELENCO SEMPRE FRESCO: l elenco si caricava solo all accesso. Su un PC acceso tutto il
+// giorno un promemoria fatto da un collega su un altro PC restava aperto: ripremendo Fatto
+// i ripetitivi ne creavano un altro. Si rilegge aprendo la pagina, tornando sulla finestra
+// e ogni 5 minuti.
+async function aggiornaPromemoriaDalServer() {
+  if (typeof getOperatore !== 'function' || !getOperatore()) return;
+  try {
+    const righe = await secGet('promemoria?order=data_scadenza.asc');
+    if (!Array.isArray(righe)) return;
+    promemoriaCache = righe;
+    if (localStorage.getItem('pagina_corrente') === 'promemoria') renderPromemoria();
+    aggiornaPromemoriaBadge();
+  } catch (e) {
+    /* rete assente: resta l elenco che c e, al prossimo giro si riprova */
+  }
+}
+setInterval(
+  () => {
+    if (document.visibilityState === 'visible') aggiornaPromemoriaDalServer();
+  },
+  5 * 60 * 1000,
+);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') aggiornaPromemoriaDalServer();
+});
 async function eliminaPromemoria(id) {
   // Il bottone e' solo per admin, ma il controllo va anche qui (chiamata diretta)
   if (!isAdmin()) {
@@ -261,7 +365,7 @@ async function eliminaPromemoria(id) {
     aggiornaPromemoriaBadge();
     toast('Eliminato');
   } catch (e) {
-    toast('Errore eliminazione promemoria');
+    toastErrore('Promemoria non eliminato: ' + ((e && e.message) || e));
   }
 }
 // Visibilità promemoria: settore corrente (i vecchi senza settore restano visibili ovunque)
@@ -392,7 +496,7 @@ function aggiornaPromemoriaBadge() {
   }
 }
 function _getDataRemindGlobal(p) {
-  const m = (p.descrizione || '').match(/Promemoria: (\d+) giorno\/i prima/);
+  const m = (p.descrizione || '').match(/Promemoria: (\d+) giorn[oi](?:\/i)? prima/);
   if (m) {
     const d = new Date(p.data_scadenza + 'T12:00:00');
     d.setDate(d.getDate() - parseInt(m[1]));
