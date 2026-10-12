@@ -1,5 +1,7 @@
 /**
  * Diario Collaboratori · Casino Lugano SA
+ * © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati.
+ * Uso consentito solo con licenza (vedi il file LICENZA).
  * File: valutazioni.js
  * Valutazione annuale integrata: 11 aree della scheda HR rev. 2026 (Polivalenza e adattabilità operativa,
  * "Affidabilità e disponibilità" (voce unica). Editor multi-scheda (anno/tipo),
@@ -963,15 +965,12 @@ async function esportaValutazionePDF(id) {
   const ph = doc.internal.pageSize.getHeight();
   const mx = 14;
   let y = 12;
-  if (_logoB64)
-    try {
-      doc.addImage(_logoB64, 'PNG', mx, y, 34, 19);
-    } catch (e) {}
+  identitaLogoPdf(doc, mx, y, 34, 19, false);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(100);
   doc.text(
-    'Scheda di valutazione\nRed: HR · Diario Collaboratori\nVersione: ' + new Date().getFullYear(),
+    'Scheda di valutazione\nRed: HR · ' + identita().programma + '\nVersione: ' + new Date().getFullYear(),
     pw - mx,
     y + 4,
     { align: 'right' },
@@ -1184,7 +1183,7 @@ async function esportaValutazionePDF(id) {
   doc.line(mx + 113, y + 14, mx + 165, y + 14);
   doc.setFontSize(6.5);
   doc.setTextColor(150);
-  doc.text('Casino Lugano SA · Scheda di valutazione ' + v.anno + ' · Riservato', mx, ph - 8);
+  doc.text(identita().azienda + ' · Scheda di valutazione ' + v.anno + ' · Riservato', mx, ph - 8);
   mostraPdfPreview(
     doc,
     'valutazione_' + v.collaboratore.replace(/\s+/g, '_') + '_' + v.anno + '.pdf',

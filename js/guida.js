@@ -1,5 +1,7 @@
 /**
  * Diario Collaboratori · Casino Lugano SA
+ * © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati.
+ * Uso consentito solo con licenza (vedi il file LICENZA).
  * File: guida.js
  * Guida completa del programma. Un solo posto per tutte le spiegazioni:
  * la pagina Guida le mostra tutte, la tab Guida del Piano mostra i capitoli
@@ -714,6 +716,7 @@ function GUIDA_CAPITOLI() {
         "Le impostazioni di configurazione (visibilità, profili, settori, punti, soglie, moduli, opzioni del piano) le salva solo una sessione amministratore: il server lo verifica, non basta l'interfaccia. Ogni salvataggio fallito viene segnalato con un avviso rosso, mai in silenzio.",
         "La pagina Impostazioni è divisa in quattro schede (Persone, Accessi, Settori e moduli, Dati): si vede solo il gruppo scelto, con le chip delle sue sezioni sotto le schede; il programma ricorda l'ultima scheda aperta.",
         '<b>Settori</b>: si creano, rinominano e si scelgono le pagine attive per ognuno.',
+        "<b>Identità del programma</b> (Settori e moduli, solo amministratore): nome del programma, nome dell'azienda, sigla, riga sopra il titolo, logo (caricato dal computer, ridotto da solo) e due colori facoltativi. Valgono nella testata, nella schermata di accesso, nel titolo della pagina e nelle intestazioni e nei piè di pagina dei PDF e delle stampe; l'anteprima mostra il risultato prima di salvare. I colori vengono adattati per restare leggibili nel tema chiaro e scuro. <b>Rimetti i valori predefiniti</b> riporta tutto com'era (poi Salva). La casella <b>Mostra il proprietario del programma in fondo alla pagina</b> accende o spegne la riga del proprietario (testo fisso, non modificabile, mai in stampa); di base è spenta.",
         '<b>Nome nei documenti</b> (in Settori): il nome ufficiale del settore che compare nei documenti stampati, per esempio <b>FoBoSlot</b> per Slots. Nei menu resta il nome breve. Vale per i fogli di cambio turno (anche quelli già archiviati), il formulario vuoto, la stampa del Piano, il briefing, le coperture, i crediti, le vacanze e le valutazioni. Vuoto = nome breve.',
         '<b>Profili personalizzati</b> (Visibilità e permessi): oltre ai cinque profili fissi del documento firmato si creano altre figure, per esempio Compliance o Segretariato: si parte da una copia di un profilo esistente, si decide voce per voce Modifica, Vede o No, si salva. Il profilo compare nel menu accanto agli altri, "Applica i profili" lo tratta allo stesso modo e la scheda permessi stampata lo mostra con il suo nome. I cinque profili fissi non si possono modificare.',
         '<b>Nuovo operatore</b>: nel modulo di creazione la casella "Posizione e permessi" assegna subito un profilo (fisso o personalizzato) e lo applica, oppure copia gli accessi di un collega (profilo, accessi extra, voci selezionate; il settore se non scelto), oppure apre la tabella di un nuovo profilo personalizzato che al salvataggio viene assegnato all\'operatore appena creato.',

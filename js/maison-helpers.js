@@ -1,5 +1,7 @@
 /**
  * Diario Collaboratori · Casino Lugano SA
+ * © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati.
+ * Uso consentito solo con licenza (vedi il file LICENZA).
  * File: maison-helpers.js
  * Maison: import, parser nomi, helpers
  */
@@ -1028,10 +1030,7 @@ async function esportaMaisonPDF() {
     const doc = new jsPDF('portrait', 'mm', 'a4');
     const pw = doc.internal.pageSize.getWidth();
     let y = 14;
-    if (_logoB64)
-      try {
-        doc.addImage(_logoB64, 'PNG', pw / 2 - 20, y, 40, 22.5);
-      } catch (e) {}
+    identitaLogoPdf(doc, pw / 2, y, 40, 22.5, true);
     y += 28;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(16);
@@ -1066,7 +1065,7 @@ async function esportaMaisonPDF() {
     } else {
       _periodoLabel = 'Tutti i dati';
     }
-    doc.text(_periodoLabel + ' · Casino Lugano SA', pw / 2, y, {
+    doc.text(_periodoLabel + ' · ' + identita().azienda, pw / 2, y, {
       align: 'center',
     });
     y += 10;
@@ -1139,7 +1138,11 @@ async function esportaMaisonPDF() {
       doc.setPage(i);
       doc.setFontSize(7);
       doc.setTextColor(150);
-      doc.text('Casino Lugano SA · Costi Maison · Pag. ' + i + '/' + tp, 16, doc.internal.pageSize.getHeight() - 8);
+      doc.text(
+        identita().azienda + ' · Costi Maison · Pag. ' + i + '/' + tp,
+        16,
+        doc.internal.pageSize.getHeight() - 8,
+      );
     }
     mostraPdfPreview(doc, 'costi_maison_' + _maisonFilePeriodo(data) + '.pdf', 'Costi Maison');
   } catch (e) {
@@ -1770,10 +1773,7 @@ async function esportaSpeseExtraPDF() {
     const doc = new jsPDF('portrait', 'mm', 'a4');
     const pw = doc.internal.pageSize.getWidth();
     let y = 14;
-    if (_logoB64)
-      try {
-        doc.addImage(_logoB64, 'PNG', pw / 2 - 20, y, 40, 22.5);
-      } catch (e) {}
+    identitaLogoPdf(doc, pw / 2, y, 40, 22.5, true);
     y += 28;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(16);
@@ -1782,7 +1782,7 @@ async function esportaSpeseExtraPDF() {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100);
-    doc.text('Casino Lugano SA · ' + data.length + ' spese · CHF ' + fmtCHF(tot), pw / 2, y, { align: 'center' });
+    doc.text(identita().azienda + ' · ' + data.length + ' spese · CHF ' + fmtCHF(tot), pw / 2, y, { align: 'center' });
     y += 10;
     doc.setTextColor(0);
     doc.autoTable({
@@ -1819,7 +1819,7 @@ async function esportaSpeseExtraPDF() {
       doc.setPage(i);
       doc.setFontSize(7);
       doc.setTextColor(150);
-      doc.text('Casino Lugano SA · Spese Extra · Pag. ' + i + '/' + tp, 16, doc.internal.pageSize.getHeight() - 8);
+      doc.text(identita().azienda + ' · Spese Extra · Pag. ' + i + '/' + tp, 16, doc.internal.pageSize.getHeight() - 8);
     }
     mostraPdfPreview(doc, 'spese_extra.pdf', 'Spese Extra');
   } catch (e) {
@@ -3846,7 +3846,9 @@ function aggiornaMenuMobile() {
     const op = typeof getOperatore === 'function' ? getOperatore() : '';
     const oggi = new Date();
     let html =
-      '<div class="mobile-nav-testa"><div class="mobile-nav-titolo">Diario Collaboratori</div><div class="mobile-nav-chi">' +
+      '<div class="mobile-nav-testa"><div class="mobile-nav-titolo">' +
+      escP(identita().programma) +
+      '</div><div class="mobile-nav-chi">' +
       (op ? escP(op) + ' · ' : '') +
       (typeof GIORNI !== 'undefined' ? GIORNI[oggi.getDay()] + ' ' : '') +
       oggi.toLocaleDateString('it-IT') +

@@ -1,4 +1,9 @@
 /**
+ * Diario Collaboratori
+ * © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati.
+ * Uso consentito solo con licenza (vedi il file LICENZA).
+ */
+/**
  * CONFINE FRA DUE MESI (v364)
  *
  * Un cambio negli ultimi giorni di un mese puo rompere una regola di legge nei

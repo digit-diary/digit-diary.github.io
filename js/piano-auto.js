@@ -1,4 +1,9 @@
 /**
+ * Diario Collaboratori
+ * © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati.
+ * Uso consentito solo con licenza (vedi il file LICENZA).
+ */
+/**
  * GENERAZIONE AUTOMATICA DEL PIANO (v364)
  *
  * L amministratore sceglie in Piano > Impostazioni, per ogni settore, un giorno

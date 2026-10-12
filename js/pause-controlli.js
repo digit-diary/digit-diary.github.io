@@ -1,5 +1,7 @@
 /**
  * Diario Collaboratori · Casino Lugano SA
+ * © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati.
+ * Uso consentito solo con licenza (vedi il file LICENZA).
  * File: pause-controlli.js
  *
  * CONTROLLI DEL FOGLIO PAUSE (Slots), in funzioni PURE e testabili.

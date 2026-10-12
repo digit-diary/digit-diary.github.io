@@ -1,5 +1,7 @@
 /**
  * Diario Collaboratori · Casino Lugano SA
+ * © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati.
+ * Uso consentito solo con licenza (vedi il file LICENZA).
  * File: piano-chi-fa-cosa.js
  * Piano > Regole: "Chi puo fare cosa" (sola lettura, controllo del 09/10/2026). Per un
  * collaboratore, ogni turno del settore raggruppato per area con l esito (si / ammesso /

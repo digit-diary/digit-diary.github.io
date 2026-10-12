@@ -1,5 +1,7 @@
 /**
  * Diario Collaboratori · Casino Lugano SA
+ * © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati.
+ * Uso consentito solo con licenza (vedi il file LICENZA).
  * File: chat-ui.js
  */
 
@@ -3821,11 +3823,7 @@ async function stampaSchedaPDF(nome) {
   var doc = new jsPDF('portrait', 'mm', 'a4');
   var pw = doc.internal.pageSize.getWidth();
   var y = 14;
-  if (typeof _logoB64 !== 'undefined' && _logoB64)
-    try {
-      doc.addImage(_logoB64, 'PNG', pw / 2 - 20, y, 40, 22.5);
-      y += 27;
-    } catch (e) {}
+  if (identitaLogoPdf(doc, pw / 2, y, 40, 22.5, true)) y += 27;
   doc.setFontSize(15);
   doc.setFont('helvetica', 'bold');
   doc.text('Scheda Collaboratore · ' + nome, pw / 2, y + 4, { align: 'center' });
@@ -4042,7 +4040,7 @@ async function stampaSchedaPDF(nome) {
   }
   doc.setFontSize(6.5);
   doc.setTextColor(150);
-  doc.text('Casino Lugano SA · Scheda collaboratore · Riservato', 14, doc.internal.pageSize.getHeight() - 8);
+  doc.text(identita().azienda + ' · Scheda collaboratore · Riservato', 14, doc.internal.pageSize.getHeight() - 8);
 
   mostraPdfPreview(
     doc,

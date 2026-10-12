@@ -1,5 +1,7 @@
 /**
  * Diario Collaboratori · Casino Lugano SA
+ * © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati.
+ * Uso consentito solo con licenza (vedi il file LICENZA).
  * File: formazione.js
  * Progetto Multidisciplinarità: mappatura competenze (spunte per reparto),
  * livelli L1/L2/L3, sistema punti personalizzabile e premi.
@@ -2248,10 +2250,7 @@ async function esportaMatricePDF() {
   const doc = new jsPDF('landscape', 'mm', 'a4');
   const pw = doc.internal.pageSize.getWidth();
   let y = 14;
-  if (_logoB64)
-    try {
-      doc.addImage(_logoB64, 'PNG', pw / 2 - 20, y, 40, 22.5);
-    } catch (e) {}
+  identitaLogoPdf(doc, pw / 2, y, 40, 22.5, true);
   y += 28;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(15);
@@ -2268,7 +2267,8 @@ async function esportaMatricePDF() {
       currentReparto.slice(1) +
       ' · ' +
       new Date().toLocaleDateString('it-IT') +
-      ' · Casino Lugano SA',
+      ' · ' +
+      identita().azienda,
     pw / 2,
     y,
     { align: 'center' },
@@ -2304,7 +2304,7 @@ async function esportaMatricePDF() {
   });
   doc.setFontSize(7);
   doc.setTextColor(150);
-  doc.text('Casino Lugano SA · Matrice competenze · Riservato', 14, doc.internal.pageSize.getHeight() - 8);
+  doc.text(identita().azienda + ' · Matrice competenze · Riservato', 14, doc.internal.pageSize.getHeight() - 8);
   mostraPdfPreview(doc, 'matrice_competenze_' + currentReparto + '.pdf', 'Matrice Competenze');
 }
 
@@ -2345,10 +2345,7 @@ async function esportaReportIncentiviPDF() {
   const doc = new jsPDF('portrait', 'mm', 'a4');
   const pw = doc.internal.pageSize.getWidth();
   let y = 14;
-  if (_logoB64)
-    try {
-      doc.addImage(_logoB64, 'PNG', pw / 2 - 20, y, 40, 22.5);
-    } catch (e) {}
+  identitaLogoPdf(doc, pw / 2, y, 40, 22.5, true);
   y += 28;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(15);
@@ -2363,7 +2360,9 @@ async function esportaReportIncentiviPDF() {
       currentReparto.slice(1) +
       ' · generato il ' +
       new Date().toLocaleDateString('it-IT') +
-      ' · Casino Lugano SA · Documento riservato HR',
+      ' · ' +
+      identita().azienda +
+      ' · Documento riservato HR',
     pw / 2,
     y,
     { align: 'center' },
@@ -2445,7 +2444,7 @@ async function esportaReportIncentiviPDF() {
   );
   doc.setFontSize(7);
   doc.setTextColor(150);
-  doc.text('Casino Lugano SA · Report incentivi · Riservato HR', 14, doc.internal.pageSize.getHeight() - 8);
+  doc.text(identita().azienda + ' · Report incentivi · Riservato HR', 14, doc.internal.pageSize.getHeight() - 8);
   logAzione('Report incentivi', 'PDF esportato · reparto ' + currentReparto + ', anno ' + anno);
   mostraPdfPreview(doc, 'report_incentivi_' + currentReparto + '_' + anno + '.pdf', 'Report Incentivi');
 }

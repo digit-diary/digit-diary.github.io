@@ -1,5 +1,7 @@
 /**
  * Diario Collaboratori · Casino Lugano SA
+ * © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati.
+ * Uso consentito solo con licenza (vedi il file LICENZA).
  * File: search.js
  * Ricerca globale, riepilogo mensile PDF
  */
@@ -504,10 +506,7 @@ async function _eseguiRiepilogoMensile() {
       }
     }
     // Logo
-    if (_logoB64)
-      try {
-        doc.addImage(_logoB64, 'PNG', pw / 2 - 20, y, 40, 22.5);
-      } catch (e) {}
+    identitaLogoPdf(doc, pw / 2, y, 40, 22.5, true);
     y += 28;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(16);
@@ -517,7 +516,7 @@ async function _eseguiRiepilogoMensile() {
     doc.setFontSize(11);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100);
-    doc.text(meseName + ' · Casino Lugano SA', pw / 2, y, { align: 'center' });
+    doc.text(meseName + ' · ' + identita().azienda, pw / 2, y, { align: 'center' });
     y += 10;
     doc.setTextColor(0);
     // Panoramica (sempre visibile)
@@ -897,7 +896,7 @@ async function _eseguiRiepilogoMensile() {
       doc.setPage(i);
       doc.setFontSize(7);
       doc.setTextColor(150);
-      doc.text('Casino Lugano SA · Riepilogo ' + meseName + ' · Pag. ' + i + '/' + tp, mx, ph - 8);
+      doc.text(identita().azienda + ' · Riepilogo ' + meseName + ' · Pag. ' + i + '/' + tp, mx, ph - 8);
     }
     mostraPdfPreview(doc, 'Riepilogo_' + meseName.replace(/\s/g, '_') + '.pdf', 'Riepilogo ' + meseName);
   } catch (e) {

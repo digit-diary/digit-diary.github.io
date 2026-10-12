@@ -1,5 +1,7 @@
 /**
  * Diario Collaboratori · Casino Lugano SA
+ * © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati.
+ * Uso consentito solo con licenza (vedi il file LICENZA).
  * File: piano-organico.js
  *
  * SCHEDA ORGANICO del Piano: legge i dati del settore (fabbisogno, turni,
@@ -1224,7 +1226,8 @@ async function organicoRapportoPdf() {
   doc.setFontSize(9);
   doc.setTextColor(100);
   doc.text(
-    'Casino Lugano SA · generata il ' +
+    identita().azienda +
+      ' · generata il ' +
       new Date().toLocaleDateString('it-IT') +
       ' da ' +
       (getOperatore() || '') +

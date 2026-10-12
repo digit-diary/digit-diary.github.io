@@ -1,5 +1,7 @@
 /**
  * Diario Collaboratori · Casino Lugano SA
+ * © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati.
+ * Uso consentito solo con licenza (vedi il file LICENZA).
  * File: api.js
  */
 
@@ -132,6 +134,7 @@ async function loadAll() {
       'conservazione_anni',
       'conservazione_giorni_grazia',
       'piano_turni_bloccati_nuovi',
+      'identita',
     ]);
   } catch (e) {
     toastErrore('Caricamento dati non riuscito: ' + e.message);
@@ -168,7 +171,10 @@ async function loadAll() {
     consAnni,
     consGrazia,
     bloccatiNuovi,
+    identitaImp,
   ] = impostazioni;
+  // identita del programma (nome, azienda, logo, colori): anche in localStorage per la schermata di accesso
+  if (typeof identitaDaImpostazione === 'function') identitaDaImpostazione(identitaImp);
   // turni bloccati di partenza dei collaboratori nuovi (Piano > Impostazioni > Preferenze)
   window._pianoBloccatiNuovi = null;
   if (bloccatiNuovi)

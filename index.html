@@ -1,4 +1,5 @@
 <!doctype html>
+<!-- Diario Collaboratori · © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati. Uso consentito solo con licenza (file LICENZA). -->
 <html lang="it">
   <head>
     <meta charset="UTF-8" />
@@ -23,6 +24,8 @@
     <link rel="apple-touch-icon" href="icon-192.png" />
     <link rel="icon" type="image/png" href="icon-192.png" />
     <title>Diario Collaboratori – Casinò Lugano SA</title>
+    <meta name="copyright" content="© 2026 Suisse Prestige Sagl, Lugano. Tutti i diritti riservati." />
+    <meta name="author" content="Suisse Prestige Sagl" />
     <!-- caratteri serviti dal sito stesso (libs/fonts): nessuna richiesta a Google -->
     <link href="libs/fonts.css" rel="stylesheet" />
     <script
@@ -102,9 +105,10 @@
     <div id="login-overlay">
       <div class="login-box">
         <img
+          id="login-logo"
           src="logo_casino.png"
-          alt="Casino Lugano SA"
-          style="width: 140px; margin-bottom: 16px"
+          alt="Casinò Lugano SA"
+          style="width: 140px; max-height: 110px; object-fit: contain; margin-bottom: 16px"
         />
         <h2>Accesso Protetto</h2>
         <p>Seleziona settore, operatore e password</p>
@@ -298,8 +302,7 @@
 
     <header>
       <h1>
-        <span class="subtitle">Registro Aziendale</span>Diario
-        Collaboratori<span class="casino">Casinò Lugano SA</span>
+        <span class="subtitle" id="id-riga">Registro Aziendale</span><span id="id-programma">Diario Collaboratori</span><span class="casino" id="id-azienda">Casinò Lugano SA</span>
       </h1>
       <div class="header-right">
         <div class="date-badge" id="today-date"></div>
@@ -326,6 +329,8 @@
         </div>
       </div>
     </header>
+    <!-- identita del programma (nome, azienda, logo, colori): prima del primo disegno -->
+    <script src="js/identita.js"></script>
 
     <!-- BARRA DEL TELEFONO (ondata 3): una riga sola con menu, ricerca e segnalazioni; al computer non si vede -->
     <div class="barra-telefono" id="barra-telefono">
@@ -3530,6 +3535,10 @@
         <div class="settings-btn-row" id="sicurezza-btns"></div>
         <div id="biometric-settings" class="sez-box"></div>
       </div>
+      <div class="settings-section" data-gruppo="Settori e moduli" id="identita-section" style="display: none">
+        <div class="sez-head"><div><h4>Identità del programma</h4><p class="sez-desc">Nome del programma, azienda, logo e colori che compaiono nella testata, nella schermata di accesso, nel titolo della pagina e nei documenti stampati o in PDF. Si può anche scegliere se mostrare in fondo alla pagina la riga del proprietario del programma (testo fisso, mai in stampa).</p></div></div>
+        <div id="identita-ui"></div>
+      </div>
       <div class="settings-section" data-gruppo="Settori e moduli" id="ai-section" style="display: none">
         <div class="sez-head"><div><h4>Intelligenza artificiale</h4><p class="sez-desc">Migliora i testi dei moduli e dell Assistente. Si può usare un servizio esterno (Groq) oppure un modello sul server interno (Ollama o LM Studio con Llama, Qwen, Mistral): uno e in uso, un altro può fare da riserva. I nomi dei collaboratori vengono sempre sostituiti prima dell invio e le fotografie non escono dal programma.</p></div></div>
         <div id="ai-fornitori-ui"></div>
@@ -3600,6 +3609,8 @@
         &#10005;
       </button>
     </div>
+
+    <footer class="app-copyright" aria-label="Proprietà del programma" hidden>Diario Collaboratori · © 2026 Suisse Prestige Sagl, Lugano · Tutti i diritti riservati</footer>
 
     <!-- JavaScript: 22 file separati per area funzionale -->
     <script src="js/config.js"></script>

@@ -1,5 +1,7 @@
 /**
  * Diario Collaboratori · Casino Lugano SA
+ * © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati.
+ * Uso consentito solo con licenza (vedi il file LICENZA).
  * File: auth.js
  * Autenticazione: login, password, sessioni, biometrico
  */
@@ -439,7 +441,7 @@ async function registraBiometrico() {
     var cred = await navigator.credentials.create({
       publicKey: {
         challenge: crypto.getRandomValues(new Uint8Array(32)),
-        rp: { name: 'Diario Collaboratori', id: location.hostname },
+        rp: { name: identita().programma, id: location.hostname },
         user: { id: userId, name: op, displayName: op },
         pubKeyCredParams: [
           { alg: -7, type: 'public-key' },

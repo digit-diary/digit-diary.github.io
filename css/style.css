@@ -1,3 +1,8 @@
+/*
+ * Diario Collaboratori
+ * © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati.
+ * Uso consentito solo con licenza (vedi il file LICENZA).
+ */
 :root {
   /* scala dei caratteri (standard PC). La base segue la dimensione scelta
      dall operatore (--scala-testo, pulsanti A- / A+), salvata per operatore */
@@ -9939,4 +9944,18 @@ body:not(.piano-segn-mostra):not(.segn-aperte):has(#page-piano.active #piano-avv
 }
 .fz-sett-turno.pref {
   color: var(--muted);
+}
+
+/* proprietà del programma: una riga discreta in fondo alla pagina, solo a schermo */
+.app-copyright {
+  text-align: center;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  padding: 24px 16px 28px;
+  letter-spacing: 0.02em;
+}
+@media print {
+  .app-copyright {
+    display: none !important;
+  }
 }

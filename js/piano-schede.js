@@ -1,5 +1,7 @@
 /**
  * Diario Collaboratori · Casino Lugano SA
+ * © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati.
+ * Uso consentito solo con licenza (vedi il file LICENZA).
  * File: piano-schede.js
  * PIANO · timbrature, statistiche, import vacanze, saldo ore dell anno, esportazione formato HR
  * Parte del modulo Piano: i file piano-*.js si caricano in ordine (index.html) e condividono lo stesso ambito globale.
@@ -1929,7 +1931,7 @@ async function pdfCambioVacanza(dati) {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(14);
   doc.setTextColor(51, 51, 51);
-  doc.text('Casino Lugano SA', 105, y, { align: 'center' });
+  doc.text(identita().azienda, 105, y, { align: 'center' });
   y += 8;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(20);
@@ -2054,7 +2056,7 @@ async function pdfCambioVacanza(dati) {
   });
   doc.setFontSize(8);
   doc.setTextColor(150, 150, 150);
-  doc.text('Casino Lugano SA · formulario cambio vacanza', 105, 287, { align: 'center' });
+  doc.text(identita().azienda + ' · formulario cambio vacanza', 105, 287, { align: 'center' });
   mostraPdfPreview(doc, 'cambio_vacanza.pdf', 'Formulario cambio vacanza');
 }
 

@@ -1,5 +1,7 @@
 /**
  * Diario Collaboratori · Casino Lugano SA
+ * © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati.
+ * Uso consentito solo con licenza (vedi il file LICENZA).
  * File: piano-cambi.js
  * PIANO · copia Excel, stampa PDF, cambi turno (scambio, esigenze, cerca cambio), copertura malattia
  * Parte del modulo Piano: i file piano-*.js si caricano in ordine (index.html) e condividono lo stesso ambito globale.
@@ -96,7 +98,7 @@ async function stampaPianoPDF(soloNomi) {
   });
   doc.setFontSize(6);
   doc.setTextColor(120);
-  doc.text('Casino Lugano SA · Piano di lavoro · generato il ' + new Date().toLocaleDateString('it-IT'), 4, 205);
+  doc.text(identita().azienda + ' · Piano di lavoro · generato il ' + new Date().toLocaleDateString('it-IT'), 4, 205);
   logAzione('Piano stampato', label + ' (' + _pianoReparto() + ')');
   mostraPdfPreview(doc, 'piano_' + ym + '_' + _pianoReparto() + '.pdf', 'Piano ' + label);
 }
@@ -119,7 +121,7 @@ function _pdfCambioTurno(dati) {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(14);
   doc.setTextColor(51, 51, 51);
-  doc.text('Casino Lugano SA', 105, y, { align: 'center' });
+  doc.text(identita().azienda, 105, y, { align: 'center' });
   y += 8;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(20);
@@ -333,7 +335,7 @@ function _pdfCambioTurno(dati) {
   doc.line(M, ph - 14, 210 - M, ph - 14);
   doc.setFontSize(7.5);
   doc.setTextColor(85, 85, 85);
-  doc.text('Casino Lugano SA · Richiesto da: ' + (dati.richiesto || getOperatore()), 105, ph - 9, {
+  doc.text(identita().azienda + ' · Richiesto da: ' + (dati.richiesto || getOperatore()), 105, ph - 9, {
     align: 'center',
   });
   return doc;
@@ -579,7 +581,7 @@ async function stampaListaCambioLibero() {
   doc.text('Firma richiedente: __________________     Firma collega: __________________', 14, y);
   doc.setFontSize(8);
   doc.text(
-    'Casino Lugano SA · lista informativa, il cambio va confermato dal responsabile',
+    identita().azienda + ' · lista informativa, il cambio va confermato dal responsabile',
     14,
     doc.internal.pageSize.getHeight() - 8,
   );
@@ -1800,7 +1802,7 @@ async function stampaPropostaCopertura() {
     margin: { left: 12, right: 12 },
   });
   doc.setFontSize(8);
-  doc.text('Casino Lugano SA · proposta operativa, non vincolante', 14, doc.internal.pageSize.getHeight() - 8);
+  doc.text(identita().azienda + ' · proposta operativa, non vincolante', 14, doc.internal.pageSize.getHeight() - 8);
   mostraPdfPreview(doc, 'proposta_copertura_' + _pianoMeseSel + '.pdf', 'Proposta copertura');
 }
 // PIANO → DIARIO: una malattia scritta nel piano si registra anche nel Diario,

@@ -1,5 +1,7 @@
 /**
  * Diario Collaboratori · Casino Lugano SA
+ * © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati.
+ * Uso consentito solo con licenza (vedi il file LICENZA).
  * File: navigazione.js
  * Freccia Indietro del browser e del telefono (09/10/2026, richiesta del titolare: "se premo
  * la freccia mi esce dal Diario"). Ogni cambio di pagina e di scheda del Piano entra nella

@@ -1,5 +1,7 @@
 /**
  * Diario Collaboratori · Casino Lugano SA
+ * © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati.
+ * Uso consentito solo con licenza (vedi il file LICENZA).
  * File: maison-budget.js
  * Maison: budget, categorie, profilo
  */
@@ -495,10 +497,7 @@ async function esportaListaMaisonPDF() {
     const doc = new jsPDF('portrait', 'mm', 'a4');
     const pw = doc.internal.pageSize.getWidth();
     let y = 14;
-    if (_logoB64)
-      try {
-        doc.addImage(_logoB64, 'PNG', pw / 2 - 20, y, 40, 22.5);
-      } catch (e) {}
+    identitaLogoPdf(doc, pw / 2, y, 40, 22.5, true);
     y += 28;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(16);
@@ -507,7 +506,7 @@ async function esportaListaMaisonPDF() {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100);
-    doc.text('Casino Lugano SA · ' + _br.length + ' clienti', pw / 2, y, { align: 'center' });
+    doc.text(identita().azienda + ' · ' + _br.length + ' clienti', pw / 2, y, { align: 'center' });
     y += 10;
     doc.setTextColor(0);
     const catOrder = ['full_maison', 'maison', 'direzione', 'bu', 'bl'];
@@ -555,7 +554,11 @@ async function esportaListaMaisonPDF() {
       doc.setPage(i);
       doc.setFontSize(7);
       doc.setTextColor(150);
-      doc.text('Casino Lugano SA · Clienti Maison · Pag. ' + i + '/' + tp, 16, doc.internal.pageSize.getHeight() - 8);
+      doc.text(
+        identita().azienda + ' · Clienti Maison · Pag. ' + i + '/' + tp,
+        16,
+        doc.internal.pageSize.getHeight() - 8,
+      );
     }
     mostraPdfPreview(doc, 'clienti_maison.pdf', 'Lista Clienti Maison');
   } catch (e) {

@@ -1,5 +1,7 @@
 /**
  * Diario Collaboratori · Casino Lugano SA
+ * © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati.
+ * Uso consentito solo con licenza (vedi il file LICENZA).
  * File: formazione-import.js
  * Formazione: import delle competenze da un file Excel "a matrice" (un collaboratore per
  * riga, una competenza per colonna, una X dove la persona la sa fare), per qualsiasi

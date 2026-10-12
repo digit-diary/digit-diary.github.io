@@ -1,5 +1,7 @@
 /**
  * Diario Collaboratori · Casino Lugano SA
+ * © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati.
+ * Uso consentito solo con licenza (vedi il file LICENZA).
  * File: stats.js
  */
 
@@ -508,7 +510,7 @@ async function esportaPDF() {
     const doc = new jsPDF('landscape', 'mm', 'a4');
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text('Diario Collaboratori - Casino Lugano SA', 14, 15);
+    doc.text(identita().programma + ' - ' + identita().azienda, 14, 15);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(120);
@@ -568,13 +570,17 @@ async function esportaPDF() {
       didDrawPage: function () {
         doc.setFontSize(7);
         doc.setTextColor(150);
-        doc.text('Casino Lugano SA - Pag. ' + doc.internal.getNumberOfPages(), 14, doc.internal.pageSize.height - 8);
+        doc.text(
+          identita().azienda + ' - Pag. ' + doc.internal.getNumberOfPages(),
+          14,
+          doc.internal.pageSize.height - 8,
+        );
       },
     });
     mostraPdfPreview(
       doc,
       'diario_' + new Date().toLocaleDateString('it-IT').replace(/\//g, '-') + '.pdf',
-      'Diario Collaboratori',
+      identita().programma,
     );
   } catch (e) {
     console.error('PDF error:', e);
@@ -824,10 +830,7 @@ async function esportaReportDirezionePDF() {
   const pw = doc.internal.pageSize.getWidth();
   const ph = doc.internal.pageSize.getHeight();
   let y = 14;
-  if (_logoB64)
-    try {
-      doc.addImage(_logoB64, 'PNG', pw / 2 - 20, y, 40, 22.5);
-    } catch (e) {}
+  identitaLogoPdf(doc, pw / 2, y, 40, 22.5, true);
   y += 28;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
@@ -837,7 +840,7 @@ async function esportaReportDirezionePDF() {
   doc.setFontSize(9);
   doc.setTextColor(100);
   doc.text(
-    'Diario Collaboratori · generato il ' + new Date().toLocaleDateString('it-IT') + ' · Riservato alla Direzione',
+    identita().programma + ' · generato il ' + new Date().toLocaleDateString('it-IT') + ' · Riservato alla Direzione',
     pw / 2,
     y,
     { align: 'center' },
@@ -970,7 +973,7 @@ async function esportaReportDirezionePDF() {
   }
   doc.setFontSize(6.5);
   doc.setTextColor(150);
-  doc.text('Casino Lugano SA · Report Direzione · Documento riservato', 14, ph - 8);
+  doc.text(identita().azienda + ' · Report Direzione · Documento riservato', 14, ph - 8);
   logAzione('Report Direzione', 'PDF esportato · ' + per.label);
   mostraPdfPreview(
     doc,

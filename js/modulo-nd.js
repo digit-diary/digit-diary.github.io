@@ -1,5 +1,7 @@
 /**
  * Diario Collaboratori · Casino Lugano SA
+ * © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati.
+ * Uso consentito solo con licenza (vedi il file LICENZA).
  * File: modulo-nd.js
  *
  * LISTA DI NON DISPONIBILITA (JOLLY), modulo 1187 di Human Resources: lo stesso
@@ -153,19 +155,25 @@ async function _ndRiallineaMese() {
 }
 
 // ---------------------------------------------------------------- PDF
-// logo ritagliato (l immagine ha molto bianco attorno)
+// logo ritagliato (l immagine predefinita ha molto bianco attorno); un logo
+// caricato in Identita del programma si usa intero
 let _ndLogo = null;
 async function _ndLogoRitagliato() {
   if (_ndLogo) return _ndLogo;
   try {
-    if (typeof _logoB64 === 'undefined' || !_logoB64) await _loadLogo();
+    if (!_logoB64) await _loadLogo();
+    if (!_logoB64) return null;
+    if (identita().logo) {
+      _ndLogo = { url: _logoB64, ratio: 1 / _logoRatio, intero: true };
+      return _ndLogo;
+    }
     const img = await new Promise((ok, ko) => {
       const i = new Image();
       i.onload = () => ok(i);
       i.onerror = ko;
       i.src = _logoB64;
     });
-    // parte disegnata del logo (CASINO, il simbolo, LUGANO)
+    // parte disegnata del logo predefinito (CASINO, il simbolo, LUGANO)
     const x = 0.04 * img.width;
     const y = 0.06 * img.height;
     const w = 0.92 * img.width;
@@ -179,6 +187,12 @@ async function _ndLogoRitagliato() {
     _ndLogo = null;
   }
   return _ndLogo;
+}
+// logo del modulo 1187 in alto a sinistra: riquadro 30 x 14,3 mm (il predefinito ritagliato lo riempie)
+function _ndDisegnaLogo(doc, logo) {
+  if (!logo) return;
+  if (logo.intero) identitaLogoPdf(doc, 18, 5, 30, 14.3, false);
+  else doc.addImage(logo.url, 'PNG', 18, 5, 30, 30 * logo.ratio);
 }
 // modulo 1187 · stessa impaginazione dell originale (A4, misure in mm)
 async function _pdfListaNd(dati) {
@@ -203,7 +217,7 @@ async function _pdfListaNd(dati) {
   doc.setTextColor(0);
   // intestazione: logo, reparto e numero del modulo, dati del documento
   const logo = await _ndLogoRitagliato();
-  if (logo) doc.addImage(logo.url, 'PNG', 18, 5, 30, 30 * logo.ratio);
+  _ndDisegnaLogo(doc, logo);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
   doc.text('4 - Human Resources', 13, 25.5);
@@ -344,7 +358,7 @@ async function pdfNotificaAssenza() {
   };
   doc.setTextColor(0);
   const logo = await _ndLogoRitagliato();
-  if (logo) doc.addImage(logo.url, 'PNG', 18, 5, 30, 30 * logo.ratio);
+  _ndDisegnaLogo(doc, logo);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
   doc.text('4 - Human Resources', 13, 25.5);

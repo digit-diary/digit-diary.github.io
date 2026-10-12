@@ -1,5 +1,7 @@
 /**
  * Diario Collaboratori · Casino Lugano SA
+ * © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati.
+ * Uso consentito solo con licenza (vedi il file LICENZA).
  * File: scheda-permessi.js
  *
  * SCHEDA DEI PERMESSI DA COMPILARE (un solo modello per tutto il programma):
@@ -65,7 +67,9 @@
     ].filter((g) => g[1]);
     const h = [TESTA];
     h.push(
-      '<header><h1>Diario Collaboratori · scheda dei permessi: stato attuale da controllare</h1><p>Ogni casella dice se l operatore <b>puo</b> (Si) vedere quella pagina o scheda, oppure eseguire quella funzione, cosi come e impostato oggi (' +
+      '<header><h1>' +
+        E(d.programma || 'Diario Collaboratori') +
+        ' · scheda dei permessi: stato attuale da controllare</h1><p>Ogni casella dice se l operatore <b>puo</b> (Si) vedere quella pagina o scheda, oppure eseguire quella funzione, cosi come e impostato oggi (' +
         E(d.oggi) +
         '). Se qualcosa va cambiato, cambia la casella: resta evidenziata in rosso, e alla fine <b>Salva copia compilata</b> produce il file da rinviare con tutte le modifiche dentro. L amministratore (password master) puo tutto ed e escluso.</p></header>',
     );

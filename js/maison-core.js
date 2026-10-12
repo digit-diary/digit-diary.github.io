@@ -1,5 +1,7 @@
 /**
  * Diario Collaboratori · Casino Lugano SA
+ * © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati.
+ * Uso consentito solo con licenza (vedi il file LICENZA).
  * File: maison.js
  */
 
@@ -1221,10 +1223,7 @@ async function esportaGdOggiPDF() {
     const doc = new jsPDF('portrait', 'mm', 'a4');
     const pw = doc.internal.pageSize.getWidth();
     let y = 14;
-    if (_logoB64)
-      try {
-        doc.addImage(_logoB64, 'PNG', pw / 2 - 20, y, 40, 22.5);
-      } catch (e) {}
+    identitaLogoPdf(doc, pw / 2, y, 40, 22.5, true);
     y += 28;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(16);
@@ -1233,9 +1232,14 @@ async function esportaGdOggiPDF() {
     doc.setFontSize(11);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100);
-    doc.text('GD ' + dt.toLocaleDateString('it-IT') + ' · ' + GIORNI[dt.getDay()] + ' · Casino Lugano SA', pw / 2, y, {
-      align: 'center',
-    });
+    doc.text(
+      'GD ' + dt.toLocaleDateString('it-IT') + ' · ' + GIORNI[dt.getDay()] + ' · ' + identita().azienda,
+      pw / 2,
+      y,
+      {
+        align: 'center',
+      },
+    );
     y += 5;
     doc.text(righe.length + ' clienti · ' + totPx + ' persone · CHF ' + fmtCHF(tot), pw / 2, y, { align: 'center' });
     y += 10;
@@ -1310,7 +1314,7 @@ async function esportaGdOggiPDF() {
     doc.setFontSize(7);
     doc.setTextColor(150);
     doc.text(
-      'Casino Lugano SA · Formulario Ristorante GD ' + dt.toLocaleDateString('it-IT'),
+      identita().azienda + ' · Formulario Ristorante GD ' + dt.toLocaleDateString('it-IT'),
       16,
       doc.internal.pageSize.getHeight() - 8,
     );
@@ -2086,7 +2090,9 @@ function stampaSchedaCliente() {
   win.document.write('textarea,input[type=text]{display:none!important}');
   win.document.write('@media print{body{padding:10px}}</style></head><body>');
   win.document.write(
-    '<div style="text-align:center;margin-bottom:20px;font-size:var(--fs-sm,.8125rem);color:#8a7d6b">Casino Lugano SA · Scheda Cliente</div>',
+    '<div style="text-align:center;margin-bottom:20px;font-size:var(--fs-sm,.8125rem);color:#8a7d6b">' +
+      escP(identita().azienda) +
+      ' · Scheda Cliente</div>',
   );
   win.document.write(content);
   win.document.write(
@@ -2551,10 +2557,7 @@ async function esportaMaisonClientePDF(nome) {
     const doc = new jsPDF('portrait', 'mm', 'a4');
     const pw = doc.internal.pageSize.getWidth();
     let y = 14;
-    if (_logoB64)
-      try {
-        doc.addImage(_logoB64, 'PNG', pw / 2 - 20, y, 40, 22.5);
-      } catch (e) {}
+    identitaLogoPdf(doc, pw / 2, y, 40, 22.5, true);
     y += 28;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
@@ -2591,7 +2594,7 @@ async function esportaMaisonClientePDF(nome) {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100);
-    doc.text(mesi + ' · Casino Lugano SA', pw / 2, y, { align: 'center' });
+    doc.text(mesi + ' · ' + identita().azienda, pw / 2, y, { align: 'center' });
     y += 8;
     doc.setTextColor(0);
     // KPI
@@ -2758,7 +2761,11 @@ async function esportaMaisonClientePDF(nome) {
       doc.setPage(i);
       doc.setFontSize(7);
       doc.setTextColor(150);
-      doc.text('Casino Lugano SA · ' + nome + ' · Pag. ' + i + '/' + tp, 16, doc.internal.pageSize.getHeight() - 8);
+      doc.text(
+        identita().azienda + ' · ' + nome + ' · Pag. ' + i + '/' + tp,
+        16,
+        doc.internal.pageSize.getHeight() - 8,
+      );
     }
     mostraPdfPreview(
       doc,

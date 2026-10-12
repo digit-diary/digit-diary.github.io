@@ -1,3 +1,8 @@
+/**
+ * Diario Collaboratori
+ * © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati.
+ * Uso consentito solo con licenza (vedi il file LICENZA).
+ */
 // ============================================================
 // MOTORE PAUSE · port 1:1 dai file Excel di Musa:
 //  - Slots: ModuloPause_v8c (BG1/Q2/BG3, pattern LUN-GIO / VEN-SAB /
@@ -4929,7 +4934,7 @@ async function pdfBriefingGiorno() {
   }
   doc.setFontSize(6);
   doc.setTextColor(120);
-  doc.text('Casino Lugano SA · Briefing · E/U da spuntare a penna', 10, PH - 5);
+  doc.text(identita().azienda + ' · Briefing · E/U da spuntare a penna', 10, PH - 5);
   logAzione('Briefing stampato', _pianoReparto() + ' ' + dstr);
   mostraPdfPreview(doc, 'briefing_' + dstr + '_' + _pianoReparto() + '.pdf', 'Briefing ' + lbl);
 }
@@ -5194,7 +5199,7 @@ async function pdfPauseGiorno() {
   doc.setFontSize(6);
   doc.setTextColor(120);
   doc.text(
-    'Casino Lugano SA · Pause ' + _pianoReparto() + ' · generato il ' + new Date().toLocaleDateString('it-IT'),
+    identita().azienda + ' · Pause ' + _pianoReparto() + ' · generato il ' + new Date().toLocaleDateString('it-IT'),
     10,
     292,
   );

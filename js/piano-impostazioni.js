@@ -1,5 +1,7 @@
 /**
  * Diario Collaboratori · Casino Lugano SA
+ * © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati.
+ * Uso consentito solo con licenza (vedi il file LICENZA).
  * File: piano-impostazioni.js
  * PIANO · mappature e impostazioni, solver esterno, formulari, card congedi non pagati
  * Parte del modulo Piano: i file piano-*.js si caricano in ordine (index.html) e condividono lo stesso ambito globale.
@@ -2067,7 +2069,7 @@ async function pdfNonDisponibilitaJolly() {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   doc.setTextColor(140, 20, 50);
-  doc.text('CASINÒ LUGANO', M, y);
+  doc.text(identita().azienda.toUpperCase(), M, y);
   doc.setTextColor(51, 51, 51);
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');

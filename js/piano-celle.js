@@ -1,5 +1,7 @@
 /**
  * Diario Collaboratori · Casino Lugano SA
+ * © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati.
+ * Uso consentito solo con licenza (vedi il file LICENZA).
  * File: piano-celle.js
  * PIANO · stampa singolo collaboratore, menu tasto destro, modifica rapida delle celle
  * Parte del modulo Piano: i file piano-*.js si caricano in ordine (index.html) e condividono lo stesso ambito globale.
@@ -150,7 +152,8 @@ async function stampaPianoCollaboratore(nome) {
       doc.setFontSize(7.5);
       doc.setTextColor(153, 153, 153);
       doc.text(
-        'Casino Lugano SA · Piano turni ' +
+        identita().azienda +
+          ' · Piano turni ' +
           meseNome +
           ' ' +
           anno +

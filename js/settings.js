@@ -1,5 +1,7 @@
 /**
  * Diario Collaboratori · Casino Lugano SA
+ * © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati.
+ * Uso consentito solo con licenza (vedi il file LICENZA).
  * File: settings.js
  * Impostazioni: visibilità, operatori, temi, campi
  */
@@ -1981,7 +1983,7 @@ async function esportaBackupCompleto() {
       totale += (dati[t] || []).length;
     }
     const backup = {
-      app: 'Diario Collaboratori · Casino Lugano SA',
+      app: identita().programma + ' · ' + identita().azienda,
       esportato_il: new Date().toISOString(),
       esportato_da: getOperatore(),
       tabelle: dati,
@@ -2625,6 +2627,7 @@ function scaricaSchedaPermessiCompilabile() {
     voci: VIS_ITEMS,
     ereditati: PIANO_AUTO_EREDITATI,
     oggi: oggi,
+    programma: identita().programma,
   });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([pagina], { type: 'text/html;charset=utf-8' }));
@@ -2668,7 +2671,9 @@ function stampaSchedaPermessi() {
   const oggi = new Date().toLocaleDateString('it-IT');
   let h =
     '<!DOCTYPE html><html lang="it"><head><meta charset="utf-8"><title>Scheda permessi</title><style>body{font-family:Georgia,serif;color:#1c1a17;margin:24px;font-size:13px}h1{font-size:var(--fs-xl,1.25rem);margin:0 0 4px}h2{font-size:var(--fs-lg,1.0625rem);margin:22px 0 6px;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid #000;padding-bottom:4px}table{border-collapse:collapse;width:100%;font-size:11.5px}th,td{border:1px solid #999;padding:3px 6px;text-align:center}th{background:#eee}td.l{text-align:left}tr.g td{background:#f3efe6;text-align:left;font-weight:700}.si{background:#e3f0e8;font-weight:700}.no{color:#999}p{margin:4px 0;color:#444}.nb{margin:12px 0}@media print{.nb{display:none}body{margin:10mm}table{font-size:10px}}@page{size:A4 landscape;margin:9mm}@media print{html,body{width:auto!important;margin:0!important}table{width:100%!important;table-layout:fixed;font-size:9px!important}td,th{overflow-wrap:anywhere;word-break:break-word;padding:2px 3px!important}thead{display:table-header-group}tr{break-inside:avoid}h2{break-after:avoid}}</style></head><body>' +
-    '<h1>Diario Collaboratori · scheda dei permessi attuali</h1><p>Stato delle Impostazioni al ' +
+    '<h1>' +
+    escP(identita().programma) +
+    ' · scheda dei permessi attuali</h1><p>Stato delle Impostazioni al ' +
     oggi +
     '. Sì = può (vedere la pagina o la scheda, oppure eseguire la funzione); vuoto = no. L\'amministratore può tutto ed è escluso dalla tabella.</p><div class="nb"><button onclick="window.print()">Stampa / PDF</button></div>';
   h +=
