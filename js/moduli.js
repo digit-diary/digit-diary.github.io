@@ -48,9 +48,9 @@ function apriModulo(tipo) {
       '<div class="modulo-field"><label>Obiettivo concordato onde evitare il ripetersi della non conformità</label><textarea id="mod-obiettivo" placeholder="Obiettivo concordato..."></textarea><div class="btn-ai-wrap"><button class="btn-ai" onclick="miglioraTesto(\'mod-obiettivo\',\'obiettivo concordato\')">Migliora testo con AI</button></div></div>';
     html +=
       '<div class="modulo-field"><label>Scadenza</label><input type="text" id="mod-scadenza" placeholder="' +
-      escP(MODULI_SCADENZA_DEFAULT) +
+      escP(_moduloScadenzaVuota(tipo)) +
       '">' +
-      _moduloScadenzaAiuti() +
+      _moduloScadenzaAiuti(tipo) +
       '</div>';
   } else if (tipo === 'apprezzamento') {
     html += 'Colloquio di apprezzamento</div><div style="padding:18px">';
@@ -82,9 +82,9 @@ function apriModulo(tipo) {
       '<div class="modulo-field"><label>Obiettivo concordato onde evitare il ripetersi della non conformità</label><textarea id="mod-obiettivo" placeholder="Obiettivo concordato..."></textarea><div class="btn-ai-wrap"><button class="btn-ai" onclick="miglioraTesto(\'mod-obiettivo\',\'obiettivo concordato\')">Migliora testo con AI</button></div></div>';
     html +=
       '<div class="modulo-field"><label>Scadenza (termine di verifica)</label><input type="text" id="mod-scadenza" placeholder="' +
-      escP(MODULI_SCADENZA_DEFAULT) +
+      escP(_moduloScadenzaVuota(tipo)) +
       '">' +
-      _moduloScadenzaAiuti() +
+      _moduloScadenzaAiuti(tipo) +
       '</div>';
     html +=
       '<div class="modulo-field"><label>Livello RDI</label><select id="mod-livello"><option value="I">I° livello</option><option value="II">II° livello (grave)</option></select></div>';
@@ -240,15 +240,16 @@ function _idAziendaPrompt() {
 // Esempi pronti sotto il campo: e' un TERMINE, non una frase. Senza un aiuto
 // chiaro ci si scriveva dentro l'obiettivo, e sul documento ufficiale non ci
 // stava bene.
-function _moduloScadenzaAiuti() {
+function _moduloScadenzaAiuti(tipo) {
   const oggi = new Date();
   oggi.setDate(oggi.getDate() + 30);
   const fra30 = 'Entro il ' + oggi.toLocaleDateString('it-IT');
-  const voci = [MODULI_SCADENZA_DEFAULT, 'Entro 30 giorni', fra30];
+  const vuota = _moduloScadenzaVuota(tipo);
+  const voci = [vuota, 'Entro 30 giorni', fra30];
   return (
     '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px;align-items:center">' +
     '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">E un termine, non una frase. Vuoto = "' +
-    escP(MODULI_SCADENZA_DEFAULT) +
+    escP(vuota) +
     '". Esempi:</span>' +
     voci
       .map(
@@ -275,10 +276,16 @@ function _moduloScadenzaMetti(v) {
 // che ha scritto l'operatore. Il valore finisce in UN SOLO punto del PDF: prima
 // veniva stampato sia sotto il titolo "Scadenza" sia dentro la frase di
 // chiusura, e chi ci scriveva una frase se la ritrovava ripetuta due volte.
+// La formula standard e un testo del modello del documento (Modelli dei documenti,
+// js/modelli-documenti.js); questa costante e il testo originale.
 const MODULI_SCADENZA_DEFAULT = 'A partire da subito';
-function _moduloScadenza(valore) {
+function _moduloScadenzaVuota(tipo, testi) {
+  if (typeof modelloTesti !== 'function' || !MODELLI_DOC[tipo]) return MODULI_SCADENZA_DEFAULT;
+  return modelloSostituisci((testi || modelloTesti(tipo)).scad_vuota, modelloValori({}));
+}
+function _moduloScadenza(valore, tipo, testi) {
   const v = String(valore == null ? '' : valore).trim();
-  return v || MODULI_SCADENZA_DEFAULT;
+  return v || (tipo ? _moduloScadenzaVuota(tipo, testi) : MODULI_SCADENZA_DEFAULT);
 }
 // Responsabile di settore proposto nei moduli: personalizzabile per reparto in
 // Impostazioni. Prima il nome era scritto fisso dentro il programma, quindi
@@ -336,8 +343,8 @@ async function generaModuloPDF(tipo) {
         !(await chiediConferma(
           'Questo documento va nel fascicolo personale di ' +
             collab +
-            ' e manca:\n\n\u2022 ' +
-            vuoti.join('\n\u2022 ') +
+            ' e manca:\n\n• ' +
+            vuoti.join('\n• ') +
             '\n\nGenerarlo comunque?',
         ))
       ) {
@@ -358,256 +365,32 @@ async function generaModuloPDF(tipo) {
     existingQr && existingQr.dati && existingQr.dati.qr_code
       ? existingQr.dati.qr_code
       : Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
-  const doc = new jspdf.jsPDF({ unit: 'mm', format: 'a4' });
-  const pw = doc.internal.pageSize.getWidth();
-  const ph = doc.internal.pageSize.getHeight();
-  const mx = 20;
-  let y = 12;
-  // logo dell azienda (js/identita.js), riquadro 40 x 22,5 mm
-  identitaLogoPdf(doc, pw / 2, y, 40, 40 / 1.78, true);
-  y += 28;
-  function checkPage(need) {
-    if (y + need > ph - 25) {
-      doc.addPage();
-      y = 20;
-      return true;
-    }
-    return false;
-  }
-  // Tabella intestazione (come Word)
-  function drawHeaderTable() {
-    const tw = pw - mx * 2,
-      col1 = 42;
-    doc.autoTable({
-      theme: 'grid',
-      startY: y,
-      margin: { left: mx, right: mx },
-      tableWidth: tw,
-      body: [
-        ['Collaboratore', collab],
-        ['Resp. Settore', resp],
-        ['Data', data],
-      ],
-      theme: 'grid',
-      styles: {
-        font: 'helvetica',
-        fontSize: 9.5,
-        cellPadding: { top: 2, bottom: 2, left: 4, right: 4 },
-        textColor: [0, 0, 0],
-        lineColor: [0, 0, 0],
-        lineWidth: 0.3,
-      },
-      columnStyles: {
-        0: { fontStyle: 'bold', cellWidth: col1 },
-        1: { fontStyle: 'normal' },
-      },
-      didDrawPage: function () {},
-    });
-    y = doc.lastAutoTable.finalY + 6;
-  }
-  // Sezione con titolo sottolineato (come Word)
-  function drawSection(title, text) {
-    const maxW = pw - mx * 2;
-    checkPage(25);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(0);
-    const titleLines = doc.splitTextToSize(title, maxW);
-    doc.text(titleLines, mx, y);
-    doc.setDrawColor(0);
-    doc.setLineWidth(0.3);
-    titleLines.forEach(function (line, i) {
-      const lw2 = doc.getTextWidth(line);
-      doc.line(mx, y + 1.2 + i * 4.5, mx + lw2, y + 1.2 + i * 4.5);
-    });
-    y += titleLines.length * 4.5 + 4;
-    if (text) {
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9.5);
-      doc.setTextColor(0);
-      const lines = doc.splitTextToSize(text, maxW);
-      lines.forEach(function (line) {
-        checkPage(5);
-        doc.text(line, mx, y);
-        y += 4;
-      });
-      y += 2;
-    } else {
-      y += 4;
-    }
-    y += 2;
-  }
-  // Riquadro "Scadenza": titolo sottolineato, nota esplicativa e valore. Il
-  // valore va a capo se e' lungo (prima usciva dal bordo destro e si perdeva) ed
-  // e' scritto una volta sola.
-  function drawScadenza(valore) {
-    const maxW = pw - mx * 2;
-    checkPage(18);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(0);
-    const lbl = 'Scadenza';
-    doc.text(lbl, mx, y);
-    const lw = doc.getTextWidth(lbl);
-    doc.setDrawColor(0);
-    doc.setLineWidth(0.3);
-    doc.line(mx, y + 1.2, mx + lw, y + 1.2);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.text(
-      " (termine di verifica entro il quale si \u00E8 concordato di raggiungere l'obiettivo di cui sopra)",
-      mx + lw,
-      y,
-    );
-    y += 6;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9.5);
-    doc.setTextColor(0);
-    doc.splitTextToSize(_moduloScadenza(valore), maxW).forEach(function (riga) {
-      checkPage(5);
-      doc.text(riga, mx, y);
-      y += 4.5;
-    });
-    y += 3;
-  }
-  if (tipo === 'allineamento') {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.setTextColor(0);
-    doc.text('Rilevamento di non conformit\u00E0 e colloquio di allineamento', mx, y);
-    y += 8;
-    drawHeaderTable();
-    const nonConf = (document.getElementById('mod-non-conf') || {}).value || '';
-    drawSection('Non conformit\u00E0 rilevata', nonConf);
-    const obiettivo = (document.getElementById('mod-obiettivo') || {}).value || '';
-    drawSection(
-      'Obiettivo concordato tra Collaboratore e Resp. Settore onde evitare il ripetersi della non conformit\u00E0',
-      obiettivo,
-    );
-    drawScadenza((document.getElementById('mod-scadenza') || {}).value);
-    checkPage(10);
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'italic');
-    doc.setTextColor(60);
-    // la frase NON ripete il termine: sta gia' scritto qui sopra
-    doc
-      .splitTextToSize(
-        "Chiediamo che, entro il termine sopra indicato, venga raggiunto l'obiettivo di cui sopra.",
-        pw - mx * 2,
-      )
-      .forEach(function (riga) {
-        checkPage(5);
-        doc.text(riga, mx, y);
-        y += 4;
-      });
-    y -= 4;
-    y += 10;
-    checkPage(25);
-    const fy1 = drawFirmePro(doc, mx, y, pw, false, _fResp, _fCollab);
-    y = fy1 + 14;
-    checkPage(15);
-    drawDistribuzionePro(doc, mx, y, ['Diario di bordo del collaboratore', 'Resp. Settore']);
-  } else if (tipo === 'apprezzamento') {
-    doc.setFont('helvetica', 'bolditalic');
-    doc.setFontSize(13);
-    doc.setTextColor(0);
-    doc.text('Colloquio di apprezzamento', mx, y);
-    y += 8;
-    drawHeaderTable();
-    const desc = (document.getElementById('mod-descrizione') || {}).value || '';
-    drawSection('Descrizione', desc);
-    const oss = (document.getElementById('mod-osservazioni') || {}).value || '';
-    drawSection('Osservazioni da parte del Resp. Settore', oss);
-    y += 6;
-    checkPage(30);
-    const fy2 = drawFirmePro(doc, mx, y, pw, false, _fResp, _fCollab);
-    y = fy2 + 20;
-    checkPage(15);
-    drawDistribuzionePro(doc, mx, y, ['Diario di bordo del collaboratore', 'Resp. Settore']);
-  } else if (tipo === 'rdi') {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.setTextColor(0);
-    doc.text('Rapporto disciplinare interno (RDI)', mx, y);
-    y += 8;
-    drawHeaderTable();
-    const nonConf = (document.getElementById('mod-non-conf') || {}).value || '';
-    drawSection('Non conformit\u00E0 rilevata', nonConf);
-    const obiettivo = (document.getElementById('mod-obiettivo') || {}).value || '';
-    drawSection(
-      'Obiettivo concordato tra Collaboratore e Resp. Settore onde evitare il ripetersi della non conformit\u00E0',
-      obiettivo,
-    );
-    drawScadenza((document.getElementById('mod-scadenza') || {}).value);
-    const livello = (document.getElementById('mod-livello') || {}).value || 'I';
-    checkPage(20);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(0);
-    const rdiLabel = 'Il presente RDI vale quale';
-    doc.text(rdiLabel, mx, y);
-    const rdiLW = doc.getTextWidth(rdiLabel);
-    doc.setDrawColor(0);
-    doc.setLineWidth(0.3);
-    doc.line(mx, y + 1.2, mx + rdiLW, y + 1.2);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.text(' (segnare ci\u00F2 che fa al caso)', mx + rdiLW, y);
-    y += 7;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9.5);
-    const rb = 1.8;
-    const cx1 = mx + rb;
-    const txtX = mx + 9;
-    doc.setDrawColor(0);
-    doc.setLineWidth(0.3);
-    doc.setFillColor(0);
-    doc.circle(cx1, y - 1, rb, 'S');
-    if (livello === 'I') {
-      doc.circle(cx1, y - 1, rb * 0.55, 'F');
-    }
-    doc.text('rapporto disciplinare interno di I\u00B0 livello', txtX, y);
-    y += 6;
-    doc.circle(cx1, y - 1, rb, 'S');
-    if (livello === 'II') {
-      doc.circle(cx1, y - 1, rb * 0.55, 'F');
-    }
-    doc.text('rapporto disciplinare interno grave (II\u00B0 livello)', txtX, y);
-    y += 10;
-    checkPage(35);
-    const firmaY = drawFirmePro(doc, mx, y, pw, true, _fResp, _fCollab);
-    y = firmaY + 6;
-    const mid = pw / 2;
-    doc.setFontSize(7);
-    doc.setFont('helvetica', 'italic');
-    doc.setTextColor(80);
-    const notaLines = doc.splitTextToSize(
-      '* il collaboratore che non vuole sottoscrivere il rapporto disciplinare lo deve espressamente dichiarare, scrivendolo al posto della firma.',
-      pw - mid - 10 - mx,
-    );
-    doc.text(notaLines, mid + 10, y);
-    y += notaLines.length * 3 + 8;
-    checkPage(15);
-    drawDistribuzionePro(doc, mx, y, ['Resp. Settore', 'Resp. Risorse Umane']);
-  }
-  // QR Code in basso a destra dell'ultima pagina
-  try {
-    if (isVis('qr_code') && typeof qrcode === 'function') {
-      const qr = qrcode(0, 'M');
-      qr.addData('https://digit-diary.github.io/#modulo/' + moduloQrId);
-      qr.make();
-      const qrImg = qr.createDataURL(4, 0);
-      const qrSz = 22;
-      const tp = doc.internal.getNumberOfPages();
-      doc.setPage(tp);
-      doc.addImage(qrImg, 'PNG', pw - mx - qrSz, ph - 14 - qrSz, qrSz, qrSz);
-      doc.setFontSize(5.5);
-      doc.setTextColor(130);
-      doc.setFont('helvetica', 'normal');
-      doc.text('Scansiona per verificare', pw - mx - qrSz, ph - 11);
-      doc.text('digit-diary.github.io/#modulo/' + moduloQrId, pw - mx - qrSz, ph - 8);
-    }
-  } catch (e) {}
+  // MODELLO DEL DOCUMENTO (testi fissi): quello in uso; la RISTAMPA di un modulo salvato usa
+  // i testi di quando e stato fatto (salvati nel modulo solo se diversi dagli originali)
+  if (typeof modelliCarica === 'function') await modelliCarica();
+  const testiSalvati =
+    _isRistampaSnap && existingQr && existingQr.dati && existingQr.dati.modello_testi
+      ? existingQr.dati.modello_testi
+      : undefined;
+  const doc = _pdfModuloDisciplinare(
+    tipo,
+    {
+      collab: collab,
+      resp: resp,
+      data: data,
+      settore: repartoNomeDocumento((existingQr && existingQr.reparto_dip) || currentReparto),
+      nonConf: (document.getElementById('mod-non-conf') || {}).value || '',
+      obiettivo: (document.getElementById('mod-obiettivo') || {}).value || '',
+      scadenza: (document.getElementById('mod-scadenza') || {}).value,
+      livello: (document.getElementById('mod-livello') || {}).value || 'I',
+      desc: (document.getElementById('mod-descrizione') || {}).value || '',
+      oss: (document.getElementById('mod-osservazioni') || {}).value || '',
+      fResp: _fResp,
+      fCollab: _fCollab,
+      qrId: moduloQrId,
+    },
+    testiSalvati,
+  );
   mostraPdfPreview(
     doc,
     'Modulo_' +
@@ -634,6 +417,9 @@ async function generaModuloPDF(tipo) {
     dati.descrizione = (document.getElementById('mod-descrizione') || {}).value || '';
     dati.osservazioni = (document.getElementById('mod-osservazioni') || {}).value || '';
   }
+  // testi del modello cambiati rispetto agli originali (con i testi originali non si salva niente)
+  const testiUsati = typeof modelloTestiCambiati === 'function' ? modelloTestiCambiati(tipo) : {};
+  if (Object.keys(testiUsati).length) dati.modello_testi = testiUsati;
   const isEdit = _isEditSnap;
   const isRistampa = _isRistampaSnap;
   let _ultimoEditCambiato = false;
@@ -720,13 +506,291 @@ async function generaModuloPDF(tipo) {
     );
   }
 }
-function drawFirmePro(doc, x, y, pw, isRdi, firmaRespB64, firmaCollabB64) {
+// PDF DI ALLINEAMENTO, APPREZZAMENTO E RDI (impaginazione di sempre, "come Word").
+// c = campi del modulo { collab, resp, data, settore, nonConf, obiettivo, scadenza, livello,
+// desc, oss, fResp, fCollab, qrId, senzaQr }; testiSovra = testi del modello da usare al
+// posto di quelli salvati (anteprima dei Modelli dei documenti, ristampa). I testi fissi
+// vengono dal modello del documento (js/modelli-documenti.js): con i testi originali il PDF
+// e identico a prima.
+function _pdfModuloDisciplinare(tipo, c, testiSovra) {
+  const T = modelloTesti(tipo, testiSovra);
+  const t = modelloTestoDi(
+    T,
+    modelloValori({ nome: c.collab, data: c.data, responsabile: c.resp, settore: c.settore || '' }),
+  );
+  const collab = c.collab;
+  const resp = c.resp;
+  const data = c.data;
+  const _fResp = c.fResp || null;
+  const _fCollab = c.fCollab || null;
+  const doc = new jspdf.jsPDF({ unit: 'mm', format: 'a4' });
+  const pw = doc.internal.pageSize.getWidth();
+  const ph = doc.internal.pageSize.getHeight();
+  const mx = 20;
+  let y = 12;
+  // logo dell azienda (js/identita.js), riquadro 40 x 22,5 mm
+  identitaLogoPdf(doc, pw / 2, y, 40, 40 / 1.78, true);
+  y += 28;
+  function checkPage(need) {
+    if (y + need > ph - 25) {
+      doc.addPage();
+      y = 20;
+      return true;
+    }
+    return false;
+  }
+  // testo su una riga come sempre; se il modello lo allunga oltre il foglio va a capo
+  function scriviRighe(testo, x, maxW, passo) {
+    const righe = doc.splitTextToSize(testo, maxW);
+    if (righe.length <= 1) {
+      doc.text(testo, x, y);
+      return 0;
+    }
+    righe.forEach((r, i) => doc.text(r, x, y + i * passo));
+    return (righe.length - 1) * passo;
+  }
+  // titolo del documento (stile gia impostato)
+  function scriviTitolo(testo) {
+    y += scriviRighe(testo, mx, pw - mx * 2, 5.6);
+    y += 8;
+  }
+  // spiegazione accanto a un titolo sottolineato (" (termine di verifica...)"): sulla
+  // stessa riga se ci sta, altrimenti sotto
+  function scriviAccanto(nota, xTitolo, wTitolo) {
+    if (!nota) return;
+    const maxW = pw - mx * 2;
+    const s = ' ' + nota;
+    if (doc.getTextWidth(s) <= maxW - wTitolo) {
+      doc.text(s, xTitolo + wTitolo, y);
+      return;
+    }
+    const righe = doc.splitTextToSize(nota, maxW);
+    righe.forEach((r, i) => doc.text(r, mx, y + 4.5 + i * 4));
+    y += 4.5 + (righe.length - 1) * 4;
+  }
+  // Tabella intestazione (come Word)
+  function drawHeaderTable() {
+    const tw = pw - mx * 2,
+      col1 = 42;
+    doc.autoTable({
+      theme: 'grid',
+      startY: y,
+      margin: { left: mx, right: mx },
+      tableWidth: tw,
+      body: [
+        [t('etich_collab'), collab],
+        [t('etich_resp'), resp],
+        [t('etich_data'), data],
+      ],
+      theme: 'grid',
+      styles: {
+        font: 'helvetica',
+        fontSize: 9.5,
+        cellPadding: { top: 2, bottom: 2, left: 4, right: 4 },
+        textColor: [0, 0, 0],
+        lineColor: [0, 0, 0],
+        lineWidth: 0.3,
+      },
+      columnStyles: {
+        0: { fontStyle: 'bold', cellWidth: col1 },
+        1: { fontStyle: 'normal' },
+      },
+      didDrawPage: function () {},
+    });
+    y = doc.lastAutoTable.finalY + 6;
+  }
+  // Sezione con titolo sottolineato (come Word)
+  function drawSection(title, text) {
+    const maxW = pw - mx * 2;
+    checkPage(25);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(0);
+    const titleLines = doc.splitTextToSize(title, maxW);
+    doc.text(titleLines, mx, y);
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.3);
+    titleLines.forEach(function (line, i) {
+      const lw2 = doc.getTextWidth(line);
+      doc.line(mx, y + 1.2 + i * 4.5, mx + lw2, y + 1.2 + i * 4.5);
+    });
+    y += titleLines.length * 4.5 + 4;
+    if (text) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(0);
+      const lines = doc.splitTextToSize(text, maxW);
+      lines.forEach(function (line) {
+        checkPage(5);
+        doc.text(line, mx, y);
+        y += 4;
+      });
+      y += 2;
+    } else {
+      y += 4;
+    }
+    y += 2;
+  }
+  // Riquadro "Scadenza": titolo sottolineato, nota esplicativa e valore. Il
+  // valore va a capo se e' lungo (prima usciva dal bordo destro e si perdeva) ed
+  // e' scritto una volta sola.
+  function drawScadenza(valore) {
+    const maxW = pw - mx * 2;
+    checkPage(18);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(0);
+    const lbl = t('scad_titolo');
+    doc.text(lbl, mx, y);
+    const lw = doc.getTextWidth(lbl);
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.3);
+    doc.line(mx, y + 1.2, mx + lw, y + 1.2);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    scriviAccanto(t('scad_nota'), mx, lw);
+    y += 6;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9.5);
+    doc.setTextColor(0);
+    doc.splitTextToSize(_moduloScadenza(valore, tipo, T), maxW).forEach(function (riga) {
+      checkPage(5);
+      doc.text(riga, mx, y);
+      y += 4.5;
+    });
+    y += 3;
+  }
+  // destinatari della distribuzione: una riga del modello per destinatario
+  const distribuzione = () =>
+    t('distribuzione')
+      .split('\n')
+      .map((x) => x.trim())
+      .filter(Boolean);
+  if (tipo === 'allineamento') {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(0);
+    scriviTitolo(t('titolo'));
+    drawHeaderTable();
+    drawSection(t('sez_nonconf'), c.nonConf || '');
+    drawSection(t('sez_obiettivo'), c.obiettivo || '');
+    drawScadenza(c.scadenza);
+    checkPage(10);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(60);
+    // la frase NON ripete il termine: sta gia' scritto qui sopra
+    doc.splitTextToSize(t('chiusura'), pw - mx * 2).forEach(function (riga) {
+      checkPage(5);
+      doc.text(riga, mx, y);
+      y += 4;
+    });
+    y -= 4;
+    y += 10;
+    checkPage(25);
+    const fy1 = drawFirmePro(doc, mx, y, pw, false, _fResp, _fCollab, t('firma_resp'), t('firma_collab'));
+    y = fy1 + 14;
+    checkPage(15);
+    drawDistribuzionePro(doc, mx, y, distribuzione(), t('distrib_titolo'));
+  } else if (tipo === 'apprezzamento') {
+    doc.setFont('helvetica', 'bolditalic');
+    doc.setFontSize(13);
+    doc.setTextColor(0);
+    scriviTitolo(t('titolo'));
+    drawHeaderTable();
+    drawSection(t('sez_descrizione'), c.desc || '');
+    drawSection(t('sez_osservazioni'), c.oss || '');
+    y += 6;
+    checkPage(30);
+    const fy2 = drawFirmePro(doc, mx, y, pw, false, _fResp, _fCollab, t('firma_resp'), t('firma_collab'));
+    y = fy2 + 20;
+    checkPage(15);
+    drawDistribuzionePro(doc, mx, y, distribuzione(), t('distrib_titolo'));
+  } else if (tipo === 'rdi') {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(0);
+    scriviTitolo(t('titolo'));
+    drawHeaderTable();
+    drawSection(t('sez_nonconf'), c.nonConf || '');
+    drawSection(t('sez_obiettivo'), c.obiettivo || '');
+    drawScadenza(c.scadenza);
+    const livello = c.livello || 'I';
+    checkPage(20);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(0);
+    const rdiLabel = t('vale_titolo');
+    doc.text(rdiLabel, mx, y);
+    const rdiLW = doc.getTextWidth(rdiLabel);
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.3);
+    doc.line(mx, y + 1.2, mx + rdiLW, y + 1.2);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    scriviAccanto(t('vale_nota'), mx, rdiLW);
+    y += 7;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9.5);
+    const rb = 1.8;
+    const cx1 = mx + rb;
+    const txtX = mx + 9;
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.3);
+    doc.setFillColor(0);
+    doc.circle(cx1, y - 1, rb, 'S');
+    if (livello === 'I') {
+      doc.circle(cx1, y - 1, rb * 0.55, 'F');
+    }
+    y += scriviRighe(t('livello1'), txtX, pw - mx - txtX, 4.5);
+    y += 6;
+    doc.circle(cx1, y - 1, rb, 'S');
+    if (livello === 'II') {
+      doc.circle(cx1, y - 1, rb * 0.55, 'F');
+    }
+    y += scriviRighe(t('livello2'), txtX, pw - mx - txtX, 4.5);
+    y += 10;
+    checkPage(35);
+    const firmaY = drawFirmePro(doc, mx, y, pw, true, _fResp, _fCollab, t('firma_resp'), t('firma_collab'));
+    y = firmaY + 6;
+    const mid = pw / 2;
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(80);
+    const notaLines = doc.splitTextToSize(t('nota_firma'), pw - mid - 10 - mx);
+    doc.text(notaLines, mid + 10, y);
+    y += notaLines.length * 3 + 8;
+    checkPage(15);
+    drawDistribuzionePro(doc, mx, y, distribuzione(), t('distrib_titolo'));
+  }
+  // QR Code in basso a destra dell'ultima pagina
+  try {
+    if (!c.senzaQr && isVis('qr_code') && typeof qrcode === 'function') {
+      const qr = qrcode(0, 'M');
+      qr.addData('https://digit-diary.github.io/#modulo/' + c.qrId);
+      qr.make();
+      const qrImg = qr.createDataURL(4, 0);
+      const qrSz = 22;
+      const tp = doc.internal.getNumberOfPages();
+      doc.setPage(tp);
+      doc.addImage(qrImg, 'PNG', pw - mx - qrSz, ph - 14 - qrSz, qrSz, qrSz);
+      doc.setFontSize(5.5);
+      doc.setTextColor(130);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Scansiona per verificare', pw - mx - qrSz, ph - 11);
+      doc.text('digit-diary.github.io/#modulo/' + c.qrId, pw - mx - qrSz, ph - 8);
+    }
+  } catch (e) {}
+  return doc;
+}
+// lbl1 / lbl2: firme del modello del documento (senza: i testi originali)
+function drawFirmePro(doc, x, y, pw, isRdi, firmaRespB64, firmaCollabB64, lbl1, lbl2) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(0);
   const mid = pw / 2;
-  const lbl1 = 'Firma del Resp. Settore';
-  const lbl2 = isRdi ? 'Firma del collaboratore*' : 'Firma del collaboratore';
+  if (lbl1 == null) lbl1 = 'Firma del Resp. Settore';
+  if (lbl2 == null) lbl2 = isRdi ? 'Firma del collaboratore*' : 'Firma del collaboratore';
   doc.text(lbl1, x, y);
   doc.text(lbl2, mid + 10, y);
   doc.setDrawColor(0);
@@ -755,12 +819,14 @@ function drawFirmePro(doc, x, y, pw, isRdi, firmaRespB64, firmaCollabB64) {
   if (!firmaCollabB64) doc.text(dots, mid + 10, y);
   return y;
 }
-function drawDistribuzionePro(doc, x, y, items) {
+// titolo: dal modello del documento (senza: "Distribuzione:")
+function drawDistribuzionePro(doc, x, y, items, titolo) {
+  if (titolo == null) titolo = 'Distribuzione:';
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(0);
-  doc.text('Distribuzione:', x, y);
-  const dw = doc.getTextWidth('Distribuzione:');
+  doc.text(titolo, x, y);
+  const dw = doc.getTextWidth(titolo);
   doc.setDrawColor(0);
   doc.setLineWidth(0.3);
   doc.line(x, y + 1.5, x + dw, y + 1.5);
@@ -988,6 +1054,7 @@ async function ristampaModuloPDF(id) {
   if (m && m.tipo === 'cambio_turno') {
     try {
       if (!window.jspdf) await caricaJsPDF();
+      if (typeof modelliCarica === 'function') await modelliCarica();
       const doc = _pdfCambioTurno(m.dati || {});
       mostraPdfPreview(doc, 'cambio_turno_' + (m.data_modulo || '') + '.pdf', 'Cambio turno ' + (m.data_modulo || ''));
       logAzione('Ristampato foglio cambio turno', m.collaboratore + ' - ' + (m.data_modulo || ''));

@@ -2061,6 +2061,14 @@ async function eliminaFormulario(id) {
 async function pdfNonDisponibilitaJolly() {
   if (!window.jspdf) await caricaJsPDF();
   if (!window.jspdf) return;
+  if (typeof modelliCarica === 'function') await modelliCarica();
+  const doc = _pdfNdVuotoDoc();
+  mostraPdfPreview(doc, 'non_disponibilita_jolly.pdf', 'Lista non disponibilità Jolly');
+}
+// modulo 1187 vuoto; testi fissi dal modello del documento "nd1187" (gli stessi del modulo
+// compilato, js/modulo-nd.js); testiSovra = testi da usare al posto di quelli salvati
+function _pdfNdVuotoDoc(testiSovra) {
+  const t = _ndTesti(testiSovra, { settore: repartoNomeDocumento(_pianoReparto()) });
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF('portrait', 'mm', 'a4');
   const M = 16;
@@ -2074,45 +2082,44 @@ async function pdfNonDisponibilitaJolly() {
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
   doc.text('Data: ' + new Date().toLocaleDateString('it-IT'), 150, y - 2);
-  doc.text('Red.  O. Sampietro', 150, y + 2);
-  doc.text('Appr. Direttore', 150, y + 6);
+  doc.text('Red.  ' + t('redatto'), 150, y + 2);
+  doc.text('Appr. ' + t('approvato'), 150, y + 6);
   y += 6;
   doc.setFont('helvetica', 'bolditalic');
   doc.setFontSize(9);
-  doc.text('4 - Human Resources', M, y);
+  doc.text(t('emittente'), M, y);
   y += 4.5;
   doc.setFont('helvetica', 'italic');
-  doc.text('1187 - LISTA NON DISPONIBILITA JOLLY', M + 6, y);
+  doc.text(t('codice'), M + 6, y);
   y += 9;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(15);
   doc.setTextColor(34, 34, 34);
-  doc.text('LISTA DI NON DISPONIBILITÀ (JOLLY)', 105, y, { align: 'center' });
+  doc.text(t('titolo'), 105, y, { align: 'center' });
   y += 5;
   doc.setFontSize(8.5);
-  doc.text(
-    '- da trasmettere al massimo entro il ' + _pianoGiornoNd() + '° giorno del mese al Responsabile di settore -',
-    105,
-    y,
-    {
-      align: 'center',
-    },
-  );
+  doc.text([t('sotto_inizio'), t('sotto_evidenza'), t('sotto_fine')].filter(Boolean).join(' '), 105, y, {
+    align: 'center',
+  });
   y += 9;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9.5);
-  doc.text('Nome e Cognome: ' + '.'.repeat(95), M, y);
+  doc.text(t('etich_nome') + ' ' + '.'.repeat(95), M, y);
   y += 7;
-  doc.text('Mese di riferimento: ' + '.'.repeat(92), M, y);
+  doc.text(t('etich_mese') + ' ' + '.'.repeat(92), M, y);
   y += 8;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10.5);
-  doc.text('vi informo che NON sarò disponibile per la pianificazione durante i giorni seguenti.', M, y);
-  y += 8;
+  // la frase su una riga (gli a capo del modulo compilato diventano spazi); a capo se lunga
+  const frase = t('frase').replace(/\s*\n\s*/g, ' ');
+  const righeFrase = doc.splitTextToSize(frase, 210 - 2 * M);
+  if (righeFrase.length <= 1) doc.text(frase, M, y);
+  else righeFrase.slice(0, 3).forEach((r, i) => doc.text(r, M, y + i * 4.6));
+  y += 8 + Math.max(0, Math.min(3, righeFrase.length) - 1) * 4.6;
   doc.setFontSize(8.5);
-  doc.text('Giorno', M, y);
-  doc.text('Non sarò disponibile', M + 14, y);
-  doc.text('Eventuali osservazioni', M + 55, y);
+  doc.text(t('col_giorno'), M, y);
+  doc.text(t('col_nonsaro'), M + 14, y);
+  doc.text(t('col_oss'), M + 55, y);
   doc.setDrawColor(51, 51, 51);
   doc.line(M, y + 1.2, 194, y + 1.2);
   y += 5.4;
@@ -2129,17 +2136,18 @@ async function pdfNonDisponibilitaJolly() {
   }
   y += 4;
   doc.setFontSize(9);
-  doc.text('Firma collaboratore (Jolly): ' + '.'.repeat(75), M, y);
+  doc.text(t('firma_collab') + ' ' + '.'.repeat(75), M, y);
   y += 8;
-  doc.text('Data: ' + '.'.repeat(24), M, y);
-  doc.text('Visto Resp. Settore: ' + '.'.repeat(35), 105, y);
-  mostraPdfPreview(doc, 'non_disponibilita_jolly.pdf', 'Lista non disponibilità Jolly');
+  doc.text(t('etich_data') + ' ' + '.'.repeat(24), M, y);
+  doc.text(t('visto') + ' ' + '.'.repeat(35), 105, y);
+  return doc;
 }
 
 // Modulo VUOTO di richiesta cambio turno (come cambio_turno_pdf_vuoto di Turnivo)
 async function pdfCambioTurnoVuoto() {
   if (!window.jspdf) await caricaJsPDF();
   if (!window.jspdf) return;
+  if (typeof modelliCarica === 'function') await modelliCarica();
   const linea = '___________________________________________';
   const doc = _pdfCambioTurno({
     tipo: 'SCAMBIO',

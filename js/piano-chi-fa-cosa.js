@@ -640,7 +640,11 @@ async function _pcfcRender() {
       escP(st.nome) +
       '</b> · funzione ' +
       escP(info.funzione || '-') +
-      (lv ? ' · livello ' + lv : '') +
+      (lv && typeof livelloEtichettaTesto === 'function'
+        ? ' · livello ' + escP(livelloEtichettaTesto(info, _pianoReparto()))
+        : lv
+          ? ' · livello ' + lv
+          : '') +
       ' · aree abilitate: ' +
       escP(sett ? sett.join(', ') || 'nessuna' : 'dalla storia dei turni') +
       '</p>';

@@ -449,19 +449,23 @@ function _pianoCtxIdoneita(extra) {
     extra || {},
   );
 }
+// LIVELLO PER IL PIANO = gradino piu alto certificato nella scala del settore (anche se
+// mancano gradini sotto: chi arriva da un altro casino e va subito in cassa e formato in
+// cassa). Unico punto da cui livello_turni, minimo_livello_giorno, equilibrio_livelli,
+// chi fa cosa e le metriche leggono il livello. null = il settore non ha scala.
 function _pianoLivelloNelSettore(info, rep) {
+  const s = _pianoScalaDi(info, rep);
+  return s ? s.effettivo : null;
+}
+// livello COMPLETO (tutti i gradini sotto certificati): solo per incentivi e passaggi di
+// livello (punti, premi, Storico HR), mai per il Piano
+function _pianoLivelloCompletoNelSettore(info, rep) {
+  const s = _pianoScalaDi(info, rep);
+  return s ? s.completo : null;
+}
+function _pianoScalaDi(info, rep) {
   if (!info || typeof getCompetenzeConfigAll !== 'function') return null;
-  const comps = (getCompetenzeConfigAll()[rep || _pianoReparto()] || []).filter((k) => parseInt(k.livello) >= 1);
-  if (!comps.length) return null;
-  const spunte = info.competenze || {};
-  // solo i livelli che esistono (come livelloDiCollaboratore in Formazione)
-  const livelli = [...new Set(comps.map((k) => parseInt(k.livello)))].sort((a, b) => a - b);
-  let lv = 0;
-  for (const n of livelli) {
-    if (comps.filter((k) => parseInt(k.livello) <= n).every((k) => spunte[k.key] === true)) lv = n;
-    else break;
-  }
-  return lv;
+  return PianoRegole.livelloScala(getCompetenzeConfigAll()[rep || _pianoReparto()] || [], info.competenze);
 }
 // "L3" o "3" -> 3 (livello minimo nelle regole di livello)
 function _pianoLivelloDaTesto(v) {
@@ -3105,8 +3109,13 @@ async function _renderPianoCore() {
       if (puoMod && puoAzioniAutoPiano('import')) {
         ge += voce(
           'Importa da Excel',
-          "document.getElementById('piano-imp-file').click()",
+          'pianoImportaConColonne(false)',
           'Legge un piano da un file Excel o CSV e lo controlla prima di scriverlo',
+        );
+        ge += voce(
+          'Importa da Excel scegliendo le colonne',
+          'pianoImportaConColonne(true)',
+          'Per un file di un altro formato: scegli foglio, colonna dei nomi e colonne dei giorni, con anteprima',
         );
       }
       h += menu('esporta', 'Esporta', 'icx-download', ge);

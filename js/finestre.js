@@ -10,6 +10,7 @@
  *   await chiediTesto(testo, predefinito, { titolo, ok })            -> testo / null
  *   await mostraAvviso(testo, { titolo })                            -> dopo OK
  *   await chiediModulo(testo, gruppi, { titolo, ok, controlla })     -> { id: valore } / null
+ *   await chiediScelta(testo, [{ valore, etichetta }], { titolo, annulla }) -> valore / null
  * Invio conferma, Esc annulla. Se ne arrivano due insieme, la seconda aspetta
  * la prima (come facevano quelle del browser).
  */
@@ -66,15 +67,32 @@ function _finestraMostra(tipo, testo, predefinito, opz) {
       '<div class="finestra-box" role="dialog" aria-modal="true" aria-labelledby="finestra-titolo">' +
       '<h3 id="finestra-titolo"></h3><div class="finestra-testo"></div>' +
       (tipo === 'testo' ? '<input type="text" class="finestra-campo" autocomplete="off">' : '') +
-      '<div class="finestra-pulsanti">' +
+      '<div class="finestra-pulsanti' +
+      (tipo === 'scelta' ? ' finestra-scelte' : '') +
+      '">' +
       (tipo === 'avviso' ? '' : '<button type="button" class="finestra-no"></button>') +
-      '<button type="button" class="finestra-ok' +
-      (pericolo && tipo === 'conferma' ? ' finestra-pericolo' : '') +
-      '"></button></div></div>';
+      (tipo === 'scelta'
+        ? // SCELTA: un pulsante per risposta, il primo e quello pieno; Annulla ed Esc = null
+          (opz.scelte || [])
+            .map(
+              (x, i) =>
+                '<button type="button" class="' +
+                (i ? 'finestra-alt' : 'finestra-ok') +
+                '" data-i="' +
+                i +
+                '"></button>',
+            )
+            .join('')
+        : '<button type="button" class="finestra-ok' +
+          (pericolo && tipo === 'conferma' ? ' finestra-pericolo' : '') +
+          '"></button>') +
+      '</div></div>';
     // testi inseriti come testo, mai come HTML
     velo.querySelector('h3').textContent = titolo;
     velo.querySelector('.finestra-testo').textContent = t;
-    velo.querySelector('.finestra-ok').textContent = okLbl;
+    if (tipo === 'scelta')
+      velo.querySelectorAll('[data-i]').forEach((b) => (b.textContent = opz.scelte[b.dataset.i].etichetta));
+    else velo.querySelector('.finestra-ok').textContent = okLbl;
     const bNo = velo.querySelector('.finestra-no');
     if (bNo) bNo.textContent = noLbl;
     const campo = velo.querySelector('.finestra-campo');
@@ -89,8 +107,11 @@ function _finestraMostra(tipo, testo, predefinito, opz) {
       } catch (e) {}
       risolvi(esito);
     };
-    const conferma = () => chiudi(tipo === 'testo' ? campo.value : tipo === 'avviso' ? undefined : true);
-    const annulla = () => chiudi(tipo === 'testo' ? null : tipo === 'avviso' ? undefined : false);
+    const conferma = () =>
+      tipo === 'scelta'
+        ? document.activeElement && velo.contains(document.activeElement) && document.activeElement.click()
+        : chiudi(tipo === 'testo' ? campo.value : tipo === 'avviso' ? undefined : true);
+    const annulla = () => chiudi(tipo === 'testo' || tipo === 'scelta' ? null : tipo === 'avviso' ? undefined : false);
     const tasti = (e) => {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -108,7 +129,11 @@ function _finestraMostra(tipo, testo, predefinito, opz) {
         el[(i + (e.shiftKey ? -1 : 1) + el.length) % el.length].focus();
       }
     };
-    velo.querySelector('.finestra-ok').addEventListener('click', conferma);
+    if (tipo === 'scelta')
+      velo
+        .querySelectorAll('[data-i]')
+        .forEach((b) => b.addEventListener('click', () => chiudi(opz.scelte[b.dataset.i].valore)));
+    else velo.querySelector('.finestra-ok').addEventListener('click', conferma);
     if (bNo) bNo.addEventListener('click', annulla);
     document.addEventListener('keydown', tasti, true);
     document.body.appendChild(velo);
@@ -121,6 +146,11 @@ function _finestraMostra(tipo, testo, predefinito, opz) {
 
 function chiediConferma(testo, opz) {
   return _finestraApri('conferma', testo, null, opz);
+}
+// piu risposte possibili (es. "Si, formazione completa" / "No, solo Cassa"): restituisce il
+// valore della scelta, null con Annulla o Esc (niente deve cambiare)
+function chiediScelta(testo, scelte, opz) {
+  return _finestraApri('scelta', testo, null, Object.assign({}, opz || {}, { scelte: scelte || [] }));
 }
 function chiediTesto(testo, predefinito, opz) {
   return _finestraApri('testo', testo, predefinito, opz);

@@ -756,12 +756,22 @@ async function esportaReportDirezionePDF() {
     const fissi = collabs.filter((c) => c.impiego === 'fisso').length;
     const jolly = collabs.filter((c) => c.impiego === 'jolly').length;
     const partTime = collabs.filter((c) => c.percentuale != null && parseFloat(c.percentuale) < 1).length;
-    const liv = { 1: 0, 2: 0, 3: 0 };
+    // persone per gradino piu alto certificato (livello effettivo, come in Formazione e nel
+    // Piano), su tutta la scala del settore: prima tre colonne fisse L1-L3 perdevano L4-L6
+    const liv = {};
+    let parziali = 0;
     collabs.forEach((c) => {
-      const l = livelloDiCollaboratore(c);
-      if (l) liv[l]++;
+      const sc = typeof livelloScalaDi === 'function' ? livelloScalaDi(c, r.key) : null;
+      if (sc && sc.effettivo) liv[sc.effettivo] = (liv[sc.effettivo] || 0) + 1;
+      if (sc && sc.parziale) parziali++;
     });
-    righeOrganico.push([r.label, collabs.length, fissi, jolly, partTime, liv[1], liv[2], liv[3]]);
+    const livTesto =
+      Object.keys(liv)
+        .map(Number)
+        .sort((a, b) => a - b)
+        .map((n) => livelloSigla(n, r.key) + ': ' + liv[n])
+        .join(', ') + (parziali ? ' (parziali: ' + parziali + ')' : '');
+    righeOrganico.push([r.label, collabs.length, fissi, jolly, partTime, livTesto || '-']);
     tot.collab += collabs.length;
 
     const dati = getDatiReparto();
@@ -876,9 +886,10 @@ async function esportaReportDirezionePDF() {
     doc.autoTable(
       Object.assign({}, stile, {
         startY: y,
-        head: [['Settore', 'Collaboratori', 'Fissi', 'Jolly', 'Part-time', 'Livello 1', 'Livello 2', 'Livello 3']],
+        head: [['Settore', 'Collaboratori', 'Fissi', 'Jolly', 'Part-time', 'Persone per livello']],
         body: righeOrganico,
-        foot: [['Totale', tot.collab, '', '', '', '', '', '']],
+        foot: [['Totale', tot.collab, '', '', '', '']],
+        columnStyles: Object.assign({}, stile.columnStyles, { 5: { halign: 'left' } }),
         footStyles: {
           fillColor: [240, 236, 228],
           textColor: [26, 18, 8],

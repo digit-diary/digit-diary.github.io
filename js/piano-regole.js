@@ -884,6 +884,44 @@
     return false;
   }
 
+  // LIVELLO DI UNA PERSONA nella scala del settore. comps = competenze configurate del
+  // settore (solo quelle con livello >= 1 fanno scala: nessun nome o gradino scritto qui),
+  // spunte = competenze certificate {key: true}. Ritorna null se il settore non ha scala.
+  //  effettivo: il gradino piu alto certificato. Vale per il PIANO (turni per livello,
+  //    minimo per giorno, equilibrio, chi fa cosa): chi arriva da un altro casino e fa
+  //    subito cassa e formato in cassa anche senza aver fatto la sala.
+  //  completo: l ultimo gradino con TUTTI quelli sotto certificati. Vale per INCENTIVI e
+  //    passaggi di livello (punti, premi, Storico HR): niente premi per gradini parziali.
+  //  comprese: le competenze di livello fino all effettivo, con certificata true/false
+  //  mancanti: quelle non certificate (sotto o allo stesso gradino); parziale se ce ne sono
+  function livelloScala(comps, spunte) {
+    const scala = (comps || [])
+      .map((k) => ({ key: k.key, label: k.label || k.key, livello: parseInt(k.livello) || 0 }))
+      .filter((k) => k.livello >= 1)
+      .sort((a, b) => a.livello - b.livello);
+    if (!scala.length) return null;
+    const sp = spunte || {};
+    const ok = (k) => sp[k.key] === true;
+    const effettivo = scala.reduce((m, k) => (ok(k) && k.livello > m ? k.livello : m), 0);
+    let completo = 0;
+    // solo i gradini che esistono (L1, L2, L4 senza L3: chi ha L1, L2 e L4 e completo a L4)
+    for (const n of [...new Set(scala.map((k) => k.livello))]) {
+      if (scala.filter((k) => k.livello <= n).every(ok)) completo = n;
+      else break;
+    }
+    const comprese = scala
+      .filter((k) => k.livello <= effettivo)
+      .map((k) => ({ key: k.key, label: k.label, livello: k.livello, certificata: ok(k) }));
+    const mancanti = comprese.filter((k) => !k.certificata);
+    return {
+      effettivo: effettivo,
+      completo: completo,
+      parziale: mancanti.length > 0,
+      comprese: comprese,
+      mancanti: mancanti,
+    };
+  }
+
   return {
     oraNum,
     riposoOre,
@@ -903,5 +941,6 @@
     meseBloccato,
     domenicheLibereMese,
     domenicaTurnoAmmesso,
+    livelloScala,
   };
 });

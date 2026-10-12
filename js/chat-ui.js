@@ -2438,13 +2438,12 @@ function apriSchedaCollaboratore(nome) {
   if (typeof livelloDiCollaboratore === 'function') {
     const _mdCollab = getCollaboratoriReparto().find((c) => c.nome.toLowerCase() === nome.toLowerCase());
     if (_mdCollab) {
-      const _mdLv = livelloDiCollaboratore(_mdCollab);
       const _mdPts = puntiTotali(nome);
       const _mdCop = conteggioAzione(nome, 'copertura');
       const _mdRif = conteggioAzione(nome, 'disponibilita_negata');
       const _mdNext = prossimaSoglia(_mdPts);
       html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:-6px 0 14px">';
-      html += livelloBadgeHtml(_mdLv);
+      html += livelloEtichettaHtml(_mdCollab);
       const _mdComps = getCompetenzeReparto().filter((k) => (_mdCollab.competenze || {})[k.key] === true);
       if (_mdComps.length)
         html +=
@@ -3888,7 +3887,7 @@ async function stampaSchedaPDF(nome) {
 
   // Multidisciplinarità: livello, punti, coperture/rifiuti, competenze certificate
   if (typeof livelloDiCollaboratore === 'function' && cRec) {
-    var lvPdf = livelloDiCollaboratore(cRec);
+    var lvPdf = typeof livelloEtichettaTesto === 'function' ? livelloEtichettaTesto(cRec) : '-';
     var ptsPdf = puntiTotali(nome);
     var copPdf = conteggioAzione(nome, 'copertura');
     var rifPdf = conteggioAzione(nome, 'disponibilita_negata');
@@ -3911,15 +3910,7 @@ async function stampaSchedaPDF(nome) {
           'Competenze certificate',
         ],
       ],
-      body: [
-        [
-          lvPdf ? (typeof livelloNome === 'function' ? livelloNome(lvPdf) : 'Livello ' + lvPdf) : '-',
-          ptsPdf,
-          copPdf,
-          rifPdf,
-          compsPdf.length ? compsPdf.join(', ') : '-',
-        ],
-      ],
+      body: [[lvPdf, ptsPdf, copPdf, rifPdf, compsPdf.length ? compsPdf.join(', ') : '-']],
       headStyles: { fillColor: [139, 105, 20], fontSize: 7 },
       bodyStyles: { fontSize: 8, halign: 'center' },
       margin: { left: 14, right: 14 },

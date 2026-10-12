@@ -1923,6 +1923,19 @@ async function _renderPianoStoricoTab() {
 async function pdfCambioVacanza(dati) {
   if (!window.jspdf) await caricaJsPDF();
   if (!window.jspdf) return;
+  if (typeof modelliCarica === 'function') await modelliCarica();
+  mostraPdfPreview(_pdfCambioVacanzaDoc(dati), 'cambio_vacanza.pdf', 'Formulario cambio vacanza');
+}
+// il PDF; testi fissi dal modello del documento "cambio_vacanza" (js/modelli-documenti.js),
+// testiSovra = testi da usare al posto di quelli salvati (anteprima)
+function _pdfCambioVacanzaDoc(dati, testiSovra) {
+  const t = modelloTestoDi(
+    modelloTesti('cambio_vacanza', testiSovra),
+    modelloValori({
+      nome: (dati && dati.a && dati.a.nome) || '',
+      settore: (dati && dati.a && dati.a.settore) || repartoNomeDocumento(_pianoReparto()),
+    }),
+  );
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF('portrait', 'mm', 'a4');
   const M = 15;
@@ -1931,12 +1944,12 @@ async function pdfCambioVacanza(dati) {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(14);
   doc.setTextColor(51, 51, 51);
-  doc.text(identita().azienda, 105, y, { align: 'center' });
+  doc.text(t('intestazione'), 105, y, { align: 'center' });
   y += 8;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(20);
   doc.setTextColor(44, 62, 80);
-  doc.text('RICHIESTA CAMBIO VACANZA', 105, y, { align: 'center' });
+  doc.text(t('titolo'), 105, y, { align: 'center' });
   y += 6;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
@@ -1999,10 +2012,10 @@ async function pdfCambioVacanza(dati) {
           ['Numero settimana:', '__________________'],
           ['Periodo vacanza:', '____/____/________  ·  ____/____/________'],
         ];
-  sezione('Collaboratore A (richiedente)', [52, 152, 219], campiDi(dati && dati.a));
-  sezione('Collaboratore B (accetta lo scambio)', [230, 126, 34], campiDi(dati && dati.b));
+  sezione(t('sez_a'), [52, 152, 219], campiDi(dati && dati.a));
+  sezione(t('sez_b'), [230, 126, 34], campiDi(dati && dati.b));
   sezione(
-    'Motivazione',
+    t('motivazione_titolo'),
     [46, 204, 113],
     [
       ['', linea + '__________________'],
@@ -2020,7 +2033,7 @@ async function pdfCambioVacanza(dati) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
   doc.setTextColor(44, 62, 80);
-  doc.text('Autorizzazione', M + 6, yy);
+  doc.text(t('aut_titolo'), M + 6, yy);
   doc.setDrawColor(221, 221, 221);
   doc.line(M + 6, yy + 2, 210 - M - 6, yy + 2);
   yy += 9;
@@ -2029,18 +2042,22 @@ async function pdfCambioVacanza(dati) {
   doc.rect(M + 6, yy - 4, 5, 5);
   doc.setFontSize(11);
   doc.setTextColor(34, 34, 34);
-  doc.text('Autorizzato', M + 14, yy);
+  doc.text(t('aut_si'), M + 14, yy);
   doc.rect(M + 52, yy - 4, 5, 5);
-  doc.text('Non autorizzato', M + 60, yy);
+  doc.text(t('aut_no'), M + 60, yy);
   yy += 8;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
-  doc.text('Motivo:', M + 6, yy);
+  doc.text(t('aut_motivo'), M + 6, yy);
   doc.setFont('helvetica', 'normal');
-  doc.text('_______________________________________________________________________', M + 22, yy);
+  doc.text(
+    '_______________________________________________________________________',
+    M + 22 + _modelloAllungo(doc, t('aut_motivo'), modelloOriginale('cambio_vacanza', 'aut_motivo')),
+    yy,
+  );
   y += hAut + 20;
   // firme A / B / Responsabile
-  const firme = ['Firma Collaboratore A', 'Firma Collaboratore B', 'Firma Responsabile'];
+  const firme = [t('firma_a'), t('firma_b'), t('firma_resp')];
   const wBox = W * 0.3;
   const gap = (W - wBox * 3) / 2;
   firme.forEach((f, i) => {
@@ -2056,8 +2073,8 @@ async function pdfCambioVacanza(dati) {
   });
   doc.setFontSize(8);
   doc.setTextColor(150, 150, 150);
-  doc.text(identita().azienda + ' · formulario cambio vacanza', 105, 287, { align: 'center' });
-  mostraPdfPreview(doc, 'cambio_vacanza.pdf', 'Formulario cambio vacanza');
+  doc.text(t('piede'), 105, 287, { align: 'center' });
+  return doc;
 }
 
 // SCAMBIO SETTIMANE tra due collaboratori (meglio del solo formulario di

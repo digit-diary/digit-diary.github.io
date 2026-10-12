@@ -120,7 +120,9 @@ function _suggerisciAree(nome) {
   const c = getCollaboratoriReparto().find((x) => x.nome.toLowerCase() === nome.toLowerCase());
   if (c && typeof livelloDiCollaboratore === 'function') {
     // 100% al livello massimo della scala del settore (Slots ne ha 6), 40% senza
-    // livello, in proporzione nel mezzo: la scala non e' fissa a tre
+    // livello, in proporzione nel mezzo: la scala non e' fissa a tre. Livello COMPLETO
+    // (gradini certificati senza buchi): la polivalenza conta le aree che sa coprire, chi ha
+    // solo Cassa (L3 parziale per il Piano) non e' polivalente come chi ha Sala-Reception-Cassa
     const lv = livelloDiCollaboratore(c);
     const lvMax = typeof _lvMaxReparto === 'function' ? _lvMaxReparto() : 3;
     sug.versatilita = Math.min(100, 40 + Math.round((60 * lv) / lvMax));

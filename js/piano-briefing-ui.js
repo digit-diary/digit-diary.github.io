@@ -29,13 +29,17 @@ function _briefGiornoLbl(dstr) {
 function _briefIsValet() {
   return _pianoReparto() === 'valet';
 }
+// settori che ordinano il foglio per lettera della sigla (sotto). Ogni altro settore, anche
+// nuovo, ordina solo per orario: prima solo Tavoli e Cleaning erano esclusi per nome e un
+// settore nuovo ereditava i gruppi C/S/R/Z delle Slots.
+const _BRIEF_SETTORI_ORDINE_LETTERE = ['slots', 'valet'];
 function _briefGruppo(cod) {
   if (!cod) return 9;
   // le lettere (C cassa, S sala, R reception, Z, L1/9) sono delle sigle Slots (e del Valet,
-  // che ne usa alcune): nei Tavoli e nel Cleaning le sigle sono numeri o altro e si
-  // ordinano solo per orario (prima il "9" dei Tavoli finiva in un gruppo a parte)
+  // che ne usa alcune): negli altri settori le sigle sono numeri o altro e si ordinano
+  // solo per orario (prima il "9" dei Tavoli finiva in un gruppo a parte)
   const rep = typeof _pianoReparto === 'function' ? _pianoReparto() : 'slots';
-  if (rep === 'tavoli' || rep === 'cleaning') return 1;
+  if (!_BRIEF_SETTORI_ORDINE_LETTERE.includes(rep)) return 1;
   const u = String(cod).toUpperCase();
   if (u === '9' || u === 'L1') return 3;
   if (u[0] === 'Z') return 4;

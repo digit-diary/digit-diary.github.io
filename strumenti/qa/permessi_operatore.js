@@ -8,9 +8,9 @@
 //   - operatori di prova della copia locale (Camponovo Andrea / ProvaLocale1!, amministratore
 //     ProvaAdmin1!, Pistocchi Mara, Bonelli Flavio, HR, Sanvido Paolo).
 // COME SI LANCIA:  node strumenti/qa/permessi_operatore.js
-// MAI sul database vero: scrive e cancella dati di prova (prefissi 'W1B ', 'W4C ' e 'W5I ').
+// MAI sul database vero: scrive e cancella dati di prova (prefissi 'W1B ', 'W4C ', 'W5I ' e 'W5M ').
 // ============================================================
-// PROVA DEI PERMESSI DEGLI OPERATORI NEL DATABASE (migrazioni 20260911, 20260913 e 20260914)
+// PROVA DEI PERMESSI DEGLI OPERATORI NEL DATABASE (migrazioni 20260911, 20260913, 20260914 e 20260915)
 // Per ogni falla: la prova che la riproduce (deve risultare CHIUSA) e le azioni legittime
 // che devono continuare a funzionare (OK). Passa dal servizio REST come il programma
 // (http://127.0.0.1:8000/rest/v1/rpc/...), con la chiave pubblica della copia locale.
@@ -630,6 +630,82 @@ function pulisci() {
         else sql(`update impostazioni set valore = ${lit(impPrima[k])} where chiave = ${lit(k)}`);
       }
       sql(`delete from log_attivita where azione = 'Istruzioni del settore modificate' and created_at >= ${lit(inizio)}`);
+      esito(sql(`select valore from impostazioni where chiave = 'visibilita'`) === visPrima, '        visibilita rimessa com era');
+    }
+    });
+    await S(async () => {
+    console.log('\n== 13) modelli dei documenti e colonne dell import del piano (migrazione 20260915)');
+    // stato di partenza: si rimette tutto com era alla fine (anche se una prova fallisce)
+    const visPrima = sql(`select valore from impostazioni where chiave = 'visibilita'`);
+    const modPrima = sql(`select coalesce(json_agg(m), '[]') from modelli_documenti m`);
+    const verPrima = sql(`select coalesce(json_agg(v), '[]') from modelli_documenti_versioni v`);
+    const impPrima = JSON.parse(sql(`select coalesce(json_object_agg(chiave, valore), '{}') from impostazioni where chiave like 'piano\\_import\\_colonne\\_%'`));
+    const inizio = sql(`select now()`);
+    const mod = (t, tipo, testi, atteso) => rpc('salva_modello_documento', { p_token: t, p_tipo: tipo, p_testi: testi, p_atteso: atteso === undefined ? null : atteso });
+    const quandoJs = (tipo) => { const x = sql(`select to_json(aggiornato_il) from modelli_documenti where tipo = ${lit(tipo)}`); return x ? JSON.parse(x) : null; };
+    const imp = (t, k, v) => rpc('upsert_impostazione', { p_token: t, p_chiave: k, p_valore: v });
+    try {
+      sql(`delete from modelli_documenti where tipo in ('rdi', 'nd1187'); delete from modelli_documenti_versioni where tipo in ('rdi', 'nd1187')`);
+      // MODELLI: senza il permesso (predefinito: solo amministratore) nessuno scrive
+      sql(`update impostazioni set valore = (valore::jsonb - 'gestione_modelli')::text where chiave = 'visibilita'`);
+      chiusa(await mod(CAMP, 'rdi', { titolo: 'W5M senza permesso' }), 'modello RDI cambiato da un operatore SENZA il permesso (predefinito)');
+      chiusa(await mod(PIS, 'rdi', { titolo: 'W5M senza permesso' }), 'modello RDI cambiato da un responsabile con piano e briefing ma senza il permesso');
+      funziona(await mod(ADM, 'nd1187', { titolo: 'W5M amministratore' }), 'amministratore cambia il modello 1187');
+      // permesso dato a Pistocchi
+      sql(`update impostazioni set valore = (valore::jsonb || '{"gestione_modelli": {"tipo": "selezionati", "operatori": ["Pistocchi Mara"]}}'::jsonb)::text where chiave = 'visibilita'`);
+      r = await mod(PIS, 'rdi', { titolo: 'W5M Rapporto {settore}', distribuzione: 'W5M HR' });
+      funziona(r, 'responsabile con il permesso "Modelli dei documenti" cambia il modello RDI');
+      esito(sql(`select aggiornato_da from modelli_documenti where tipo = 'rdi'`) === 'Pistocchi Mara', 'CHIUSA  autore del modello = sessione (scritto dal database)');
+      const reg = sql(`select dettaglio from log_attivita where azione = 'Modello del documento modificato' and operatore = 'Pistocchi Mara' and created_at >= ${lit(inizio)}`);
+      esito(/titolo: \(originale\) -> "W5M Rapporto \{settore\}"/.test(reg) && /distribuzione: \(originale\) -> "W5M HR"/.test(reg), 'FUNZIONA la modifica va nel Registro con il testo prima e dopo', reg);
+      chiusa(await mod(CAMP, 'rdi', { titolo: 'W5M' }, quandoJs('rdi')), 'modello cambiato da chi non ha il permesso (anche con l ora giusta)');
+      chiusa(await mod(PIS, 'rdi', { titolo: 'W5M senza aver letto' }), 'modello sovrascritto senza l ultima versione (chi salva per secondo)');
+      chiusa(await mod(PIS, 'rdi', { titolo: 'W5M ora vecchia' }, '2020-01-01T00:00:00Z'), 'modello salvato con un ora di lettura vecchia');
+      funziona(await mod(PIS, 'rdi', { titolo: 'W5M seconda versione' }, quandoJs('rdi')), 'modello salvato con l ultima versione letta');
+      chiusa(await mod(ADM, 'rdi', { 'Chiave-Strana': 'W5M' }, quandoJs('rdi')), 'modello con una chiave non valida');
+      chiusa(await mod(ADM, 'rdi', { titolo: 'x'.repeat(3001) }, quandoJs('rdi')), 'modello con un testo oltre 3000 caratteri');
+      chiusa(await mod(ADM, 'rdi', { titolo: 5 }, quandoJs('rdi')), 'modello con un testo che non e testo');
+      chiusa(await mod(ADM, 'rdi', ['W5M'], quandoJs('rdi')), 'modello che non e un elenco {chiave: testo}');
+      chiusa(await mod(ADM, 'Rdi; drop', {}, quandoJs('rdi')), 'modello di un documento con nome non valido');
+      chiusa(await mod('w5m-token-finto', 'rdi', { titolo: 'W5M' }), 'modello cambiato senza sessione valida');
+      // versioni: si conservano prima e dopo; le legge solo chi puo modificare
+      const ver = await rpc('leggi_versioni_modello', { p_token: PIS, p_tipo: 'rdi' });
+      esito(ver.ok && ver.body.length === 2 && ver.body[0].testi_prima.titolo === 'W5M Rapporto {settore}' && ver.body[0].testi_dopo.titolo === 'W5M seconda versione', 'FUNZIONA versioni conservate (la precedente si puo rimettere)', JSON.stringify(ver.body).slice(0, 200));
+      chiusa(await rpc('leggi_versioni_modello', { p_token: CAMP, p_tipo: 'rdi' }), 'versioni dei modelli lette da chi non ha il permesso');
+      // lettura dei modelli: tutti quelli che accedono (servono per stampare)
+      const letti = await rpc('leggi_modelli_documenti', { p_token: CAMP });
+      esito(letti.ok && letti.body.some((x) => x.tipo === 'rdi'), 'FUNZIONA un operatore legge i modelli per stampare i documenti');
+      chiusa(await rpc('leggi_modelli_documenti', { p_token: 'w5m-token-finto' }), 'modelli letti senza sessione');
+      for (const tab of ['modelli_documenti', 'modelli_documenti_versioni']) {
+        const dir = await fetch(BASE + tab + '?select=*', { headers: H });
+        esito(dir.status === 401 || dir.status === 403, 'CHIUSA  lettura diretta della tabella ' + tab + ' con la chiave pubblica', 'HTTP ' + dir.status);
+        const corpo = tab === 'modelli_documenti' ? { tipo: 'rdi', testi: { titolo: 'W5M diretto' } } : { tipo: 'rdi', testi_dopo: { titolo: 'W5M diretto' } };
+        const dirW = await fetch(BASE + tab, { method: 'POST', headers: H, body: JSON.stringify(corpo) });
+        esito(dirW.status === 401 || dirW.status === 403, 'CHIUSA  scrittura diretta della tabella ' + tab, 'HTTP ' + dirW.status);
+      }
+      // tornare ai testi originali = elenco vuoto
+      funziona(await mod(PIS, 'rdi', {}, quandoJs('rdi')), 'testi originali rimessi (elenco vuoto)');
+      esito(sql(`select testi::text from modelli_documenti where tipo = 'rdi'`) === '{}', '        modello RDI di nuovo originale');
+
+      // COLONNE DELL IMPORT DEL PIANO: chi importa il piano da file, solo nei suoi settori
+      const map = '{"foglio":"W5M","rigaIntest":1,"colNome":2,"giorni":"numeri"}';
+      sql(`update impostazioni set valore = (valore::jsonb - 'gestione_modelli')::text where chiave = 'visibilita'`);
+      chiusa(await imp(CAMP, 'piano_import_colonne_slots', map), 'colonne dell import salvate da chi non gestisce il piano');
+      chiusa(await imp(PIS, 'piano_import_colonne_slots', map), 'colonne dell import salvate da chi gestisce il piano ma NON importa da file');
+      sql(`update impostazioni set valore = (valore::jsonb || '{"piano_auto_import": {"tipo": "selezionati", "operatori": ["Bushi Musa", "Fertitta Lara", "Pistocchi Mara"]}}'::jsonb)::text where chiave = 'visibilita'`);
+      funziona(await imp(PIS, 'piano_import_colonne_slots', map), 'responsabile Slots che importa da file salva le colonne degli Slots');
+      chiusa(await imp(PIS, 'piano_import_colonne_tavoli', map), 'responsabile Slots salva le colonne dell import dei TAVOLI');
+      chiusa(await imp(PIS, 'piano_import_colonne_slots', '[1,2]'), 'colonne dell import che non sono un oggetto');
+      chiusa(await imp(ADM, 'piano_import_colonne_inventato', map), 'colonne dell import di un settore che non esiste');
+      funziona(await imp(ADM, 'piano_import_colonne_tavoli', map), 'amministratore salva le colonne dell import dei Tavoli');
+      funziona(await imp(PIS, 'piano_import_colonne_slots', ''), 'responsabile Slots toglie la sua mappatura (valore vuoto)');
+    } finally {
+      sql(`update impostazioni set valore = ${lit(visPrima)} where chiave = 'visibilita'`);
+      sql(`delete from modelli_documenti; insert into modelli_documenti select * from json_populate_recordset(null::modelli_documenti, ${lit(modPrima)}::json)`);
+      sql(`delete from modelli_documenti_versioni; insert into modelli_documenti_versioni overriding system value select * from json_populate_recordset(null::modelli_documenti_versioni, ${lit(verPrima)}::json)`);
+      sql(`delete from impostazioni where chiave like 'piano\\_import\\_colonne\\_%'`);
+      for (const k of Object.keys(impPrima)) sql(`insert into impostazioni (chiave, valore) values (${lit(k)}, ${lit(impPrima[k])})`);
+      sql(`delete from log_attivita where azione = 'Modello del documento modificato' and created_at >= ${lit(inizio)}`);
       esito(sql(`select valore from impostazioni where chiave = 'visibilita'`) === visPrima, '        visibilita rimessa com era');
     }
     });

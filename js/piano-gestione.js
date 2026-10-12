@@ -699,7 +699,9 @@ function _renderPianoTurniCard() {
       '</tbody></table></div><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:6px">Sola lettura: i turni si modificano solo da admin o da chi ha il permesso.</p></div></div>';
     return hRO;
   }
-  const turni = _pianoTurniReparto();
+  // Qui servono anche i turni disattivati: altrimenti, tolta la spunta Attivo,
+  // il turno sparirebbe dalla tabella e non si potrebbe piu' riattivare.
+  const turni = (pianoTurniCache || []).filter((t) => _repartoDi(t) === _pianoReparto());
   let h =
     '<div class="main-card" style="margin-top:16px"><div class="card-header">Turni · ' +
     escP(repartoLabel(_pianoReparto())) +
@@ -717,14 +719,23 @@ function _renderPianoTurniCard() {
     '<div style="overflow-x:auto"><table class="piano-table" style="min-width:720px;font-size:var(--fs-md,.875rem)"><thead><tr><th>Codice</th><th title="Area di lavoro del turno (SALA, CASSA, REC...)">Area</th><th>Inizio</th><th>Fine</th><th title="Ora di fine nei giorni in cui il casino chiude alle 5: venerdì, sabato, vigilie di festività, 31 dicembre. Vuoto = il turno finisce sempre alla stessa ora">Fine (chiusura 5)</th><th title="Durata in ore decimali e, accanto, in ore e minuti: 8.33 = 8h20, perché 20 minuti sono un terzo di ora">Ore</th><th>Tipo</th><th>Colore</th><th>Oltre 23</th><th>Attivo</th><th></th></tr></thead><tbody>';
   turni
     .slice()
-    .sort((x, y) => (x.gruppo || '').localeCompare(y.gruppo || '') || x.codice.localeCompare(y.codice))
+    .sort(
+      (x, y) =>
+        (x.attivo === false) - (y.attivo === false) ||
+        (x.gruppo || '').localeCompare(y.gruppo || '') ||
+        x.codice.localeCompare(y.codice),
+    )
     .forEach((t) => {
       const _mod = (window._pianoModifiche || []).filter((m) => m.scheda === 'Turni' && m.codice === t.codice);
       h +=
         '<tr id="pt-riga-' +
         t.id +
         '"' +
-        (_mod.length ? ' style="background:var(--avviso-bg)"' : '') +
+        (_mod.length
+          ? ' style="background:var(--avviso-bg)"'
+          : t.attivo === false
+            ? ' style="opacity:.55" title="Turno non attivo: non compare nel piano. Spunta Attivo per riattivarlo."'
+            : '') +
         '><td style="font-weight:700;background:' +
         (t.colore || '#fff') +
         '">' +

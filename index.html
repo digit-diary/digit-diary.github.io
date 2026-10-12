@@ -3202,7 +3202,7 @@
             </p>
           </div>
         </div>
-        <div style="padding: 0 16px 16px">
+        <div style="padding: 0 16px 16px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center">
           <button
             class="btn-salva"
             onclick="document.getElementById('import-modulo-file').click()"
@@ -3215,7 +3215,7 @@
             accept=".docx,.doc,.pdf"
             style="display: none"
             onchange="importaModuloFile(this)"
-          />
+          /><span id="moduli-modelli-azione"></span>
         </div>
       </div>
       <div id="modulo-form-area" style="display: none"></div>
@@ -3535,6 +3535,10 @@
         <div class="settings-btn-row" id="sicurezza-btns"></div>
         <div id="biometric-settings" class="sez-box"></div>
       </div>
+      <div class="settings-section" data-gruppo="Settori e moduli" id="modelli-section" style="display: none">
+        <div class="sez-head"><div><h4>Modelli dei documenti</h4><p class="sez-desc">I testi fissi dei moduli e dei formulari stampati (allineamento, apprezzamento, RDI, lista di non disponibilità 1187, notifica d'assenza 827, cambio turno e cambio vacanza): titoli, frasi standard, diciture e firme, con anteprima del PDF e versioni precedenti. I campi compilati nel modulo e l'impaginazione non cambiano.</p></div></div>
+        <div id="modelli-ui"></div>
+      </div>
       <div class="settings-section" data-gruppo="Settori e moduli" id="identita-section" style="display: none">
         <div class="sez-head"><div><h4>Identità del programma</h4><p class="sez-desc">Nome del programma, azienda, logo e colori che compaiono nella testata, nella schermata di accesso, nel titolo della pagina e nei documenti stampati o in PDF. Si può anche scegliere se mostrare in fondo alla pagina la riga del proprietario del programma (testo fisso, mai in stampa).</p></div></div>
         <div id="identita-ui"></div>
@@ -3632,6 +3636,7 @@
     <script src="js/chat-ui.js"></script>
     <script src="js/ai.js"></script>
     <script src="js/moduli.js"></script>
+    <script src="js/modelli-documenti.js"></script>
     <script src="js/formazione.js"></script>
     <script src="js/formazione-import.js"></script>
     <script src="js/valutazioni.js"></script>
@@ -3654,6 +3659,7 @@
     <script src="js/piano-auto.js"></script>
     <script src="js/piano-confine.js"></script>
     <script src="js/piano-config.js"></script>
+    <script src="js/piano-import-colonne.js"></script>
     <script src="js/piano-gestione.js"></script>
     <script src="js/piano-cambi.js"></script>
     <script src="js/piano-schede.js"></script>

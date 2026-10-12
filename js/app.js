@@ -127,6 +127,7 @@ function switchPage(name) {
       idSec.style.display = isAdmin() ? '' : 'none';
       if (isAdmin() && typeof renderIdentitaUI === 'function') renderIdentitaUI();
     }
+    if (typeof renderModelliUI === 'function') renderModelliUI();
     const ai = document.getElementById('ai-section');
     if (ai) ai.style.display = isAdmin() ? '' : 'none';
     const dbSec = document.getElementById('db-stats-section');
@@ -208,6 +209,8 @@ function switchPage(name) {
   if (name === 'moduli') {
     if (!document.getElementById('mod-list-results')) _modFiltInit = false;
     renderModuliList();
+    if (typeof modelliPulsanteModuli === 'function') modelliPulsanteModuli();
+    if (typeof modelliCarica === 'function') modelliCarica().catch(() => {});
   }
   if (name === 'formazione') renderFormazione();
   if (name === 'piano' && typeof renderPiano === 'function') renderPiano();

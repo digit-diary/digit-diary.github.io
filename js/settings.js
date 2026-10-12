@@ -75,6 +75,8 @@ const VIS_ITEMS = {
     vista_valutazioni: 'Valutazioni · VEDERE le valutazioni annuali (chi le gestisce le vede comunque)',
     gestione_istruzioni:
       'Istruzioni del settore · MODIFICARE le istruzioni interne dei propri settori, in cima alla Guida (le leggono tutti quelli del settore)',
+    gestione_modelli:
+      'Modelli dei documenti · MODIFICARE i testi fissi dei moduli e dei formulari stampati (allineamento, apprezzamento, RDI, 1187, 827, cambio turno e vacanza): vale per tutti i settori',
   },
   // Schede del PIANO: chi le VEDE. Default 'tutti'; 'nascosto' le toglie dal
   // menu, 'operatori selezionati' le mostra solo a quei nomi. L'admin vede
@@ -1994,6 +1996,14 @@ async function esportaBackupCompleto() {
         totale += istr.length;
       }
     } catch (e) {}
+    // modelli dei documenti (migrazione 20260915): stessa strada, stesse colonne della tabella
+    try {
+      const mod = await _conSessione((t) => _rpcSicura('leggi_modelli_documenti', { p_token: t }), getOpToken());
+      if (Array.isArray(mod)) {
+        dati.modelli_documenti = mod;
+        totale += mod.length;
+      }
+    } catch (e) {}
     const backup = {
       app: identita().programma + ' · ' + identita().azienda,
       esportato_il: new Date().toISOString(),
@@ -2757,6 +2767,11 @@ function _gcFunzioneTesto(f) {
   const nome = (typeof funzioneNomeEsteso === 'function' && funzioneNomeEsteso(s)) || _GC_FUNZIONI_NOMI[s];
   return s && nome ? s + ' · ' + nome : s;
 }
+// settore della scala dei livelli: quello della persona; "Tutti i settori" o vuoto = quello aperto
+function _gcRepLivello(c) {
+  const r = c && c.reparto_dip;
+  return r && r !== 'entrambi' && getCompetenzeConfigAll()[r] ? r : currentReparto;
+}
 function _gcSettoreTesto(rep) {
   return rep === 'entrambi' ? 'Tutti i settori' : repartoLabel(rep || 'slots');
 }
@@ -2793,7 +2808,6 @@ function _gcElencoHtml(attivi, inattivi, p) {
     (vedeCat ? '<th>Categoria</th>' : '') +
     '<th class="num">Percentuale</th><th>Settore</th><th>Livello</th><th class="gc-col-apri"><span class="fz-sr">Apri</span></th></tr></thead>';
   const riga = (c) => {
-    const lv = typeof livelloDiCollaboratore === 'function' ? livelloDiCollaboratore(c) : 0;
     const cop = typeof _coperturaSettori === 'function' ? _coperturaSettori(c) : [];
     return (
       '<tr class="collab-riga gc-riga" tabindex="0" role="button" data-nome="' +
@@ -2827,7 +2841,9 @@ function _gcElencoHtml(attivi, inattivi, p) {
       '</td><td data-et="Settore">' +
       escP(_gcSettoreTesto(c.reparto_dip)) +
       '</td><td data-et="Livello">' +
-      (typeof _lvBadge === 'function' ? _lvBadge(lv) : lv ? 'Livello ' + lv : 'Senza livello') +
+      (typeof livelloEtichettaHtml === 'function'
+        ? livelloEtichettaHtml(c, { rep: _gcRepLivello(c), compatto: true, vuoto: '<span class="gc-manca">-</span>' })
+        : '') +
       '</td><td class="gc-col-apri" aria-hidden="true">&rsaquo;</td></tr>'
     );
   };
@@ -2930,12 +2946,12 @@ function gcApriScheda(id) {
   repAttivi.forEach((r) => (settOpz += opt(r.key, escP(r.label), repCur)));
   if (repCur !== 'entrambi' && !repAttivi.some((r) => r.key === repCur))
     settOpz += opt(repCur, escP(repartoLabel(repCur)) + ' (disattivato)', repCur);
-  const lv = typeof livelloDiCollaboratore === 'function' ? livelloDiCollaboratore(c) : 0;
+  const lvH = typeof livelloEtichettaHtml === 'function' ? livelloEtichettaHtml(c, { rep: _gcRepLivello(c) }) : '';
   let h =
     '<div class="fz-fin-testa"><div><h3 id="gc-titolo">' +
     escP(c.nome) +
     '</h3><p>' +
-    (typeof _lvBadge === 'function' ? _lvBadge(lv) + ' · ' : '') +
+    (lvH ? lvH + ' · ' : '') +
     escP(_gcSettoreTesto(c.reparto_dip)) +
     (c.data_fine_rapporto ? ' · <b>fine contratto ' + _gcDataIt(c.data_fine_rapporto) + '</b>' : '') +
     '</p></div><button type="button" class="fz-chiudi" aria-label="Chiudi senza salvare" onclick="gcChiudiScheda()">&times;</button></div>';

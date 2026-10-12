@@ -106,12 +106,24 @@ async function stampaPianoPDF(soloNomi) {
 // Formulario cambio turno IDENTICO a Turnivo (template cambio_turno_pdf.html):
 // header centrato, sezioni con barra colorata (A blu, B arancio, motivazione
 // verde, autorizzazione viola con checkbox), chip turni, firme con data.
-function _pdfCambioTurno(dati) {
+// I testi fissi (titoli, sezioni, autorizzazione, firme, piede) vengono dal modello del
+// documento "cambio_turno" (js/modelli-documenti.js); testiSovra = testi da usare al posto di
+// quelli salvati (anteprima). Chi chiama legge prima i modelli (modelliCarica).
+function _pdfCambioTurno(dati, testiSovra) {
   // fogli archiviati con il nome breve del settore di allora (es. "Slots"): si stampa il nome nei documenti
   dati = Object.assign({}, dati, {
     a: Object.assign({}, dati.a, { settore: settoreNomeDocumento(dati.a && dati.a.settore) }),
     b: Object.assign({}, dati.b, { settore: settoreNomeDocumento(dati.b && dati.b.settore) }),
   });
+  const t = modelloTestoDi(
+    modelloTesti('cambio_turno', testiSovra),
+    modelloValori({
+      nome: dati.a.nome || '',
+      data: dati.data || '',
+      settore: dati.a.settore || '',
+      richiesto: dati.richiesto || getOperatore(),
+    }),
+  );
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF('portrait', 'mm', 'a4');
   const M = 15;
@@ -121,12 +133,12 @@ function _pdfCambioTurno(dati) {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(14);
   doc.setTextColor(51, 51, 51);
-  doc.text(identita().azienda, 105, y, { align: 'center' });
+  doc.text(t('intestazione'), 105, y, { align: 'center' });
   y += 8;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(20);
   doc.setTextColor(44, 62, 80);
-  doc.text(dati.tipo === 'ESIGENZE' ? 'CAMBIO TURNO PER ESIGENZE OPERATIVE' : 'RICHIESTA CAMBIO TURNO', 105, y, {
+  doc.text(dati.tipo === 'ESIGENZE' ? t('titolo_esigenze') : t('titolo'), 105, y, {
     align: 'center',
   });
   y += 6;
@@ -210,7 +222,7 @@ function _pdfCambioTurno(dati) {
 
   if (dati.tipo === 'ESIGENZE') {
     sezione(
-      'Collaboratore',
+      t('sez_collab'),
       [52, 152, 219],
       [250, 250, 250],
       [
@@ -223,7 +235,7 @@ function _pdfCambioTurno(dati) {
     );
   } else {
     sezione(
-      'Collaboratore A (richiedente)',
+      t('sez_a'),
       [52, 152, 219],
       [250, 250, 250],
       [
@@ -234,7 +246,7 @@ function _pdfCambioTurno(dati) {
       ],
     );
     sezione(
-      'Collaboratore B (accetta lo scambio)',
+      t('sez_b'),
       [230, 126, 34],
       [250, 250, 250],
       [
@@ -248,16 +260,16 @@ function _pdfCambioTurno(dati) {
   if (dati.restituzione) {
     // IDENTICA a Turnivo: barra viola #8e44ad, sfondo #f8f0ff
     sezione(
-      'Restituzione',
+      t('restituzione_titolo'),
       [142, 68, 173],
       [248, 240, 255],
       [
         ['Data restituzione:', dati.restituzione],
-        ['', 'In questa data i turni verranno scambiati nuovamente tra i due collaboratori.'],
+        ['', t('restituzione_frase')],
       ],
     );
   }
-  sezione('Motivazione', [46, 204, 113], [240, 250, 240], [['', dati.motivo || 'Nessuna motivazione specificata']]);
+  sezione(t('motivazione_titolo'), [46, 204, 113], [240, 250, 240], [['', dati.motivo || t('motivo_vuoto')]]);
   // Autorizzazione con checkbox
   const hAut = 30;
   doc.setFillColor(250, 248, 252);
@@ -269,7 +281,7 @@ function _pdfCambioTurno(dati) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
   doc.setTextColor(44, 62, 80);
-  doc.text('Autorizzazione', M + 6, yy);
+  doc.text(t('aut_titolo'), M + 6, yy);
   doc.setDrawColor(221, 221, 221);
   doc.line(M + 6, yy + 2, 210 - M - 6, yy + 2);
   yy += 9;
@@ -287,27 +299,31 @@ function _pdfCambioTurno(dati) {
   }
   doc.setFontSize(11);
   doc.setTextColor(34, 34, 34);
-  doc.text('Autorizzato', M + 14, yy);
+  doc.text(t('aut_si'), M + 14, yy);
   doc.rect(M + 52, yy - 4, 5, 5);
-  doc.text('Non autorizzato', M + 60, yy);
+  doc.text(t('aut_no'), M + 60, yy);
   yy += 8;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
-  doc.text('Motivo:', M + 6, yy);
+  doc.text(t('aut_motivo'), M + 6, yy);
   doc.setFont('helvetica', 'normal');
-  doc.text('_______________________________________________________________________', M + 22, yy);
+  doc.text(
+    '_______________________________________________________________________',
+    M + 22 + _modelloAllungo(doc, t('aut_motivo'), modelloOriginale('cambio_turno', 'aut_motivo')),
+    yy,
+  );
   y += hAut + 14;
   // firme
   const firme =
     dati.tipo === 'ESIGENZE'
       ? [
-          ['Firma Collaboratore', dati.a.nome],
-          ['Firma Responsabile', ''],
+          [t('firma_collab'), dati.a.nome],
+          [t('firma_resp'), ''],
         ]
       : [
-          ['Firma Collaboratore A', dati.a.nome],
-          ['Firma Collaboratore B', dati.b.nome],
-          ['Firma Responsabile', ''],
+          [t('firma_a'), dati.a.nome],
+          [t('firma_b'), dati.b.nome],
+          [t('firma_resp'), ''],
         ];
   const wBox = firme.length === 2 ? W * 0.45 : W * 0.3;
   const gap = (W - wBox * firme.length) / (firme.length - 1);
@@ -335,7 +351,7 @@ function _pdfCambioTurno(dati) {
   doc.line(M, ph - 14, 210 - M, ph - 14);
   doc.setFontSize(7.5);
   doc.setTextColor(85, 85, 85);
-  doc.text(identita().azienda + ' · Richiesto da: ' + (dati.richiesto || getOperatore()), 105, ph - 9, {
+  doc.text(t('piede'), 105, ph - 9, {
     align: 'center',
   });
   return doc;
@@ -780,6 +796,7 @@ async function _confermaCercaCambioLiberoEsegui() {
             cand.nome.split(' ')[0]
           : null,
       };
+      if (typeof modelliCarica === 'function') await modelliCarica();
       const doc = _pdfCambioTurno(datiPdf);
       mostraPdfPreview(doc, 'cambio_turno_' + _ccDati.data + '.pdf', 'Cambio turno ' + _ccDati.data);
       const idFoglio = await _salvaFoglioCambio(datiPdf, _ccDati.nome, _ccDati.data);
@@ -840,6 +857,7 @@ async function ristampaFoglioCambio(nome, dstr) {
       return;
     }
     if (!window.jspdf) await caricaJsPDF();
+    if (typeof modelliCarica === 'function') await modelliCarica();
     const doc = _pdfCambioTurno(miei[0].dati);
     mostraPdfPreview(doc, 'cambio_turno_' + dstr + '.pdf', 'Cambio turno ' + dstr);
   } catch (e) {
@@ -1216,6 +1234,7 @@ async function _confermaScambioTurnoEsegui() {
         autorizzato: true,
         restituzione: dataRest ? new Date(dataRest + 'T12:00:00').toLocaleDateString('it-IT') : null,
       };
+      if (typeof modelliCarica === 'function') await modelliCarica();
       const doc = _pdfCambioTurno(datiPdf);
       mostraPdfPreview(doc, 'cambio_turno_' + sel.data + '.pdf', 'Cambio turno ' + sel.data);
       const idFoglio = await _salvaFoglioCambio(datiPdf, sel.nome, sel.data);

@@ -461,9 +461,10 @@ const PIANO_REGOLE_GUIDA = {
   funzioni_fanno_tutto: {
     g: 'Funzioni e turni',
     n: 'Funzioni che a mano possono fare qualsiasi turno (il livello alto comprende quelli sotto, come in Formazione)',
-    s: 'Sigle delle funzioni separate da virgola (per esempio SUP,RESP). Vuoto = nessuna: a mano valgono per tutti le regole del settore.',
+    s: 'Sigle delle funzioni separate da virgola (per esempio SUP,SOSTRESP,RESP). Vuoto = nessuna: a mano valgono per tutti le regole del settore e nessuno e esente dall avviso "non formato".',
     t: 'testo',
-    p: 'SUP,RESP',
+    // SOSTRESP: prima era esente dall avviso "non formato" per una lista fissa nel codice
+    p: 'SUP,SOSTRESP,RESP',
     d: 'Scrittura manuale, Controlla le regole, cambi turno e coperture (la bozza automatica segue le regole del settore)',
   },
   chiusura_ora_normale: {
@@ -1968,11 +1969,30 @@ async function importaPianoExcel(input) {
   input.value = '';
   if (!file || !window.XLSX) return;
   const ym = _pianoMeseSel;
+  // "Importa da Excel scegliendo le colonne" (js/piano-import-colonne.js)
+  const scegli = typeof _pianoImpScegliColonne !== 'undefined' && _pianoImpScegliColonne;
+  if (typeof _pianoImpScegliColonne !== 'undefined') _pianoImpScegliColonne = false;
   let wb;
   try {
     wb = XLSX.read(await file.arrayBuffer(), { bookFiles: true }); // file interni: servono per i colori delle celle
   } catch (e) {
     toast('Errore lettura file piano');
+    return;
+  }
+  // FILE DI UN ALTRO FORMATO (o colonne scelte a richiesta): prima la finestra delle colonne,
+  // poi l import di sempre con quelle colonne. Il file del Casino e il formato semplice si
+  // riconoscono da soli e vanno avanti come prima.
+  if (
+    typeof pianoImportScegliColonne === 'function' &&
+    (scegli ||
+      !_xlsFileRiconosciuto(
+        wb,
+        ym,
+        collaboratoriCache.filter((c) => c.attivo !== false),
+      ))
+  ) {
+    const colonne = await pianoImportScegliColonne(wb, ym, { nonRiconosciuto: !scegli });
+    if (colonne) await _importaPianoDaWb(wb, ym, { colonne: colonne });
     return;
   }
   const esito = {};
@@ -2008,6 +2028,8 @@ function _pianoMotivoBloccoDaNota(nota) {
   return /\bvisit[ae]\b|\bmedic[oaie]\b|controll[oi] medic|certificat[oi] medic/i.test(t) ? t.slice(0, 200) : null;
 }
 // opz.meseInCorso: secondo giro sul mese in corso dello stesso file (si chiede prima)
+// opz.colonne: colonne scelte dall utente (js/piano-import-colonne.js) per un file di un
+// altro formato; tutto il resto (controlli, riepilogo, scrittura) e quello di sempre
 async function _importaPianoDaWb(wb, ym, opz) {
   opz = opz || {};
   const nGiorni = _pianoUltimoGiorno(ym);
@@ -2017,9 +2039,18 @@ async function _importaPianoDaWb(wb, ym, opz) {
     const trova = (nome) => _xlsTrovaCollab(nome, collabs);
     // layout: file REALE (foglio del mese, giorni da riga seriale, nomi nella
     // colonna con più riscontri) oppure formato semplice (nome + giorni 1..N)
-    const foglioMese = _xlsFoglioMese(wb, ym);
+    // oppure le colonne scelte dall utente
+    const LC = opz.colonne ? _xlsLayoutColonne(wb, ym, opz.colonne) : null;
+    if (LC && LC.errore) {
+      toastErrore('Piano non importato: ' + LC.errore, 9000);
+      return;
+    }
+    const foglioMese = LC ? LC.foglio : _xlsFoglioMese(wb, ym);
     let dati, mappa, colNome, inizio, fonte;
-    if (foglioMese) {
+    if (LC) {
+      dati = LC.dati;
+      mappa = LC.mappa;
+    } else if (foglioMese) {
       dati = XLSX.utils.sheet_to_json(wb.Sheets[foglioMese], { header: 1, defval: '', raw: true });
       mappa = _xlsCercaMappaGiorni(dati, nGiorni, 0, 8);
     }
@@ -2054,7 +2085,11 @@ async function _importaPianoDaWb(wb, ym, opz) {
         return '';
       }
     };
-    if (foglioMese && mappa) {
+    if (LC) {
+      colNome = LC.colNome;
+      inizio = LC.inizio;
+      fonte = LC.fonte;
+    } else if (foglioMese && mappa) {
       const primoGiornoCol = mappa[1];
       let rIntest = 0;
       for (let r = 0; r <= 8; r++) if (_xlsMappaGiorni(dati[r], nGiorni)) rIntest = r;
@@ -2175,11 +2210,14 @@ async function _importaPianoDaWb(wb, ym, opz) {
         // prima ogni persona nuova diventava jolly HOST. Percentuale come 0.8, 80 o 80%.
         const giorniCol = mappa ? new Set(Object.values(mappa)) : null;
         const colInfo = (k) => (giorniCol && !giorniCol.has(colNome + k) ? riga[colNome + k] : null);
-        const fz = String(colInfo(1) || '')
+        // colonne scelte: funzione e percentuale solo dalle colonne indicate (se indicate)
+        const fzVal = LC ? (LC.colFunzione == null ? '' : riga[LC.colFunzione]) : colInfo(1);
+        const pctVal = LC ? (LC.colPerc == null ? null : riga[LC.colPerc]) : colInfo(2);
+        const fz = String(fzVal || '')
           .trim()
           .toUpperCase();
         const funzioni = _pianoFunzioniDi(_pianoReparto());
-        let pct = parseFloat(String(colInfo(2) == null ? '' : colInfo(2)).replace(',', '.'));
+        let pct = parseFloat(String(pctVal == null ? '' : pctVal).replace(',', '.'));
         if (pct > 1 && pct <= 100) pct = pct / 100;
         const pctLetta = !isNaN(pct) && pct > 0 && pct <= 1;
         righeCollab.push({
@@ -2191,8 +2229,9 @@ async function _importaPianoDaWb(wb, ym, opz) {
           percentuale: pctLetta ? pct : 1,
           // jolly = nel foglio del piano la colonna della percentuale e vuota (come nel file
           // HR); nel formato semplice non si sa: fisso al 100%, da controllare nella scheda
-          isJolly: !!giorniCol && !pctLetta,
-          daControllare: !giorniCol || !funzioni.includes(fz),
+          // colonne scelte: jolly solo se c e la colonna della percentuale ed e vuota
+          isJolly: LC ? LC.colPerc != null && !pctLetta : !!giorniCol && !pctLetta,
+          daControllare: LC ? LC.colPerc == null || !funzioni.includes(fz) : !giorniCol || !funzioni.includes(fz),
         });
       }
     });

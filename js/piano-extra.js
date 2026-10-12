@@ -3200,8 +3200,9 @@ function _pianoGruppoNonFormato(nome, codTurno, commento) {
   const info = _pianoCollabInfo(nome);
   if (!info) return null;
   const fz = ((info.funzione || '') + '').toUpperCase();
-  // chi "fa tutto" (regola funzioni_fanno_tutto, es. SUP e RESP) non riceve l avviso
-  if (fz && (_pianoFunzioniFannoTutto().has(fz) || ['SUP', 'SOSTRESP', 'RESP'].includes(fz))) return null;
+  // chi "fa tutto" non riceve l avviso: UNICA fonte la regola funzioni_fanno_tutto (prima
+  // SUP, SOSTRESP e RESP erano anche fissi qui e restavano esenti svuotando la regola)
+  if (fz && _pianoFunzioniFannoTutto().has(fz)) return null;
   // chi lavora quel settore IN ACCOMPAGNAMENTO (es. guardaroba con la rec)
   // è una situazione voluta: nessun avviso
   if (_pianoAccompagnamentoDi(info).includes(g)) return null;
@@ -3248,14 +3249,17 @@ async function _pianoProponiCertificazioniBulk(coppie, opz) {
     if (!gruppi.length) return;
     gruppi.sort((a, b) => livDi(inv[b]) - livDi(inv[a]));
     const key = inv[gruppi[0]];
-    const prima = _pianoLivelloNelSettore(info, rep) || 0;
+    // prima/dopo sul livello COMPLETO: servono a punti e premi del passaggio di livello
+    // (incentivi invariati, niente premi per gradini parziali), non al Piano
+    const prima = _pianoLivelloCompletoNelSettore(info, rep) || 0;
     const sim = Object.assign({}, info.competenze || {});
     comps.forEach((k) => {
       if ((parseInt(k.livello) || 0) <= livDi(key)) sim[k.key] = true;
     });
-    const dopo = _pianoLivelloNelSettore(Object.assign({}, info, { competenze: sim }), rep) || 0;
+    const dopo = _pianoLivelloCompletoNelSettore(Object.assign({}, info, { competenze: sim }), rep) || 0;
     proposte.push({
       nome: nome,
+      rep: rep,
       key: key,
       prima: prima,
       dopo: dopo,
@@ -3274,10 +3278,20 @@ async function _pianoProponiCertificazioniBulk(coppie, opz) {
   // raggiunti; il premio del livello si legge a parte
   const puntiDi = (p) => {
     let t = (azComp && parseInt(azComp.punti)) || 0;
-    for (let lv = p.prima + 1; lv <= p.dopo; lv++) t += parseInt((cfgPunti.punti_livello || {})[String(lv)]) || 0;
+    // punti e premi del settore della persona (valori propri del settore o globali)
+    for (let lv = p.prima + 1; lv <= p.dopo; lv++)
+      t +=
+        typeof puntiLivelloDi === 'function'
+          ? puntiLivelloDi(lv, p.rep, cfgPunti)
+          : parseInt((cfgPunti.punti_livello || {})[String(lv)]) || 0;
     return t;
   };
-  const premioDi = (p) => (p.dopo > p.prima && p.dopo >= 2 ? (cfgPunti.premi_livello || {})[String(p.dopo)] : '');
+  const premioDi = (p) =>
+    p.dopo > p.prima && p.dopo >= 2
+      ? typeof premioLivelloDi === 'function'
+        ? premioLivelloDi(p.dopo, p.rep, cfgPunti)
+        : (cfgPunti.premi_livello || {})[String(p.dopo)]
+      : '';
   const incentivi = typeof incentiviAttivi !== 'function' || incentiviAttivi();
   if (
     !(await chiediConferma(
@@ -3306,17 +3320,91 @@ async function _pianoProponiCertificazioniBulk(coppie, opz) {
   for (const p of proposte)
     if (typeof certificaCompetenzaDaPiano === 'function') await certificaCompetenzaDaPiano(p.nome, p.key, 'livelli');
 }
+// SETTORE DELLA FORMAZIONE DAL COMMENTO, per qualsiasi settore: il commento si confronta con
+// i NOMI CONFIGURATI del settore aperto, cioe i gruppi dei suoi turni (SALA, REC, CASSA,
+// TAVOLI, VALET...) e, per ogni competenza di Formazione collegata a un gruppo, la sua
+// chiave, il suo nome e la sigla fra parentesi ("Back Office (BO)" -> "back office" e
+// "bo"). Un nome di piu parole vale solo intero ("Sala Slot", non "slot" da solo).
+// Prima riconosceva solo cassa/rec/sala/acc, parole delle Slots. Per le Slots il risultato
+// resta quello di prima: "cass..." -> CASSA, "rec..." -> REC, "sala" -> SALA, "acc..." ->
+// ACCOGLIENZA. Se piu nomi corrispondono vince il gruppo del livello di Formazione piu
+// alto (cassa L3 prima di reception L2 prima di sala L1, come l ordine di prima); un gruppo
+// senza competenza collegata conta come livello 0. Nessuna corrispondenza = gruppo del turno.
+function _pianoParoleDi(txt) {
+  return String(txt || '')
+    .toLowerCase()
+    .split(/[^a-z0-9\u00e0-\u00ff]+/)
+    .filter(Boolean);
+}
+// voci del settore: [{ gruppo, livello, termini: [[parola, ...], ...] }] (un termine di piu
+// parole e un nome intero)
+function _pianoVociFormazioneSettore(rep) {
+  const r = rep || _pianoReparto();
+  const voci = {}; // GRUPPO -> { gruppo, livello, termini: Map testo -> parole }
+  const voce = (g) => {
+    const G = String(g || '').toUpperCase();
+    if (!G) return null;
+    return (voci[G] = voci[G] || { gruppo: G, livello: 0, termini: new Map() });
+  };
+  const aggiungi = (v, parole) => parole.length && v.termini.set(parole.join(' '), parole);
+  (typeof pianoTurniCache !== 'undefined' ? pianoTurniCache : [])
+    .filter((t) => t.attivo !== false && _repartoDi(t) === r && t.gruppo)
+    .forEach((t) => aggiungi(voce(t.gruppo), _pianoParoleDi(t.gruppo)));
+  const mappa = _pianoCompetenzeGruppi();
+  const comps = ((typeof getCompetenzeConfigAll === 'function' ? getCompetenzeConfigAll() : {}) || {})[r] || [];
+  comps.forEach((k) => {
+    const g = k && k.key && mappa[k.key];
+    const v = g ? voce(g) : null;
+    if (!v) return;
+    v.livello = Math.max(v.livello, parseInt(k.livello) || 0);
+    const label = String(k.label || '');
+    aggiungi(v, _pianoParoleDi(k.key));
+    // nome senza la sigla e senza le parole corte ("di", "la")
+    aggiungi(
+      v,
+      _pianoParoleDi(label.replace(/\([^)]*\)/g, ' ')).filter((p) => p.length >= 3),
+    );
+    const sig = label.match(/\(([^)]+)\)/);
+    if (sig) aggiungi(v, _pianoParoleDi(sig[1]));
+  });
+  return Object.values(voci).map((v) => ({ gruppo: v.gruppo, livello: v.livello, termini: [...v.termini.values()] }));
+}
+// una parola del commento corrisponde a una parola configurata se: quella configurata e
+// corta (fino a 3 lettere, es. BO, REC, SUP) e sono uguali, cosi "supporto" non e SUP; la
+// parola comincia con quella configurata (receptionist -> reception); la parola di almeno 3
+// lettere e l inizio di quella configurata (rec -> reception, acc -> accoglienza); hanno in
+// comune le prime 4 lettere (casse -> cassa)
+function _pianoParolaCorrisponde(parola, termine) {
+  if (!parola || !termine) return false;
+  if (termine.length <= 3) return parola === termine;
+  if (parola.startsWith(termine)) return true;
+  if (parola.length >= 3 && termine.startsWith(parola)) return true;
+  return parola.length >= 4 && termine.length >= 4 && parola.slice(0, 4) === termine.slice(0, 4);
+}
+// il commento contiene il termine: una parola, oppure tutte le parole di un nome una dopo
+// l altra (senza contare le parole corte del commento)
+function _pianoCommentoHaTermine(parole, lunghe, termine) {
+  if (termine.length === 1) return parole.some((p) => _pianoParolaCorrisponde(p, termine[0]));
+  for (let i = 0; i + termine.length <= lunghe.length; i++)
+    if (termine.every((t, j) => _pianoParolaCorrisponde(lunghe[i + j], t))) return true;
+  return false;
+}
+function _pianoSettoreDaCommentoVoci(commento, gruppoTurno, voci) {
+  const parole = _pianoParoleDi(commento);
+  const lunghe = parole.filter((p) => p.length >= 3);
+  let meglio = null;
+  (voci || []).forEach((v) => {
+    if (!v.termini.some((t) => _pianoCommentoHaTermine(parole, lunghe, t))) return;
+    if (!meglio || v.livello > meglio.livello) meglio = v;
+  });
+  return meglio ? meglio.gruppo : gruppoTurno;
+}
+function _pianoSettoreDaCommento(commento, gruppoTurno, rep) {
+  return _pianoSettoreDaCommentoVoci(commento, gruppoTurno, _pianoVociFormazioneSettore(rep));
+}
 // FORMAZIONI COMPLETATE dai commenti: cella con turno + commento
 // "formazione/affianc..." = giorno di affiancamento; al raggiungimento
 // della soglia (personalizzabile, default 5) propone la certificazione
-function _pianoSettoreDaCommento(commento, gruppoTurno) {
-  const c = (commento || '').toLowerCase();
-  if (/cass/.test(c)) return 'CASSA';
-  if (/rec/.test(c)) return 'REC';
-  if (/sala/.test(c)) return 'SALA';
-  if (/acc/.test(c)) return 'ACCOGLIENZA';
-  return gruppoTurno;
-}
 async function controllaFormazioniCompletate(silenzioso) {
   const soglia = window._pianoGgFormazione || parseInt(await getImp('piano_giorni_formazione')) || 5;
   const rep = _pianoReparto();
@@ -3329,10 +3417,11 @@ async function controllaFormazioniCompletate(silenzioso) {
   const perId = {};
   tutte.forEach((r) => (perId[r.id] = r));
   const gruppi = {}; // nome|settore -> {giorni:Set, ultimo}
+  const voci = _pianoVociFormazioneSettore(rep);
   Object.values(perId).forEach((r) => {
     const t = _pianoTurnoInfo(r.codice);
     if (!t) return;
-    const sett = _pianoSettoreDaCommento(r.commento, (t.gruppo || '').toUpperCase());
+    const sett = _pianoSettoreDaCommentoVoci(r.commento, (t.gruppo || '').toUpperCase(), voci);
     if (!_pianoGruppiConFormazione().has(sett)) return;
     const k = r.collaboratore + '|' + sett;
     gruppi[k] = gruppi[k] || { giorni: new Set(), ultimo: '' };

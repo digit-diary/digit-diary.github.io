@@ -43,18 +43,6 @@ function _fziComp(rep) {
   const l = (getCompetenzeConfigAll()[rep] || []).slice();
   return typeof _compOrdinate === 'function' ? _compOrdinate(l) : l;
 }
-// livello di una persona nel settore con un certo insieme di spunte (stessa regola di
-// livelloDiCollaboratore: il livello piu alto con tutte le competenze fino a li)
-function _fziLivello(rep, spunte) {
-  const comps = _fziComp(rep).filter((k) => (parseInt(k.livello) || 0) >= 1);
-  const livelli = [...new Set(comps.map((k) => parseInt(k.livello) || 0))].sort((a, b) => a - b);
-  let lv = 0;
-  for (const n of livelli) {
-    if (comps.filter((k) => (parseInt(k.livello) || 0) <= n).every((k) => spunte[k.key] === true)) lv = n;
-    else break;
-  }
-  return lv;
-}
 function _fziCollabDelSettore(rep) {
   return collaboratoriCache.filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === rep);
 }
@@ -365,14 +353,9 @@ function _fziCalcola() {
       piu: piu.map(etichetta),
       meno: meno.map(etichetta),
       piuK: piu,
-      lvPrima: c ? _fziLivello(z.rep, prima) : 0,
-      lvDopo: _fziLivelloConNuove(z.rep, dopo, nuoveComp),
     });
   });
   return { righe: righe, nuoveComp: nuoveComp };
-}
-function _fziLivelloConNuove(rep, spunte) {
-  return _fziLivello(rep, spunte); // le specialita nuove sono Extra: non cambiano il livello
 }
 
 function _fziAnteprima() {
@@ -387,11 +370,9 @@ function _fziAnteprima() {
   const trovati = r.righe.filter((x) => x.collab);
   const nuovi = r.righe.filter((x) => !x.collab);
   const conModifiche = trovati.filter((x) => x.piu.length || x.meno.length);
-  // stesso badge della matrice: nome del livello per esteso, "Senza livello" ben visibile
-  const lvChip = (lv) =>
-    typeof _lvBadge === 'function'
-      ? _lvBadge(lv, z.rep)
-      : '<span class="mini-badge" style="background:#1a4a7a">' + (lv ? 'Livello ' + lv : 'Senza livello') + '</span>';
+  // stessa etichetta della matrice ("L3 · Cassa", parziale, "Senza livello"), sulle spunte
+  // prima e dopo l import; le specialita nuove sono Extra e non cambiano il livello
+  const lvChip = (spunte) => livelloEtichettaHtml({ competenze: spunte }, { rep: z.rep, compatto: true, vuoto: '-' });
   const riga = (x, i) =>
     '<tr><td>' +
     (x.collab
@@ -405,8 +386,8 @@ function _fziAnteprima() {
         escP(capitalizzaNome(x.nomeFile.toLowerCase())) +
         ' <span style="color:var(--muted)">(nuovo)</span></label>') +
     '</td><td style="white-space:nowrap">' +
-    (x.collab ? lvChip(x.lvPrima) + ' &rarr; ' : '') +
-    lvChip(x.lvDopo) +
+    (x.collab ? lvChip(x.prima) + ' &rarr; ' : '') +
+    lvChip(x.dopo) +
     '</td><td>' +
     (x.piu.length ? '<span style="color:var(--c-verde,#2c6e49)">+ ' + escP(x.piu.join(', ')) + '</span>' : '') +
     (x.piu.length && x.meno.length ? '<br>' : '') +

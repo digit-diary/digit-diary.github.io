@@ -98,9 +98,9 @@ function _lvNomeAutomatico(lv, rep) {
 function livelloNome(lv, rep) {
   return _lvNomeManuale(lv, rep) || _lvNomeAutomatico(lv, rep);
 }
-// stesso nome anche nelle sigle: prima era "L4", che non diceva niente a chi legge
+// sigla nei testi ed esportazioni: numero + nome ("L3 · Cassa"), come il badge
 function livelloSigla(lv, rep) {
-  return livelloNome(lv, rep);
+  return _lvSigla(lv, rep);
 }
 // Testo dentro un attributo HTML (value="...", title="..."): escP non converte
 // le virgolette, quindi una nota con " veniva troncata e poi risalvata monca.
@@ -136,13 +136,21 @@ function _lvColore(lv, rep) {
   const n = parseInt(lv) || 0;
   return n > 0 ? _lvTono(n, rep).bg : 'var(--muted)';
 }
-// Badge del livello: nome per esteso; "Senza livello" ben visibile (persone da classificare)
-function _lvBadge(lv, rep, extraTitle) {
+// Sigla del gradino: numero + nome ("L3 · Cassa"), cosi il nome di un gradino non sembra
+// "solo cassa"; se il nome e quello automatico "Livello 3" basta "L3"
+function _lvSigla(lv, rep) {
+  const n = parseInt(lv) || 0;
+  const nome = livelloNome(n, rep);
+  return nome === 'Livello ' + n ? 'L' + n : 'L' + n + ' · ' + nome;
+}
+// Badge del gradino ("L3 · Cassa"); 0 = "Senza livello" ben visibile (persone da
+// classificare). opz.soloNome: solo il nome (anteprima nella configurazione della scala)
+function _lvBadge(lv, rep, extraTitle, opz) {
   const n = parseInt(lv) || 0;
   if (!n)
     return (
       '<span class="fz-lv fz-lv-nessuno" title="' +
-      _escAttr(extraTitle || 'Non ha ancora il primo livello della scala: da classificare') +
+      _escAttr(extraTitle || 'Nessuna competenza della scala certificata: da classificare') +
       '">Senza livello</span>'
     );
   const t = _lvTono(n, rep);
@@ -152,11 +160,9 @@ function _lvBadge(lv, rep, extraTitle) {
     ';color:' +
     t.fg +
     '" title="' +
-    _escAttr(
-      (extraTitle ? extraTitle + ' · ' : '') + 'Livello ' + n + ' di ' + Math.max(_lvMaxReale(rep), n) + ' della scala',
-    ) +
+    _escAttr(extraTitle || 'Livello ' + n + ' di ' + Math.max(_lvMaxReale(rep), n) + ' della scala') +
     '">' +
-    escP(livelloNome(n, rep)) +
+    escP(opz && opz.soloNome ? livelloNome(n, rep) : _lvSigla(n, rep)) +
     '</span>'
   );
 }
@@ -209,6 +215,9 @@ function getPuntiConfig() {
     soglie: Array.isArray(cfg.soglie) ? cfg.soglie : PUNTI_DEFAULT.soglie,
     premi_livello: cfg.premi_livello || PUNTI_DEFAULT.premi_livello,
     punti_livello: cfg.punti_livello || PUNTI_DEFAULT.punti_livello,
+    // valori propri di un settore (punti e premi del passaggio di livello): { tavoli: {
+    // punti_livello: {...}, premi_livello: {...} } }. Senza voce il settore usa i globali.
+    per_settore: cfg.per_settore && typeof cfg.per_settore === 'object' ? cfg.per_settore : {},
     notifiche: cfg.notifiche === 'tutti' || cfg.notifiche === 'off' ? cfg.notifiche : 'privato',
     inventario: Array.isArray(cfg.inventario) ? cfg.inventario : [],
   };
@@ -223,6 +232,40 @@ function incentiviAttivi(azioneKey) {
     if (az && az.attiva === false) return false;
   }
   return true;
+}
+
+// INCENTIVI DEL PASSAGGIO DI LIVELLO PER SETTORE: punti e premio del livello lv nel
+// settore rep. Se il settore ha valori suoi (Formazione > Configurazione, "Valori propri
+// del settore") vale quello del settore per quel livello; altrimenti il valore globale
+// di sempre. Un premio vuoto scritto nel settore vuol dire "nessun premio" in quel settore.
+function incentiviLivelloSettore(rep, cfgP) {
+  const ps = (cfgP || getPuntiConfig()).per_settore || {};
+  const o = rep ? ps[rep] : null;
+  return o && typeof o === 'object' ? o : null;
+}
+function _incLivelloVoce(campo, lv, rep, cfgP) {
+  const cfg = cfgP || getPuntiConfig();
+  const own = incentiviLivelloSettore(rep, cfg);
+  const k = String(lv);
+  if (own && own[campo] && Object.prototype.hasOwnProperty.call(own[campo], k)) return own[campo][k];
+  return (cfg[campo] || {})[k];
+}
+function puntiLivelloDi(lv, rep, cfgP) {
+  return parseInt(_incLivelloVoce('punti_livello', lv, rep, cfgP)) || 0;
+}
+function premioLivelloDi(lv, rep, cfgP) {
+  const p = _incLivelloVoce('premi_livello', lv, rep, cfgP);
+  return p == null ? '' : String(p);
+}
+// premi di livello del settore, per l elenco "Passaggio livello" dei traguardi
+function premiLivelloDelSettore(rep, cfgP) {
+  const cfg = cfgP || getPuntiConfig();
+  const own = incentiviLivelloSettore(rep, cfg);
+  const out = Object.assign({}, cfg.premi_livello || {}, (own && own.premi_livello) || {});
+  Object.keys(out).forEach((k) => {
+    if (!String(out[k] || '').trim()) delete out[k];
+  });
+  return out;
 }
 
 // === LIMITI MENSILI, INVENTARIO E ATTESE PREMI ===
@@ -318,49 +361,66 @@ async function _proponiContrattoFisso(c, dopo) {
 // ================================================================
 // LIVELLI E PUNTI · helpers
 // ================================================================
-// Livello multidisciplinare: L(n) = tutte le competenze di livello <= n spuntate
-function livelloDiCollaboratore(c) {
-  const comps = getCompetenzeReparto().filter((k) => k.livello >= 1);
-  if (!comps.length) return 0;
-  const spunte = (c && c.competenze) || {};
-  let lv = 0;
-  // solo i livelli che esistono (L1, L2, L4 senza L3: chi ha L1 e L2 e L2, non L3)
-  const livelli = [...new Set(comps.map((k) => parseInt(k.livello) || 0))].filter((n) => n > 0).sort((a, b) => a - b);
-  for (const n of livelli) {
-    const richieste = comps.filter((k) => (parseInt(k.livello) || 0) <= n);
-    if (richieste.every((k) => spunte[k.key] === true)) lv = n;
-    else break;
-  }
-  return lv;
+// LIVELLI: due letture della stessa scala (PianoRegole.livelloScala, unico calcolo)
+//  - EFFETTIVO = gradino piu alto certificato: e il livello mostrato ovunque e quello che
+//    usa il Piano (_pianoLivelloNelSettore). Se mancano gradini sotto e "parziale" (es. chi
+//    arriva da un altro casino e fa subito cassa: L3 Cassa parziale, manca Sala, Reception).
+//  - COMPLETO = tutte le competenze di livello <= n spuntate: SOLO per incentivi e passaggi
+//    di livello (punti e premi per livello, messaggio "raggiunto il livello", Storico HR,
+//    proposta di contratto fisso), che restano invariati: niente premi per gradini parziali.
+function livelloScalaDi(c, rep) {
+  return PianoRegole.livelloScala(getCompetenzeConfigAll()[rep || currentReparto] || [], (c && c.competenze) || {});
 }
-// Competenze di livello che mancano sotto la piu alta certificata: chi ha ISP 3 ma non
-// ISP 1 ha la scala incompleta (succede con import o livelli cambiati dopo le spunte)
-function _lvLacune(c, rep) {
-  const comps = (getCompetenzeConfigAll()[rep || currentReparto] || []).filter((k) => (parseInt(k.livello) || 0) >= 1);
-  const spunte = (c && c.competenze) || {};
-  const cert = comps.filter((k) => spunte[k.key] === true).map((k) => parseInt(k.livello) || 0);
-  const maxCert = cert.length ? Math.max.apply(null, cert) : 0;
-  const mancanti = comps.filter((k) => (parseInt(k.livello) || 0) < maxCert && spunte[k.key] !== true);
-  return { maxCert: maxCert, mancanti: mancanti };
+// livello COMPLETO (incentivi e passaggi di livello, vedi sopra); 0 se il settore non ha scala
+function livelloDiCollaboratore(c, rep) {
+  const s = livelloScalaDi(c, rep);
+  return s ? s.completo : 0;
 }
-function livelloBadgeHtml(lv, c) {
-  // scala INCOMPLETA: ha competenze di un gradino alto ma ne manca una sotto. Il livello
-  // resta quello completo; accanto si dice cosa manca (prima: "L5 parziale", poco chiaro)
-  if (c) {
-    const l = _lvLacune(c);
-    if (l.maxCert > lv && l.mancanti.length) {
-      const testo = 'ha ' + livelloNome(l.maxCert) + ', manca ' + l.mancanti.map((k) => k.label).join(', ');
-      return (
-        _lvBadge(lv, null, lv ? '' : 'Ha livelli alti della scala ma non il primo') +
-        ' <span class="fz-lv-lacuna" title="' +
-        _escAttr('Scala incompleta: ' + testo + '. Il livello resta quello completo finché manca.') +
-        '"><i class="icx icx-avviso"></i> ' +
-        escP(testo) +
-        '</span>'
-      );
-    }
-  }
-  return _lvBadge(lv);
+// livello EFFETTIVO (gradino piu alto certificato); 0 se nessuno o il settore non ha scala
+function livelloEffettivoDi(c, rep) {
+  const s = livelloScalaDi(c, rep);
+  return s ? s.effettivo : 0;
+}
+// UNICA FORMATTAZIONE del livello in tutte le schermate: badge "L3 · Cassa" e, se mancano
+// gradini sotto, "parziale — manca Sala, Reception" (opz.compatto: solo "parziale", il
+// resto nel title, per gli elenchi stretti). Al passaggio del mouse l elenco delle
+// competenze comprese. opz.rep: settore (default quello aperto); opz.vuoto: cosa
+// mostrare se il settore non ha scala (default niente).
+function livelloEtichettaHtml(c, opz) {
+  const o = opz || {};
+  const rep = o.rep || currentReparto;
+  const s = livelloScalaDi(c, rep);
+  if (!s) return o.vuoto != null ? o.vuoto : '';
+  if (!s.effettivo) return _lvBadge(0, rep);
+  const manca = s.mancanti.map((k) => k.label).join(', ');
+  const titolo =
+    'Livello ' +
+    s.effettivo +
+    ' di ' +
+    Math.max(_lvMaxReale(rep), s.effettivo) +
+    ' della scala. Comprende: ' +
+    s.comprese.map((k) => k.label + (k.certificata ? '' : ' (manca)')).join(', ') +
+    (s.parziale ? '. Scala parziale: per il Piano vale comunque questo livello.' : '');
+  let h = _lvBadge(s.effettivo, rep, titolo);
+  if (s.parziale)
+    h +=
+      ' <span class="fz-lv-parz" title="' +
+      _escAttr('Manca ' + manca + '. Per il Piano vale comunque ' + _lvSigla(s.effettivo, rep) + '.') +
+      '">parziale' +
+      (o.compatto ? '' : ' — manca ' + escP(manca)) +
+      '</span>';
+  return h;
+}
+// stesso testo senza HTML (PDF, CSV): "L3 · Cassa · parziale (manca Sala, Reception)"
+function livelloEtichettaTesto(c, rep) {
+  const r = rep || currentReparto;
+  const s = livelloScalaDi(c, r);
+  if (!s) return '-';
+  if (!s.effettivo) return 'Senza livello';
+  return (
+    _lvSigla(s.effettivo, r) +
+    (s.parziale ? ' · parziale (manca ' + s.mancanti.map((k) => k.label).join(', ') + ')' : '')
+  );
 }
 function puntiTotali(nome, anno) {
   const a = anno || new Date().getFullYear();
@@ -940,12 +1000,12 @@ function _fzAvvisoScollegate() {
   );
 }
 // PRIMO PASSO GUIDATO: settore con la scala vuota o con quasi tutti "Senza livello"
-// (almeno 8 su 10). Tre passi in ordine, con i pulsanti che li fanno; sparisce da solo
+// (almeno 8 su 10 senza nessuna competenza di livello). Tre passi in ordine, con i pulsanti che li fanno; sparisce da solo
 // quando la maggior parte delle persone ha un livello.
 function _fzComeIniziare(comps, collabs, adm, puoProporre) {
   if (!adm && !puoProporre) return '';
   const scala = comps.filter((k) => (parseInt(k.livello) || 0) >= 1);
-  const senza = collabs.filter((c) => livelloDiCollaboratore(c) === 0).length;
+  const senza = collabs.filter((c) => livelloEffettivoDi(c) === 0).length;
   const quasiTutti = collabs.length > 0 && senza / collabs.length >= 0.8;
   if (scala.length && !quasiTutti) return '';
   const rep = currentReparto;
@@ -1058,16 +1118,17 @@ function renderFormazione() {
         : '') +
       '</div>';
   if (adm) html += _fzAvvisoScollegate();
-  // PERSONE PER LIVELLO: una sola riga, ogni persona contata una volta (il livello
-  // completo che ha). I totali per competenza stanno in fondo alla matrice.
+  // PERSONE PER LIVELLO: una sola riga, ogni persona contata una volta al gradino piu alto
+  // certificato (il livello effettivo, quello del Piano); chi ha la scala parziale e contato
+  // anche a parte in "Scala incompleta". I totali per competenza stanno in fondo alla matrice.
   const lvMax = _lvMaxReale();
   const perLivello = {};
   let incompleti = 0;
   collabs.forEach((c) => {
-    const lv = livelloDiCollaboratore(c);
+    const sc = livelloScalaDi(c);
+    const lv = sc ? sc.effettivo : 0;
     perLivello[lv] = (perLivello[lv] || 0) + 1;
-    const lac = _lvLacune(c);
-    if (lac.maxCert > lv && lac.mancanti.length) incompleti++;
+    if (sc && sc.parziale) incompleti++;
   });
   const filtroLv = window._fzFiltroLv == null ? '' : String(window._fzFiltroLv);
   const chip = (val, contenuto, n, cls, title) =>
@@ -1099,7 +1160,7 @@ function renderFormazione() {
       '<span class="fz-lv fz-lv-nessuno">Senza livello</span>',
       perLivello[0] || 0,
       (perLivello[0] || 0) > 0 ? 'fz-conta-avviso' : '',
-      'Persone che non hanno ancora il primo livello della scala: da classificare',
+      'Persone senza nessuna competenza di livello certificata: da classificare',
     );
     for (let l = 1; l <= lvMax; l++) {
       if (!_lvCompetenzeDi(l).length) continue; // gradino vuoto (es. L1, L2, L4 senza L3)
@@ -1108,7 +1169,7 @@ function renderFormazione() {
         _lvBadge(l),
         perLivello[l] || 0,
         '',
-        'Persone che hanno completato la scala fino a ' + livelloNome(l) + (l === lvMax ? ' (tutta la scala)' : ''),
+        'Persone il cui gradino più alto certificato è ' + _lvSigla(l) + (l === lvMax ? ' (ultimo della scala)' : ''),
       );
     }
     if (incompleti)
@@ -1117,7 +1178,7 @@ function renderFormazione() {
         '<span class="fz-lv-lacuna"><i class="icx icx-avviso"></i> Scala incompleta</span>',
         incompleti,
         'fz-conta-avviso',
-        'Hanno un livello alto ma ne manca uno sotto: vale il livello completo',
+        'Hanno un gradino alto ma ne manca uno sotto (livello parziale): per il Piano vale comunque il gradino più alto',
       );
   } else
     html +=
@@ -1177,8 +1238,8 @@ function renderFormazione() {
     new Date().getFullYear() +
     '</th></tr></thead><tbody>';
   collabs.forEach((c) => {
-    const lv = livelloDiCollaboratore(c);
-    const lac = _lvLacune(c);
+    const sc = livelloScalaDi(c);
+    const lv = sc ? sc.effettivo : 0;
     const pts = puntiTotali(c.nome);
     const ne = _jsArg(c.nome);
     html +=
@@ -1187,7 +1248,7 @@ function renderFormazione() {
       '" data-lv="' +
       lv +
       '"' +
-      (lac.maxCert > lv && lac.mancanti.length ? ' data-inc="1"' : '') +
+      (sc && sc.parziale ? ' data-inc="1"' : '') +
       '><td><span class="entry-name" onclick="apriSchedaCollaboratore(\'' +
       ne +
       '\')"><strong>' +
@@ -1236,7 +1297,7 @@ function renderFormazione() {
     });
     html +=
       '<td class="num fz-col-livello">' +
-      livelloBadgeHtml(lv, c) +
+      livelloEtichettaHtml(c) +
       '</td><td class="num"><strong style="color:' +
       (pts < 0 ? 'var(--accent)' : 'var(--accent2)') +
       '">' +
@@ -1394,7 +1455,7 @@ function renderFormazione() {
     '<p style="color:var(--muted);font-size:var(--fs-md,.875rem);margin-bottom:10px">Soglie punti: ' +
     cfgP.soglie.map((s) => '<strong>' + s.punti + '</strong> = ' + escP(s.premio)).join(' · ') +
     ' · Passaggio livello: ' +
-    Object.entries(cfgP.premi_livello)
+    Object.entries(premiLivelloDelSettore(currentReparto, cfgP))
       .map(([l, p]) => escP(livelloSigla(l)) + ' = ' + escP(p))
       .join(' · ') +
     '</p>';
@@ -1462,8 +1523,9 @@ function renderFormazione() {
   const conPunti = collabs
     .map((c) => ({
       nome: c.nome,
+      c: c,
       punti: puntiTotali(c.nome),
-      lv: livelloDiCollaboratore(c),
+      lv: livelloEffettivoDi(c),
     }))
     .filter((x) => x.punti !== 0 || x.lv > 0)
     .sort((a, b) => b.punti - a.punti);
@@ -1478,7 +1540,7 @@ function renderFormazione() {
         '<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><strong style="min-width:170px">' +
         escP(x.nome) +
         '</strong>' +
-        livelloBadgeHtml(x.lv) +
+        livelloEtichettaHtml(x.c, { compatto: true }) +
         '<span style="font-weight:700;color:var(--accent2)">' +
         x.punti +
         ' pt</span><div class="budget-bar" style="flex:1;min-width:120px;height:6px"><div class="budget-bar-fill" style="width:' +
@@ -1642,7 +1704,8 @@ function _renderEquitaCard(collabs) {
       dataAss: c.data_assunzione || '',
       mesiFermo: parseInt(c.mesi_congedo_non_pagato) || 0,
       anzGiorni,
-      lv: livelloDiCollaboratore(c),
+      c: c,
+      lv: livelloEffettivoDi(c),
       punti: puntiTotali(c.nome),
       media,
     };
@@ -1711,7 +1774,7 @@ function _renderEquitaCard(collabs) {
       '</strong></td><td>' +
       (r.dataAss ? anzianitaLabel(r.dataAss, r.mesiFermo) : '-') +
       '</td><td class="num">' +
-      (r.lv ? escP(livelloSigla(r.lv)) : '-') +
+      livelloEtichettaHtml(r.c, { compatto: true, vuoto: '-' }) +
       '</td><td class="num">' +
       r.punti +
       '</td><td class="num">' +
@@ -1748,6 +1811,41 @@ function fzFiltraLivello(val) {
   }
 }
 
+// GRADINI SOTTO (decisione del titolare: chiedere ogni volta). Spuntando un gradino della
+// scala con gradini sotto vuoti si chiede se spuntarli: "Si" = formazione completa (come
+// sempre, incentivi compresi); "No" = solo il gradino cliccato, livello parziale (chi arriva
+// gia formato da un altro casino). Nomi dalla scala del settore. 'si' | 'no' | null (annulla)
+function _fzElencoNomi(nomi) {
+  return nomi.length > 1 ? nomi.slice(0, -1).join(', ') + ' e ' + nomi[nomi.length - 1] : nomi.join('');
+}
+function _fzTestoGradiniSotto(nome, comp, mancanti) {
+  return (
+    'Spunto anche ' +
+    _fzElencoNomi(mancanti) +
+    '?\n\n' +
+    comp +
+    ' comprende di solito i gradini sotto. Se ' +
+    nome +
+    ' ha già esperienza in ' +
+    comp +
+    ' (per esempio da un altro casinò), si spunta solo ' +
+    comp +
+    ' e il livello risulta parziale: per il Piano vale comunque ' +
+    comp +
+    '.'
+  );
+}
+function _fzChiediGradiniSotto(nome, comp, mancanti) {
+  return chiediScelta(
+    _fzTestoGradiniSotto(nome, comp, mancanti),
+    [
+      { valore: 'si', etichetta: 'Sì, formazione completa' },
+      { valore: 'no', etichetta: 'No, solo ' + comp + ' (esperienza già fatta)' },
+    ],
+    { titolo: 'Gradini sotto ' + comp },
+  );
+}
+
 // Toggle spunta competenza (admin) + punti automatici + rilevamento passaggio livello
 // Una spunta alla volta per persona e competenza: il doppio click salvava due volte, con
 // due eventi nello Storico HR e le domande (formatore, punti) ripetute. Mentre si salva la
@@ -1768,6 +1866,8 @@ async function _toggleCompetenzaEsegui(collabId, key, cb) {
   }
   const c = collaboratoriCache.find((x) => x.id === collabId);
   if (!c) return;
+  // INCENTIVI: passaggi di livello, punti e premi guardano il livello COMPLETO (tutti i
+  // gradini sotto certificati), non quello effettivo del Piano: un gradino parziale non da premi
   const prima = livelloDiCollaboratore(c);
   const nuove = Object.assign({}, c.competenze || {});
   const attiva = cb.checked;
@@ -1779,13 +1879,27 @@ async function _toggleCompetenzaEsegui(collabId, key, cb) {
   const lvAtt = compAtt ? parseInt(compAtt.livello) || 0 : 0;
   const implicate = [];
   if (attiva && lvAtt > 1) {
-    compsRep.forEach((k) => {
+    const sotto = compsRep.filter((k) => {
       const lv = parseInt(k.livello) || 0;
-      if (lv > 0 && lv < lvAtt && nuove[k.key] !== true) {
+      return lv > 0 && lv < lvAtt && nuove[k.key] !== true;
+    });
+    // gradini sotto vuoti: si chiede ogni volta (Annulla/Esc = la casella torna vuota)
+    const risp = sotto.length
+      ? await _fzChiediGradiniSotto(
+          c.nome,
+          compAtt ? compAtt.label : key,
+          sotto.map((k) => k.label),
+        )
+      : 'si';
+    if (!risp) {
+      cb.checked = false;
+      return;
+    }
+    if (risp === 'si')
+      sotto.forEach((k) => {
         nuove[k.key] = true;
         implicate.push(k.label);
-      }
-    });
+      });
   }
   // TOGLIERE una competenza cambia i turni che il Piano propone: si chiede sempre conferma,
   // dicendo l effetto (prima si salvava al clic e la persona spariva dai turni dell area)
@@ -1905,17 +2019,17 @@ async function _toggleCompetenzaEsegui(collabId, key, cb) {
         }
       }
     }
-    // Passaggio livello?
+    // Passaggio livello? (livello COMPLETO, vedi sopra)
     const dopo = livelloDiCollaboratore(c);
     if (dopo > prima) {
       // Punti configurabili per ogni livello raggiunto (anche più livelli in un colpo)
       for (let lv = prima + 1; lv <= dopo; lv++) {
-        const pl = parseInt(getPuntiConfig().punti_livello[String(lv)]) || 0;
+        const pl = puntiLivelloDi(lv, currentReparto);
         if (pl) await _insertPuntiEvento(c.nome, pl, 'livello_' + lv, 'Raggiunto Livello ' + lv + ' multidisciplinare');
       }
     }
     if (dopo > prima && dopo >= 2) {
-      const premio = getPuntiConfig().premi_livello[String(dopo)];
+      const premio = premioLivelloDi(dopo, currentReparto);
       logAzione('Passaggio livello', c.nome + ' → ' + livelloNome(dopo) + ' (livello ' + dopo + ' della scala)');
       if (typeof _insertHrEvento === 'function')
         _insertHrEvento(
@@ -2229,16 +2343,15 @@ function _matriceRows() {
     .sort((a, b) => a.nome.localeCompare(b.nome));
   const head = [
     'Collaboratore',
-    ...comps.map((k) => k.label + (k.livello ? ' (' + livelloSigla(k.livello) + ')' : '')),
+    ...comps.map((k) => k.label + (parseInt(k.livello) ? ' (L' + parseInt(k.livello) + ')' : '')),
     'Livello',
     'Punti ' + new Date().getFullYear(),
   ];
   const rows = collabs.map((c) => {
-    const lv = livelloDiCollaboratore(c);
     return [
       c.nome,
       ...comps.map((k) => ((c.competenze || {})[k.key] === true ? 'SI' : '-')),
-      lv ? livelloSigla(lv) : '-',
+      livelloEtichettaTesto(c),
       puntiTotali(c.nome),
     ];
   });
@@ -2350,7 +2463,8 @@ async function esportaReportIncentiviPDF() {
       );
       return {
         nome: c.nome,
-        lv: livelloDiCollaboratore(c),
+        c: c,
+        lv: livelloEffettivoDi(c),
         punti: puntiTotali(c.nome, anno),
         cop: conteggioAzione(c.nome, 'copertura', anno),
         rif: conteggioAzione(c.nome, 'disponibilita_negata', anno),
@@ -2402,7 +2516,7 @@ async function esportaReportIncentiviPDF() {
       body: righe.length
         ? righe.map((r) => [
             r.nome,
-            r.lv ? livelloSigla(r.lv) : '-',
+            livelloEtichettaTesto(r.c),
             r.punti,
             r.cop,
             r.rif,
@@ -2589,9 +2703,12 @@ function _renderFormazioneConfig() {
   // settori (oggi Slot arriva a L6), cosi' aggiungendo un livello compare da
   // solo anche qui. L'assegnazione gestiva gia' qualsiasi livello: era solo
   // questa lista a fermarsi a L3.
-  const _lvMaxT = _lvMaxTutti();
-  // punti e premi valgono per numero di gradino in tutti i settori: accanto si legge
-  // come si chiama quel gradino nel settore aperto
+  // VALORI PER SETTORE: il settore aperto puo avere punti e premi suoi; senza, valgono i
+  // valori globali (per numero di gradino, in tutti i settori), come sempre
+  const _repInc = currentReparto;
+  const _ownInc = incentiviLivelloSettore(_repInc, cfgP);
+  const _lvMaxT = _ownInc ? _lvMaxReparto(_repInc) : _lvMaxTutti();
+  // accanto al numero si legge come si chiama quel gradino nel settore aperto
   const _fzLvQui = (l) =>
     _lvCompetenzeDi(l).length || _lvNomeManuale(l)
       ? ' <span class="tipo-item-default">(' +
@@ -2600,20 +2717,44 @@ function _renderFormazioneConfig() {
         escP(livelloNome(l)) +
         ')</span>'
       : ' <span class="tipo-item-default">(non esiste in ' + escP(repartoLabel(currentReparto)) + ')</span>';
+  const _argRep = _ownInc ? ",'" + String(_repInc).replace(/[^a-z0-9_-]/gi, '') + "'" : '';
+  html +=
+    '<p style="font-size:var(--fs-sm,.8125rem);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Punti e premi del passaggio di livello</p>' +
+    '<div class="tipo-item"><div class="tipo-item-name">Valori per ' +
+    escP(repartoLabel(_repInc)) +
+    '</div><select id="cfg-inc-settore" onchange="impostaIncentiviSettore(\'' +
+    String(_repInc).replace(/[^a-z0-9_-]/gi, '') +
+    '\',this.value===\'propri\')" style="padding:8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)">' +
+    '<option value="globali"' +
+    (_ownInc ? '' : ' selected') +
+    '>Uguali per tutti i settori</option><option value="propri"' +
+    (_ownInc ? ' selected' : '') +
+    '>Propri di ' +
+    escP(repartoLabel(_repInc)) +
+    '</option></select></div>' +
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:2px 0 6px">' +
+    (_ownInc
+      ? 'Stai modificando i valori di <b>' +
+        escP(repartoLabel(_repInc)) +
+        '</b>: valgono solo per chi sale di livello in questo settore. Gli altri settori restano sui valori di tutti i settori.'
+      : 'Stai modificando i valori di <b>tutti i settori</b>: un livello vale nei settori dove esiste, i settori con una scala più corta si fermano prima. Con "Propri di ' +
+        escP(repartoLabel(_repInc)) +
+        '" questo settore parte da questi valori e li cambia solo per sé.') +
+    '</p>';
   html +=
     '<p style="font-size:var(--fs-sm,.8125rem);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Punti al raggiungimento del livello (0 = disattivato)</p>';
-  html +=
-    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:6px">Un livello vale nei settori dove esiste: i settori con una scala più corta si fermano prima.</p>';
   for (let l = 1; l <= _lvMaxT; l++) {
     html +=
       '<div class="tipo-item"><div class="tipo-item-name">Livello ' +
       l +
       _fzLvQui(l) +
       '</div><input type="number" value="' +
-      (parseInt(cfgP.punti_livello[String(l)]) || 0) +
+      (_ownInc ? puntiLivelloDi(l, _repInc, cfgP) : parseInt(cfgP.punti_livello[String(l)]) || 0) +
       '" onchange="modificaPuntiLivello(' +
       l +
-      ',this.value)" style="width:70px;padding:5px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);text-align:center"></div>';
+      ',this.value' +
+      _argRep +
+      ')" style="width:70px;padding:5px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);text-align:center"></div>';
   }
   // premi livello (dal 2 in su: il passaggio al livello 1 non e' un traguardo)
   html +=
@@ -2624,10 +2765,12 @@ function _renderFormazioneConfig() {
       l +
       _fzLvQui(l) +
       '</div><input type="text" value="' +
-      _escAttr(cfgP.premi_livello[String(l)] || '') +
-      '" onchange="modificaPremioLivello(' +
+      _escAttr(_ownInc ? premioLivelloDi(l, _repInc, cfgP) : cfgP.premi_livello[String(l)] || '') +
+      '" placeholder="nessun premio" onchange="modificaPremioLivello(' +
       l +
-      ',this.value)" style="flex:1;padding:5px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></div>';
+      ',this.value' +
+      _argRep +
+      ')" style="flex:1;padding:5px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></div>';
   }
   // notifiche incentivi
   html +=
@@ -3006,7 +3149,7 @@ function fzDisegnaConfigScala() {
       '</span><span id="fz-prev-' +
       n +
       '" class="fz-prev">' +
-      _lvBadge(n, rep) +
+      _lvBadge(n, rep, null, { soloNome: true }) +
       '</span>';
     if (comps.length === 1) {
       // un livello = una voce: una sola riga (numero e nome | comandi), sotto i turni;
@@ -3518,20 +3661,77 @@ async function rimuoviSoglia(idx) {
   await savePuntiConfig(cfg);
   renderFormazione();
 }
-async function modificaPremioLivello(lv, val) {
+// rep: settore con valori propri (vuoto = valori globali, come sempre)
+async function modificaPremioLivello(lv, val, rep) {
   if (!_soloAdminCfg()) return;
   const cfg = getPuntiConfig();
-  cfg.premi_livello[String(lv)] = val.trim();
+  const own = rep ? incentiviLivelloSettore(rep, cfg) : null;
+  if (rep && !own) return;
+  const dest = own ? (own.premi_livello = own.premi_livello || {}) : cfg.premi_livello;
+  dest[String(lv)] = String(val || '').trim();
   await savePuntiConfig(cfg);
-  toast('Premio livello aggiornato');
+  if (own)
+    logAzione('Premio livello', repartoLabel(rep) + ' · Livello ' + lv + ' → ' + (dest[String(lv)] || 'nessuno'));
+  toast('Premio livello aggiornato' + (own ? ' (' + repartoLabel(rep) + ')' : ''));
 }
-async function modificaPuntiLivello(lv, val) {
+async function modificaPuntiLivello(lv, val, rep) {
   if (!_soloAdminCfg()) return;
   const cfg = getPuntiConfig();
-  cfg.punti_livello[String(lv)] = parseInt(val) || 0;
+  const own = rep ? incentiviLivelloSettore(rep, cfg) : null;
+  if (rep && !own) return;
+  const dest = own ? (own.punti_livello = own.punti_livello || {}) : cfg.punti_livello;
+  dest[String(lv)] = parseInt(val) || 0;
   await savePuntiConfig(cfg);
-  logAzione('Punti livello', 'Livello ' + lv + ' → ' + (parseInt(val) || 0) + ' punti');
-  toast('Punti livello ' + lv + ' aggiornati');
+  logAzione(
+    'Punti livello',
+    (own ? repartoLabel(rep) + ' · ' : '') + 'Livello ' + lv + ' → ' + (parseInt(val) || 0) + ' punti',
+  );
+  toast('Punti livello ' + lv + ' aggiornati' + (own ? ' (' + repartoLabel(rep) + ')' : ''));
+}
+// VALORI PROPRI DEL SETTORE per punti e premi del passaggio di livello. Accendendo si parte
+// dai valori globali di oggi (copiati per i livelli del settore); spegnendo il settore torna
+// ai valori globali e i suoi valori si cancellano.
+async function impostaIncentiviSettore(rep, propri) {
+  if (!_soloAdminCfg()) return;
+  if (!rep) return;
+  const cfg = getPuntiConfig();
+  const ps = (cfg.per_settore = Object.assign({}, cfg.per_settore || {}));
+  if (propri) {
+    if (ps[rep]) return;
+    const max = _lvMaxReparto(rep);
+    const punti = {};
+    const premi = {};
+    for (let l = 1; l <= max; l++) {
+      punti[String(l)] = parseInt((cfg.punti_livello || {})[String(l)]) || 0;
+      if (l >= 2) premi[String(l)] = String((cfg.premi_livello || {})[String(l)] || '');
+    }
+    ps[rep] = { punti_livello: punti, premi_livello: premi };
+  } else {
+    if (!ps[rep]) return;
+    if (
+      !(await chiediConferma(
+        'Togliere i valori propri di ' +
+          repartoLabel(rep) +
+          '?\nPunti e premi del passaggio di livello torneranno quelli validi per tutti i settori.',
+      ))
+    ) {
+      renderFormazione();
+      return;
+    }
+    delete ps[rep];
+    if (!Object.keys(ps).length) delete cfg.per_settore;
+  }
+  await savePuntiConfig(cfg);
+  logAzione(
+    'Incentivi di livello',
+    repartoLabel(rep) + (propri ? ': valori propri del settore' : ': valori uguali per tutti i settori'),
+  );
+  toast(
+    propri
+      ? repartoLabel(rep) + ': valori propri, partono da quelli di tutti i settori'
+      : repartoLabel(rep) + ': valori di tutti i settori',
+  );
+  renderFormazione();
 }
 
 // ================================================================
@@ -3993,10 +4193,13 @@ function _renderPanoramicaHrCard(collabs) {
   collabs.forEach((c) => {
     if (c.categoria) perCat[c.categoria] = (perCat[c.categoria] || 0) + 1;
   });
+  // per gradino piu alto certificato (livello effettivo); i parziali contati anche a parte
   const perLiv = {};
+  let lvParziali = 0;
   collabs.forEach((c) => {
-    const lv = livelloDiCollaboratore(c);
-    if (lv) perLiv[lv] = (perLiv[lv] || 0) + 1;
+    const sc = livelloScalaDi(c);
+    if (sc && sc.effettivo) perLiv[sc.effettivo] = (perLiv[sc.effettivo] || 0) + 1;
+    if (sc && sc.parziale) lvParziali++;
   });
   const giubilei = getHrEventiReparto().filter((e) => e.tipo === 'giubileo');
   const giubAnno = giubilei.filter((e) => (e.data_evento || '').startsWith(String(anno)));
@@ -4044,7 +4247,8 @@ function _renderPanoramicaHrCard(collabs) {
   const livStr = [];
   for (let n = 1; n <= _lvMaxReparto(); n++)
     if (perLiv[n]) livStr.push(escP(livelloSigla(n)) + ': <strong>' + perLiv[n] + '</strong>');
-  const livStrTesto = livStr.join(' · ');
+  if (livStr.length && lvParziali) livStr.push('di cui parziali: <strong>' + lvParziali + '</strong>');
+  const livStrTesto = livStr.join(', '); // virgola: la sigla "L3 · Cassa" contiene gia il punto
   if (livStrTesto) righe.push('<span style="color:var(--muted)">Livelli multidisciplinari ·</span> ' + livStrTesto);
   if (righe.length) html += '<p style="font-size:var(--fs-md,.875rem);line-height:1.8">' + righe.join('<br>') + '</p>';
   html +=
@@ -4102,8 +4306,8 @@ async function certificaCompetenzaDaPiano(nome, key, chiediPunti) {
   const c = collaboratoriCache.find((x) => x.nome === nome);
   if (!c) return false;
   const repC = c.reparto_dip || 'slots';
-  const livDi = (x) =>
-    typeof _pianoLivelloNelSettore === 'function' ? _pianoLivelloNelSettore(x, repC) || 0 : livelloDiCollaboratore(x);
+  // punti e premi del livello sul livello COMPLETO, come la spunta in Formazione
+  const livDi = (x) => livelloDiCollaboratore(x, repC);
   const prima = livDi(c);
   const nuove = Object.assign({}, c.competenze || {});
   if (nuove[key] === true) return true;
@@ -4112,13 +4316,28 @@ async function certificaCompetenzaDaPiano(nome, key, chiediPunti) {
   const compAtt = compsRep.find((k) => k.key === key);
   const lvAtt = compAtt ? parseInt(compAtt.livello) || 0 : 0;
   const implicate = [];
-  if (lvAtt > 1)
-    compsRep.forEach((k) => {
-      const lv = parseInt(k.livello) || 0;
-      if (lv > 0 && lv < lvAtt && nuove[k.key] !== true) {
-        nuove[k.key] = true;
-        implicate.push(k.label);
-      }
+  const sotto =
+    lvAtt > 1
+      ? compsRep.filter((k) => {
+          const lv = parseInt(k.livello) || 0;
+          return lv > 0 && lv < lvAtt && nuove[k.key] !== true;
+        })
+      : [];
+  // una certificazione alla volta dal Piano (chiediPunti true: "come dalla Formazione") fa la
+  // stessa domanda della spunta in Formazione; "Proponi livelli" ('livelli') ha gia confermato
+  // l elenco "con le competenze dei livelli sotto" e resta in cascata
+  let risp = 'si';
+  if (sotto.length && chiediPunti === true)
+    risp = await _fzChiediGradiniSotto(
+      nome,
+      compAtt ? compAtt.label : key,
+      sotto.map((k) => k.label),
+    );
+  if (!risp) return false;
+  if (risp === 'si')
+    sotto.forEach((k) => {
+      nuove[k.key] = true;
+      implicate.push(k.label);
     });
   await secPatch('collaboratori', 'id=eq.' + c.id, { competenze: nuove });
   c.competenze = nuove;
@@ -4155,11 +4374,11 @@ async function certificaCompetenzaDaPiano(nome, key, chiediPunti) {
       );
     const dopo = livDi(c);
     for (let lv = prima + 1; lv <= dopo; lv++) {
-      const pl = parseInt(cfgP.punti_livello[String(lv)]) || 0;
+      const pl = puntiLivelloDi(lv, repC, cfgP);
       if (pl) await _insertPuntiEvento(nome, pl, 'livello_' + lv, 'Raggiunto Livello ' + lv + ' multidisciplinare');
     }
     if (dopo > prima && dopo >= 2) {
-      const premio = (cfgP.premi_livello || {})[String(dopo)];
+      const premio = premioLivelloDi(dopo, repC, cfgP);
       logAzione('Passaggio livello', nome + ' → Livello ' + dopo + ' (dai turni del piano)');
       if (typeof _insertHrEvento === 'function')
         _insertHrEvento(nome, 'livello', 'Raggiunto Livello ' + dopo + ' multidisciplinare (dai turni del piano)');
@@ -4187,7 +4406,7 @@ async function certificaCompetenzaDaPiano(nome, key, chiediPunti) {
       );
     const dopo = livDi(c);
     for (let lv = prima + 1; lv <= dopo; lv++) {
-      const pl = parseInt(getPuntiConfig().punti_livello[String(lv)]) || 0;
+      const pl = puntiLivelloDi(lv, repC);
       if (pl) await _insertPuntiEvento(nome, pl, 'livello_' + lv, 'Raggiunto Livello ' + lv + ' multidisciplinare');
     }
     if (dopo > prima) await _proponiContrattoFisso(c, dopo);
