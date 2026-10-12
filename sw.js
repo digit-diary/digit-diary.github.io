@@ -3,7 +3,7 @@
  * © 2026 Suisse Prestige Sagl, Via Rinaldo Simen 18, 6900 Lugano, Svizzera. Tutti i diritti riservati.
  * Uso consentito solo con licenza (vedi il file LICENZA).
  */
-const CACHE_NAME = 'diario-cl-v451';
+const CACHE_NAME = 'diario-cl-v452';
 const SHELL_URLS = ['/', '/manifest.json', '/logo_casino.png', '/icon-192.png', '/icon-512.png',
   '/css/style.css',
   '/js/config.js', '/js/finestre.js', '/js/crypto.js', '/js/chat-core.js', '/js/annulla.js', '/js/realtime.js',

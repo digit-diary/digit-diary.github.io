@@ -34,6 +34,82 @@ const PIANO_REGOLE_FONTE = {
   riposo_domenica_libera_ore: 'LL art. 18-20a, OLL 1 art. 21: 35 ore (11 + 24) comprese le 23 sab - 23 dom',
   riposo_domenica_lavorata_ore: 'OLL 2 art. 12 cpv. 2 (case da gioco): 36 + 11 = 47 ore consecutive',
 };
+// RIFERIMENTO PERSONALIZZATO (v452): l amministratore cambia il testo della fonte di una
+// regola da Piano > Regole, senza toccare il codice. Impostazione 'piano_regole_fonte'
+// = { nome regola: testo } (testo vuoto = nessun riferimento); senza voce vale il testo
+// originale qui sopra. Vale per tutti i settori, anche per le regole di legge. Cambia solo
+// la scritta: il comportamento delle regole resta quello.
+function pianoRegolaFonte(nome) {
+  const cfg = window._pianoRegoleFonteCfg || {};
+  if (Object.prototype.hasOwnProperty.call(cfg, nome) && typeof cfg[nome] === 'string') return cfg[nome];
+  return PIANO_REGOLE_FONTE[nome] || '';
+}
+function _pianoRegolaFonteCambiata(nome) {
+  const cfg = window._pianoRegoleFonteCfg || {};
+  return Object.prototype.hasOwnProperty.call(cfg, nome) && cfg[nome] !== (PIANO_REGOLE_FONTE[nome] || '');
+}
+async function pianoRegolaFonteModifica(nome) {
+  if (!isAdmin()) return;
+  const g = PIANO_REGOLE_GUIDA[nome];
+  if (!g) return;
+  const originale = PIANO_REGOLE_FONTE[nome] || '';
+  const attuale = pianoRegolaFonte(nome);
+  const velo = document.createElement('div');
+  velo.className = 'finestra-velo';
+  velo.innerHTML =
+    '<div class="finestra-box" role="dialog" aria-modal="true" aria-labelledby="fonte-tit" style="width:min(620px,100%)">' +
+    '<h3 id="fonte-tit">Riferimento normativo</h3><div class="finestra-testo fonte-regola"></div>' +
+    '<input type="text" class="finestra-campo" maxlength="200" autocomplete="off" aria-label="Riferimento normativo">' +
+    '<p class="fonte-orig" style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:10px"></p>' +
+    '<div class="finestra-pulsanti" style="flex-wrap:wrap"><button type="button" class="finestra-no fonte-rimetti" style="margin-right:auto">Rimetti il testo originale</button>' +
+    '<button type="button" class="finestra-no fonte-annulla">Annulla</button><button type="button" class="finestra-ok">Salva</button></div></div>';
+  velo.querySelector('.fonte-regola').textContent =
+    g.n +
+    ' (' +
+    nome +
+    ')\nTesto breve che dice da dove viene la regola (legge, RAP, direttiva). Vale per tutti i settori e cambia solo la scritta: la regola funziona come prima. Lascia vuoto per non mostrare nessun riferimento.';
+  velo.querySelector('.fonte-orig').textContent = 'Testo originale: ' + (originale || 'nessuno');
+  const campo = velo.querySelector('input');
+  campo.value = attuale;
+  const rimetti = velo.querySelector('.fonte-rimetti');
+  if (!_pianoRegolaFonteCambiata(nome)) rimetti.hidden = true;
+  const chiudi = () => {
+    document.removeEventListener('keydown', tasti, true);
+    velo.remove();
+  };
+  const salva = async (testo) => {
+    const t = String(testo == null ? '' : testo)
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 200);
+    const cfg = Object.assign({}, window._pianoRegoleFonteCfg || {});
+    if (t === originale) delete cfg[nome];
+    else cfg[nome] = t;
+    chiudi();
+    if (!(await salvaImp('piano_regole_fonte', JSON.stringify(cfg)))) return;
+    window._pianoRegoleFonteCfg = cfg;
+    logAzione('Regola: riferimento normativo', nome + ' = ' + (t === originale ? 'testo originale' : t || '(nessuno)'));
+    toast(t === originale ? 'Rimesso il testo originale' : 'Riferimento salvato');
+    renderPiano();
+  };
+  const tasti = (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      chiudi();
+    } else if (e.key === 'Enter' && document.activeElement === campo) {
+      e.preventDefault();
+      salva(campo.value);
+    }
+  };
+  rimetti.addEventListener('click', () => salva(originale));
+  velo.querySelector('.fonte-annulla').addEventListener('click', chiudi);
+  velo.querySelector('.finestra-ok').addEventListener('click', () => salva(campo.value));
+  document.addEventListener('keydown', tasti, true);
+  document.body.appendChild(velo);
+  campo.focus();
+  campo.select();
+}
 // REGOLE DI LEGGE (legge sul lavoro per le case da gioco): valgono uguali per tutti i
 // settori, decisione del titolare 11/10/2026. Non si personalizzano per settore e un valore
 // per settore gia salvato non conta (_pianoRegolaVal legge sempre quello generale).
@@ -705,7 +781,7 @@ function _renderPianoRegoleCard() {
     '<li><b>Un valore diverso per un settore</b>: scegli il settore nel menu in alto e cambia il numero. Nasce l eccezione per quel settore; gli altri tengono il valore generale. "Torna al generale" la toglie. Esempio: riposo 11 ore ovunque, 12 ai Tavoli.</li>' +
     '<li><b>Regole nuove sui gruppi di lavoro</b> (chi può fare cassa, quanti Supervisor al giorno, una funzione richiesta): si creano nella card <b>Regole di gruppo</b>, più in basso in questa scheda, scegliendo il tipo dall elenco. Non serve scrivere codice.</li>' +
     '<li><b>Preferenze di una persona</b> (solo diurni o notturni, turni bloccati, giorni di lavoro, affiancamento): in Piano &gt; Impostazioni, Preferenze collaboratori. La copertura di altri settori, la funzione e la percentuale in Impostazioni &gt; Gestione collaboratori; competenze e livelli in Formazione. La bozza e Controlla le regole le rispettano.</li>' +
-    '<li><b>Fonte</b>: sotto ogni regola normativa c e il riferimento (RAP, legge sul lavoro, direttiva). Se cambia il regolamento, cambia il numero qui: il programma non va toccato. Ogni modifica finisce nel Registro attività.</li>' +
+    '<li><b>Fonte</b>: sotto ogni regola normativa c e il riferimento (RAP, legge sul lavoro, direttiva). Se cambia il regolamento, cambia il numero qui: il programma non va toccato. L amministratore cambia anche il testo del riferimento con la matita accanto (vale per tutti i settori; "Rimetti il testo originale" torna a quello di partenza). Ogni modifica finisce nel Registro attività.</li>' +
     '</ol></details>';
   if (vista)
     h +=
@@ -799,7 +875,17 @@ function _renderPianoRegoleCard() {
           '<br><span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
           escP(nome) +
           (r.virtuale ? ' · valore predefinito' : '') +
-          (PIANO_REGOLE_FONTE[nome] ? ' · ' + escP(PIANO_REGOLE_FONTE[nome]) : '') +
+          (pianoRegolaFonte(nome) ? ' · ' + escP(pianoRegolaFonte(nome)) : '') +
+          (_pianoRegolaFonteCambiata(nome)
+            ? ' <i title="Riferimento cambiato dall\'amministratore">(modificato)</i>'
+            : '') +
+          (isAdmin()
+            ? ' <button type="button" class="regola-fonte-btn" title="Cambia il riferimento normativo" aria-label="Cambia il riferimento normativo di ' +
+              escP(g.n) +
+              '" onclick="pianoRegolaFonteModifica(\'' +
+              escP(nome) +
+              '\')"><i class="icx icx-penna"></i></button>'
+            : '') +
           '</span></td><td>' +
           (diLegge && vista
             ? '<b>' +

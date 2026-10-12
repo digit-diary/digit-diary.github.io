@@ -4718,22 +4718,20 @@ async function pdfBriefingGiorno() {
   doc.text('BRIEFING ' + repartoNomeDocumento(_pianoReparto()).toUpperCase() + ' · ' + lbl, PW / 2, 17, {
     align: 'center',
   });
-  const generico = !valet && _pianoReparto() !== 'slots';
-  const cols = valet
-    ? ['E', 'U', 'COLLABORATORE', 'TURNO', 'USCITA', 'FIRMA', 'RADIO', 'BADGE']
-    : generico
-      ? ['E', 'U', 'COLLABORATORE', 'T', 'USCITA', 'FIRMA']
-      : ['E', 'U', 'HOST', 'T', 'CD', 'USCITA', 'FIRMA'];
+  // colonne scelte per il settore (card "Colonne del briefing"); senza scelta quelle di
+  // sempre: E, U, HOST, T, CD, USCITA, FIRMA (Slots), con RADIO e BADGE (Valet), senza CD (altri)
+  const colonne = _briefColonne(_pianoReparto());
+  const cols = colonne.map((c) => c.tit);
+  const ids = colonne.map((c) => c.id);
+  const iN = ids.indexOf('nome'); // sempre presente
+  const iT = ids.indexOf('turno'); // sempre presente
+  const iC = ids.indexOf('cd'); // numeri cassa (Slots)
   const body = [];
   const righeFm = {}; // indice riga body -> in formazione (nome giallo sul PDF)
   const righeFmt = {}; // indice riga body -> formato dell'intera riga {b,i}
   const righeCs = {}; // indice riga body -> stili per singola cella (r.cs)
-  // colonna PDF -> campo della riga briefing (per gli stili per cella)
-  const campiCol = valet
-    ? [null, null, 'nome', 'turno', 'uscita', 'firma', 'radio', 'badge']
-    : generico
-      ? [null, null, 'nome', 'turno', 'uscita', 'firma']
-      : [null, null, 'nome', 'turno', 'cd', 'uscita', 'firma'];
+  // colonna PDF -> campo della riga briefing (per gli stili per cella; E e U senza)
+  const campiCol = ids.map((id) => (id === 'e' || id === 'u' ? null : id));
   let gPrec = null;
   (_briefState.righe || []).forEach((r) => {
     if (!r.nome && !r.turno) return;
@@ -4745,13 +4743,7 @@ async function pdfBriefingGiorno() {
     if (r.col || r.fm) righeFm[body.length] = r.col || '#FFFF00';
     if (r.bold || r.ital || r.colT) righeFmt[body.length] = { b: !!r.bold, i: !!r.ital, t: r.colT || '' };
     if (r.cs) righeCs[body.length] = r.cs;
-    body.push(
-      valet
-        ? ['', '', nomePdf, r.turno || '', r.uscita || '', r.firma || '', r.radio || '', r.badge || '']
-        : generico
-          ? ['', '', nomePdf, r.turno || '', r.uscita || '', r.firma || '']
-          : ['', '', nomePdf, r.turno || '', r.cd || '', r.uscita || '', r.firma || ''],
-    );
+    body.push(ids.map((id) => (id === 'e' || id === 'u' ? '' : id === 'nome' ? nomePdf : r[id] || '')));
   });
   // sempre in UN SOLO foglio, con il carattere piu grande che ci sta (fino a 12)
   // e colonne larghe quanto il testo piu lungo (cognomi lunghi, radio, badge)
@@ -4766,30 +4758,31 @@ async function pdfBriefingGiorno() {
       let w = doc.getTextWidth(String(h));
       body.forEach((riga) => {
         if (riga.length !== cols.length) return;
-        doc.setFont('helvetica', c === 2 || c === 3 || (c === 4 && !valet && !generico) ? 'bold' : 'normal');
+        doc.setFont('helvetica', c === iN || c === iT || c === iC ? 'bold' : 'normal');
         w = Math.max(w, doc.getTextWidth(String(riga[c] == null ? '' : riga[c])));
       });
       return w + 2 * pad + 1.5;
     });
-    const minimi = cols.map((h) => (h === 'E' || h === 'U' ? 9 : h === 'FIRMA' ? 30 : h === 'USCITA' ? 18 : 12));
+    const minimi = ids.map((id) => (id === 'e' || id === 'u' ? 9 : id === 'firma' ? 30 : id === 'uscita' ? 18 : 12));
     const w = larg.map((x, c) => Math.max(x, minimi[c]));
     const rowH = f * 0.3528 * 1.25 + 2 * pad;
-    return { f, pad, w, rowH, somma: w.reduce((a, b) => a + b, 0), naturale: w[2] };
+    return { f, pad, w, rowH, somma: w.reduce((a, b) => a + b, 0), naturale: w[iN] };
   };
   // il nome si allarga quanto serve; se non ci sta nella larghezza del foglio va a
   // capo su due righe (la riga si alza) invece di rimpicciolire tutto il testo
   const adatta = (x, larghMax) => {
-    const altre = x.somma - x.w[2];
+    const altre = x.somma - x.w[iN];
     const spazio = larghMax - altre;
     if (spazio < 30) return null;
     let doppie = 0;
-    if (x.w[2] > spazio) {
+    if (x.w[iN] > spazio) {
       doc.setFontSize(x.f);
       doc.setFont('helvetica', 'bold');
       body.forEach((riga) => {
-        if (riga.length === cols.length && doc.getTextWidth(String(riga[2] || '')) + 2 * x.pad + 1.5 > spazio) doppie++;
+        if (riga.length === cols.length && doc.getTextWidth(String(riga[iN] || '')) + 2 * x.pad + 1.5 > spazio)
+          doppie++;
       });
-      x.w[2] = spazio;
+      x.w[iN] = spazio;
       x.somma = altre + spazio;
     }
     x.doppie = doppie;
@@ -4834,14 +4827,14 @@ async function pdfBriefingGiorno() {
   const largUso = valet || orariSotto ? PW - 20 : largMax;
   // lo spazio che avanza va soprattutto a FIRMA (per scrivere) e al nome
   const avanza = Math.max(0, (valet || orariSotto ? largUso : Math.min(largUso, Math.max(m.somma, 138))) - m.somma);
-  const iF = cols.indexOf('FIRMA');
+  const iF = ids.indexOf('firma');
   if (iF >= 0) m.w[iF] += avanza * 0.6;
-  m.w[2] += avanza * (iF >= 0 ? 0.4 : 1);
+  m.w[iN] += avanza * (iF >= 0 ? 0.4 : 1);
   const larghezze = {};
   m.w.forEach((x, c) => (larghezze[c] = { cellWidth: Math.round(x * 10) / 10 }));
   // sigle del turno (e numero cassa) al centro della casella
-  larghezze[3].halign = 'center';
-  if (!valet && !generico) larghezze[4].halign = 'center';
+  larghezze[iT].halign = 'center';
+  if (iC >= 0) larghezze[iC].halign = 'center';
   const tabW = m.w.reduce((a, b) => a + b, 0);
   const rowH = m.rowH;
   const fontR = m.f;
@@ -4865,9 +4858,9 @@ async function pdfBriefingGiorno() {
     columnStyles: larghezze,
     didParseCell: (d) => {
       if (d.section === 'head') {
-        d.cell.styles.fillColor =
-          d.column.index === 0 ? [0, 176, 80] : d.column.index === 1 ? [255, 0, 0] : [255, 255, 0];
-        if (d.column.index === 1) d.cell.styles.textColor = [255, 255, 255]; // E nero sul verde, come a video
+        const id = ids[d.column.index];
+        d.cell.styles.fillColor = id === 'e' ? [0, 176, 80] : id === 'u' ? [255, 0, 0] : [255, 255, 0];
+        if (id === 'u') d.cell.styles.textColor = [255, 255, 255]; // E nero sul verde, come a video
         return;
       }
       // stile della cella singola + formato riga + regole fisse delle colonne
@@ -4879,14 +4872,14 @@ async function pdfBriefingGiorno() {
       let fill = stC.c || '';
       const tCol = stC.t || fmtR.t || '';
       if (tCol && tCol[0] === '#') d.cell.styles.textColor = _peHexRgb(tCol);
-      if (d.column.index === 2 && righeFm[d.row.index]) {
+      if (d.column.index === iN && righeFm[d.row.index]) {
         fill = fill || righeFm[d.row.index];
         bold = true;
-      } else if (d.column.index === 3 && d.cell.raw) {
+      } else if (d.column.index === iT && d.cell.raw) {
         const hex = _pianoColore(String(d.cell.raw).trim());
         if (!fill && hex && hex[0] === '#') fill = hex;
         bold = true;
-      } else if (d.column.index === 4 && !valet && !generico && d.cell.raw) {
+      } else if (d.column.index === iC && d.cell.raw) {
         fill = fill || '#FFFF00';
         bold = true;
       }

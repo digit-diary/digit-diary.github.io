@@ -73,6 +73,8 @@ const VIS_ITEMS = {
     storico_hr_modifica:
       'Storico HR · MODIFICARE: inizio e fine contratto, data di nascita, giubilei, congedi non pagati (es. HR)',
     vista_valutazioni: 'Valutazioni · VEDERE le valutazioni annuali (chi le gestisce le vede comunque)',
+    gestione_istruzioni:
+      'Istruzioni del settore · MODIFICARE le istruzioni interne dei propri settori, in cima alla Guida (le leggono tutti quelli del settore)',
   },
   // Schede del PIANO: chi le VEDE. Default 'tutti'; 'nascosto' le toglie dal
   // menu, 'operatori selezionati' le mostra solo a quei nomi. L'admin vede
@@ -1982,6 +1984,16 @@ async function esportaBackupCompleto() {
       dati[t] = await secGet(t + '?limit=100000');
       totale += (dati[t] || []).length;
     }
+    // istruzioni del settore: tabella senza lettura generica, si leggono con la loro
+    // funzione (l amministratore le riceve tutte; stesse colonne della tabella, cosi
+    // import_backup.py le rimette al loro posto)
+    try {
+      const istr = await _conSessione((t) => _rpcSicura('leggi_istruzioni_settore', { p_token: t }), getOpToken());
+      if (Array.isArray(istr)) {
+        dati.istruzioni_settore = istr;
+        totale += istr.length;
+      }
+    } catch (e) {}
     const backup = {
       app: identita().programma + ' · ' + identita().azienda,
       esportato_il: new Date().toISOString(),

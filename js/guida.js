@@ -174,6 +174,17 @@ function GUIDA_CAPITOLI() {
     },
     {
       area: 'inizio',
+      titolo: 'Istruzioni del settore: come si scrivono',
+      vis: () => true,
+      righe: [
+        "In cima alla Guida c'è <b>Istruzioni del settore</b>: le regole interne del tuo settore (come si apre e si chiude il turno, chi chiamare, cosa controllare), scritte e aggiornate dai responsabili, senza chiedere a uno sviluppatore. Ognuno vede quelle dei suoi settori; chi lavora in più settori le vede una sotto l'altra, prima quelle del settore aperto.",
+        "<b>Chi le scrive</b>: l'amministratore e chi ha il permesso <b>Istruzioni del settore: modificare</b> (Impostazioni › Visibilità e permessi; all'inizio solo l'amministratore), e solo per i propri settori: un responsabile degli Slots non cambia quelle dei Tavoli. Il pulsante <b>Modifica</b> (o <b>Scrivi le istruzioni</b>, se il settore non ne ha ancora) compare solo a chi può.",
+        "<b>Come si scrivono</b>: nella finestra a sinistra c'è il testo, a destra l'anteprima di come apparirà. <b>#</b> a inizio riga fa un titolo, <b>-</b> un elenco puntato, <b>1.</b> un elenco numerato, <b>**parola**</b> il grassetto; i pulsanti Titolo, Elenco, Elenco numerato e Grassetto lo fanno per te sulle righe scelte. Una riga vuota separa i paragrafi. Il testo si mostra sempre come testo semplice: niente collegamenti, immagini o codice.",
+        "Accanto al nome del settore c'è l'<b>ultima modifica</b> (chi e quando); ogni salvataggio finisce anche nel <b>Registro attività</b>. Se due persone modificano insieme, chi salva per secondo riceve un avviso e il suo testo resta nella finestra: lo copi, riapri le istruzioni aggiornate e lo aggiungi.",
+      ],
+    },
+    {
+      area: 'inizio',
       titolo: 'Dettagli utili in tutto il programma',
       vis: () => true,
       righe: [
@@ -327,6 +338,7 @@ function GUIDA_CAPITOLI() {
         'La data parte da <b>domani</b>. <b>Compila dal piano</b> riempie nomi e turni del giorno; ogni cella si modifica, ogni riga ha il più per inserire sotto e la crocetta per eliminare; le righe si riordinano trascinandole.',
         'I <b>numeri di cassa</b> si assegnano da soli con la regola "chi chiude riapre": le casse che finiscono più tardi aprono il giorno dopo di presto. Restano modificabili a mano.',
         'Le colonne <b>E</b> e <b>U</b> restano vuote apposta: si spuntano a penna sul foglio stampato.',
+        "<b>Colonne del briefing</b> (card in fondo alla scheda Briefing, per chi compila il briefing): per ogni settore si sceglie quali colonne ha il foglio, in che ordine (con le frecce) e con che intestazione; vale a video e nella stampa. Le colonne speciali restano con la loro funzione: E e U a penna, numeri cassa (CD) con la rotazione, colori del turno; si possono solo mostrare, nascondere, rinominare e spostare. Collaboratore e turno ci sono sempre. <b>+ Aggiungi colonna libera</b> crea una casella vuota (per esempio Note o Postazione) da compilare a mano; <b>Rimetti le colonne predefinite</b> torna a quelle di sempre. Una colonna nascosta non cancella quello che c'era scritto. Ogni modifica va nel Registro attività.",
         "<b>Copiare per un'email</b>: seleziona trascinando (anche le intestazioni, es. HOST), poi tasto destro: <b>Copia</b> incolla una tabella con colori e bordi, <b>Copia come immagine</b> incolla un'immagine (se il browser non lo permette, la scarica come file). Nello stesso menu Taglia, Incolla e Cancella contenuto.",
         'Per colorare o evidenziare: <b>clicca la cella</b> per marcarla, con Ctrl aggiungi le altre, poi <b>Colora</b> applica il colore della barretta, la freccia ne sceglie un altro, <b>G</b> mette il grassetto e <b>C</b> il corsivo.',
         '<b>Genera pause</b> crea la distribuzione delle pause; anche queste si modificano cella per cella. Le stampe sono in PDF A4, sempre su un foglio solo.',
@@ -394,6 +406,7 @@ function GUIDA_CAPITOLI() {
         '<b>Turni</b>: orari, ore, tipo diurno o notturno e colore. Sono <b>divisi per settore</b>, quindi due settori possono usare la stessa sigla senza confondersi.',
         '<b>Codici speciali</b> (V, M, C, CGF, ND, ASS e simili) sono comuni a tutti i settori.',
         '<b>Regole del piano</b>: ogni regola ha un nome in italiano semplice, un valore (numero oppure Sì / No), la colonna <b>Dove agisce</b> che dice in quali schermate conta, e sotto il nome tecnico con la <b>fonte</b> (RAP, direttiva 16-007, legge sul lavoro). Sono raggruppate per tema: riposo, domeniche, ore e saldo, festivi e recuperi, vacanze, ausiliari, funzioni, orari di chiusura, giorni chiusi, congedi non pagati. Se domani cambia il regolamento si aggiorna il numero, senza toccare il programma.',
+        "<b>Riferimento normativo</b> (la scritta grigia sotto il nome della regola, per esempio «LL art. 15a · direttiva 16-007»): l'amministratore lo cambia con la <b>matita</b> accanto, per esempio quando cambia il RAP. Vale per tutti i settori, anche per le regole di legge, e cambia solo la scritta: la regola funziona come prima. Accanto compare «(modificato)»; <b>Rimetti il testo originale</b> torna a quello di partenza. Ogni modifica va nel Registro attività.",
         '<b>Impostazioni del motore</b> (scheda Regole, valori predefiniti finché non le cambi): <b>Funzioni esenti dai riposi attorno alla domenica e dal conto delle domeniche libere</b> (gruppo Domeniche, predefinito RESP): chi ha queste funzioni non riceve avvisi su quei riposi e sulle domeniche; vuoto = nessuno esente. <b>Chi non può più recuperare le domeniche libere nel mese non ne perde altre</b> (Domeniche, predefinito No): con No, se serve a coprire un posto la bozza può ancora fargli lavorare una domenica, per ultimo, e resta segnalato; con Sì la bozza non gli toglie altre domeniche libere, anche a costo di lasciare un posto scoperto. <b>Turno preferito</b> (Funzioni e turni, predefinito L1): le sigle dei turni che la bozza dà per primi a chi ha la spunta «Preferisce» nelle Preferenze collaboratori; vuoto = nessuno. <b>Quanto Migliora la bozza cerca di dividere le notti in modo uguale</b> (Riposo e giorni di lavoro, predefinito 3, 0 = spento). Tutte e quattro si possono cambiare per settore. La casella Attiva resta sempre accesa: si spengono con il valore (vuoto, 0 oppure No).',
         '<b>Per un settore</b>: nel menu in alto della scheda Regole scegli il settore (Slots, Tavoli, Valet, Cleaning) e cambia il numero nella riga: nasce da sola l\'eccezione per quel settore, gli altri tengono il valore generale. La colonna dice "eccezione" o "valore generale"; <b>Torna al generale</b> la toglie. Esempio: riposo minimo 11 ore ovunque, 12 ai Tavoli.',
         '<b>Controlli prima di salvare</b>: un valore fuori scala (riposo di 3 ore, 40 giorni consecutivi), un testo dove serve un numero, oppure una regola che cita turni o funzioni che in quel settore non esistono (per esempio "L1 e 9 solo a BO e SUP" ai Tavoli, dove L1 e 9 non ci sono) viene rifiutato con un avviso rosso che spiega il motivo, e resta il valore di prima. Lo stesso vale per le regole di gruppo: gruppo, funzione e formato vengono verificati sul settore.',
@@ -755,6 +768,7 @@ const GUIDA_GRUPPI = [
 const _GUIDA_GRUPPO_DI = {
   'Da dove iniziare': 'inizio',
   'Dettagli utili in tutto il programma': 'inizio',
+  'Istruzioni del settore: come si scrivono': 'inizio',
   'Compleanni: dove compaiono e chi ci finisce': 'inizio',
   'Diario delle attività': 'diario',
   'Rapporto giornaliero': 'diario',
@@ -824,6 +838,7 @@ function renderGuidaHtml(area) {
     (g) => g.cap.length,
   );
   const inizio = cap.find((c) => c.titolo === 'Da dove iniziare');
+  const istr = _istrGuidaHtml();
   let h =
     '<div class="guida-radice"><div class="main-card guida-indice"><div class="card-header guida-testa"><span>Guida del programma</span><input type="search" class="campo-cerca" placeholder="Cerca nella guida (es. CGF, malattia, pause)" aria-label="Cerca nella guida" oninput="guidaCerca(this)" autocomplete="off"></div><div class="guida-indice-corpo">' +
     (inizio
@@ -833,6 +848,7 @@ function renderGuidaHtml(area) {
         vai(inizio) +
         '><span class="guida-inizio-tit">È la prima volta? Parti da qui</span><span class="guida-inizio-sub">Da dove iniziare: come è fatto il programma, cosa si salva da solo, Annulla, ricerca e dimensione del testo</span></button>'
       : '') +
+    istr.voce +
     '<p class="guida-nota">Qui trovi solo gli argomenti che riguardano quello che puoi fare tu.</p>' +
     gruppi
       .filter((g) => g.cap.some((c) => c !== inizio))
@@ -859,7 +875,8 @@ function renderGuidaHtml(area) {
           '</div></section>',
       )
       .join('') +
-    '</div></div>';
+    '</div></div>' +
+    istr.capitolo;
   gruppi.forEach((g) => {
     h += '<h2 class="guida-sezione" data-gruppo="' + g.id + '">' + escP(g.titolo) + '</h2>';
     g.cap.forEach((c) => {
@@ -916,4 +933,338 @@ function guidaCerca(inp) {
 function renderGuida() {
   const el = document.getElementById('guida-content');
   if (el) el.innerHTML = renderGuidaHtml();
+}
+
+// ================================================================
+// ISTRUZIONI DEL SETTORE (v452): le regole interne di ogni settore, scritte e aggiornate
+// dai responsabili senza chiedere a uno sviluppatore. Stanno in cima alla Guida.
+// Database: tabella istruzioni_settore (migrazione 20260914), lette e scritte solo con
+// leggi_istruzioni_settore / salva_istruzioni_settore, che controllano permesso e settore.
+// Il testo e Markdown ridotto (titoli, elenchi, grassetto): si mostra SEMPRE come testo
+// scappato, mai come HTML scritto da qualcuno.
+// ================================================================
+let _istrCache = null; // [{ settore, testo, aggiornato_da, aggiornato_il }]
+let _istrCaricamento = null;
+const ISTR_MAX = 20000;
+// permesso delegabile "Istruzioni del settore: modificare" (predefinito: solo amministratore).
+// Come puoModificare, ma senza la sola lettura del settore extra aperto: il settore conta
+// per ogni blocco (vedi _istrSettori)
+function _istrHaPermesso() {
+  if (_guidaAdmin()) return true;
+  const cfg = typeof visibilitaConfig !== 'undefined' ? visibilitaConfig : {};
+  const v = cfg.gestione_istruzioni || 'admin';
+  if (v === 'admin' || v === 'nascosto') return false;
+  if (typeof v === 'object' && v.tipo === 'selezionati')
+    return !!(v.operatori && v.operatori.includes(typeof getOperatore === 'function' ? getOperatore() : ''));
+  return true;
+}
+// settori di chi legge (scrittura: solo gli accessi extra con modifica), come
+// _settori_operatore nel database: amministratore e chi lavora in tutti i settori = tutti
+function _istrSettori(scrittura) {
+  const tutti = typeof getReparti === 'function' ? getReparti().map((r) => r.key) : [];
+  if (_guidaAdmin()) return tutti;
+  const op = typeof getOperatore === 'function' ? getOperatore() : '';
+  const mappa = typeof operatoriRepartoMap !== 'undefined' ? operatoriRepartoMap : {};
+  const proprio = mappa[op] || 'entrambi';
+  if (proprio === 'entrambi') return tutti;
+  const out = [proprio];
+  const extra = (typeof _accessiExtraDi === 'function' && _accessiExtraDi(op)) || {};
+  Object.keys(extra).forEach((k) => {
+    const v = extra[k];
+    if (!scrittura || (v && typeof v === 'object' && v.modifica === true)) out.push(k);
+  });
+  return out.filter((k, i) => out.indexOf(k) === i && tutti.includes(k));
+}
+function istrPuoScrivere(settore) {
+  return _istrHaPermesso() && _istrSettori(true).includes(settore);
+}
+async function _istrCarica() {
+  if (_istrCaricamento) return _istrCaricamento;
+  const tk = typeof getOpToken === 'function' ? getOpToken() : null;
+  if (!tk) return _istrCache || [];
+  _istrCaricamento = (async () => {
+    try {
+      const r = await _conSessione((t) => _rpcSicura('leggi_istruzioni_settore', { p_token: t }), tk);
+      _istrCache = Array.isArray(r) ? r : [];
+    } catch (e) {
+      // database senza la migrazione 20260914 o rete caduta: la Guida resta com era
+      if (_istrCache == null) _istrCache = [];
+    }
+    _istrCaricamento = null;
+    return _istrCache;
+  })();
+  return _istrCaricamento;
+}
+function _istrDi(settore) {
+  return (_istrCache || []).find((x) => x.settore === settore) || null;
+}
+function _istrQuando(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  const p = (n) => String(n).padStart(2, '0');
+  return (
+    p(d.getDate()) +
+    '.' +
+    p(d.getMonth() + 1) +
+    '.' +
+    d.getFullYear() +
+    ' alle ' +
+    p(d.getHours()) +
+    ':' +
+    p(d.getMinutes())
+  );
+}
+// MARKDOWN RIDOTTO -> HTML sicuro: ogni riga e prima scappata (escP), poi si riconoscono
+// solo titoli (# e ##), elenchi (- oppure 1.) e grassetto (**testo**). Nient altro.
+function istrMarkdownHtml(testo) {
+  const righe = String(testo || '')
+    .replace(/\r\n?/g, '\n')
+    .split('\n');
+  let h = '';
+  let lista = null;
+  let par = [];
+  const inline = (s) => escP(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  const chiudiPar = () => {
+    if (par.length) h += '<p class="guida-riga">' + par.map(inline).join('<br>') + '</p>';
+    par = [];
+  };
+  const chiudiLista = () => {
+    if (lista) h += '</' + lista + '>';
+    lista = null;
+  };
+  const apriLista = (tipo) => {
+    chiudiPar();
+    if (lista !== tipo) {
+      chiudiLista();
+      h += '<' + tipo + ' class="istr-elenco">';
+      lista = tipo;
+    }
+  };
+  righe.forEach((r) => {
+    const t = r.trim();
+    let m;
+    if (!t) {
+      chiudiPar();
+      chiudiLista();
+    } else if ((m = t.match(/^(#{1,3})\s+(.+)$/))) {
+      chiudiPar();
+      chiudiLista();
+      h += '<h4 class="istr-tit' + (m[1].length > 1 ? ' istr-tit2' : '') + '">' + inline(m[2]) + '</h4>';
+    } else if ((m = t.match(/^[-*•]\s+(.+)$/))) {
+      apriLista('ul');
+      h += '<li class="guida-riga">' + inline(m[1]) + '</li>';
+    } else if ((m = t.match(/^\d{1,3}[.)]\s+(.+)$/))) {
+      apriLista('ol');
+      h += '<li class="guida-riga">' + inline(m[1]) + '</li>';
+    } else {
+      chiudiLista();
+      par.push(t);
+    }
+  });
+  chiudiPar();
+  chiudiLista();
+  return h;
+}
+// contenuto della card: un blocco per settore (prima quello aperto), solo i settori con
+// istruzioni scritte o che chi legge puo scrivere. '' = niente da mostrare
+function _istrCorpoHtml() {
+  const lettura = _istrSettori(false);
+  const cur = typeof currentReparto !== 'undefined' ? currentReparto : '';
+  const ordine = lettura.slice().sort((a, b) => (a === cur ? -1 : b === cur ? 1 : 0));
+  const blocchi = ordine
+    .map((k) => {
+      const r = _istrDi(k);
+      const scritte = r && String(r.testo || '').trim();
+      const puo = istrPuoScrivere(k);
+      if (!scritte && !puo) return '';
+      const nome = typeof repartoLabel === 'function' ? repartoLabel(k) : k;
+      return (
+        '<section class="istr-settore" data-settore="' +
+        escP(k) +
+        '"><div class="istr-testa"><h3 class="istr-nome">' +
+        escP(nome) +
+        '</h3>' +
+        (r && r.aggiornato_da
+          ? '<span class="istr-agg">Ultima modifica: ' +
+            escP(r.aggiornato_da) +
+            ', ' +
+            escP(_istrQuando(r.aggiornato_il)) +
+            '</span>'
+          : '') +
+        (puo
+          ? '<button type="button" class="btn-export istr-modifica" onclick="istrApriEditor(\'' +
+            _jsArg(k) +
+            '\')"><i class="icx icx-modifica"></i> ' +
+            (scritte ? 'Modifica' : 'Scrivi le istruzioni') +
+            '</button>'
+          : '') +
+        '</div>' +
+        (scritte
+          ? '<div class="istr-corpo">' + istrMarkdownHtml(r.testo) + '</div>'
+          : '<p class="istr-vuoto">Non ci sono ancora istruzioni per ' +
+            escP(nome) +
+            '. Scrivi qui le regole interne del settore: come si apre e si chiude il turno, chi chiamare, cosa controllare.</p>') +
+        '</section>'
+      );
+    })
+    .filter(Boolean);
+  return blocchi.join('');
+}
+// riempie (o toglie) card e voce dell indice in tutte le guide aperte
+function _istrAggiornaDom() {
+  const corpo = _istrCorpoHtml();
+  document.querySelectorAll('.guida-radice').forEach((radice) => {
+    const card = radice.querySelector('#guida-istruzioni-del-settore');
+    const voce = radice.querySelector('.guida-istr-voce');
+    if (!corpo) {
+      [card, voce].forEach((x) => x && x.remove());
+      return;
+    }
+    if (card) {
+      card.querySelector('.guida-cap-corpo').innerHTML = corpo;
+      card.hidden = false;
+    }
+    if (voce) voce.hidden = false;
+  });
+}
+// parte della Guida: voce evidenziata nell indice + capitolo in cima, riempiti appena
+// arrivano le istruzioni dal database (subito dalla memoria se gia lette)
+function _istrGuidaHtml() {
+  const vai =
+    "onclick=\"document.getElementById('guida-istruzioni-del-settore').scrollIntoView({behavior:'smooth',block:'start'})\"";
+  setTimeout(() => _istrCarica().then(_istrAggiornaDom), 0);
+  return {
+    voce:
+      '<button type="button" class="guida-inizio guida-istr-voce" data-cap="guida-istruzioni-del-settore" hidden ' +
+      vai +
+      '><span class="guida-inizio-tit"><i class="icx icx-clipboard"></i> Istruzioni del settore</span><span class="guida-inizio-sub">Le regole interne del tuo settore, scritte e aggiornate dai responsabili</span></button>',
+    capitolo:
+      '<div class="main-card guida-cap guida-istr" id="guida-istruzioni-del-settore" data-gruppo="istr" hidden><div class="card-header">Istruzioni del settore</div><div class="guida-cap-corpo">' +
+      (_istrCache ? _istrCorpoHtml() : '') +
+      '</div></div>',
+  };
+}
+// EDITOR: casella di testo con i pulsanti per titolo, elenco e grassetto e l anteprima
+// accanto (come apparira nella Guida). Salva solo chi ha il permesso nel settore; se nel
+// frattempo un collega ha salvato, il database rifiuta e il testo resta nella finestra.
+async function istrApriEditor(settore) {
+  if (!istrPuoScrivere(settore)) {
+    toastErrore(
+      'Per modificare le istruzioni di questo settore serve il permesso "Istruzioni del settore: modificare".',
+    );
+    return;
+  }
+  await _istrCarica();
+  const r = _istrDi(settore);
+  const atteso = r ? r.aggiornato_il : null;
+  const nome = typeof repartoLabel === 'function' ? repartoLabel(settore) : settore;
+  const velo = document.createElement('div');
+  velo.className = 'finestra-velo';
+  velo.innerHTML =
+    '<div class="finestra-box istr-editor" role="dialog" aria-modal="true" aria-labelledby="istr-ed-tit">' +
+    '<h3 id="istr-ed-tit"></h3>' +
+    '<p class="istr-ed-aiuto">Scrivi in parole semplici. <b># Titolo</b> a inizio riga fa un titolo, <b>- </b> un elenco puntato, <b>1. </b> un elenco numerato, <b>**parola**</b> il grassetto. Una riga vuota separa i paragrafi.</p>' +
+    '<div class="istr-ed-barra">' +
+    '<button type="button" data-f="tit" title="Titolo (# a inizio riga)">Titolo</button>' +
+    '<button type="button" data-f="ul" title="Elenco puntato (- a inizio riga)">Elenco</button>' +
+    '<button type="button" data-f="ol" title="Elenco numerato (1. a inizio riga)">Elenco numerato</button>' +
+    '<button type="button" data-f="b" title="Grassetto (**testo**)"><b>G</b> Grassetto</button>' +
+    '<span class="istr-ed-conta"></span></div>' +
+    '<div class="istr-ed-due"><label class="istr-ed-col"><span>Testo</span><textarea class="istr-ed-testo" spellcheck="true" maxlength="' +
+    ISTR_MAX +
+    '"></textarea></label>' +
+    '<div class="istr-ed-col"><span>Anteprima</span><div class="istr-ed-anteprima istr-corpo"></div></div></div>' +
+    '<p class="istr-ed-ultima"></p>' +
+    '<div class="finestra-pulsanti"><button type="button" class="finestra-no">Annulla</button><button type="button" class="finestra-ok">Salva</button></div></div>';
+  velo.querySelector('h3').textContent = 'Istruzioni del settore · ' + nome;
+  const ta = velo.querySelector('textarea');
+  const prev = velo.querySelector('.istr-ed-anteprima');
+  const conta = velo.querySelector('.istr-ed-conta');
+  ta.value = r ? r.testo || '' : '';
+  velo.querySelector('.istr-ed-ultima').textContent =
+    r && r.aggiornato_da
+      ? 'Ultima modifica: ' + r.aggiornato_da + ', ' + _istrQuando(r.aggiornato_il)
+      : 'Ancora nessuna istruzione salvata.';
+  const aggiorna = () => {
+    prev.innerHTML = istrMarkdownHtml(ta.value) || '<p class="istr-vuoto">L\'anteprima compare qui.</p>';
+    conta.textContent = ta.value.length + ' / ' + ISTR_MAX;
+  };
+  ta.addEventListener('input', aggiorna);
+  aggiorna();
+  // pulsanti di formato: agiscono sulle righe selezionate (o sulla riga del cursore)
+  velo.querySelector('.istr-ed-barra').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-f]');
+    if (!b) return;
+    const f = b.dataset.f;
+    const v = ta.value;
+    let s = ta.selectionStart;
+    let fine = ta.selectionEnd;
+    if (f === 'b') {
+      const sel = v.slice(s, fine) || 'testo';
+      ta.setRangeText('**' + sel + '**', s, fine, 'end');
+    } else {
+      s = v.lastIndexOf('\n', s - 1) + 1;
+      const fineRiga = v.indexOf('\n', fine);
+      fine = fineRiga < 0 ? v.length : fineRiga;
+      const righe = v.slice(s, fine).split('\n');
+      const nuove = righe.map((x, i) => {
+        const pulita = x.replace(/^(#{1,3}\s+|[-*•]\s+|\d{1,3}[.)]\s+)/, '');
+        return (f === 'tit' ? '# ' : f === 'ul' ? '- ' : i + 1 + '. ') + pulita;
+      });
+      ta.setRangeText(nuove.join('\n'), s, fine, 'end');
+    }
+    ta.focus();
+    aggiorna();
+  });
+  const originale = ta.value;
+  const chiudi = () => {
+    document.removeEventListener('keydown', tasti, true);
+    velo.remove();
+  };
+  // chiudere senza salvare: se il testo e cambiato, prima si chiede
+  const annulla = async () => {
+    if (
+      ta.value !== originale &&
+      !(await chiediConferma('Chiudere senza salvare? Le modifiche al testo andranno perse.'))
+    )
+      return;
+    chiudi();
+  };
+  const tasti = (e) => {
+    // una conferma aperta sopra l editor risponde lei ai tasti
+    if (e.key !== 'Escape' || document.querySelectorAll('.finestra-velo').length > 1) return;
+    e.preventDefault();
+    e.stopPropagation();
+    annulla();
+  };
+  const salva = async () => {
+    const ok = velo.querySelector('.finestra-ok');
+    ok.disabled = true;
+    try {
+      const tk = getOpToken();
+      const esito = await _conSessione(
+        (t) =>
+          _rpcSicura('salva_istruzioni_settore', {
+            p_token: t,
+            p_settore: settore,
+            p_testo: ta.value.replace(/\s+$/, ''),
+            p_atteso: atteso,
+          }),
+        tk,
+      );
+      chiudi();
+      toast(esito && esito.invariato ? 'Nessuna modifica da salvare' : 'Istruzioni di ' + nome + ' salvate');
+      _istrCache = null;
+      await _istrCarica();
+      _istrAggiornaDom();
+    } catch (e) {
+      ok.disabled = false;
+      toastErrore('Istruzioni non salvate: ' + ((e && e.message) || 'errore'), 9000);
+    }
+  };
+  velo.querySelector('.finestra-no').addEventListener('click', annulla);
+  velo.querySelector('.finestra-ok').addEventListener('click', salva);
+  document.addEventListener('keydown', tasti, true);
+  document.body.appendChild(velo);
+  ta.focus();
 }

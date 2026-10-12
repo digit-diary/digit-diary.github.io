@@ -677,6 +677,7 @@ async function _pianoCaricaCfg() {
     cdConfig,
     evidCfg,
     solverUrl,
+    fonteCfg,
   ] = await Promise.all([
     secGet('piano_turni?order=ordine.asc&limit=500'),
     secGet('piano_codici?order=codice.asc&limit=200'),
@@ -696,7 +697,14 @@ async function _pianoCaricaCfg() {
     getImp('piano_cd_config'),
     getImp('brief_evidenziazioni'),
     getImp('piano_solver_url'),
+    getImp('piano_regole_fonte'),
   ]);
+  // riferimenti normativi delle regole cambiati dall amministratore (piano-config.js)
+  try {
+    window._pianoRegoleFonteCfg = fonteCfg ? JSON.parse(fonteCfg) || {} : {};
+  } catch (e) {
+    window._pianoRegoleFonteCfg = {};
+  }
   pianoRegoleGruppoCache = regoleGruppo || [];
   try {
     window._pianoCompGruppiCfg = compGruppi ? JSON.parse(compGruppi) : null;

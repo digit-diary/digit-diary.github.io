@@ -1028,7 +1028,21 @@ function renderFormazione() {
   const puoComp = typeof puoModificare === 'function' ? puoModificare('gestione_competenze') : adm;
   const comps = getCompetenzeReparto();
   _formCaricaOrdinePiano();
-  const collabs = _formOrdineComePiano(getCollaboratoriReparto().filter((c) => c.attivo !== false));
+  // anche chi COPRE questo settore da un altro (reparti extra / copertura, es. un collaboratore
+  // degli Slots che copre il Valet): la competenza del settore va certificata qui, altrimenti
+  // il Piano non lo considera mai abilitato ai turni di questo settore
+  const _copre = collaboratoriCache.filter(
+    (c) =>
+      c.attivo !== false &&
+      !getCollaboratoriReparto().includes(c) &&
+      typeof _pianoAppartieneAlReparto === 'function' &&
+      _pianoAppartieneAlReparto(c, currentReparto),
+  );
+  const collabs = _formOrdineComePiano(
+    getCollaboratoriReparto()
+      .filter((c) => c.attivo !== false)
+      .concat(_copre),
+  );
   // COMANDI IN TESTA: configurazione della scala del settore aperto e proposta dai turni
   const puoProporre = adm || (typeof puoModificare === 'function' && puoModificare('gestione_formazioni'));
   // con il riquadro "Come iniziare" i comandi stanno nei suoi passi: niente doppioni sopra
@@ -1179,6 +1193,11 @@ function renderFormazione() {
       '\')"><strong>' +
       escP(c.nome) +
       '</strong></span>' +
+      (_copre.includes(c)
+        ? ' <span class="mini-badge" style="background:var(--pieno-azzurro,#2a7ab0);font-size:var(--fs-sm,.8125rem)" title="Appartiene a un altro settore e copre anche questo">copre da ' +
+          escP(repartoLabel(c.reparto_dip || 'slots')) +
+          '</span>'
+        : '') +
       (c.impiego
         ? ' <span class="mini-badge" style="background:' +
           (c.impiego === 'fisso' ? '#1a7a6d' : '#e67e22') +

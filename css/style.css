@@ -9198,6 +9198,171 @@ body:has(.fz-velo) .toast {
   border-radius: 50%;
   background: var(--accent2);
 }
+/* ISTRUZIONI DEL SETTORE (guida.js): voce evidenziata nell indice, un blocco per settore,
+   testo in Markdown ridotto (titoli, elenchi, grassetto) e la finestra per scriverle */
+.guida-istr-voce {
+  border-left-color: var(--c-verde, #2c6e49);
+}
+.guida-istr-voce:hover {
+  border-left-color: var(--c-verde, #2c6e49);
+}
+.guida-istr-voce .icx {
+  margin-right: 4px;
+}
+.guida-cap[hidden],
+.guida-istr-voce[hidden] {
+  display: none;
+}
+.istr-settore + .istr-settore {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.istr-testa {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-bottom: 4px;
+}
+.istr-nome {
+  font-family: 'Playfair Display', serif;
+  font-size: var(--fs-lg);
+  margin: 0;
+}
+.istr-agg {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.istr-modifica {
+  margin-left: auto;
+  font-size: var(--fs-sm);
+  padding: 4px 12px;
+}
+.istr-corpo .guida-riga {
+  padding-left: 0;
+}
+.istr-corpo .guida-riga::before {
+  display: none;
+}
+.istr-corpo .istr-elenco {
+  margin: 4px 0 8px 22px;
+}
+.istr-corpo li.guida-riga {
+  margin: 2px 0;
+}
+.istr-tit {
+  font-family: 'Source Sans 3', sans-serif;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  margin: 12px 0 4px;
+}
+.istr-tit2 {
+  font-size: var(--fs-md);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.istr-vuoto {
+  color: var(--muted);
+  font-style: italic;
+  margin: 4px 0;
+}
+.finestra-box.istr-editor {
+  width: min(1000px, 100%);
+}
+.istr-ed-aiuto {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+.istr-ed-barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.istr-ed-barra button {
+  padding: 4px 10px;
+  font-family: 'Source Sans 3', sans-serif;
+  font-size: var(--fs-sm);
+  color: var(--ink);
+  background: var(--paper2);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.istr-ed-barra button:hover {
+  border-color: var(--line-forte);
+}
+.istr-ed-conta {
+  margin-left: auto;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.istr-ed-due {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.istr-ed-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.istr-ed-col > span {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.istr-ed-testo {
+  min-height: 46vh;
+  resize: vertical;
+  padding: 10px;
+  font-family: 'Source Sans 3', sans-serif;
+  font-size: var(--fs-md);
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--paper2);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+}
+.istr-ed-testo:focus {
+  outline: none;
+  border-color: var(--accent2);
+}
+.istr-ed-anteprima {
+  min-height: 46vh;
+  max-height: 46vh;
+  overflow: auto;
+  padding: 8px 12px;
+  font-size: var(--fs-md);
+  line-height: 1.55;
+  border: 1px dashed var(--line-forte);
+  border-radius: 3px;
+}
+.istr-ed-ultima {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  margin: 8px 0 0;
+}
+@media (max-width: 700px) {
+  .istr-ed-due {
+    grid-template-columns: 1fr;
+  }
+  .istr-ed-testo,
+  .istr-ed-anteprima {
+    min-height: 30vh;
+    max-height: none;
+  }
+  .istr-modifica {
+    margin-left: 0;
+  }
+}
 @media (max-width: 700px) {
   .guida-voci {
     grid-template-columns: 1fr;
@@ -9958,4 +10123,24 @@ body:not(.piano-segn-mostra):not(.segn-aperte):has(#page-piano.active #piano-avv
   .app-copyright {
     display: none !important;
   }
+}
+
+/* RIFERIMENTO NORMATIVO DELLE REGOLE (Piano > Regole): matita dell amministratore */
+.regola-fonte-btn {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  padding: 1px 4px;
+  margin-left: 2px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.regola-fonte-btn:hover,
+.regola-fonte-btn:focus-visible {
+  border-color: var(--line-forte);
+  color: var(--ink);
+  outline: none;
 }

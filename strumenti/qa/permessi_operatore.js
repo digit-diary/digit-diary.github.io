@@ -8,9 +8,9 @@
 //   - operatori di prova della copia locale (Camponovo Andrea / ProvaLocale1!, amministratore
 //     ProvaAdmin1!, Pistocchi Mara, Bonelli Flavio, HR, Sanvido Paolo).
 // COME SI LANCIA:  node strumenti/qa/permessi_operatore.js
-// MAI sul database vero: scrive e cancella dati di prova (prefissi 'W1B ' e 'W4C ').
+// MAI sul database vero: scrive e cancella dati di prova (prefissi 'W1B ', 'W4C ' e 'W5I ').
 // ============================================================
-// PROVA DEI PERMESSI DEGLI OPERATORI NEL DATABASE (migrazioni 20260911 e 20260913)
+// PROVA DEI PERMESSI DEGLI OPERATORI NEL DATABASE (migrazioni 20260911, 20260913 e 20260914)
 // Per ogni falla: la prova che la riproduce (deve risultare CHIUSA) e le azioni legittime
 // che devono continuare a funzionare (OK). Passa dal servizio REST come il programma
 // (http://127.0.0.1:8000/rest/v1/rpc/...), con la chiave pubblica della copia locale.
@@ -562,6 +562,76 @@ function pulisci() {
     if (r.ok && r.body && r.body.session_token) tutteSessioni.push(r.body.session_token);
     r = await rpc('force_change_pwd', { p_nome: 'W1B Legacy', p_new_hash: pbkdf2('Reset4!', 'W1B Legacy'), p_deve_cambiare: true, p_token: ADM });
     esito(r.ok && r.body && r.body.success, 'FUNZIONA amministratore: Reimposta password anche dopo un accesso da un altro PC', JSON.stringify(r.body));
+    });
+    await S(async () => {
+    console.log('\n== 12) personalizzazioni dalle schermate (migrazione 20260914)');
+    // stato di partenza: si rimette tutto com era alla fine (anche se una prova fallisce)
+    const visPrima = sql(`select valore from impostazioni where chiave = 'visibilita'`);
+    const istrPrima = sql(`select coalesce(json_agg(i), '[]') from istruzioni_settore i`);
+    const impPrima = JSON.parse(sql(`select coalesce(json_object_agg(chiave, valore), '{}') from impostazioni where chiave in ('piano_regole_fonte', 'brief_colonne_slots', 'brief_colonne_tavoli')`));
+    const inizio = sql(`select now()`);
+    const ist = (t, sett, testo, atteso) => rpc('salva_istruzioni_settore', { p_token: t, p_settore: sett, p_testo: testo, p_atteso: atteso === undefined ? null : atteso });
+    const quando = (sett) => sql(`select aggiornato_il from istruzioni_settore where settore = ${lit(sett)}`) || null;
+    const quandoJs = (sett) => { const r = sql(`select to_json(aggiornato_il) from istruzioni_settore where settore = ${lit(sett)}`); return r ? JSON.parse(r) : null; };
+    const imp = (t, k, v) => rpc('upsert_impostazione', { p_token: t, p_chiave: k, p_valore: v });
+    try {
+      sql(`delete from istruzioni_settore where settore in ('slots', 'tavoli', 'cleaning')`);
+      // ISTRUZIONI: senza il permesso (predefinito: solo amministratore) nessuno scrive
+      sql(`update impostazioni set valore = (valore::jsonb - 'gestione_istruzioni')::text where chiave = 'visibilita'`);
+      chiusa(await ist(PIS, 'slots', 'W5I senza permesso'), 'istruzioni Slots scritte da un responsabile Slots SENZA il permesso (predefinito)');
+      chiusa(await ist(CAMP, 'tavoli', 'W5I senza permesso'), 'istruzioni scritte da chi lavora in tutti i settori senza il permesso');
+      funziona(await ist(ADM, 'cleaning', 'W5I amministratore'), 'amministratore scrive le istruzioni del Cleaning');
+      // permesso dato a Pistocchi (Slots) e Bonelli (Tavoli)
+      sql(`update impostazioni set valore = (valore::jsonb || '{"gestione_istruzioni": {"tipo": "selezionati", "operatori": ["Pistocchi Mara", "Bonelli Flavio"]}}'::jsonb)::text where chiave = 'visibilita'`);
+      r = await ist(PIS, 'slots', 'W5I # Apertura\n- **cassa**');
+      funziona(r, 'responsabile Slots con il permesso scrive le istruzioni Slots');
+      esito(sql(`select aggiornato_da from istruzioni_settore where settore = 'slots'`) === 'Pistocchi Mara', 'CHIUSA  autore delle istruzioni = sessione (scritto dal database)');
+      esito(sql(`select count(*) from log_attivita where azione = 'Istruzioni del settore modificate' and operatore = 'Pistocchi Mara' and reparto_dip = 'slots' and created_at >= ${lit(inizio)}`) === '1', 'FUNZIONA la modifica finisce nel Registro attivita');
+      chiusa(await ist(PIS, 'tavoli', 'W5I Slots scrive Tavoli'), 'responsabile Slots scrive le istruzioni dei TAVOLI');
+      chiusa(await ist(BON, 'slots', 'W5I Tavoli scrive Slots', quandoJs('slots')), 'responsabile Tavoli scrive le istruzioni degli SLOTS');
+      funziona(await ist(BON, 'tavoli', 'W5I tavoli'), 'responsabile Tavoli con il permesso scrive le istruzioni Tavoli');
+      chiusa(await ist(PIS, 'slots', 'W5I sovrascrive senza aver letto'), 'istruzioni sovrascritte senza l ultima versione (chi salva per secondo)');
+      chiusa(await ist(PIS, 'slots', 'W5I ora vecchia', '2020-01-01T00:00:00Z'), 'istruzioni salvate con un ora di lettura vecchia');
+      funziona(await ist(PIS, 'slots', 'W5I seconda versione', quandoJs('slots')), 'istruzioni salvate con l ultima versione letta');
+      chiusa(await ist(ADM, 'inventato', 'W5I'), 'istruzioni di un settore che non esiste');
+      chiusa(await ist(ADM, 'cleaning', 'W5I ' + 'x'.repeat(20001), quandoJs('cleaning')), 'istruzioni oltre 20000 caratteri');
+      chiusa(await ist('w5i-token-finto', 'slots', 'W5I'), 'istruzioni senza sessione valida');
+      // lettura: ognuno i suoi settori
+      const settoriLetti = async (t) => { const x = await rpc('leggi_istruzioni_settore', { p_token: t }); return x.ok ? x.body.map((y) => y.settore).sort().join(',') : 'ERRORE ' + x.msg; };
+      esito((await settoriLetti(PIS)) === 'slots', 'CHIUSA  responsabile Slots legge solo le istruzioni Slots', await settoriLetti(PIS));
+      esito((await settoriLetti(BON)) === 'tavoli', 'CHIUSA  responsabile Tavoli legge solo le istruzioni Tavoli', await settoriLetti(BON));
+      esito((await settoriLetti(CAMP)) === 'cleaning,slots,tavoli', 'FUNZIONA chi lavora in tutti i settori le legge tutte', await settoriLetti(CAMP));
+      chiusa(await rpc('leggi_istruzioni_settore', { p_token: 'w5i-token-finto' }), 'istruzioni lette senza sessione');
+      const dir = await fetch(BASE + 'istruzioni_settore?select=*', { headers: H });
+      esito(dir.status === 401 || dir.status === 403, 'CHIUSA  lettura diretta della tabella istruzioni_settore con la chiave pubblica', 'HTTP ' + dir.status);
+      const dirW = await fetch(BASE + 'istruzioni_settore', { method: 'POST', headers: H, body: JSON.stringify({ settore: 'slots', testo: 'W5I diretto' }) });
+      esito(dirW.status === 401 || dirW.status === 403, 'CHIUSA  scrittura diretta della tabella istruzioni_settore', 'HTTP ' + dirW.status);
+
+      // RIFERIMENTI NORMATIVI DELLE REGOLE: solo amministratore
+      chiusa(await imp(PIS, 'piano_regole_fonte', '{"min_riposo_ore":"W5I"}'), 'riferimento normativo di una regola cambiato da un operatore (anche con piano e briefing)');
+      chiusa(await imp(CAMP, 'piano_regole_fonte', '{"min_riposo_ore":"W5I"}'), 'riferimento normativo cambiato da un operatore senza permessi');
+      funziona(await imp(ADM, 'piano_regole_fonte', '{"min_riposo_ore":"W5I LL art. 15a"}'), 'amministratore cambia il riferimento normativo');
+
+      // COLONNE DEL BRIEFING: chi compila il briefing, solo nei suoi settori
+      const col = '[{"id":"e","tit":"E","vis":true},{"id":"nome","tit":"W5I","vis":true},{"id":"turno","tit":"T","vis":true}]';
+      chiusa(await imp(CAMP, 'brief_colonne_slots', col), 'colonne del briefing cambiate da chi non compila il briefing');
+      chiusa(await imp(HR, 'brief_colonne_slots', col), 'colonne del briefing cambiate senza briefing ne piano (HR)');
+      funziona(await imp(PIS, 'brief_colonne_slots', col), 'responsabile Slots (briefing) cambia le colonne del briefing Slots');
+      chiusa(await imp(PIS, 'brief_colonne_tavoli', col), 'responsabile Slots cambia le colonne del briefing dei TAVOLI');
+      funziona(await imp(BON, 'brief_colonne_tavoli', col), 'responsabile Tavoli cambia le colonne del briefing Tavoli');
+      funziona(await imp(PIS, 'brief_colonne_slots', ''), 'responsabile Slots rimette le colonne predefinite (valore vuoto)');
+      chiusa(await imp(PIS, 'brief_colonne_slots', '<b>non json</b>'), 'colonne del briefing con un valore che non e un elenco');
+      chiusa(await imp(ADM, 'brief_colonne_inventato', col), 'colonne del briefing di un settore che non esiste');
+    } finally {
+      sql(`update impostazioni set valore = ${lit(visPrima)} where chiave = 'visibilita'`);
+      sql(`delete from istruzioni_settore; insert into istruzioni_settore select * from json_populate_recordset(null::istruzioni_settore, ${lit(istrPrima)}::json)`);
+      for (const k of ['piano_regole_fonte', 'brief_colonne_slots', 'brief_colonne_tavoli']) {
+        if (impPrima[k] == null) sql(`delete from impostazioni where chiave = ${lit(k)}`);
+        else sql(`update impostazioni set valore = ${lit(impPrima[k])} where chiave = ${lit(k)}`);
+      }
+      sql(`delete from log_attivita where azione = 'Istruzioni del settore modificate' and created_at >= ${lit(inizio)}`);
+      esito(sql(`select valore from impostazioni where chiave = 'visibilita'`) === visPrima, '        visibilita rimessa com era');
+    }
     });
     sql(`delete from operator_sessions where token in (${tutteSessioni.map(lit).join(',') || "''"})`);
   } catch (e) {

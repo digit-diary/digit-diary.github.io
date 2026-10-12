@@ -45,6 +45,99 @@ function _briefGruppo(cod) {
   if (u[0] === 'X') return 1;
   return 5;
 }
+// COLONNE DEL BRIEFING PER SETTORE (v452): quali colonne, in che ordine e con che
+// intestazione. Impostazione 'brief_colonne_<settore>' = [{ id, tit, vis, libera }]; senza
+// impostazione valgono le colonne di sempre (identiche, a video e in stampa). Le colonne con
+// logica (E e U a penna e maniglia della riga, nome con formazione e colori, turno con il
+// suo colore, CD numeri cassa, uscita, firma) tengono la loro logica: si possono solo
+// mostrare, nascondere, rinominare e spostare. Collaboratore e turno restano sempre (sono la
+// base del foglio, delle pause e della tabella ORARI). Le colonne libere sono caselle di
+// testo vuote (es. Note, Postazione), salvate nella riga del briefing come le altre.
+const BRIEF_COLONNE_CATALOGO = {
+  e: { nome: 'Entrata', spiega: 'si spunta a penna sul foglio; a video è la maniglia per spostare la riga' },
+  u: { nome: 'Uscita a penna', spiega: 'si spunta a penna sul foglio; a video è la maniglia per spostare la riga' },
+  nome: { nome: 'Collaboratore', spiega: 'cognome, formazione in giallo e colori dal piano', fissa: true },
+  turno: { nome: 'Turno', spiega: 'sigla con il colore del turno', fissa: true },
+  cd: { nome: 'Numero cassa', spiega: 'assegnato dalla rotazione "chi chiude riapre"', settori: ['slots'] },
+  uscita: { nome: 'Ora di uscita', spiega: 'si scrive a mano' },
+  firma: { nome: 'Firma', spiega: 'la colonna che si allarga di più in stampa' },
+  radio: { nome: 'Radio', spiega: 'numero della radio' },
+  badge: { nome: 'Badge', spiega: 'numero del badge' },
+};
+function _briefColonnePredefinite(rep) {
+  if (rep === 'valet')
+    return [
+      ['e', 'E'],
+      ['u', 'U'],
+      ['nome', 'COLLABORATORE'],
+      ['turno', 'TURNO'],
+      ['uscita', 'USCITA'],
+      ['firma', 'FIRMA'],
+      ['radio', 'RADIO'],
+      ['badge', 'BADGE'],
+    ].map(([id, tit]) => ({ id, tit, vis: true }));
+  const base =
+    rep === 'slots'
+      ? [
+          ['e', 'E'],
+          ['u', 'U'],
+          ['nome', 'HOST'],
+          ['turno', 'T'],
+          ['cd', 'CD'],
+          ['uscita', 'USCITA'],
+          ['firma', 'FIRMA'],
+        ]
+      : [
+          ['e', 'E'],
+          ['u', 'U'],
+          ['nome', 'COLLABORATORE'],
+          ['turno', 'T'],
+          ['uscita', 'USCITA'],
+          ['firma', 'FIRMA'],
+        ];
+  const out = base.map(([id, tit]) => ({ id, tit, vis: true }));
+  // radio e badge ci sono in tutti i settori, nascoste dove non si usavano
+  ['radio', 'badge'].forEach((id) => out.push({ id, tit: id.toUpperCase(), vis: false }));
+  return out;
+}
+// elenco completo (anche le nascoste) del settore, ripulito: colonne sconosciute tolte,
+// collaboratore e turno sempre visibili, le colonne del catalogo mancanti in fondo nascoste
+function _briefColonneTutte(rep) {
+  rep = rep || _pianoReparto();
+  const pred = _briefColonnePredefinite(rep);
+  const salv = (window._briefColonneCfg || {})[rep];
+  if (!Array.isArray(salv) || !salv.length) return pred;
+  const ammessa = (id) => {
+    const c = BRIEF_COLONNE_CATALOGO[id];
+    return c && (!c.settori || c.settori.includes(rep));
+  };
+  const visti = new Set();
+  const out = [];
+  salv.forEach((c) => {
+    if (!c || typeof c.id !== 'string' || visti.has(c.id)) return;
+    const libera = /^x_[a-z0-9]{1,12}$/.test(c.id);
+    if (!libera && !ammessa(c.id)) return;
+    visti.add(c.id);
+    const tit = String(c.tit == null ? '' : c.tit)
+      .trim()
+      .slice(0, 30);
+    const fissa = !libera && BRIEF_COLONNE_CATALOGO[c.id].fissa;
+    out.push({
+      id: c.id,
+      tit: tit || (libera ? 'NOTE' : (pred.find((p) => p.id === c.id) || {}).tit || c.id.toUpperCase()),
+      vis: fissa ? true : c.vis !== false,
+      libera: libera || undefined,
+    });
+  });
+  pred.forEach((p) => {
+    if (!visti.has(p.id)) out.push(Object.assign({}, p, { vis: !!BRIEF_COLONNE_CATALOGO[p.id].fissa }));
+  });
+  return out;
+}
+// le colonne mostrate (a video e in stampa), nell ordine scelto
+function _briefColonne(rep) {
+  return _briefColonneTutte(rep).filter((c) => c.vis);
+}
 function _briefOrarioHM(s) {
   return s ? String(s).substring(0, 5) : '';
 }
@@ -365,17 +458,24 @@ async function _renderPianoBriefingTab() {
   if (!_briefData) _briefData = _briefDomani();
   const dstr = _briefData;
   const rep = _pianoReparto();
-  const [salvati, pianoRighe, pauseCfg] = await Promise.all([
+  const [salvati, pianoRighe, pauseCfg, colonneCfg] = await Promise.all([
     secGet('piano_briefing?data=eq.' + dstr + '&reparto_dip=eq.' + rep),
     // senza filtro reparto: i multi-reparto (es. Balliu) entrano nel briefing
     // del reparto del TURNO che fanno quel giorno; _briefComponi filtra per turno
     secGet('piano?data=eq.' + dstr),
     getImp('piano_pause_cfg'),
+    getImp('brief_colonne_' + rep),
   ]);
   try {
     window._briefPauseCfgObj = pauseCfg ? JSON.parse(pauseCfg) : {};
   } catch (e) {
     window._briefPauseCfgObj = {};
+  }
+  window._briefColonneCfg = window._briefColonneCfg || {};
+  try {
+    window._briefColonneCfg[rep] = colonneCfg ? JSON.parse(colonneCfg) : null;
+  } catch (e) {
+    window._briefColonneCfg[rep] = null;
   }
   const valetR = _briefIsValet();
   const rigaBrief = (salvati || []).find((x) => x.sezione === 'briefing');
@@ -536,23 +636,21 @@ async function _renderPianoBriefingTab() {
   h +=
     '<table id="brief-tabella" class="brief-table" style="border-collapse:collapse;font-size:var(--fs-md,.875rem)"><thead><tr>';
   // ogni reparto ha il SUO briefing: slots con CD (numeri cassa), valet con
-  // radio/badge, gli altri (es. tavoli, senza casse) tabella essenziale
-  const cols = valet
-    ? ['E', 'U', 'COLLABORATORE', 'TURNO', 'USCITA', 'FIRMA', 'RADIO', 'BADGE']
-    : rep === 'slots'
-      ? ['E', 'U', 'HOST', 'T', 'CD', 'USCITA', 'FIRMA']
-      : ['E', 'U', 'COLLABORATORE', 'T', 'USCITA', 'FIRMA'];
-  cols.forEach((c) => {
-    const bg = c === 'E' ? '#00B050' : c === 'U' ? '#FF0000' : '#FFFF00';
+  // radio/badge, gli altri (es. tavoli, senza casse) tabella essenziale. Colonne,
+  // ordine e intestazioni si scelgono per settore (card "Colonne del briefing")
+  const colonne = _briefColonne(rep);
+  const cols = colonne.map((c) => c.tit);
+  colonne.forEach((c) => {
+    const bg = c.id === 'e' ? '#00B050' : c.id === 'u' ? '#FF0000' : '#FFFF00';
     // E: nero sul verde (bianco era 2,9:1, poco leggibile); U: bianco sul rosso
-    const fg = c === 'U' ? '#fff' : '#000';
+    const fg = c.id === 'u' ? '#fff' : '#000';
     h +=
       '<th style="border:1px solid #999;background:' +
       bg +
       ';color:' +
       fg +
       ';padding:4px 8px;font-size:var(--fs-sm,.8125rem)">' +
-      c +
+      escP(c.tit) +
       '</th>';
   });
   h += (puo ? '<th style="border:none"></th>' : '') + '</tr></thead><tbody>';
@@ -561,9 +659,11 @@ async function _renderPianoBriefingTab() {
   // piu lungo che contiene (es. un cognome lungo non viene tagliato)
   const lungMax = {};
   righe.forEach((r) =>
-    ['nome', 'turno', 'cd', 'uscita', 'firma', 'radio', 'badge'].forEach((k) => {
-      lungMax[k] = Math.max(lungMax[k] || 0, String(r[k] || '').length);
-    }),
+    ['nome', 'turno', 'cd', 'uscita', 'firma', 'radio', 'badge']
+      .concat(colonne.filter((c) => c.libera).map((c) => c.id))
+      .forEach((k) => {
+        lungMax[k] = Math.max(lungMax[k] || 0, String(r[k] || '').length);
+      }),
   );
   const largCol = (campo, base) =>
     'max(' + base + 'px,calc(' + ((lungMax[campo] || 0) * 1.12).toFixed(1) + 'ch + 14px))';
@@ -618,13 +718,12 @@ async function _renderPianoBriefingTab() {
     // E e U si spuntano A PENNA sul foglio stampato: celle vuote. A video sono la
     // maniglia della riga: si trascinano per spostare la riga intera
     const maniglia = puo ? ' data-ge-maniglia="1"' : '';
-    h += '<td' + maniglia + ' style="border:1px solid #999;width:34px;padding:3px 4px">&nbsp;</td>';
-    h += '<td' + maniglia + ' style="border:1px solid #999;width:34px;padding:3px 4px">&nbsp;</td>';
-    const stNome = stDi('nome');
-    const bgNome = stNome.c || r.col || (r.fm ? '#FFFF00' : '');
-    if (r.fm || bgNome) {
+    const cellaNome = () => {
+      const stNome = stDi('nome');
+      const bgNome = stNome.c || r.col || (r.fm ? '#FFFF00' : '');
+      if (!(r.fm || bgNome)) return inp('nome', r.nome, 150);
       // in formazione (giallo) o colorata: sfondo sulla cella del nome
-      h +=
+      return (
         '<td data-campo="nome" data-ge="b|' +
         i +
         '|nome" style="border:1px solid #999;padding:0;white-space:nowrap;background:' +
@@ -648,23 +747,22 @@ async function _renderPianoBriefingTab() {
         (r.fm
           ? '<span style="font-size:var(--fs-sm,.8125rem);font-weight:700;color:#000;padding-right:3px">(formazione)</span>'
           : '') +
-        '</td>';
-    } else h += inp('nome', r.nome, 150);
-    const colTurno = _pianoColore(r.turno) || '';
-    h += inp('turno', r.turno, 52, '', colTurno, true);
-    if (valet) {
-      h += inp('uscita', r.uscita, 70);
-      h += inp('firma', r.firma, 90);
-      h += inp('radio', r.radio, 60);
-      h += inp('badge', r.badge, 60);
-    } else if (rep !== 'slots') {
-      h += inp('uscita', r.uscita, 70);
-      h += inp('firma', r.firma, 90);
-    } else {
-      h += inp('cd', r.cd, 40, '', r.cd ? '#FFFF00' : '', true);
-      h += inp('uscita', r.uscita, 70);
-      h += inp('firma', r.firma, 90);
-    }
+        '</td>'
+      );
+    };
+    colonne.forEach((c) => {
+      if (c.id === 'e' || c.id === 'u')
+        // E e U si spuntano A PENNA sul foglio stampato: celle vuote. A video sono la
+        // maniglia della riga: si trascinano per spostare la riga intera
+        h += '<td' + maniglia + ' style="border:1px solid #999;width:34px;padding:3px 4px">&nbsp;</td>';
+      else if (c.id === 'nome') h += cellaNome();
+      else if (c.id === 'turno') h += inp('turno', r.turno, 52, '', _pianoColore(r.turno) || '', true);
+      else if (c.id === 'cd') h += inp('cd', r.cd, 40, '', r.cd ? '#FFFF00' : '', true);
+      else if (c.id === 'uscita') h += inp('uscita', r.uscita, 70);
+      else if (c.id === 'firma') h += inp('firma', r.firma, 90);
+      else if (c.id === 'radio' || c.id === 'badge') h += inp(c.id, r[c.id], 60);
+      else h += inp(c.id, r[c.id], 90); // colonna libera: testo da scrivere a mano
+    });
     if (puo)
       h +=
         '<td style="border:none;padding:0 5px;white-space:nowrap;font-size:var(--fs-md,.875rem)">' +
@@ -722,6 +820,7 @@ async function _renderPianoBriefingTab() {
   h += '</div></div>';
   h += _briefRenderPauseCard();
   h += _briefRenderEvidCard();
+  h += _briefRenderColonneCard();
   return h;
 }
 // ANNULLA / RIPRISTINA del briefing: righe (nomi, turni, casse, colori, formato)
@@ -1495,6 +1594,160 @@ async function briefEvidRimuovi(i) {
   await _briefEvidPersisti(rep, lista);
   toast('Evidenziazione rimossa');
   renderPiano();
+}
+// CARD "COLONNE DEL BRIEFING" (chi compila il briefing): per il settore aperto, quali
+// colonne si vedono (a video e in stampa), in che ordine e con che intestazione. Ogni
+// modifica si salva subito; "Rimetti le colonne predefinite" torna a quelle di sempre.
+function _briefRenderColonneCard() {
+  if (!puoGestireBriefing()) return '';
+  const rep = _pianoReparto();
+  const tutte = _briefColonneTutte(rep);
+  const personalizzate = Array.isArray((window._briefColonneCfg || {})[rep]);
+  const stIn =
+    'padding:4px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);font:inherit';
+  let h =
+    '<div class="main-card" style="margin-top:14px"><div class="card-header">Colonne del briefing · ' +
+    escP(repartoLabel(rep)) +
+    '</div><div style="padding:12px 14px">' +
+    '<p style="font-size:var(--fs-md,.875rem);color:var(--muted);margin-bottom:8px">Scegli quali colonne ha il foglio del briefing di questo settore, in che ordine e con che intestazione. Vale a video e nella stampa. Le colonne speciali (E e U a penna, numeri cassa, colori del turno) tengono la loro funzione: si possono solo mostrare, nascondere, rinominare e spostare. Collaboratore e turno restano sempre. Le <b>colonne libere</b> (per esempio Note o Postazione) sono caselle vuote da compilare a mano.</p>' +
+    '<p style="font-size:var(--fs-sm,.8125rem);margin-bottom:8px">' +
+    (personalizzate
+      ? '<b>Colonne personalizzate</b> per ' + escP(repartoLabel(rep)) + '.'
+      : '<span style="color:var(--muted)">Colonne predefinite (quelle di sempre).</span>') +
+    '</p>';
+  tutte.forEach((c, i) => {
+    const cat = BRIEF_COLONNE_CATALOGO[c.id];
+    const fissa = !c.libera && cat && cat.fissa;
+    h +=
+      '<div class="tipo-item brief-col-riga"' +
+      (c.vis ? '' : ' style="opacity:.6"') +
+      '>' +
+      '<button class="btn-export" style="padding:2px 8px" title="Sposta a sinistra (prima)" aria-label="Sposta prima"' +
+      (i === 0 ? ' disabled' : '') +
+      ' onclick="briefColSposta(' +
+      i +
+      ',-1)">&#8593;</button>' +
+      '<button class="btn-export" style="padding:2px 8px" title="Sposta a destra (dopo)" aria-label="Sposta dopo"' +
+      (i === tutte.length - 1 ? ' disabled' : '') +
+      ' onclick="briefColSposta(' +
+      i +
+      ',1)">&#8595;</button>' +
+      '<label style="display:inline-flex;align-items:center;gap:4px;font-size:var(--fs-md,.875rem);min-width:82px"><input type="checkbox"' +
+      (c.vis ? ' checked' : '') +
+      (fissa ? ' disabled title="Collaboratore e turno restano sempre"' : '') +
+      ' onchange="briefColMostra(' +
+      i +
+      ',this.checked)"> Mostra</label>' +
+      '<input type="text" maxlength="30" value="' +
+      escP(c.tit) +
+      '" aria-label="Intestazione della colonna" onchange="briefColTitolo(' +
+      i +
+      ',this.value)" style="width:150px;' +
+      stIn +
+      '">' +
+      '<span style="flex:1;min-width:180px;font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
+      (c.libera
+        ? '<b>Colonna libera</b>: testo scritto a mano'
+        : '<b>' + escP(cat.nome) + '</b>: ' + escP(cat.spiega)) +
+      '</span>' +
+      (c.libera ? '<button class="btn-del-tipo" onclick="briefColRimuovi(' + i + ')">Rimuovi</button>' : '') +
+      '</div>';
+  });
+  h +=
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn-add-tipo" onclick="briefColAggiungi()">+ Aggiungi colonna libera</button>' +
+    (personalizzate
+      ? '<button class="btn-export" onclick="briefColPredefinite()">Rimetti le colonne predefinite</button>'
+      : '') +
+    '</div></div></div>';
+  return h;
+}
+async function _briefColPersisti(lista, descr) {
+  if (!puoGestireBriefing()) return;
+  const rep = _pianoReparto();
+  const valore = lista ? JSON.stringify(lista.map((c) => ({ id: c.id, tit: c.tit, vis: !!c.vis }))) : '';
+  if (!(await salvaImp('brief_colonne_' + rep, valore))) {
+    renderPiano();
+    return;
+  }
+  window._briefColonneCfg = window._briefColonneCfg || {};
+  window._briefColonneCfg[rep] = lista ? JSON.parse(valore) : null;
+  logAzione('Briefing: colonne', repartoLabel(rep) + ' · ' + descr);
+  renderPiano();
+}
+async function briefColSposta(i, d) {
+  const lista = _briefColonneTutte();
+  const j = i + d;
+  if (!lista[i] || !lista[j]) return;
+  [lista[i], lista[j]] = [lista[j], lista[i]];
+  await _briefColPersisti(lista, lista[j].tit + ' spostata ' + (d < 0 ? 'prima' : 'dopo'));
+}
+async function briefColMostra(i, on) {
+  const lista = _briefColonneTutte();
+  const c = lista[i];
+  if (!c || (!c.libera && BRIEF_COLONNE_CATALOGO[c.id].fissa)) return;
+  c.vis = !!on;
+  await _briefColPersisti(lista, c.tit + (on ? ' mostrata' : ' nascosta'));
+}
+async function briefColTitolo(i, val) {
+  const lista = _briefColonneTutte();
+  const c = lista[i];
+  const t = String(val || '')
+    .trim()
+    .slice(0, 30);
+  if (!c) return;
+  if (!t) {
+    toastErrore("L'intestazione non può restare vuota: resta quella di prima.");
+    renderPiano();
+    return;
+  }
+  const prima = c.tit;
+  c.tit = t;
+  await _briefColPersisti(lista, prima + ' rinominata ' + t);
+}
+async function briefColAggiungi() {
+  if (!puoGestireBriefing()) return;
+  const tit = await chiediTesto(
+    'Intestazione della nuova colonna (per esempio NOTE o POSTAZIONE). Sul foglio sarà una casella vuota da compilare a mano.',
+    'NOTE',
+    { titolo: 'Nuova colonna libera', ok: 'Aggiungi' },
+  );
+  if (tit == null) return;
+  const t = String(tit).trim().slice(0, 30);
+  if (!t) return;
+  const lista = _briefColonneTutte();
+  let id;
+  do id = 'x_' + Math.random().toString(36).slice(2, 8);
+  while (lista.some((c) => c.id === id));
+  lista.push({ id, tit: t, vis: true, libera: true });
+  await _briefColPersisti(lista, t + ' aggiunta');
+}
+async function briefColRimuovi(i) {
+  const lista = _briefColonneTutte();
+  const c = lista[i];
+  if (!c || !c.libera) return;
+  if (
+    !(await chiediConferma(
+      'Rimuovere la colonna ' +
+        c.tit +
+        '?\n\nSparisce dal foglio di tutti i giorni; il testo già scritto resta salvato nel briefing e torna se la colonna viene rimessa con Annulla.',
+    ))
+  )
+    return;
+  lista.splice(i, 1);
+  await _briefColPersisti(lista, c.tit + ' rimossa');
+}
+async function briefColPredefinite() {
+  if (!puoGestireBriefing()) return;
+  if (
+    !(await chiediConferma(
+      'Rimettere le colonne predefinite del briefing di ' +
+        repartoLabel(_pianoReparto()) +
+        '?\n\nLe colonne libere spariscono dal foglio (il testo già scritto resta salvato).',
+      { ok: 'Rimetti' },
+    ))
+  )
+    return;
+  await _briefColPersisti(null, 'colonne predefinite');
 }
 function _briefRenderPauseCard() {
   let h =
