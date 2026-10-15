@@ -583,7 +583,48 @@ console.log('\n== scambio di giorni e rifinitura (blocchi compatti, v453) ==');
   ok(r0.dopo.scoperti === 1, 'senza la rifinitura dei posti resta scoperto');
 }
 
-console.log('\n=======================================');
-console.log('  ' + passati + ' passati, ' + falliti + ' falliti');
-console.log('=======================================');
-process.exit(falliti ? 1 : 0);
+console.log('\n== rifinitura delle celle critiche (sabato oltre le 23 a chi e indietro) ==');
+{
+  // un sabato, un posto di notte: Anna e indietro con le domeniche (la notte del sabato le costa
+  // 250, come l avviso), Bruno riposa e puo farla senza costo
+  const d = '2026-11-21';
+  const base = () => ({
+    giorni: [d],
+    persone: ['Anna', 'Bruno'],
+    stato: { Anna: { [d]: 'N' }, Bruno: { [d]: 'C' } },
+    riposo: 'C',
+    fabbisogno: { [d]: { N: 1 } },
+    modificabile: () => true,
+    ammessi: () => ['N', 'C'],
+    costoPersona: (n, m) => (n === 'Anna' && m[d] === 'N' ? 250 : 0),
+  });
+  const conCritiche = Object.assign(base(), {
+    celleCritiche: (n, m) => (n === 'Anna' && m[d] === 'N' ? [d] : []),
+  });
+  const r = R.crea(conCritiche, { seme: 1 }).risultato();
+  ok(r.stato.Bruno[d] === 'N' && r.stato.Anna[d] === 'C', 'il turno passa al collega libero');
+  ok(r.dopo.scoperti === 0, 'il posto resta coperto');
+  const r0 = R.crea(base(), { seme: 1 }).risultato();
+  ok(r0.stato.Anna[d] === 'N', 'senza celle critiche la rifinitura non lo sposta');
+}
+
+console.log('\n== rifiniture con le pause (risultatoAsync) ==');
+(async () => {
+  const fai = () => {
+    const m = R.crea(problema(), { seme: 3 });
+    for (let i = 0; i < 10; i++) m.passo(0, i / 10, 2000);
+    return m;
+  };
+  const a = fai().risultato();
+  const b = await fai().risultatoAsync(() => new Promise((r) => setTimeout(r, 0)));
+  ok(JSON.stringify(a.cambi) === JSON.stringify(b.cambi), 'stesse celle con e senza pause');
+  const c = await fai().risultatoAsync(
+    () => new Promise((r) => setTimeout(r, 0)),
+    () => true,
+  );
+  ok(Array.isArray(c.cambi) && c.ammesso !== undefined, 'Ferma durante le rifiniture: risultato valido');
+  console.log('\n=======================================');
+  console.log('  ' + passati + ' passati, ' + falliti + ' falliti');
+  console.log('=======================================\n');
+  process.exit(falliti ? 1 : 0);
+})();

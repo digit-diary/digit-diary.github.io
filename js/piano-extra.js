@@ -547,6 +547,12 @@ function _pianoTogliDallaPila(pila, st) {
   if (i >= 0) pila.splice(i, 1);
 }
 async function pianoAnnulla() {
+  // generazione in corso su questo PC (automatica o Prepara più mesi): mese, settore e
+  // celle in memoria sono i suoi, un Annulla adesso cambierebbe mese a meta lavoro
+  if (window._pianoAutoInCorso) {
+    toast('Preparazione del piano in corso su questo PC: Annulla e Ripristina alla fine');
+    return false;
+  }
   const u = window._pianoUndo || (window._pianoUndo = []);
   if (!u.length) {
     toast('Niente da annullare');
@@ -719,6 +725,10 @@ async function _pianoSeguitoCambio(sg, annulla) {
 // gia chiesti, mai insieme. Ritorna true se fatto.
 async function pianoAnnullaTutto() {
   if (!puoGestirePiano()) return false;
+  if (window._pianoAutoInCorso) {
+    toast('Preparazione del piano in corso su questo PC: Annulla e Ripristina alla fine');
+    return false;
+  }
   const k = _pianoMeseSel + '|' + _pianoReparto();
   const snap = (window._pianoSessSnap || {})[k];
   if (!snap) return false;
@@ -800,6 +810,10 @@ async function pianoAnnullaTutto() {
   return true;
 }
 async function pianoRipristina() {
+  if (window._pianoAutoInCorso) {
+    toast('Preparazione del piano in corso su questo PC: Annulla e Ripristina alla fine');
+    return false;
+  }
   const rd = window._pianoRedo || (window._pianoRedo = []);
   if (!rd.length) {
     toast('Niente da ripristinare');
@@ -5216,106 +5230,122 @@ async function _pianoAnalisiScoperti(ym) {
     return out;
   };
   const minRip = parseFloat(_pianoRegolaVal('min_riposo_ore')) || 11;
-  const analisi = scoperti.map((s) => {
-    const g = parseInt(s.data.substring(8, 10));
-    const t = _pianoTurnoInfo(s.codice);
-    const gruppo = String((t && t.gruppo) || '').toUpperCase();
-    const out = Object.assign({}, s, {
-      gruppo,
-      lavoro: [],
-      assenti: [],
-      riposi: [],
-      giorniNo: [],
-      nonFormati: [],
-      config: [],
-      gruppoRegole: [],
-      regole: [],
-      liberi: [],
-    });
-    persone.forEach((c) => {
-      const n = c.nome;
-      const cod = String(cella[n + '|' + g] || '');
-      const riga = rigaDi[n + '|' + g];
-      if (cod && _pianoTurnoInfo(cod)) return out.lavoro.push(n);
-      if (mal[n + '|' + s.data] || assente(n, s.data)) return out.assenti.push(n + (cod ? ' (' + cod + ')' : ''));
-      if (cod && cod !== 'C' && cod !== 'WD') return out.assenti.push(n + ' (' + cod + ')');
-      if (cod === 'C' && riga && (riga.protetto || !riga.generato || _pianoCellaRiservata(riga)))
-        return out.riposi.push(n);
-      if (cod === 'WD' && t && String(t.tipo).toUpperCase() === 'NOTTURNO') return out.riposi.push(n + ' (WD)');
-      if (c.giorni_lavoro && !PianoRegole.lavoraNelGiorno(c, new Date(s.data + 'T12:00:00').getDay()))
-        return out.config.push({ nome: n, motivo: 'non lavora quel giorno (Preferenze, Giorni di lavoro)' });
-      if (!t || !_pianoIdoneoPerTurno(n, t, s.data)) {
-        // CONFIGURAZIONE della persona (da controllare se e un errore) o FORMAZIONE vera
-        const tipoT = String((t && t.tipo) || '').toUpperCase();
-        const bloccati = String(c.turni_bloccati || '')
-          .toUpperCase()
-          .split(',')
-          .map((x) => x.trim());
-        if (bloccati.includes(s.codice))
-          return out.config.push({ nome: n, motivo: 'turno ' + s.codice + ' bloccato (Preferenze, Turni bloccati)' });
-        if (c.solo_diurni && tipoT === 'NOTTURNO')
-          return out.config.push({ nome: n, motivo: 'solo diurni (Preferenze)' });
-        if (c.solo_notti && tipoT !== 'NOTTURNO')
-          return out.config.push({ nome: n, motivo: 'solo notturni (Preferenze)' });
-        const fz = t ? _pianoViolazioneFunzioneTurno(n, t, new Date(s.data + 'T12:00:00').getDay(), true) : null;
-        if (fz) return out.gruppoRegole.push({ nome: n, regola: String(fz.msg || fz).substring(0, 90) });
-        return out.nonFormati.push(n);
-      }
-      const lim = _pianoLimitiOre(n, nG);
-      if (lim.max != null && (ore[n] || 0) + (parseFloat(t.durata_ore) || 0) > lim.max)
-        return out.regole.push({ nome: n, regola: 'ore del mese al massimo' });
-      const prima = viol(n);
-      const vecchia = cella[n + '|' + g];
-      cella[n + '|' + g] = s.codice;
-      const nuove = _pianoViolazioniNuove(prima, viol(n));
-      if (vecchia === undefined) delete cella[n + '|' + g];
-      else cella[n + '|' + g] = vecchia;
-      if (nuove.length) {
-        const parole = nuove.map(inParole);
-        if (parole.every((q) => q.config))
-          return out.config.push({ nome: n, motivo: parole.map((q) => q.testo).join(', ') });
-        const testo = [...new Set(parole.map((q) => q.testo))].join(', ');
-        // eccezione proponibile solo se manca SOLO un po di riposo (11 o 36 ore)
-        let dettaglio = '';
-        if (parole.every((q) => q.riposo)) {
-          // al massimo UNA eccezione a settimana per persona (lunedi-domenica)
-          const dowG = (new Date(s.data + 'T12:00:00').getDay() + 6) % 7;
-          let giaUsata = false;
-          for (let k = g - dowG; k <= g - dowG + 6; k++) {
-            const rr = rigaDi[n + '|' + k];
-            if (rr && /^Eccezione:/i.test(rr.commento || '')) giaUsata = true;
+  // PAUSE (15/10/2026): un posto alla volta, ogni ~40 ms la pagina respira (alla fine della bozza
+  // di novembre Slots questa analisi teneva la pagina ferma mezzo secondo)
+  const analisi = [];
+  let tPausaA = Date.now();
+  for (const s of scoperti) {
+    if (Date.now() - tPausaA > 40) {
+      await new Promise((r) => setTimeout(r, 0));
+      tPausaA = Date.now();
+    }
+    analisi.push(
+      ((s) => {
+        const g = parseInt(s.data.substring(8, 10));
+        const t = _pianoTurnoInfo(s.codice);
+        const gruppo = String((t && t.gruppo) || '').toUpperCase();
+        const out = Object.assign({}, s, {
+          gruppo,
+          lavoro: [],
+          assenti: [],
+          riposi: [],
+          giorniNo: [],
+          nonFormati: [],
+          config: [],
+          gruppoRegole: [],
+          regole: [],
+          liberi: [],
+        });
+        persone.forEach((c) => {
+          const n = c.nome;
+          const cod = String(cella[n + '|' + g] || '');
+          const riga = rigaDi[n + '|' + g];
+          if (cod && _pianoTurnoInfo(cod)) return out.lavoro.push(n);
+          if (mal[n + '|' + s.data] || assente(n, s.data)) return out.assenti.push(n + (cod ? ' (' + cod + ')' : ''));
+          if (cod && cod !== 'C' && cod !== 'WD') return out.assenti.push(n + ' (' + cod + ')');
+          if (cod === 'C' && riga && (riga.protetto || !riga.generato || _pianoCellaRiservata(riga)))
+            return out.riposi.push(n);
+          if (cod === 'WD' && t && String(t.tipo).toUpperCase() === 'NOTTURNO') return out.riposi.push(n + ' (WD)');
+          if (c.giorni_lavoro && !PianoRegole.lavoraNelGiorno(c, new Date(s.data + 'T12:00:00').getDay()))
+            return out.config.push({ nome: n, motivo: 'non lavora quel giorno (Preferenze, Giorni di lavoro)' });
+          if (!t || !_pianoIdoneoPerTurno(n, t, s.data)) {
+            // CONFIGURAZIONE della persona (da controllare se e un errore) o FORMAZIONE vera
+            const tipoT = String((t && t.tipo) || '').toUpperCase();
+            const bloccati = String(c.turni_bloccati || '')
+              .toUpperCase()
+              .split(',')
+              .map((x) => x.trim());
+            if (bloccati.includes(s.codice))
+              return out.config.push({
+                nome: n,
+                motivo: 'turno ' + s.codice + ' bloccato (Preferenze, Turni bloccati)',
+              });
+            if (c.solo_diurni && tipoT === 'NOTTURNO')
+              return out.config.push({ nome: n, motivo: 'solo diurni (Preferenze)' });
+            if (c.solo_notti && tipoT !== 'NOTTURNO')
+              return out.config.push({ nome: n, motivo: 'solo notturni (Preferenze)' });
+            const fz = t ? _pianoViolazioneFunzioneTurno(n, t, new Date(s.data + 'T12:00:00').getDay(), true) : null;
+            if (fz) return out.gruppoRegole.push({ nome: n, regola: String(fz.msg || fz).substring(0, 90) });
+            return out.nonFormati.push(n);
           }
-          if (giaUsata) return out.regole.push({ nome: n, regola: testo + ' (eccezione già usata questa settimana)' });
-          const corti = riposoOre(n, g, t).filter((x) => x.ore < minRip);
-          // mai sotto le 8 ore di riposo (il minimo assoluto): niente eccezione da proporre
-          if (corti.some((x) => x.ore < 8))
-            return out.regole.push({
-              nome: n,
-              regola:
-                testo +
-                ' (' +
-                corti.map((x) => Math.round(x.ore * 10) / 10 + ' h').join(', ') +
-                ', sotto le 8 ore: nessuna eccezione)',
-            });
-          dettaglio = corti
-            .map((x) =>
-              x.dopo
-                ? Math.round(x.ore * 10) / 10 + ' h di riposo dopo ' + x.dopo
-                : Math.round(x.ore * 10) / 10 + ' h di riposo prima di ' + x.prima,
-            )
-            .join(', ');
-          return out.regole.push({
-            nome: n,
-            regola: testo + (dettaglio ? ' (' + dettaglio + ')' : ''),
-            eccezione: true,
-          });
-        }
-        return out.regole.push({ nome: n, regola: testo });
-      }
-      out.liberi.push(n);
-    });
-    return out;
-  });
+          const lim = _pianoLimitiOre(n, nG);
+          if (lim.max != null && (ore[n] || 0) + (parseFloat(t.durata_ore) || 0) > lim.max)
+            return out.regole.push({ nome: n, regola: 'ore del mese al massimo' });
+          const prima = viol(n);
+          const vecchia = cella[n + '|' + g];
+          cella[n + '|' + g] = s.codice;
+          const nuove = _pianoViolazioniNuove(prima, viol(n));
+          if (vecchia === undefined) delete cella[n + '|' + g];
+          else cella[n + '|' + g] = vecchia;
+          if (nuove.length) {
+            const parole = nuove.map(inParole);
+            if (parole.every((q) => q.config))
+              return out.config.push({ nome: n, motivo: parole.map((q) => q.testo).join(', ') });
+            const testo = [...new Set(parole.map((q) => q.testo))].join(', ');
+            // eccezione proponibile solo se manca SOLO un po di riposo (11 o 36 ore)
+            let dettaglio = '';
+            if (parole.every((q) => q.riposo)) {
+              // al massimo UNA eccezione a settimana per persona (lunedi-domenica)
+              const dowG = (new Date(s.data + 'T12:00:00').getDay() + 6) % 7;
+              let giaUsata = false;
+              for (let k = g - dowG; k <= g - dowG + 6; k++) {
+                const rr = rigaDi[n + '|' + k];
+                if (rr && /^Eccezione:/i.test(rr.commento || '')) giaUsata = true;
+              }
+              if (giaUsata)
+                return out.regole.push({ nome: n, regola: testo + ' (eccezione già usata questa settimana)' });
+              const corti = riposoOre(n, g, t).filter((x) => x.ore < minRip);
+              // mai sotto le 8 ore di riposo (il minimo assoluto): niente eccezione da proporre
+              if (corti.some((x) => x.ore < 8))
+                return out.regole.push({
+                  nome: n,
+                  regola:
+                    testo +
+                    ' (' +
+                    corti.map((x) => Math.round(x.ore * 10) / 10 + ' h').join(', ') +
+                    ', sotto le 8 ore: nessuna eccezione)',
+                });
+              dettaglio = corti
+                .map((x) =>
+                  x.dopo
+                    ? Math.round(x.ore * 10) / 10 + ' h di riposo dopo ' + x.dopo
+                    : Math.round(x.ore * 10) / 10 + ' h di riposo prima di ' + x.prima,
+                )
+                .join(', ');
+              return out.regole.push({
+                nome: n,
+                regola: testo + (dettaglio ? ' (' + dettaglio + ')' : ''),
+                eccezione: true,
+              });
+            }
+            return out.regole.push({ nome: n, regola: testo });
+          }
+          out.liberi.push(n);
+        });
+        return out;
+      })(s),
+    );
+  }
   return { totPosti, scoperti, analisi };
 }
 function _pianoDataBreve(d) {

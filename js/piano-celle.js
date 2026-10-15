@@ -821,7 +821,8 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo, orari) {
     const avvisiExtra = [];
     // preferenze: solo diurni / solo notti / giorni di lavoro (a mano si puo, con avviso)
     const tPref = codiceNuovo ? _pianoTurnoInfo(codiceNuovo) : null;
-    const infoPref = _pianoCollabInfo(nome) || {};
+    // le scelte valide quel giorno (anche in un mese passato: js/piano-scelte.js)
+    const infoPref = (typeof pianoInfoIl === 'function' ? pianoInfoIl(nome, dstr) : _pianoCollabInfo(nome)) || {};
     if (tPref) {
       if (infoPref.solo_diurni && tPref.tipo === 'NOTTURNO') avvisiExtra.push('preferenza: solo turni diurni');
       if (infoPref.solo_notti && tPref.tipo !== 'NOTTURNO') avvisiExtra.push('preferenza: solo turni notturni');

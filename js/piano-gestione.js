@@ -197,378 +197,177 @@ function _renderPianoDomenicheCard() {
     '</div><div style="padding:10px 14px" id="piano-domeniche-body"><p style="color:var(--muted);font-size:var(--fs-md,.875rem)">Caricamento...</p></div></div>'
   );
 }
+// ===== BENESSERE DEI COLLABORATORI (v457) =====
+// Il calcolo e UNO solo: pianoBenessereCalcola (js/piano-benessere.js). Qui si sceglie il
+// periodo e si mostra il risultato: stato, perche in una riga, numeri per colonna.
+// Periodo: mese del piano, 3 mesi fino al mese del piano, anno intero (i giorni senza piano
+// restano fuori da tutti i conti).
+function _benPeriodo() {
+  const p = window._benPeriodoSel || {};
+  const tipo = p.tipo || 'anno';
+  const fine = p.fine || _pianoMeseSel;
+  const [y, m] = fine.split('-').map((x) => parseInt(x));
+  const iso = (yy, mm, gg) => yy + '-' + String(mm).padStart(2, '0') + '-' + String(gg).padStart(2, '0');
+  const ultimo = (yy, mm) => new Date(yy, mm, 0).getDate();
+  if (tipo === 'anno') return { tipo: tipo, fine: fine, da: iso(y, 1, 1), a: iso(y, 12, 31), anno: y };
+  if (tipo === 'mese') return { tipo: tipo, fine: fine, da: iso(y, m, 1), a: iso(y, m, ultimo(y, m)), anno: y };
+  const ini = new Date(y, m - 3, 1);
+  return {
+    tipo: tipo,
+    fine: fine,
+    da: iso(ini.getFullYear(), ini.getMonth() + 1, 1),
+    a: iso(y, m, ultimo(y, m)),
+    anno: y,
+  };
+}
+function _benPeriodoTitolo(per) {
+  const MESI = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
+  const nome = (iso) => MESI[parseInt(iso.substring(5, 7)) - 1] + ' ' + iso.substring(0, 4);
+  if (per.tipo === 'anno') return String(per.anno);
+  if (per.tipo === 'mese') return nome(per.da);
+  return nome(per.da) + ' - ' + nome(per.a);
+}
 function _renderPianoBenessereCard() {
+  const per = _benPeriodo();
+  const btn = (tipo, testo) =>
+    '<button class="btn-act pin" aria-pressed="' +
+    (per.tipo === tipo) +
+    '" style="' +
+    (per.tipo === tipo ? 'font-weight:700;border-color:var(--ink)' : '') +
+    '" onclick="pianoBenesserePeriodo(\'' +
+    tipo +
+    '\')">' +
+    testo +
+    '</button>';
   return (
-    '<div class="main-card" style="margin-top:16px"><div class="card-header" style="display:flex;align-items:center;gap:10px">Benessere · ' +
+    '<div class="main-card" style="margin-top:16px"><div class="card-header" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">Benessere · ' +
     escP(repartoLabel(_pianoReparto())) +
-    ' ' +
-    escP(_pianoMeseSel.split('-')[0]) +
-    '<button class="btn-act pin" onclick="pianoBenessereAnno(-1)">&larr;</button><button class="btn-act pin" onclick="pianoBenessereAnno(1)">&rarr;</button>' +
+    // il periodo dopo i pulsanti: il titolo della card (che ricorda se e aperta) resta uguale
+    '<button class="btn-act pin" aria-label="Periodo prima" onclick="pianoBenessereAnno(-1)">&larr;</button><button class="btn-act pin" aria-label="Periodo dopo" onclick="pianoBenessereAnno(1)">&rarr;</button>' +
+    btn('mese', 'Mese') +
+    btn('trim', '3 mesi') +
+    btn('anno', 'Anno') +
+    '<b id="benessere-periodo-tit">' +
+    escP(_benPeriodoTitolo(per)) +
+    '</b>' +
     '<input type="text" id="benessere-cerca" class="piano-cerca campo-cerca" placeholder="Cerca collaboratore..." oninput="pianoBenessereFiltra(this.value)">' +
     '</div><div style="padding:10px 14px" id="piano-benessere-body"><p style="color:var(--muted);font-size:var(--fs-md,.875rem)">Caricamento...</p></div></div>'
   );
 }
-function pianoBenessereAnno(d) {
-  window._pianoBenessereAnno = (window._pianoBenessereAnno || parseInt(_pianoMeseSel.split('-')[0])) + d;
-  caricaBenesserePiano();
+function pianoBenesserePeriodo(tipo) {
+  const per = _benPeriodo();
+  window._benPeriodoSel = { tipo: tipo, fine: per.tipo === 'anno' && tipo !== 'anno' ? _pianoMeseSel : per.fine };
+  renderPiano();
 }
+// frecce: un anno, un mese o tre mesi avanti/indietro (il nome resta per compatibilita)
+function pianoBenessereAnno(d) {
+  const per = _benPeriodo();
+  const passo = per.tipo === 'anno' ? 12 : per.tipo === 'trim' ? 3 : 1;
+  const [y, m] = per.fine.split('-').map((x) => parseInt(x));
+  const n = new Date(y, m - 1 + d * passo, 1);
+  window._benPeriodoSel = {
+    tipo: per.tipo,
+    fine: n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0'),
+  };
+  renderPiano();
+}
+const _BEN_COLORE = {
+  critico: 'var(--c-rosso,#c0392b)',
+  attenzione: 'var(--c-oro,#8b6914)',
+  ok: 'var(--c-verde,#2c6e49)',
+  nota: 'var(--muted)',
+};
 async function caricaBenesserePiano() {
   const el = document.getElementById('piano-benessere-body');
   if (!el) return;
-  const anno = window._pianoBenessereAnno || parseInt(_pianoMeseSel.split('-')[0]);
+  const per = _benPeriodo();
   el.innerHTML =
-    '<p style="color:var(--muted);font-size:var(--fs-md,.875rem)">Calcolo del ' + anno + ' in corso...</p>';
+    '<p style="color:var(--muted);font-size:var(--fs-md,.875rem)">Calcolo ' +
+    escP(_benPeriodoTitolo(per)) +
+    ' in corso...</p>';
   try {
-    const righe =
-      (await secGet(
-        'piano?data=gte.' +
-          anno +
-          '-01-01&data=lte.' +
-          anno +
-          '-12-31&reparto_dip=eq.' +
-          _pianoReparto() +
-          '&limit=40000',
-      )) || [];
-    const nomi = collaboratoriCache
-      .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && c.funzione !== 'RESP')
-      .map((c) => c.nome);
-    // dati per persona
-    const per = {};
-    nomi.forEach((n) => (per[n] = { giorni: {}, lav: 0, notti: 0, we: 0, vac: 0, mal: 0, domLib: 0, oreLav: 0 }));
-    righe.forEach((r) => {
-      const p = per[r.collaboratore];
-      if (!p) return;
-      p.giorni[r.data] = r.codice;
-      (p.righe = p.righe || {})[r.data] = r;
-    });
-    const domeniche = {};
-    for (let m = 0; m < 12; m++) {
-      const ultimo = new Date(anno, m + 1, 0).getDate();
-      for (let g = 1; g <= ultimo; g++) {
-        const d = new Date(anno, m, g);
-        if (d.getDay() === 0)
-          domeniche[
-            d.getFullYear() +
-              '-' +
-              String(d.getMonth() + 1).padStart(2, '0') +
-              '-' +
-              String(d.getDate()).padStart(2, '0')
-          ] = true;
-      }
-    }
-    // PERIODO CONSIDERATO: solo i MESI CON PIANO COMPLETO (tutti i giorni del
-    // mese hanno una cella), anche se sono nel futuro. Un mese a meta' o non
-    // ancora pianificato falserebbe medie e conteggi, quindi resta fuori.
-    const giorniDelMese = {};
-    for (let m = 1; m <= 12; m++) {
-      const ym = anno + '-' + String(m).padStart(2, '0');
-      giorniDelMese[ym] = new Date(anno, m, 0).getDate();
-    }
-    nomi.forEach((n) => {
-      const p = per[n];
-      const date = Object.keys(p.giorni).sort();
-      // mesi completi di questa persona
-      const perMese = {};
-      date.forEach((d) => {
-        const ym = d.substring(0, 7);
-        perMese[ym] = (perMese[ym] || 0) + 1;
-      });
-      const mesiOk = new Set(Object.keys(perMese).filter((ym) => perMese[ym] >= giorniDelMese[ym]));
-      p.mesiPiano = mesiOk.size;
-      p.mesiElenco = [...mesiOk].sort();
-      let serie = 0;
-      p.serieMax = 0;
-      p.riposiIsolati = 0;
-      date.forEach((d, i) => {
-        if (!mesiOk.has(d.substring(0, 7))) return; // mese non completo: fuori
-        const cod = p.giorni[d];
-        const t = _pianoTurnoInfo(cod);
-        if (t) {
-          p.lav++;
-          p.oreLav += _pianoOreEffettiveTurno(t, { codice: cod, data: d });
-          if (t.tipo === 'NOTTURNO') p.notti++;
-          const dow = new Date(d + 'T12:00:00').getDay();
-          if (dow === 0 || dow === 6) p.we++;
-          if (dow === 0) p.domLav = (p.domLav || 0) + 1;
-          serie++;
-          if (serie > p.serieMax) p.serieMax = serie;
-        } else {
-          serie = 0;
-          if (cod === 'V') p.vac++;
-          if (cod === 'M' || cod === 'M1') p.mal++;
-          const prima = _pianoTurnoInfo(p.giorni[date[i - 1]]);
-          const dopo = _pianoTurnoInfo(p.giorni[date[i + 1]]);
-          const cs = _pianoCodiceInfo(cod);
-          if (cs && cs.is_riposo && prima && dopo) p.riposiIsolati++;
-        }
-      });
-      // DOMENICHE LIBERE nei soli mesi completi. Vale la regola LL art. 18: la
-      // domenica libera conta solo se il sabato prima si finisce entro le 23.
-      p.domTot = 0;
-      p.domTardi = 0;
-      Object.keys(domeniche).forEach((d) => {
-        if (!mesiOk.has(d.substring(0, 7))) return;
-        const cod = p.giorni[d];
-        // Una domenica passata in VACANZA (o in malattia) non e' un riposo
-        // settimanale: non conta ne' come libera ne' nel totale.
-        if (_pianoDomenicaEsclusa(cod)) {
-          p.domAssenza = (p.domAssenza || 0) + 1;
-          return;
-        }
-        p.domTot++;
-        if (_pianoTurnoInfo(cod)) return; // domenica lavorata
-        const sab = new Date(d + 'T12:00:00');
-        sab.setDate(sab.getDate() - 1);
-        const isoSab =
-          sab.getFullYear() +
-          '-' +
-          String(sab.getMonth() + 1).padStart(2, '0') +
-          '-' +
-          String(sab.getDate()).padStart(2, '0');
-        // stessa regola delle C rosse (anche con il controllo del sabato spento)
-        if (!_pianoDomenicaValida(cod, p.giorni[isoSab], isoSab, (p.righe || {})[isoSab], undefined, n)) {
-          p.domTardi++;
-          return;
-        }
-        p.domLib++;
-      });
-    });
-    const conPiano = nomi.filter((n) => per[n].lav > 0);
-    const mediaWe = conPiano.length ? conPiano.reduce((s, n) => s + per[n].we, 0) / conPiano.length : 0;
-    const soglie = {
-      domenicheAnno: parseInt(_pianoRegolaVal('domeniche_libere_anno')) || 12,
-      maxConsecutivi: parseInt(_pianoRegolaVal('max_consecutivi')) || 5,
-      vacanzeAnno: parseInt(_pianoRegolaVal('vacanze_giorni_anno')) || 20,
-    };
-    const calcolati = conPiano
-      .map((n) => {
-        const p = per[n];
-        const info = _pianoCollabInfo(n) || {};
-        // vacanze: il diritto vero della persona (28 o 35 giorni secondo l anzianita, ridotto
-        // dai congedi), come nella scheda Vacanze; il valore fisso della regola solo se manca
-        // la data di assunzione (prima valeva 20 per tutti)
-        let sogliePers = soglie;
-        try {
-          if (info.data_assunzione && typeof _pianoVacCfg === 'function') {
-            const eff = _pianoCongedoNpEffetti(n, anno);
-            const d = PianoRegole.giorniVacanzaSpettanti(String(info.data_assunzione).substring(0, 10), anno, {
-              ..._pianoVacCfg(),
-              giorniCongedo: eff.giorniVacanze,
-              giorniAnzianita: eff.giorniAnzianita,
-            });
-            if (d && d.giorni > 0) sogliePers = Object.assign({}, soglie, { vacanzeAnno: d.giorni });
-          }
-        } catch (e) {}
-        const res = PianoRegole.indiceBenessere(
-          {
-            domenicheLibere: p.domLib,
-            weekendLavorati: p.we,
-            weekendMediaSettore: mediaWe,
-            notti: p.notti,
-            giorniLavorati: p.lav,
-            riposiIsolati: p.riposiIsolati,
-            serieMax: p.serieMax,
-            vacanzeGiorni: p.vac,
-          },
-          sogliePers,
-        );
-        return { nome: n, jolly: !!(info.is_jolly || info.impiego === 'jolly'), p: p, res: res };
-      })
-      .sort((a, b) => {
-        const so = window._benessereSort;
-        if (!so) return a.res.punteggio - b.res.punteggio; // default: prima i piu critici
-        const val = (x) =>
-          so.campo === 'nome' ? x.nome : so.campo === 'indice' ? x.res.punteggio : x.p[so.campo] || 0;
-        const va = val(a);
-        const vb = val(b);
-        if (typeof va === 'string') return so.dir * va.localeCompare(vb);
-        return so.dir * (va - vb);
-      });
-    if (!calcolati.length) {
-      el.innerHTML = '<p style="font-size:var(--fs-md,.875rem)">Nessun piano nel ' + anno + ' per questo settore.</p>';
+    const ris = await pianoBenessereCalcola({ reparto: _pianoReparto(), da: per.da, a: per.a });
+    window._benessereUltimo = ris;
+    if (!document.body.contains(el)) return;
+    const lista = ris.persone;
+    if (!lista.length) {
+      el.innerHTML =
+        '<p style="font-size:var(--fs-md,.875rem)">Nessun piano in ' +
+        escP(_benPeriodoTitolo(per)) +
+        ' per questo settore.</p>';
       return;
     }
-    const colore = (v) =>
-      v >= 75 ? 'var(--c-verde,#2c6e49)' : v >= 55 ? 'var(--c-oro,#b8860b)' : 'var(--c-rosso,#c0392b)';
-    const etichetta = (v) => (v >= 75 ? 'buono' : v >= 55 ? "da tenere d'occhio" : 'critico');
-    const tabella = (lista, titolo) => {
-      if (!lista.length) return '';
-      const media = Math.round(lista.reduce((s, x) => s + x.res.punteggio, 0) / lista.length);
-      let t =
-        '<p style="font-size:var(--fs-md,.875rem);font-weight:700;margin:14px 0 6px">' +
-        titolo +
-        ' <span style="font-weight:400;color:var(--muted)">· ' +
-        lista.length +
-        ' persone, media ' +
-        '<b style="color:' +
-        colore(media) +
-        '">' +
-        media +
-        '/100</b></span></p>';
-      const thOrd = (campo, testo, tip) =>
-        '<th style="cursor:pointer" title="' +
-        (tip || '') +
-        ' · clicca per ordinare" onclick="pianoBenessereOrdina(\'' +
-        campo +
-        '\')">' +
-        testo +
-        (window._benessereSort && window._benessereSort.campo === campo
-          ? window._benessereSort.dir > 0
-            ? ' &#9650;'
-            : ' &#9660;'
-          : '') +
-        '</th>';
-      t +=
-        '<div style="overflow-x:auto"><table class="piano-table benessere-tab" style="min-width:860px;font-size:var(--fs-base,.9375rem)"><thead><tr>' +
-        '<th style="text-align:left;cursor:pointer" onclick="pianoBenessereOrdina(\'nome\')">Collaboratore' +
-        (window._benessereSort && window._benessereSort.campo === 'nome'
-          ? window._benessereSort.dir > 0
-            ? ' &#9650;'
-            : ' &#9660;'
-          : '') +
-        '</th>' +
-        thOrd('indice', 'Indice', 'Punteggio complessivo, 100 = carico ben distribuito') +
-        thOrd('domLib', 'Dom. libere', 'Domeniche libere già trascorse quest anno') +
-        thOrd('domLav', 'Dom. lavorate', 'Domeniche in cui ha lavorato') +
-        thOrd('we', 'Weekend', 'Sabati e domeniche lavorati (giornate, non fine settimana interi)') +
-        thOrd('notti', 'Notti', 'Turni notturni') +
-        thOrd('riposiIsolati', 'Riposi isolati', 'Riposi di un solo giorno tra due periodi di lavoro') +
-        thOrd('serieMax', 'Serie max', 'Serie più lunga di giorni consecutivi') +
-        thOrd('vac', 'Vacanze', 'Giorni di vacanza goduti') +
-        thOrd('mal', 'Malattie', 'Giorni di malattia: segnale da leggere, non tolgono punti') +
-        thOrd('oreLav', 'Ore lavorate', 'Ore effettivamente lavorate nell anno') +
-        '</tr></thead><tbody>';
-      lista.forEach((x) => {
-        t +=
-          '<tr title="' +
-          escP(
-            'Indice ' +
-              x.res.punteggio +
-              ' su 100:\n' +
-              x.res.voci.map((v) => v.nome + ': ' + v.punti + '/' + v.max + ' (' + v.valore + ')').join('\n'),
-          ) +
-          '" data-nome="' +
-          escP(x.nome) +
-          '"><td style="text-align:left;font-weight:600">' +
-          escP(x.nome) +
-          '</td><td style="min-width:120px"><div style="display:flex;align-items:center;gap:6px">' +
-          '<div style="flex:1;height:7px;background:var(--line);border-radius:4px;overflow:hidden"><div style="width:' +
-          x.res.punteggio +
-          '%;height:100%;background:' +
-          colore(x.res.punteggio) +
-          '"></div></div><b style="color:' +
-          colore(x.res.punteggio) +
-          '">' +
-          x.res.punteggio +
-          '</b></div><div style="font-size:var(--fs-sm,.8125rem);color:var(--muted);text-align:center">' +
-          etichetta(x.res.punteggio) +
-          '</div></td><td title="' +
-          x.p.domLib +
-          ' libere su ' +
-          (x.p.domTot || 0) +
-          ' domeniche nei mesi con piano completo (' +
-          (x.p.mesiPiano || 0) +
-          ' mesi)' +
-          (x.p.domTardi ? ' · ' + x.p.domTardi + ' non valide: il sabato si finisce dopo le 23' : '') +
-          (x.p.domAssenza ? ' · ' + x.p.domAssenza + ' escluse perché in vacanza o malattia' : '') +
-          '">' +
-          x.p.domLib +
-          '<span style="font-weight:400;color:var(--muted);font-size:var(--fs-md,.875rem)">/' +
-          (x.p.domTot || 0) +
-          '</span></td><td>' +
-          (x.p.domLav || 0) +
-          '</td><td>' +
-          x.p.we +
-          '</td><td>' +
-          x.p.notti +
-          '</td><td' +
-          (x.p.riposiIsolati > 2 ? ' style="color:var(--c-rosso,#c0392b);font-weight:700"' : '') +
-          '>' +
-          x.p.riposiIsolati +
-          '</td><td' +
-          (x.p.serieMax > soglie.maxConsecutivi ? ' style="color:var(--c-rosso,#c0392b);font-weight:700"' : '') +
-          '>' +
-          x.p.serieMax +
-          '</td><td>' +
-          x.p.vac +
-          '</td><td' +
-          (x.p.mal > 20 ? ' style="color:var(--c-oro,#8b6914);font-weight:700"' : '') +
-          '>' +
-          x.p.mal +
-          '</td><td>' +
-          Math.round(x.p.oreLav) +
-          'h</td></tr>';
-      });
-      t += '</tbody></table></div>';
-      return t;
-    };
+    const ord = { critico: 0, attenzione: 1, ok: 2 };
+    const conNote = (x) => x.res.voci.some((v) => v.livello === 'nota');
+    const so = window._benessereSort;
+    lista.sort((a, b) => {
+      if (!so) return ord[a.res.stato] - ord[b.res.stato] || a.nome.localeCompare(b.nome);
+      const va = _benValore(a, so.campo);
+      const vb = _benValore(b, so.campo);
+      return typeof va === 'string' ? so.dir * va.localeCompare(vb) : so.dir * (va - vb);
+    });
+    const conta = (st) => lista.filter((x) => x.res.stato === st).length;
+    const sog = ris.soglie;
     let h =
       '<p style="font-size:var(--fs-md,.875rem);color:var(--muted);margin-bottom:6px">' +
-      _benesserePeriodoLbl(calcolati, anno) +
-      ' ' +
-      ', su dati del piano. L indice va da 0 a 100 e pesa: domeniche libere (25), equità nei weekend (20), carico notturno (15), qualità del riposo (15), giorni consecutivi (15), vacanze godute (10). ' +
-      'Le <b>malattie non tolgono punti</b>: sono un segnale da leggere insieme al resto, non una colpa. Passa il mouse su una riga per il dettaglio dei punti.</p>';
-    h += '<div style="margin:8px 0 10px;max-width:720px"><canvas id="benessere-chart" height="150"></canvas></div>';
-    h += tabella(
-      calcolati.filter((x) => !x.jolly),
+      _benesserePeriodoLbl(ris) +
+      ' Ogni persona si confronta con <b>quello che ha scelto</b> (solo notti, solo diurni, giorni fissi, giorni a settimana, turni bloccati, turni scritti a mano, percentuale) e con i <b>colleghi della stessa funzione e categoria</b>. ' +
+      'Una scelta non è mai critica: diventa una nota. I <b>limiti di legge e di salute</b> (riposo di ' +
+      sog.minRiposo +
+      ' ore fra i turni, massimo ' +
+      sog.maxConsecutivi +
+      ' giorni di fila, notti di fila, recupero dopo le notti, ' +
+      sog.domenicheAnno +
+      ' domeniche libere all anno) valgono per tutti. I turni del mattino e le malattie non pesano. Passa il mouse su una riga per tutte le voci; le soglie si cambiano in Regole, gruppo Benessere.</p>';
+    h +=
+      '<p style="font-size:var(--fs-base,.9375rem);margin:6px 0 8px">' +
+      '<b style="color:' +
+      _BEN_COLORE.critico +
+      '">' +
+      conta('critico') +
+      ' critici</b> · <b style="color:' +
+      _BEN_COLORE.attenzione +
+      '">' +
+      conta('attenzione') +
+      ' da tenere d\'occhio</b> · <b style="color:' +
+      _BEN_COLORE.ok +
+      '">' +
+      conta('ok') +
+      ' buoni</b> <span style="color:var(--muted)">(' +
+      lista.filter((x) => x.res.stato === 'ok' && conNote(x)).length +
+      ' con una nota sulle loro scelte)</span></p>';
+    h +=
+      '<div style="margin:8px 0 10px;max-width:760px;height:200px;position:relative"><canvas id="benessere-chart"></canvas></div>';
+    h += _benTabella(
+      lista.filter((x) => !x.jolly),
       'Personale fisso',
     );
-    h += tabella(
-      calcolati.filter((x) => x.jolly),
+    h += _benTabella(
+      lista.filter((x) => x.jolly),
       'Personale ausiliario (jolly)',
     );
-    const critici = calcolati.filter((x) => x.res.punteggio < 55);
+    const critici = lista.filter((x) => x.res.stato === 'critico');
     if (critici.length)
       h +=
-        '<p style="font-size:var(--fs-md,.875rem);margin-top:12px;padding:8px 10px;background:var(--errore-bg);border-left:3px solid #c0392b;border-radius:2px"><b>Da guardare per primi:</b> ' +
-        escP(critici.map((x) => x.nome.split(' ')[0] + ' (' + x.res.punteggio + ')').join(', ')) +
-        '</p>';
+        '<div style="font-size:var(--fs-md,.875rem);margin-top:12px;padding:8px 10px;background:var(--errore-bg);border-left:3px solid #c0392b;border-radius:2px"><b>Da guardare per primi:</b><ul style="margin:4px 0 0 18px">' +
+        critici
+          .map(
+            (x) =>
+              '<li><b>' +
+              escP(x.nome) +
+              '</b>: ' +
+              escP(
+                x.res.voci
+                  .filter((v) => v.livello === 'critico')
+                  .map((v) => v.testo)
+                  .join(' · '),
+              ) +
+              '</li>',
+          )
+          .join('') +
+        '</ul></div>';
     el.innerHTML = h;
-    if (typeof Chart !== 'undefined' && document.getElementById('benessere-chart')) {
-      // Grafico compatto: la MEDIA di ogni indicatore, in percentuale del suo
-      // massimo, confrontando personale fisso e ausiliari. Dice a colpo d'occhio
-      // dove il settore e' solido e dove no, senza una barra per ogni persona.
-      const medieDi = (lista) => {
-        if (!lista.length) return null;
-        const n = lista[0].res.voci.length;
-        const out = [];
-        for (let k = 0; k < n; k++) {
-          const somma = lista.reduce((sm, x) => sm + x.res.voci[k].punti, 0);
-          out.push(Math.round((somma / lista.length / lista[0].res.voci[k].max) * 100));
-        }
-        return out;
-      };
-      const fissi = calcolati.filter((x) => !x.jolly);
-      const jolly = calcolati.filter((x) => x.jolly);
-      const etichette = calcolati[0].res.voci.map((v) => v.nome);
-      const dataset = [];
-      const mf = medieDi(fissi);
-      const mj = medieDi(jolly);
-      if (mf)
-        dataset.push({ label: 'Fissi (' + fissi.length + ')', data: mf, backgroundColor: '#1a4a7a', borderRadius: 3 });
-      if (mj)
-        dataset.push({
-          label: 'Ausiliari (' + jolly.length + ')',
-          data: mj,
-          backgroundColor: '#b8860b',
-          borderRadius: 3,
-        });
-      renderChart(
-        'benessere-chart',
-        'bar',
-        { labels: etichette, datasets: dataset },
-        {
-          plugins: {
-            legend: { position: 'top', labels: { font: { size: 12 }, boxWidth: 12 } },
-            tooltip: { callbacks: { label: (c) => c.dataset.label + ': ' + c.parsed.y + '% del massimo' } },
-          },
-          scales: {
-            y: { min: 0, max: 100, ticks: { stepSize: 25, font: { size: 12 }, callback: (v) => v + '%' } },
-            x: { ticks: { font: { size: 12 } } },
-          },
-        },
-      );
-    }
+    _benGrafico(lista);
   } catch (e) {
     console.error(e);
     el.innerHTML =
@@ -577,8 +376,192 @@ async function caricaBenesserePiano() {
       '</p>';
   }
 }
-// Etichetta del periodo davvero considerato: solo i mesi con piano completo
-function _benesserePeriodoLbl(calcolati, anno) {
+// valore di una colonna per l ordinamento
+function _benValore(x, campo) {
+  const m = x.m;
+  switch (campo) {
+    case 'nome':
+      return x.nome;
+    case 'stato':
+      return { critico: 2, attenzione: 1, ok: 0 }[x.res.stato];
+    case 'notti':
+      return m.notti;
+    case 'we':
+      return m.quotaWeekend;
+    case 'domLib':
+      return x.mAnno.domLib;
+    case 'serieMax':
+      return m.serieMax;
+    case 'rientri':
+      return m.rientri.length;
+    case 'isolati':
+      return m.isolati;
+    case 'vac':
+      return m.vac;
+    case 'mal':
+      return m.mal;
+    default:
+      return 0;
+  }
+}
+function _benTabella(lista, titolo) {
+  if (!lista.length) return '';
+  const so = window._benessereSort;
+  const freccia = (campo) => (so && so.campo === campo ? (so.dir > 0 ? ' &#9650;' : ' &#9660;') : '');
+  const th = (campo, testo, tip, sx) =>
+    '<th style="cursor:pointer' +
+    (sx ? ';text-align:left' : '') +
+    '" title="' +
+    escP((tip || '') + ' · clicca per ordinare') +
+    '" onclick="pianoBenessereOrdina(\'' +
+    campo +
+    '\')">' +
+    testo +
+    freccia(campo) +
+    '</th>';
+  const cella = (x, chiave, testo) => {
+    const v = x.res.voci.find((y) => y.chiave === chiave);
+    const liv = v ? v.livello : 'ok';
+    const stile =
+      liv === 'critico' || liv === 'attenzione' ? ' style="color:' + _BEN_COLORE[liv] + ';font-weight:700"' : '';
+    return '<td' + stile + (v ? ' title="' + escP(v.testo) + '"' : '') + '>' + testo + '</td>';
+  };
+  const n = (k) => lista.filter((x) => x.res.stato === k).length;
+  let t =
+    '<p style="font-size:var(--fs-md,.875rem);font-weight:700;margin:14px 0 6px">' +
+    titolo +
+    ' <span style="font-weight:400;color:var(--muted)">· ' +
+    lista.length +
+    ' persone: ' +
+    n('critico') +
+    ' critici, ' +
+    n('attenzione') +
+    " da tenere d'occhio, " +
+    n('ok') +
+    ' buoni</span></p>';
+  t +=
+    '<div style="overflow-x:auto"><table class="piano-table benessere-tab" style="min-width:980px;font-size:var(--fs-base,.9375rem)"><thead><tr>' +
+    th('nome', 'Collaboratore', '', true) +
+    th('stato', 'Stato', 'Il livello più alto fra le voci; le note sulle scelte non contano') +
+    '<th style="text-align:left;min-width:320px">Perché</th>' +
+    th('notti', 'Notti', 'Turni con almeno 3 ore nella fascia notturna, sui giorni lavorati') +
+    th('we', 'Weekend', 'Weekend (sabato o domenica) lavorati su quelli del periodo') +
+    th('domLib', 'Dom. libere', 'Domeniche libere valide da gennaio alla fine del periodo') +
+    th('serieMax', 'Serie max', 'Giorni di lavoro di fila, serie più lunga') +
+    th('rientri', 'Rientri brevi', 'Rientri con meno ore di riposo del minimo di legge') +
+    th('isolati', 'Riposi isolati', 'Riposi di un giorno solo fra due giorni di lavoro (ND chiesti esclusi)') +
+    th('vac', 'Vacanze', 'Giorni di vacanza nel periodo') +
+    th('mal', 'Malattie', 'Giorni di malattia: da leggere, non pesano') +
+    '</tr></thead><tbody>';
+  lista.forEach((x) => {
+    const r = x.res;
+    const m = x.m;
+    const tip =
+      x.nome +
+      ': ' +
+      r.etichetta +
+      (x.p.percentuale < 1 ? '\nImpiego: ' + Math.round(x.p.percentuale * 100) + '%' : '') +
+      (r.scelte.length ? '\nScelte: ' + r.scelte.join(', ') : '') +
+      '\nConfronto con: ' +
+      ((x.c && x.c.gruppo) || '-') +
+      '\n' +
+      r.voci.map((v) => '[' + (v.livello === 'ok' ? 'ok' : v.livello) + '] ' + v.nome + ': ' + v.testo).join('\n');
+    t +=
+      '<tr title="' +
+      escP(tip) +
+      '" data-nome="' +
+      escP(x.nome) +
+      '"><td style="text-align:left;font-weight:600">' +
+      escP(x.nome) +
+      // la percentuale e la quantita di lavoro (non una scelta): si mostra accanto alle scelte
+      (r.scelte.length || x.p.percentuale < 1
+        ? '<div style="font-weight:400;font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
+          escP(
+            [x.p.percentuale < 1 ? 'al ' + Math.round(x.p.percentuale * 100) + '%' : '']
+              .concat(r.scelte.length ? ['scelte: ' + r.scelte.join(', ')] : [])
+              .filter(Boolean)
+              .join(' · '),
+          ) +
+          '</div>'
+        : '') +
+      '</td><td style="white-space:nowrap"><b style="color:' +
+      _BEN_COLORE[r.stato] +
+      '">' +
+      escP(r.etichetta) +
+      '</b></td><td style="text-align:left;font-size:var(--fs-md,.875rem);white-space:normal;min-width:320px;max-width:560px">' +
+      escP(r.perche) +
+      '</td>' +
+      cella(
+        x,
+        'notti',
+        m.notti + '<span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">/' + m.lavorati + '</span>',
+      ) +
+      cella(
+        x,
+        'weekend',
+        m.weLav + '<span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">/' + m.weTot + '</span>',
+      ) +
+      cella(x, 'domeniche', String(x.mAnno.domLib)) +
+      cella(x, 'serie', String(m.serieMax)) +
+      cella(x, 'rientri', String(m.rientri.length)) +
+      cella(x, 'isolati', String(m.isolati)) +
+      '<td>' +
+      m.vac +
+      '</td><td>' +
+      m.mal +
+      '</td></tr>';
+  });
+  return t + '</tbody></table></div>';
+}
+// Grafico: per ogni indicatore quante persone sono critiche, da tenere d occhio o con una nota
+// sulle loro scelte. Dice a colpo d occhio dove il settore deve lavorare.
+function _benGrafico(lista) {
+  if (typeof Chart === 'undefined' || !document.getElementById('benessere-chart')) return;
+  const nomi = [];
+  const per = {};
+  lista.forEach((x) =>
+    x.res.voci.forEach((v) => {
+      if (!per[v.chiave]) {
+        per[v.chiave] = { nome: v.nome, critico: 0, attenzione: 0, nota: 0 };
+        nomi.push(v.chiave);
+      }
+      if (per[v.chiave][v.livello] != null) per[v.chiave][v.livello]++;
+    }),
+  );
+  const chiavi = nomi.filter((k) => per[k].critico + per[k].attenzione + per[k].nota > 0);
+  if (!chiavi.length) return;
+  const ds = (liv, label, colore) => ({
+    label: label,
+    data: chiavi.map((k) => per[k][liv]),
+    backgroundColor: colore,
+    borderRadius: 3,
+  });
+  renderChart(
+    'benessere-chart',
+    'bar',
+    {
+      labels: chiavi.map((k) => per[k].nome),
+      datasets: [
+        ds('critico', 'Critico', '#c0392b'),
+        ds('attenzione', "Da tenere d'occhio", '#b8860b'),
+        ds('nota', 'Nota (scelta della persona)', '#8a96a3'),
+      ],
+    },
+    {
+      plugins: {
+        legend: { position: 'top', labels: { font: { size: 12 }, boxWidth: 12 } },
+        tooltip: { callbacks: { label: (c) => c.dataset.label + ': ' + c.parsed.y + ' persone' } },
+      },
+      animation: false,
+      scales: {
+        x: { stacked: true, ticks: { font: { size: 12 } } },
+        y: { stacked: true, beginAtZero: true, ticks: { precision: 0, font: { size: 12 } } },
+      },
+    },
+  );
+}
+// Etichetta del periodo davvero considerato: i mesi in cui c e un piano
+function _benesserePeriodoLbl(ris) {
   const MESI_N = [
     'gennaio',
     'febbraio',
@@ -593,71 +576,54 @@ function _benesserePeriodoLbl(calcolati, anno) {
     'novembre',
     'dicembre',
   ];
-  const tutti = new Set();
-  calcolati.forEach((x) => (x.p.mesiElenco || []).forEach((m) => tutti.add(m)));
-  const lista = [...tutti].sort();
-  if (!lista.length) return '<b>Nessun mese con piano completo nel ' + anno + '.</b>';
-  const nome = (ym) => MESI_N[parseInt(ym.split('-')[1]) - 1];
-  const periodo = lista.length === 1 ? nome(lista[0]) : 'da ' + nome(lista[0]) + ' a ' + nome(lista[lista.length - 1]);
+  const giorni = ris.persone.reduce((s, x) => Math.max(s, x.m.giorni), 0);
+  const nome = (iso) => parseInt(iso.substring(8, 10)) + ' ' + MESI_N[parseInt(iso.substring(5, 7)) - 1];
   return (
-    '<b>Periodo considerato: ' +
-    periodo +
+    '<b>Periodo: dal ' +
+    nome(ris.da) +
+    ' al ' +
+    nome(ris.a) +
     ' ' +
-    anno +
+    ris.a.substring(0, 4) +
     '</b> (' +
-    lista.length +
-    (lista.length === 1 ? ' mese con piano completo' : ' mesi con piano completo') +
-    '). I mesi incompleti o non ancora pianificati restano fuori dal conteggio, così i confronti sono corretti.'
+    giorni +
+    ' giorni con piano). I giorni senza piano restano fuori dai conti; le domeniche libere si contano da gennaio, perché il minimo è annuale.'
   );
 }
-// Ordina le tabelle del benessere SENZA ricaricare i dati: si riordinano le
-// righe gia' presenti, cosi' la pagina non sfarfalla.
+// Ordina senza ricalcolare: si riusa l ultimo risultato
 function pianoBenessereOrdina(campo) {
   const so = window._benessereSort;
   const dir = so && so.campo === campo ? -so.dir : campo === 'nome' ? 1 : -1;
   window._benessereSort = { campo: campo, dir: dir };
-  // indice di colonna corrispondente al campo
-  const col = {
-    nome: 0,
-    indice: 1,
-    domLib: 2,
-    domLav: 3,
-    we: 4,
-    notti: 5,
-    riposiIsolati: 6,
-    serieMax: 7,
-    vac: 8,
-    mal: 9,
-    oreLav: 10,
-  }[campo];
-  if (col == null) return;
-  document.querySelectorAll('#piano-benessere-body table').forEach((tab) => {
-    const tbody = tab.querySelector('tbody');
-    if (!tbody) return;
-    const righe = [...tbody.querySelectorAll('tr[data-nome]')];
-    const val = (tr) => {
-      const testo = (tr.cells[col] || {}).textContent || '';
-      if (campo === 'nome') return tr.dataset.nome.toLowerCase();
-      const n = parseFloat(
-        String(testo)
-          .replace(',', '.')
-          .replace(/[^0-9.\-]/g, ''),
-      );
-      return isNaN(n) ? 0 : n;
-    };
-    righe
-      .sort((a, b) => {
-        const va = val(a);
-        const vb = val(b);
-        return typeof va === 'string' ? dir * va.localeCompare(vb) : dir * (va - vb);
-      })
-      .forEach((tr) => tbody.appendChild(tr));
-    // freccia sull'intestazione ordinata
-    [...tab.querySelectorAll('thead th')].forEach((th, i) => {
-      th.innerHTML = th.innerHTML.replace(/\s*[▲▼]\s*$/, '');
-      if (i === col) th.innerHTML += dir > 0 ? ' ▲' : ' ▼';
-    });
+  const ris = window._benessereUltimo;
+  if (!ris) return caricaBenesserePiano();
+  const el = document.getElementById('piano-benessere-body');
+  if (!el) return;
+  const cerca = (document.getElementById('benessere-cerca') || {}).value || '';
+  ris.persone.sort((a, b) => {
+    const va = _benValore(a, campo);
+    const vb = _benValore(b, campo);
+    return typeof va === 'string' ? dir * va.localeCompare(vb) : dir * (va - vb);
   });
+  // si ridisegnano solo le tabelle (grafico e testi restano)
+  const tabelle = el.querySelectorAll('table.benessere-tab');
+  const nuove = [
+    _benTabella(
+      ris.persone.filter((x) => !x.jolly),
+      '',
+    ),
+    _benTabella(
+      ris.persone.filter((x) => x.jolly),
+      '',
+    ),
+  ].filter(Boolean);
+  tabelle.forEach((tab, i) => {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = nuove[i] || '';
+    const t2 = tmp.querySelector('table');
+    if (t2) tab.replaceWith(t2);
+  });
+  if (cerca) pianoBenessereFiltra(cerca);
 }
 function pianoBenessereFiltra(q) {
   const testo = (q || '').trim().toLowerCase();

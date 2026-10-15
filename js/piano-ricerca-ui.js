@@ -45,10 +45,20 @@
 // alla fine), e dal 30% della ricerca uno stato fuori dai vincoli si lascia per il migliore
 // ammesso: cosi la ricerca lavora fra i piani applicabili (prima finiva su un piano con 13
 // scoperti e una legge in piu, scartato tutto: restavano 41 scoperti).
+// SABATO OLTRE LE 23 A CHI E INDIETRO con le domeniche (decisione del titolare 15/10/2026):
+// 250 per ogni domenica persa. Meno di un posto scoperto (300, fino a 1.500 se raro, e i
+// riservati 30.000 in piu): un posto non resta mai scoperto per salvare la domenica, ma a
+// parita di posti coperti Migliora sposta il sabato tardi a un collega. Piu delle ore sotto il
+// minimo (200), della qualita (150), dei buchi nei blocchi (60) e delle ore verso l obiettivo
+// (2 all ora: un turno spostato = 16), che da sole non valgono la domenica di chi e indietro.
+// Quando la domenica manca anche per legge (a fine anno non si recupera piu) resta la legge
+// (60.000 per domenica). Con "consenti in caso di copertura" = No pesa come una regola e non
+// puo aumentare (vincolo).
 const RICERCA_PESI = {
   legge: 60000,
   regola: 20000,
   qualita: 150,
+  sabatoTardi: 250,
   riservato: 30000,
   oreSotto: 200,
   scoperto: 300,
@@ -111,12 +121,33 @@ function _ricercaRegolaDiLegge(msg) {
 function _ricercaTipoViolazione(msg) {
   const m = String(msg || '');
   if (/ SOTTO il minimo /.test(m)) return 'oreSotto';
+  if (_ricercaSabatoTardi(m)) return 'sabato_tardi';
+  if (_ricercaLimiteGruppo(m)) return 'limite_gruppo';
   if (_ricercaRegolaDiQualita(m)) return 'qualita';
   if (_ricercaRegolaDiLegge(m)) {
     const o = _ricercaPesoOrdine(m);
     return o >= 2 ? 'legge_dom' : o >= 1.5 ? 'legge_riposo' : o > 1 ? 'legge_sett' : 'legge_altre';
   }
   return 'regola';
+}
+// avviso del sabato oltre le 23 a chi e indietro con le domeniche (_pianoTestoSabatoTardi)
+function _ricercaSabatoTardi(msg) {
+  return /^lavora sab \S+ (fino alle \S+|oltre le 23): perde la domenica \d+ /.test(String(msg || ''));
+}
+// LIMITI DI UNA FUNZIONE IN UN AREA (regole di gruppo "massimo di una funzione al giorno" e
+// "al mese, a testa"; decisione del titolare 15/10/2026): un limite configurato non si supera
+// per coprire un posto (al massimo il posto resta scoperto e si vede). Prima pesavano come le
+// altre regole e il loro numero poteva crescere se altre regole scendevano (Migliora dava 4-5
+// turni 9 al BO allo stesso Supervisor, "Altre regole violate 10 -> 7"): ora un vincolo a parte
+function _ricercaLimiteGruppo(msg) {
+  const m = String(msg || '');
+  return (
+    /^più di \d+ \S+ nel gruppo \S+ lo stesso giorno$/.test(m) || / nel gruppo \S+ nel mese \(max \d+ a testa /.test(m)
+  );
+}
+// "consenti in caso di copertura" (scheda Regole): con No il sabato tardi e un vincolo
+function _ricercaSabatoCopertura() {
+  return typeof _pianoDomSabatoParam !== 'function' || _pianoDomSabatoParam().copertura;
 }
 const RICERCA_TIPI_LEGGE = ['legge_dom', 'legge_riposo', 'legge_sett', 'legge_altre'];
 // VINCOLI DI MIGLIORA (motore e controllo finale, la stessa lista): per ogni tipo di regola
@@ -128,8 +159,14 @@ const RICERCA_TIPI_LEGGE = ['legge_dom', 'legge_riposo', 'legge_sett', 'legge_al
 // migliore della ricerca poteva avere una legge in piu e veniva scartato tutto.
 const RICERCA_VINCOLI = RICERCA_TIPI_LEGGE.map((k) => [k]).concat([
   ['legge_dom_mancanti'],
-  RICERCA_TIPI_LEGGE.concat(['regola']),
+  ['limite_gruppo'],
+  RICERCA_TIPI_LEGGE.concat(['regola', 'limite_gruppo']),
 ]);
+// i vincoli di adesso: con "consenti in caso di copertura" = No anche i sabati oltre le 23 a
+// chi e indietro non possono aumentare
+function _ricercaVincoli() {
+  return _ricercaSabatoCopertura() ? RICERCA_VINCOLI : RICERCA_VINCOLI.concat([['sabato_tardi']]);
+}
 // DOMENICHE LIBERE MANCANTI in una segnalazione (attese - avute; 0 se non e una domenica
 // libera): chi e gia indietro e ne perde un altra peggiora. Prima contava solo SE una persona
 // era indietro: Migliora toglieva una domenica libera a chi era gia sotto (Andrea Molinari da
@@ -156,7 +193,8 @@ function _ricercaPuntiDi(msg) {
   const k = _ricercaTipoViolazione(msg);
   if (k === 'oreSotto') return RICERCA_PESI.oreSotto;
   if (k === 'qualita') return RICERCA_PESI.qualita;
-  if (k === 'regola') return RICERCA_PESI.regola;
+  if (k === 'regola' || k === 'limite_gruppo') return RICERCA_PESI.regola;
+  if (k === 'sabato_tardi') return _ricercaSabatoCopertura() ? RICERCA_PESI.sabatoTardi : RICERCA_PESI.regola;
   // le domeniche libere: per ogni domenica mancante
   return RICERCA_PESI.legge * _ricercaPesoOrdine(msg) * Math.max(1, _ricercaDomMancanti(msg));
 }
@@ -172,8 +210,10 @@ function _ricercaVincoliRotti(prima, dopo, eccesso) {
     legge_riposo: 'riposo minimo fra due turni',
     legge_sett: 'riposo attorno alla domenica',
     legge_altre: 'altre regole di legge',
+    sabato_tardi: 'sabati oltre le 23 a chi è indietro con le domeniche',
+    limite_gruppo: 'limiti di una funzione in un area (al giorno, al mese a testa)',
   };
-  RICERCA_VINCOLI.forEach((g) => {
+  _ricercaVincoli().forEach((g) => {
     const a = somma(prima.conti, g);
     const b = somma(dopo.conti, g);
     if (b > a) rotti.push((g.length === 1 ? NOMI[g[0]] || g[0] : 'regole violate in tutto') + ' ' + a + ' → ' + b);
@@ -418,6 +458,10 @@ async function _ricercaPrepara(opz) {
   // 1-3 posti scoperti in piu, misura novembre e dicembre 2026 Slots e Tavoli, 3 semi); nella
   // rifinitura finale (scambi di giorni e di turno, che non cambiano i posti coperti) contano
   // col peso pieno. La compattezza non si paga mai con un posto scoperto.
+  // GIORNI ISOLATI (15/10/2026): provato anche il loro peso durante la ricerca a caso: dicembre
+  // Slots 3 semi, scoperti 5,0 senza, 7,7 con meta peso, 8,3 con il peso pieno (v456: 4,3); i
+  // 3-1-1 interni al mese erano 0 in tutti i casi. Si tengono solo nella rifinitura (pesi in
+  // _pianoPesoBuco: giorno isolato 150, 3-1-1 306, piu di un posto normale).
   const parBl = typeof _pianoBlocchiParam === 'function' ? _pianoBlocchiParam() : { attivo: false };
   let pesoBlOra = 0;
   const valutaPersona = (n, mappa) => {
@@ -425,7 +469,11 @@ async function _ricercaPrepara(opz) {
     const viol = _pianoViolazioniPersona(n, mese, mese.concat(bordoDi[n] || []), ctx);
     let costo = 0;
     viol.forEach((v) => (costo += _ricercaPuntiDi(v.msg)));
-    if (pesoBlOra) costo += pesoBlOra * _pianoBlocchiPersona(n, mese, bordoDi[n] || [], ym, parBl).length;
+    // modello 4+2 / 5+2: un blocco accettato ma non preferito (5 invece di 4) vale un quarto di buco
+    if (pesoBlOra)
+      _pianoBlocchiPersona(n, mese, bordoDi[n] || [], ym, parBl, true).forEach(
+        (b) => (costo += pesoBlOra * _pianoPesoBuco(b)),
+      );
     if (obiettivo[n] != null) {
       const infoO = _pianoCollabInfo(n) || {};
       const pct = parseFloat(infoO.percentuale) || 1;
@@ -542,6 +590,13 @@ async function _ricercaPrepara(opz) {
       fissi: opz.fissi || null,
       tipoNotte: tipoNotte,
       gruppoEquita: gruppoEquita,
+      // celle critiche per la rifinitura: i sabati oltre le 23 a chi e indietro con le domeniche
+      celleCritiche: (n, mappa) => {
+        const mese = righePersona(n, mappa);
+        return _pianoViolazioniPersona(n, mese, mese.concat(bordoDi[n] || []), ctx)
+          .filter((v) => _ricercaSabatoTardi(v.msg))
+          .map((v) => v.celle[0]);
+      },
       // rifinitura finale: i buchi nei blocchi col peso pieno (vedi parBl)
       primaDellaRifinitura: () => {
         pesoBlOra = parBl.attivo ? parBl.peso || 0 : 0;
@@ -614,6 +669,8 @@ function _ricercaMisuraUfficiale(righe, fabbOriginale, riservati) {
       legge: v.lista.filter((x) => _ricercaRegolaDiLegge(x.msg)).length,
       // regole di qualita (livelli, competenze per fascia): contano in regole, peso proprio
       qualita: conti.qualita || 0,
+      // sabati oltre le 23 a chi e indietro con le domeniche (avvisi, non legge)
+      sabati: conti.sabato_tardi || 0,
       riservati: _ricercaScopertiRiservati(righe, fabbOriginale, riservati),
       voci: v.lista.map((x) => x.nome + (x.giorno ? ' ' + x.giorno : '') + ': ' + x.msg),
       regole: v.lista.length - sotto,
@@ -694,7 +751,7 @@ async function pianoRicercaCalcola(secondi, onPasso, opz) {
         pesoScoperto: RICERCA_PESI.scoperto,
         pesoRiservato: RICERCA_PESI.riservato,
         pesoNotti: pn >= 0 ? pn : RICERCA_PESI.notti,
-        vincoli: RICERCA_VINCOLI,
+        vincoli: _ricercaVincoli(),
         pesoSforo: RICERCA_PESI.sforo,
         // sforo che cresce in linea retta e, dal 30% della ricerca, ritorno al migliore ammesso
         // se lo stato corrente e fuori dai vincoli (Slots novembre 2026, stessa bozza e seme:
@@ -717,6 +774,7 @@ async function pianoRicercaCalcola(secondi, onPasso, opz) {
   const inizio = Date.now();
   let fatte = 0;
   let troncata = false;
+  let ultimiScoperti = null;
   window._ricercaFerma = false;
   while (fatte < totIter && !window._ricercaFerma) {
     if (Date.now() - inizio > msFreno) {
@@ -725,12 +783,19 @@ async function pianoRicercaCalcola(secondi, onPasso, opz) {
     }
     const n = Math.min(FETTA, totIter - fatte);
     const m = motore.passo(0, fatte / totIter, n);
+    ultimiScoperti = m.scoperti;
     fatte += n;
     if (onPasso) onPasso({ frazione: fatte / totIter, scoperti: m.scoperti, punteggio: m.punteggio });
     await new Promise((x) => setTimeout(x, 0));
   }
+  // RIFINITURE CON LE PAUSE (15/10/2026): prima un blocco unico fino a 60 secondi, pagina ferma
+  // e Ferma senza effetto; ora pezzi di ~40 ms. Stesso risultato, cella per cella.
+  if (onPasso) onPasso({ frazione: 1, scoperti: ultimiScoperti, rifinitura: true });
+  const ris = await motore.risultatoAsync(
+    () => new Promise((x) => setTimeout(x, 0)),
+    () => !!window._ricercaFerma,
+  );
   const fermata = !!window._ricercaFerma;
-  const ris = motore.risultato();
   const righeDopo = _ricercaRigheDa(prep, ris.stato);
   const dopo = _ricercaMisuraUfficiale(righeDopo, fabbOriginale, prep.riservati);
   // si usa solo se non rompe nessun vincolo (gli stessi del motore: nessun tipo di regola di
@@ -828,6 +893,11 @@ async function pianoMigliora(opz) {
       secondi,
       (x) => {
         const pass = Math.round((Date.now() - t0) / 1000);
+        if (x.rifinitura) {
+          barra.style.width = '100%';
+          testo.textContent = 'Ultimi ritocchi (posti scoperti, blocchi, sabati): ancora qualche secondo.';
+          return;
+        }
         barra.style.width = Math.round(x.frazione * 100) + '%';
         testo.textContent =
           'Sto cercando: ' +
@@ -857,7 +927,14 @@ async function pianoMigliora(opz) {
   const riepilogo =
     'Risultato controllato con "Controlla le regole":' +
     riga('Regole di legge violate (riposi, giorni di fila, ore della settimana, domenica)', P.legge, D.legge) +
-    riga('Altre regole violate', P.regole - P.legge - P.qualita, D.regole - D.legge - D.qualita) +
+    riga(
+      'Altre regole violate',
+      P.regole - P.legge - P.qualita - (P.sabati || 0),
+      D.regole - D.legge - D.qualita - (D.sabati || 0),
+    ) +
+    (P.sabati || D.sabati
+      ? riga('Sabati oltre le 23 a chi è indietro con le domeniche (avviso)', P.sabati || 0, D.sabati || 0)
+      : '') +
     riga('Regole di qualità (livelli, competenze per fascia)', P.qualita, D.qualita) +
     riga('Posti del fabbisogno scoperti', P.scoperti, D.scoperti) +
     riga('di cui posti riservati (es. Supervisor)', P.riservati, D.riservati) +

@@ -1057,7 +1057,7 @@ async function _formCercaProposte(r, seq) {
         );
         await new Promise((x) => setTimeout(x, 0));
       }
-      const ris = motore.risultato();
+      const ris = await motore.risultatoAsync(() => new Promise((x) => setTimeout(x, 0)));
       const righeDopo = _ricercaRigheDa(prep, ris.stato);
       const dopoUff = _formMisura(righeDopo, fabb, { allievo: r.allievo, giorni: c.giorni });
       const altri = ris.cambi.filter((x) => !(fissi[x.nome] && fissi[x.nome][x.data] != null));

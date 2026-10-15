@@ -40,6 +40,9 @@
  *   tipoNotte     (codice) -> 1 notte, 0 turno di giorno, null non e un turno (facoltativo,
  *                 per l equita delle notti)
  *   gruppoEquita  (nome) -> chiave del gruppo di persone comparabili o null (facoltativo)
+ *   celleCritiche (nome, mappa) -> [dstr] (facoltativo): celle che costano senza essere legge
+ *                 (es. sabato oltre le 23 a chi e indietro con le domeniche): la rifinitura prova
+ *                 a spostarne il turno a un collega (vedi rifinisciCritiche)
  *   primaDellaRifinitura () -> niente (facoltativo): chiamata prima della rifinitura con gli
  *                 scambi di giorni, per cambiare i pesi delle regole (costi ricalcolati dopo)
  * Opzioni:
@@ -774,7 +777,15 @@
     // RIFINITURA: ogni cella cambiata prova a tornare com era (da sola, poi insieme a
     // un altra cella cambiata dello stesso giorno, come negli scambi): resta solo se
     // niente peggiora. Toglie i cambi non necessari.
-    function rifinisci() {
+    // PAUSE DELLE RIFINITURE (15/10/2026): le rifiniture sono generatori che si fermano un attimo
+    // (yield) ogni ~40 ms; risultatoAsync lascia respirare la pagina (barra, Ferma) fra un pezzo e
+    // l altro, risultato() le esegue di fila. Le pause non cambiano nessuna scelta: stesso seme,
+    // stesso piano (prima la pagina restava bloccata fino a 60 secondi). fermaRif: Ferma durante
+    // le rifiniture, si tiene il migliore trovato fin li.
+    let tPausa = Date.now();
+    let fermaRif = false;
+    const pausa = () => Date.now() - tPausa > 40;
+    function* rifinisci() {
       ricaricaMigliore();
       let giro = true;
       for (let volte = 0; giro && volte < 4; volte++) {
@@ -786,6 +797,10 @@
           }),
         );
         for (const [n, d] of cambiate) {
+          if (pausa()) {
+            yield;
+            if (fermaRif) return;
+          }
           if ((stato[n][d] || '') === (partenza[n][d] || '')) continue;
           if (prova([{ n: n, d: d, c: partenza[n][d] || '' }], 0)) {
             giro = true;
@@ -853,7 +868,7 @@
       if (!pesiRifinitura && typeof P.primaDellaRifinitura === 'function') P.primaDellaRifinitura();
       pesiRifinitura = true;
     }
-    function rifinisciScambi() {
+    function* rifinisciScambi() {
       const maxProve = o.rifinituraScambi != null ? o.rifinituraScambi : 60000;
       if (!(maxProve > 0)) return;
       // il problema puo cambiare i pesi per la rifinitura (P.primaDellaRifinitura): i costi si
@@ -877,6 +892,10 @@
         for (const n of persone) {
           for (const d1 of giorni) {
             if (prove >= maxProve) break;
+            if (pausa()) {
+              yield;
+              if (fermaRif) return;
+            }
             if (!puo(n, d1) || !lavora(n, d1)) continue;
             // SCAMBIO DI GIORNI con chi riposa d1 e lavora d2 (fino a 5 giorni di distanza)
             for (let k = -5; k <= 5 && lavora(n, d1); k++) {
@@ -984,7 +1003,7 @@
     // Migliora di 1 minuto restavano 10-16 posti che si coprivano con una sola persona libera o
     // con una catena di due, senza nessuna regola in piu. o.rifinituraScoperti: quante prove al
     // massimo (default 20000; 0 = niente).
-    function rifinisciScoperti() {
+    function* rifinisciScoperti() {
       const maxProve = o.rifinituraScoperti != null ? o.rifinituraScoperti : 20000;
       if (!(maxProve > 0)) return;
       // con i pesi della rifinitura (i buchi nei blocchi contano): un posto si copre con la
@@ -1079,11 +1098,15 @@
       };
       // si prova ogni mossa e si tiene la MIGLIORE (non la prima): a parita di posto coperto,
       // quella con meno buchi nei blocchi e ore piu vicine all obiettivo
-      const copri = (d, c) => {
+      const copri = function* (d, c) {
         let best = null;
         let bestG = -1e-9;
         for (const m of mosseDi(d, c)) {
           if (prove >= maxProve) break;
+          if (pausa()) {
+            yield;
+            if (fermaRif) return false;
+          }
           const g = guadagno(m);
           if (g != null && g < bestG) {
             bestG = g;
@@ -1097,7 +1120,8 @@
         for (const d of giorni) {
           for (const c of Object.keys(fab[d] || {})) {
             while (manca(d, c) && prove < maxProve) {
-              if (!copri(d, c)) break;
+              if (!(yield* copri(d, c))) break;
+              if (fermaRif) return;
               migliorati++;
               // una mossa accettata cambia i costi: il filtro veloce riparte da capo
               Object.keys(memoPersona).forEach((k) => delete memoPersona[k]);
@@ -1107,12 +1131,106 @@
         if (!migliorati) break;
       }
     }
-    function risultato() {
-      rifinisciScoperti();
-      rifinisciScambi();
+    // RIFINITURA DELLE CELLE CRITICHE (15/10/2026): celle che costano senza essere una regola di
+    // legge, segnalate dal problema (P.celleCritiche(nome, mappa) -> [dstr]: per esempio il turno
+    // del sabato oltre le 23 a chi e indietro con le domeniche). Per ognuna si provano tutte le
+    // mosse corte che spostano il turno a un collega: chi lavora quel giorno scambia il turno
+    // (la persona prende il suo, magari entro le 23), chi riposa lo prende e la persona riposa
+    // o fa un altro turno ammesso; si tiene la migliore, a temperatura zero. Le altre mosse
+    // partono da un posto scoperto o da una persona a caso: il sabato tardi, con il posto
+    // coperto, si spostava solo per caso.
+    function* rifinisciCritiche() {
+      if (typeof P.celleCritiche !== 'function') return;
+      const maxProve = o.rifinituraCritiche != null ? o.rifinituraCritiche : 20000;
+      if (!(maxProve > 0)) return;
+      pesiDellaRifinitura();
+      ricaricaMigliore();
+      if (migliore.ammesso) migliore.punteggio = totale;
+      let prove = 0;
+      const guadagno = (mossa) => {
+        prove++;
+        const primaT = totale;
+        const vecchi = mossa.map((m) => ({ n: m.n, d: m.d, c: stato[m.n][m.d] || '' }));
+        if (!prova(mossa, 0)) return null;
+        const g = totale - primaT;
+        prova(vecchi, Infinity);
+        return g;
+      };
+      for (let giro = 0; giro < 3 && prove < maxProve; giro++) {
+        let migliorati = 0;
+        for (const n of persone) {
+          const celle = (P.celleCritiche(n, stato[n]) || []).filter(
+            (d) => indiceGiorno[d] != null && puo(n, d) && lavora(n, d),
+          );
+          for (const d of celle) {
+            if (prove >= maxProve || !lavora(n, d)) continue;
+            const c = stato[n][d];
+            const mosse = [];
+            mobili[d].forEach((y) => {
+              if (y === n || !ammessi(y, d).includes(c)) return;
+              if (lavora(y, d)) {
+                const cy = stato[y][d];
+                if (cy !== c && ammessi(n, d).includes(cy))
+                  mosse.push([
+                    { n: n, d: d, c: cy },
+                    { n: y, d: d, c: c },
+                  ]);
+              } else if ((stato[y][d] || riposo) === riposo)
+                ammessi(n, d).forEach((c2) => {
+                  if (c2 !== c)
+                    mosse.push([
+                      { n: n, d: d, c: c2 },
+                      { n: y, d: d, c: c },
+                    ]);
+                });
+            });
+            let best = null;
+            let bestG = -1e-9;
+            for (const m of mosse) {
+              if (prove >= maxProve) break;
+              if (pausa()) {
+                yield;
+                if (fermaRif) return;
+              }
+              const g = guadagno(m);
+              if (g != null && g < bestG) {
+                bestG = g;
+                best = m;
+              }
+            }
+            if (best && prova(best, 0)) migliorati++;
+          }
+        }
+        if (!migliorati) break;
+      }
+    }
+    function* rifiniture() {
+      yield* rifinisciScoperti();
+      yield* rifinisciCritiche();
+      yield* rifinisciScambi();
       // gli scambi di giorni aprono altre catene corte (giorni di fila, riposi): un secondo giro
-      rifinisciScoperti();
-      if (o.pesoCambio) rifinisci();
+      yield* rifinisciScoperti();
+      if (o.pesoCambio) yield* rifinisci();
+    }
+    // tutto di fila (test, uso semplice)
+    function risultato() {
+      const g = rifiniture();
+      while (!g.next().done) tPausa = Date.now();
+      return finale();
+    }
+    // con le pause: attende(), es. () => new Promise((r) => setTimeout(r, 0)), fra un pezzo e l altro;
+    // ferma() -> true per chiudere le rifiniture (si tiene il migliore trovato)
+    async function risultatoAsync(attende, ferma) {
+      const g = rifiniture();
+      tPausa = Date.now();
+      while (!g.next().done) {
+        if (ferma && ferma()) fermaRif = true;
+        await attende();
+        tPausa = Date.now();
+      }
+      return finale();
+    }
+    function finale() {
       const cambi = [];
       persone.forEach((n) =>
         giorni.forEach((d) => {
@@ -1177,7 +1295,7 @@
         accettate: accettate,
       };
     }
-    return { passo: passo, risultato: risultato, misura: misura };
+    return { passo: passo, risultato: risultato, risultatoAsync: risultatoAsync, misura: misura };
   }
 
   // ricerca completa con un numero di iterazioni (test e uso semplice)

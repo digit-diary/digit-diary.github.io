@@ -2007,6 +2007,14 @@ async function esportaBackupCompleto() {
         totale += mod.length;
       }
     } catch (e) {}
+    // storico delle scelte del piano (migrazione 20260923): stessa strada, stesse colonne
+    try {
+      const sc = await _conSessione((t) => _rpcSicura('leggi_scelte_storico', { p_token: t }), getOpToken());
+      if (Array.isArray(sc)) {
+        dati.collab_scelte_storico = sc;
+        totale += sc.length;
+      }
+    } catch (e) {}
     const backup = {
       app: identita().programma + ' · ' + identita().azienda,
       esportato_il: new Date().toISOString(),

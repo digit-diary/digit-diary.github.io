@@ -889,6 +889,16 @@ async function secPatch(table, filter, data) {
   const op = _annullaPronto() ? await window.Annulla.primaDiPatch(table, filter, data) : null;
   await _secPatchRaw(table, filter, data);
   if (op) window.Annulla.conferma(op);
+  // SCELTE DEL PIANO (solo notti, solo diurni, giorni...): il database ne registra il cambio
+  // (migrazione 20260923); qui si rilegge lo storico, da qualsiasi strada arrivi il salvataggio
+  if (
+    table === 'collaboratori' &&
+    data &&
+    typeof pianoScelteCambiate === 'function' &&
+    typeof PianoScelte !== 'undefined' &&
+    PianoScelte.CAMPI.some((k) => Object.prototype.hasOwnProperty.call(data, k))
+  )
+    pianoScelteCambiate();
 }
 async function secDel(table, filter) {
   const op = _annullaPronto() ? await window.Annulla.primaDiDel(table, filter) : null;

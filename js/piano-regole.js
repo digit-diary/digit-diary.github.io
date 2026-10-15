@@ -131,7 +131,8 @@
   //   ctx.mappFunzione(funzione) : -> array {tipo, turno_codice} o null
   //   ctx.regolaVal(nome)        : -> valore regola o null
   // REGOLE "CHI FA COSA" (regole di gruppo, per settore, create dall'utente):
-  //   turni_solo_funzioni   'L1,9:BO,SUP'          -> quei turni solo a quelle funzioni
+  //   turni_solo_funzioni   'L1,9:BO,SUP'          -> quei turni solo a quelle funzioni (o
+  //                         settori); chi ha la sigla fra i "turni consentiti" e un'eccezione
   //   funzione_turni_giorni 'SUP:Z*,L1,9:0,1,2,3'  -> in quei giorni (0=lun..6=dom,
   //                         vuoto = sempre) la funzione fa SOLO turni che
   //                         combaciano con i modelli (Z* = tutte le sigle che
@@ -189,6 +190,12 @@
       return cod === m;
     };
     const dowPy = dow == null ? null : (dow + 6) % 7;
+    // turni consentiti alla persona (Preferenze collaboratori): eccezioni alle regole sui
+    // turni riservati a funzioni e ai turni per livello
+    const consentiti = String((info && info.turni_consentiti) || '')
+      .split(',')
+      .map((x) => x.trim().toUpperCase())
+      .filter(Boolean);
     for (const rg of regole) {
       if (rg.attivo === false) continue;
       const tipo = String(rg.tipo_regola || '').toLowerCase();
@@ -201,6 +208,10 @@
           .filter(Boolean);
         if (!turni.some(combacia)) continue;
         if (funzioni.includes(fz) || settori.some((x) => funzioni.includes(String(x).toUpperCase()))) continue;
+        // ECCEZIONE PER PERSONA (15/10/2026): la sigla fra i "Turni consentiti" (Preferenze
+        // collaboratori) vale anche qui, come per i turni per livello. Prima chi aveva la spunta
+        // Preferisce L1 ma un altra funzione non riceveva mai L1, senza modo di dirlo
+        if (consentiti.includes(cod)) continue;
         return 'turno ' + cod + ' riservato a ' + funzioni.join(', ') + ' (funzione: ' + (fz || 'nessuna') + ')';
       }
       if (tipo === 'turni_solo_collaboratori') {
@@ -223,10 +234,6 @@
         if (!turni.some(combacia)) continue;
         const lv = info && info._livello;
         if (lv == null) continue; // settore senza livelli in Formazione
-        const consentiti = String((info && info.turni_consentiti) || '')
-          .split(',')
-          .map((x) => x.trim().toUpperCase())
-          .filter(Boolean);
         if (consentiti.includes(cod)) continue;
         const [minT, maxT] = String(parti[1] || '').split('-');
         const min = parseInt(String(minT || '').replace(/^L/i, '')) || 0;
@@ -839,7 +846,9 @@
   // sacrificando posti rari. Ora tutte e due chiedono qui.
   // stati: lo stato di ogni domenica del mese per la persona:
   //   'libera'     vale fra quelle dell anno (riposo, sabato finito entro le 23)
-  //   'non_valida' libera ma non conta (il sabato finisce oltre le 23, codice che non e riposo)
+  //   'non_valida' libera ma non conta (codice che non e riposo)
+  //   'sabato_tardi' libera ma non conta: il sabato prima finisce oltre le 23 (vedi
+  //                domenicheVerdetto; prima era anche lui 'non_valida')
   //   'lavoro'     turno di lavoro
   //   'esclusa'    vacanza o malattia: non conta (ne a favore ne contro)
   //   'aperta'     (bozza) cella ancora da decidere: puo diventare libera
@@ -882,6 +891,47 @@
     const prima = domenicheLibereMese(statiPrima, conto);
     if (!prima.raggiungibile) return rigido ? dopo.possibili >= prima.possibili : true;
     return false;
+  }
+
+  // ===== SABATO OLTRE LE 23 PER CHI E INDIETRO CON LE DOMENICHE (decisione del titolare
+  // 15/10/2026, cambia quella dell 08/10) =====
+  // Una domenica libera vale solo se il turno del sabato prima finisce entro le 23. Chi e
+  // indietro con le domeniche valide dell anno non riceve dalla bozza un turno del sabato che
+  // finisce dopo le 23 (lavora entro le 23 o resta libero); se nessun altro puo coprire il posto
+  // il turno si puo dare, con un avviso (non una violazione di legge) finche nel resto dell anno
+  // si puo ancora recuperare.
+  // Stato in piu per gli stati delle domeniche (vedi domenicheLibereMese):
+  //   'sabato_tardi'  libera, ma il sabato prima finisce oltre le 23: non vale (come non_valida)
+  // INDIETRO: arretrato dei mesi passati (conto.arretrato, recupero spalmato fino a dicembre)
+  // oppure, nel mese, sotto la quota attesa anche lasciando libere le domeniche aperte.
+  function domenicheIndietro(stati, conto) {
+    if (!conto) return false;
+    if ((conto.arretrato || 0) > 0) return true;
+    return !domenicheLibereMese(stati, conto).raggiungibile;
+  }
+  // VERDETTO DEL MESE per Controlla le regole. opz: { evita, copertura } (impostazioni del
+  // settore domeniche_arretrate_no_sabato_tardi e domeniche_arretrate_sabato_copertura).
+  // conto come in domenicheLibereMese, con diritto (domeniche dell anno) e restanti (domeniche
+  // dell anno nei mesi dopo questo). Ritorna l esito di domenicheLibereMese piu:
+  //   indietro     vedi domenicheIndietro
+  //   avvisi       indici (in stati) delle domeniche perse per il sabato tardi da segnalare
+  //   recuperabile a fine anno si arriva ancora al diritto (le domeniche restanti bastano)
+  //   legge        violazione di legge: come violata, salvo quando quello che manca nel mese
+  //                viene solo dai sabati tardi (dati per coprire un posto) e l anno e recuperabile
+  function domenicheVerdetto(stati, conto, opz) {
+    const o = opz || {};
+    const st = stati || [];
+    const esito = domenicheLibereMese(st, conto);
+    const indietro = domenicheIndietro(st, conto);
+    const avvisi = [];
+    if (o.evita && indietro) st.forEach((s, i) => s === 'sabato_tardi' && avvisi.push(i));
+    let recuperabile = false;
+    if (conto && conto.diritto != null)
+      recuperabile = conto.diritto - ((conto.prima || 0) + esito.libere) <= (conto.restanti || 0);
+    let legge = esito.violata;
+    if (legge && o.evita && o.copertura && conto && recuperabile && esito.libere + avvisi.length >= esito.serve)
+      legge = false;
+    return Object.assign({}, esito, { indietro: indietro, avvisi: avvisi, recuperabile: recuperabile, legge: legge });
   }
 
   // LIVELLO DI UNA PERSONA nella scala del settore. comps = competenze configurate del
@@ -941,6 +991,14 @@
     const t = tipi || [];
     const minimo = parseInt(par.minimo) || 0;
     const maxCons = parseInt(par.maxCons) || 0;
+    // MODELLO 4+2 / 5+2 (decisione del titolare 15/10/2026): riposoMin = riposo preferito (2: un
+    // libero solo fra due blocchi e sempre un buco, anche 4-1-4), massimo = blocco di lavoro piu
+    // lungo accettato (5, oltre: 'blocco_lungo'), preferito = blocco di lavoro preferito (4: con
+    // conPreferito un blocco intero fra minimo e massimo ma diverso esce come 'fuori_preferito',
+    // non e un buco: costa poco in Migliora e nella bozza)
+    const riposoMin = parseInt(par.riposoMin) || 0;
+    const massimo = parseInt(par.massimo) || 0;
+    const preferito = parseInt(par.preferito) || 0;
     const da = par.da != null ? par.da : 0;
     const a = par.a != null ? par.a : t.length - 1;
     const runs = [];
@@ -955,17 +1013,37 @@
       const p = runs[k - 1];
       const s = runs[k + 1];
       // un blocco di lavoro corto fra due riposi
-      if (r.c === 'L' && minimo >= 2 && r.n < minimo && p.c === 'R' && s.c === 'R' && r.i >= da && r.i <= a)
+      const dentro = r.i >= da && r.i <= a;
+      const fraRiposi = p.c === 'R' && s.c === 'R';
+      if (r.c === 'L' && minimo >= 2 && r.n < minimo && fraRiposi && dentro)
         out.push({ tipo: 'lavoro_isolato', i: r.i, lungo: r.n });
+      // un blocco di lavoro piu lungo del massimo accettato
+      if (r.c === 'L' && massimo && r.n > massimo && fraRiposi && dentro)
+        out.push({ tipo: 'blocco_lungo', i: r.i, lungo: r.n });
+      // un blocco accettato ma diverso da quello preferito (5 invece di 4)
+      if (
+        r.c === 'L' &&
+        par.conPreferito &&
+        preferito &&
+        fraRiposi &&
+        dentro &&
+        r.n !== preferito &&
+        r.n >= Math.max(1, minimo) &&
+        (!massimo || r.n <= massimo)
+      )
+        out.push({ tipo: 'fuori_preferito', i: r.i, lungo: r.n });
       // un riposo di un giorno solo fra due blocchi di lavoro che insieme non arrivano ai
       // giorni di fila: il giorno libero poteva stare accanto a un altro riposo
-      if (r.c === 'R' && r.n === 1 && par.riposoSingolo && p.c === 'L' && s.c === 'L' && r.i >= da && r.i <= a) {
+      const corto = riposoMin >= 2 ? r.n < riposoMin : r.n === 1;
+      if (r.c === 'R' && corto && par.riposoSingolo && p.c === 'L' && s.c === 'L' && dentro) {
         // i due blocchi devono essere interi (chiusi da un riposo): accanto a una vacanza o
         // al bordo dei giorni letti la lunghezza non si conosce e non si giudica
         const chiusoPrima = k - 2 >= 0 && runs[k - 2].c === 'R';
         const chiusoDopo = k + 2 < runs.length && runs[k + 2].c === 'R';
-        if (chiusoPrima && chiusoDopo && (!maxCons || p.n + s.n <= maxCons))
-          out.push({ tipo: 'riposo_singolo', i: r.i, prima: p.n, dopo: s.n });
+        // con il riposo preferito (riposoMin) il libero corto e un buco anche fra blocchi
+        // lunghi (4-1-4); senza, solo se i due blocchi insieme starebbero nei giorni di fila
+        if (chiusoPrima && chiusoDopo && (riposoMin >= 2 || !maxCons || p.n + s.n <= maxCons))
+          out.push({ tipo: 'riposo_singolo', i: r.i, prima: p.n, dopo: s.n, lungo: r.n });
       }
     }
     return out;
@@ -991,6 +1069,8 @@
     meseBloccato,
     domenicheLibereMese,
     domenicaTurnoAmmesso,
+    domenicheIndietro,
+    domenicheVerdetto,
     livelloScala,
   };
 });

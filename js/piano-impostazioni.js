@@ -948,8 +948,10 @@ const _REGOLE_GRUPPO_TIPI = {
   blocca_tipo_turno: 'Nell area nessuno fa turni del tipo scelto (per esempio notturni)',
   richiede_campo: 'Nell area lavora solo chi ha un valore sulla scheda (per esempio accoglienza maggiore di 0)',
   limite_funzione_giorno: 'Al massimo quante persone di una funzione nello stesso giorno',
-  limite_funzione_mese: 'Al massimo quante persone diverse di una funzione nel mese',
-  minimo_funzione_mese: 'Almeno quante persone di una funzione nel mese',
+  limite_funzione_mese:
+    'Ogni persona di una funzione fa al massimo quanti turni in quest area nel mese, a testa (per esempio ogni Supervisor al massimo un turno al BO): bozza e Migliora non lo superano mai, nemmeno per coprire un posto',
+  minimo_funzione_mese:
+    'Ogni persona di una funzione che lavora nel mese fa almeno quanti turni in quest area, a testa: la bozza ci prova, Controlla le regole segnala chi resta sotto',
   turni_persona_area_mese:
     'Ogni persona di una funzione fa almeno quanti turni in quest area nel mese, SE POSSIBILE (per esempio ogni Supervisor un turno al BO, per non dimenticarlo): la bozza ci prova, non e un obbligo',
   minimo_funzione_giorno: 'Almeno quante persone di una funzione al giorno, anche solo certi giorni o certi turni',
@@ -975,8 +977,8 @@ const _REGOLE_GRUPPO_ETICHETTE = {
   blocca_tipo_turno: 'Tipo di turno vietato nel gruppo',
   richiede_campo: 'Requisito sulla scheda del collaboratore',
   limite_funzione_giorno: 'Massimo di una funzione al giorno',
-  limite_funzione_mese: 'Massimo persone di una funzione al mese',
-  minimo_funzione_mese: 'Minimo di una funzione al mese',
+  limite_funzione_mese: 'Massimo turni a testa di una funzione al mese',
+  minimo_funzione_mese: 'Minimo turni a testa di una funzione al mese',
   turni_persona_area_mese: 'Turni al mese nell area per persona (se possibile)',
   minimo_funzione_giorno: 'Minimo di una funzione al giorno',
   turni_solo_funzioni: 'Turni riservati a certe funzioni',
@@ -1202,22 +1204,14 @@ function _rgFrase(r) {
       return 'Al massimo ' + c.n + ' ' + c.fz + ' al giorno ' + gr;
     case 'limite_funzione_mese':
       return (
-        'Al massimo ' +
-        c.n +
-        (c.n === '1' ? ' persona' : ' persone diverse') +
-        ' con funzione ' +
-        c.fz +
-        ' nel mese ' +
-        gr
+        'Ogni ' + c.fz + ' fa al massimo ' + c.n + (c.n === '1' ? ' turno ' : ' turni ') + gr + ' al mese, a testa'
       );
     case 'turni_persona_area_mese':
       return (
         'Ogni ' + c.fz + ' fa almeno ' + c.n + (c.n === '1' ? ' turno ' : ' turni ') + gr + ' al mese, se possibile'
       );
     case 'minimo_funzione_mese':
-      return (
-        'Almeno ' + c.n + (c.n === '1' ? ' persona' : ' persone diverse') + ' con funzione ' + c.fz + ' nel mese ' + gr
-      );
+      return 'Ogni ' + c.fz + ' fa almeno ' + c.n + (c.n === '1' ? ' turno ' : ' turni ') + gr + ' al mese, a testa';
     case 'minimo_funzione_giorno':
       return 'Almeno ' + c.n + ' ' + c.fz + tipoTxt + ' ' + gr + giorniTxt;
     case 'minimo_livello_giorno':
@@ -3031,7 +3025,7 @@ function _renderPianoPreferenzeCard() {
   h +=
     '<fieldset' +
     (prefSolaLettura ? ' disabled' : '') +
-    ' style="border:0;padding:0;margin:0;min-width:0"><div style="overflow-x:auto"><table class="piano-table" id="pref-collab-table" style="min-width:760px;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Funzione</th><th>%</th><th>Solo diurni</th><th title="Solo turni notturni">Solo notturni</th><th title="Non sta nella rotazione (es. ufficio): bozza, Migliora, coperture e cambi non le propongono mai turni e la bozza non riempie i giorni vuoti. Turni scritti a mano; le ore contano come sempre">Turni solo a mano</th><th style="text-align:left" title="Giorni in cui lavora: negli altri non viene mai proposto (bozza, Migliora, generazione automatica, cerca cambio, copertura malattia, formazioni). Nessuna spunta = tutti i giorni">Giorni di lavoro</th><th style="text-align:left">Turni bloccati (CSV)</th><th style="text-align:left" title="Eccezioni alle regole Turni per livello: questi turni li può fare anche senza il livello richiesto (CSV)">Turni consentiti</th>' +
+    ' style="border:0;padding:0;margin:0;min-width:0"><div style="overflow-x:auto"><table class="piano-table" id="pref-collab-table" style="min-width:760px;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Funzione</th><th>%</th><th>Solo diurni</th><th title="Solo turni notturni">Solo notturni</th><th title="Non sta nella rotazione (es. ufficio): bozza, Migliora, coperture e cambi non le propongono mai turni e la bozza non riempie i giorni vuoti. Turni scritti a mano; le ore contano come sempre">Turni solo a mano</th><th style="text-align:left" title="Giorni in cui lavora: negli altri non viene mai proposto (bozza, Migliora, generazione automatica, cerca cambio, copertura malattia, formazioni). Nessuna spunta = tutti i giorni">Giorni di lavoro</th><th style="text-align:left">Turni bloccati (CSV)</th><th style="text-align:left" title="Eccezioni alle regole Turni per livello e Turni riservati a certe funzioni: questi turni li può fare anche senza il livello o la funzione richiesti (CSV, es. L1)">Turni consentiti</th>' +
     (colPref.preferiti.length
       ? '<th title="La bozza dà per primi a queste persone i turni ' +
         escP(prefSigle) +
@@ -3057,17 +3051,25 @@ function _renderPianoPreferenzeCard() {
       (c.solo_diurni ? ' checked' : '') +
       ' onchange="salvaPreferenzaCollab(' +
       c.id +
-      ',\'solo_diurni\',this.checked)"></td><td><input type="checkbox"' +
+      ",'solo_diurni',this.checked)\">" +
+      (typeof pianoSceltaNota === 'function' ? pianoSceltaNota(c, 'solo_diurni') : '') +
+      '</td><td><input type="checkbox"' +
       (c.solo_notti ? ' checked' : '') +
       ' onchange="salvaPreferenzaCollab(' +
       c.id +
-      ',\'solo_notti\',this.checked)"></td><td><input type="checkbox"' +
+      ",'solo_notti',this.checked)\">" +
+      (typeof pianoSceltaNota === 'function' ? pianoSceltaNota(c, 'solo_notti') : '') +
+      '</td><td><input type="checkbox"' +
       (c.turni_solo_a_mano ? ' checked' : '') +
       ' onchange="salvaPreferenzaCollab(' +
       c.id +
-      ',\'turni_solo_a_mano\',this.checked)"></td><td style="text-align:left;white-space:nowrap">' +
+      ",'turni_solo_a_mano',this.checked)\">" +
+      (typeof pianoSceltaNota === 'function' ? pianoSceltaNota(c, 'turni_solo_a_mano') : '') +
+      '</td><td style="text-align:left;white-space:nowrap">' +
       _pianoGiorniLavoroChips(c) +
       _pianoGiorniSettSelect(c) +
+      (typeof pianoSceltaNota === 'function' ? pianoSceltaNota(c, 'giorni_lavoro') : '') +
+      (typeof pianoSceltaNota === 'function' ? pianoSceltaNota(c, 'giorni_settimana') : '') +
       '</td><td style="text-align:left"><input type="text" value="' +
       escP(c.turni_bloccati || '') +
       '" placeholder="Es: S8,S7C" onchange="salvaPreferenzaCollab(' +

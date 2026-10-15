@@ -442,6 +442,8 @@ async function loadAll() {
   _loadLogo();
   // testi dei modelli dei documenti (migrazione 20260915): in sottofondo, senza attendere
   if (typeof modelliCarica === 'function') modelliCarica().catch(() => {});
+  // storico delle scelte del piano (migrazione 20260923): in sottofondo, per Controlla le regole
+  if (typeof pianoScelteCarica === 'function') pianoScelteCarica().catch(() => {});
   // Pulizia automatica: sessioni scadute + log > 12 mesi
   // con la sessione: senza, il database la rifiuta (migrazione 20260895)
   // una volta al giorno per questo browser basta (prima a ogni accesso di chiunque)

@@ -768,6 +768,74 @@ console.log('\n== blocchi compatti (blocchiSpezzati, v453) ==');
   eq(B('RLLRLLR')[0].prima + '-' + B('RLLRLLR')[0].dopo, '2-2', 'riposo singolo: lunghezze dei due blocchi');
 }
 
+console.log('\n== modello 4+2 / 5+2 (blocchiSpezzati, 15/10/2026) ==');
+{
+  const M = { minimo: 3, riposoSingolo: true, maxCons: 5, preferito: 4, massimo: 5, riposoMin: 2 };
+  const B = (txt, par) => R.blocchiSpezzati(txt.split(''), Object.assign({}, M, par || {}));
+  const tipi = (v) => v.map((x) => x.tipo + '@' + x.i);
+  eq(tipi(B('RRLLLLRRLLLLRR')), [], '4+2 4+2: nessun buco');
+  eq(tipi(B('RRLLLLLRRLLLLRR')), [], '5+2: accettato, nessun buco');
+  eq(tipi(B('RRLLLLLRRLLLLRR', { conPreferito: true })), ['fuori_preferito@2'], '5 invece di 4: fuori preferito');
+  eq(tipi(B('RRLLLLRLLLLRR')), ['riposo_singolo@6'], '4-1-4: il libero solo e un buco');
+  eq(tipi(B('RRLLLLRLLLLRR', { riposoMin: 0 })), [], 'riposo preferito 0: 4-1-4 come prima');
+  eq(tipi(B('RRLLLRLRR')), ['riposo_singolo@5', 'lavoro_isolato@6'], '3-1-1: due buchi');
+  eq(tipi(B('RRLLRRLLLLRR')), ['lavoro_isolato@2'], 'minimo 3: due giorni soli sono un buco');
+  eq(tipi(B('RRLRLRLRR')).length, 5, 'alternanza 1-1-1-1-1: ogni giorno e un buco');
+  eq(tipi(B('RRLLLLLLRR', { maxCons: 6, massimo: 5 })), ['blocco_lungo@2'], 'oltre il massimo accettato');
+}
+
+console.log('\n== sabato oltre le 23 per chi e indietro con le domeniche (15/10/2026) ==');
+{
+  const conto = { prima: 6, attese: 9, arretrato: 2, diritto: 12, restanti: 4 };
+  const opz = { evita: true, copertura: true };
+  // indietro: arretrato dei mesi passati, oppure il mese non arriva alla quota
+  eq(R.domenicheIndietro(['libera', 'aperta'], conto), true, 'arretrato: indietro');
+  eq(R.domenicheIndietro(['aperta', 'aperta'], { prima: 6, attese: 7, arretrato: 0 }), false, 'in linea: non indietro');
+  eq(R.domenicheIndietro(['lavoro', 'aperta'], { prima: 6, attese: 8, arretrato: 0 }), true, 'mese sotto la quota');
+  eq(R.domenicheIndietro(['lavoro'], null), false, 'senza conto annuale: mai indietro');
+  // sabato tardi: non conta come libera (come non_valida)
+  eq(R.domenicheLibereMese(['libera', 'sabato_tardi'], null).libere, 1, 'sabato_tardi non e libera');
+  // avviso e legge: manca solo per il sabato tardi e l anno si recupera -> avviso, non legge
+  let v = R.domenicheVerdetto(['libera', 'libera', 'sabato_tardi', 'lavoro'], conto, opz);
+  eq([v.violata, v.legge, v.avvisi, v.recuperabile], [true, false, [2], true], 'copertura: avviso, non legge');
+  // a fine anno non ci si arriva piu: resta la legge
+  v = R.domenicheVerdetto(
+    ['libera', 'libera', 'sabato_tardi', 'lavoro'],
+    Object.assign({}, conto, { restanti: 1 }),
+    opz,
+  );
+  eq([v.legge, v.avvisi], [true, [2]], 'anno non recuperabile: legge (e l avviso)');
+  // manca anche per una domenica lavorata: resta la legge
+  v = R.domenicheVerdetto(['libera', 'lavoro', 'sabato_tardi', 'lavoro'], conto, opz);
+  eq(v.legge, true, 'manca anche per un turno di domenica: legge');
+  // copertura spenta: il sabato tardi non e mai un semplice avviso
+  v = R.domenicheVerdetto(['libera', 'libera', 'sabato_tardi', 'lavoro'], conto, { evita: true, copertura: false });
+  eq([v.legge, v.avvisi], [true, [2]], 'copertura No: legge come prima');
+  // impostazione spenta: niente avvisi, legge come prima
+  v = R.domenicheVerdetto(['libera', 'libera', 'sabato_tardi', 'lavoro'], conto, { evita: false, copertura: true });
+  eq([v.legge, v.avvisi], [true, []], 'evita No: come prima');
+  // chi e in linea non riceve avvisi
+  v = R.domenicheVerdetto(
+    ['libera', 'sabato_tardi', 'libera'],
+    { prima: 6, attese: 8, arretrato: 0, diritto: 12, restanti: 4 },
+    opz,
+  );
+  eq([v.legge, v.avvisi], [false, []], 'in linea: nessun avviso');
+}
+
+console.log('\n== turni consentiti come eccezione ai turni riservati a funzioni (15/10/2026) ==');
+eq(
+  R.violazioneFunzioneTurno({ funzione: 'HOST', turni_consentiti: 'L1' }, tL1, 2, RG),
+  null,
+  'HOST con L1 fra i turni consentiti: idoneo a L1',
+);
+eq(
+  R.violazioneFunzioneTurno({ funzione: 'HOST', turni_consentiti: 'L1' }, { codice: '9', gruppo: 'BO' }, 2, RG) !==
+    null,
+  true,
+  'HOST con L1 consentito: 9 resta riservato',
+);
+
 console.log('\n=======================================');
 console.log('  ' + passati + ' passati, ' + falliti + ' falliti');
 console.log('=======================================\n');

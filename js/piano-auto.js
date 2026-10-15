@@ -94,6 +94,7 @@ function _pianoAutoBanner() {
   const el = document.getElementById('piano-content');
   const a = window._pianoAutoInCorso;
   if (!el || !a) return;
+  if (a.mesi && typeof _pianoMesiBanner === 'function') return _pianoMesiBanner(el); // Prepara più mesi
   el.style.opacity = '';
   el.innerHTML =
     '<div class="main-card" style="margin-top:12px"><div class="card-header">Generazione automatica del piano in corso</div>' +

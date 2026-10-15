@@ -172,16 +172,36 @@ const PIANO_REGOLE_GUIDA = {
   blocco_lavoro_minimo: {
     g: 'Riposo e giorni di lavoro',
     n: 'Blocco di lavoro minimo fra due liberi (giorni)',
-    s: '2 = un giorno di lavoro isolato fra due liberi è un buco; 3 = anche due giorni soli; 0 = non conta. Vale con "Blocchi compatti".',
+    s: '3 = uno o due giorni di lavoro soli fra due liberi sono un buco (come 3-1-1 o 1-1-1); 2 = solo il giorno isolato; 0 = non conta. Vale con "Blocchi compatti".',
+    t: 'numero',
+    p: '3',
+    d: 'Bozza, Migliora la bozza, Controlla le regole (con "blocchi compatti")',
+  },
+  // MODELLO 4+2 / 5+2 (decisione del titolare 15/10/2026): 4 giorni di lavoro e 2 liberi, se
+  // non si riesce 5 e 2; da evitare 3-1-1 e le alternanze 1-1-1-1
+  pattern_lavoro: {
+    g: 'Riposo e giorni di lavoro',
+    n: 'Blocco di lavoro preferito (giorni)',
+    s: '4 = di norma 4 giorni di lavoro di fila poi i liberi (modello 4+2). Vale con "Blocchi compatti".',
+    t: 'numero',
+    p: '4',
+    d: 'Bozza, Migliora la bozza (con "blocchi compatti")',
+  },
+  blocco_lavoro_massimo: {
+    g: 'Riposo e giorni di lavoro',
+    n: 'Blocco di lavoro massimo accettato (giorni)',
+    s: '5 = se il preferito non si riesce, fino a 5 giorni di fila (5+2); di più è un buco. Mai oltre i giorni di fila di legge.',
+    t: 'numero',
+    p: '5',
+    d: 'Bozza, Migliora la bozza, Controlla le regole (con "blocchi compatti")',
+  },
+  riposo_preferito: {
+    g: 'Riposo e giorni di lavoro',
+    n: 'Riposo preferito fra due blocchi (giorni liberi insieme)',
+    s: '2 = i liberi di norma a coppie: un libero solo fra due blocchi di lavoro è un buco (anche 4-1-4). 0 = come prima: solo fra blocchi corti (3-1-1, 2-1-2). Vale con "Riposi a coppie".',
     t: 'numero',
     p: '2',
     d: 'Bozza, Migliora la bozza, Controlla le regole (con "blocchi compatti")',
-  },
-  pattern_lavoro: {
-    g: 'Riposo e giorni di lavoro',
-    n: 'Lunghezza ideale di un blocco di lavoro (giorni)',
-    t: 'numero',
-    d: 'Bozza (con "blocchi compatti")',
   },
   penalita_riposo_isolato: {
     g: 'Riposo e giorni di lavoro',
@@ -571,6 +591,24 @@ const PIANO_REGOLE_GUIDA = {
     p: 'FALSE',
     d: 'Bozza',
   },
+  // SABATO OLTRE LE 23 PER CHI E INDIETRO (decisione del titolare 15/10/2026): la domenica
+  // libera vale solo se il sabato finisce entro le 23. Per settore, predefinito Si e Si.
+  domeniche_arretrate_no_sabato_tardi: {
+    g: 'Domeniche',
+    n: 'Domeniche arretrate: evita i turni del sabato oltre le 23',
+    s: "Sì: a chi è indietro con le domeniche libere valide dell'anno la bozza e Migliora non danno un turno del sabato che finisce dopo le 23 (la domenica dopo non conterebbe): lavora entro le 23 o resta libero.",
+    t: 'sino',
+    p: 'TRUE',
+    d: 'Bozza, Migliora la bozza, Controlla le regole',
+  },
+  domeniche_arretrate_sabato_copertura: {
+    g: 'Domeniche',
+    n: 'Domeniche arretrate: consenti il sabato oltre le 23 in caso di copertura, con avviso',
+    s: "Sì: se nessun altro può coprire il posto del sabato, il turno si dà lo stesso e Controlla le regole e gli Avvisi del mese lo segnalano (non è violazione di legge finché nel resto dell'anno si recupera). No: il posto resta scoperto.",
+    t: 'sino',
+    p: 'TRUE',
+    d: 'Bozza, Migliora la bozza, Controlla le regole (con la regola sopra)',
+  },
   turno_preferito_sigle: {
     g: 'Funzioni e turni',
     n: 'Turno preferito di chi ha la spunta "Preferisce" nelle Preferenze collaboratori',
@@ -605,6 +643,8 @@ const PIANO_REGOLE_LIMITI = {
   max_consecutivi: [1, 7],
   pattern_lavoro: [1, 7],
   blocco_lavoro_minimo: [0, 5],
+  blocco_lavoro_massimo: [1, 7],
+  riposo_preferito: [0, 4],
   blocchi_compatti_peso: [0, 250],
   equita_notti_peso: [0, 20],
   domeniche_libere_anno: [0, 52],
@@ -2915,32 +2955,42 @@ function _pianoProfiloGiorno(dstr) {
   if (dow === 5 || dow === 6) return 'CHIUSURA5';
   return 'D' + dow; // lunedi..giovedi restano distinti
 }
-async function copiaFabbisognoMese() {
-  // il fabbisogno si modifica solo con il permesso Modificare il fabbisogno (v359)
-  if (!_pianoAzioneAutoConsentita('fabbisogno')) return;
-  if (!puoGestirePiano()) return;
-  const p = _pianoMeseSel.split('-');
+// COPIA DEL FABBISOGNO DAL MESE PRECEDENTE, senza finestre: la usano il pulsante "Copia dal
+// mese precedente" (qui sotto) e "Prepara più mesi" (piano-mesi.js), che copia da solo il
+// fabbisogno dei mesi che non ce l hanno. ym = mese da riempire, rep = settore,
+// presenti = celle gia impostate in ym ('data|turno', non si toccano). Ritorna
+// { ymPrec, nPrec, nuovi, riepilogo, modello, senzaModello, nomiProfilo }: nPrec 0 = mese
+// precedente senza fabbisogno.
+async function _pianoFabbisognoCopiaCalcola(ym, rep, presenti) {
+  const p = ym.split('-');
   const dPrec = new Date(parseInt(p[0]), parseInt(p[1]) - 2, 15);
   const ymPrec = dPrec.getFullYear() + '-' + String(dPrec.getMonth() + 1).padStart(2, '0');
   const daP = ymPrec + '-01';
   const aP = ymPrec + '-' + String(_pianoUltimoGiorno(ymPrec)).padStart(2, '0');
   const prec =
-    (await secGet(
-      'piano_fabbisogni?data=gte.' + daP + '&data=lte.' + aP + '&reparto_dip=eq.' + _pianoReparto() + '&limit=3000',
-    )) || [];
-  if (!prec.length) {
-    toast('Nessun fabbisogno nel mese precedente (' + ymPrec + ')');
-    return;
-  }
+    (await secGet('piano_fabbisogni?data=gte.' + daP + '&data=lte.' + aP + '&reparto_dip=eq.' + rep + '&limit=3000')) ||
+    [];
+  const nomiProfilo = {
+    FESTIVO: 'domeniche e festivi',
+    CHIUSURA5: 'venerdì, sabato e vigilie (chiusura alle 5)',
+    D1: 'lunedi',
+    D2: 'martedi',
+    D3: 'mercoledi',
+    D4: 'giovedi',
+  };
+  const esito = { ymPrec, nPrec: prec.length, nuovi: [], riepilogo: {}, modello: {}, senzaModello: [], nomiProfilo };
+  if (!prec.length) return esito;
   // I FESTIVI DEI DUE MESI: servono a riconoscere i giorni che seguono la
   // domenica e le vigilie che chiudono alle 5.
   await _pianoCaricaFestivita(parseInt(p[0]));
   await _pianoCaricaFestivita(dPrec.getFullYear());
-  const nGiorni = _pianoUltimoGiorno(_pianoMeseSel);
-  const giaPresenti = new Set(_pianoFabbCache.map((f) => f.data + '|' + f.turno_codice));
+  const nGiorni = _pianoUltimoGiorno(ym);
+  const giaPresenti = presenti || new Set();
   // MODELLO PER TIPO DI GIORNATA, non per numero del giorno. Copiare il 7 sul 7
   // spostava i venerdi sui lunedi e faceva saltare tutto: qui si prende, per
-  // ogni tipo di giornata, l'assetto piu' ricorrente del mese di partenza.
+  // ogni tipo di giornata, l'assetto piu' ricorrente del mese di partenza
+  // (a pari frequenza il primo giorno del mese: righe in ordine di data).
+  prec.sort((a, b) => String(a.data).localeCompare(String(b.data)));
   const perData = {};
   prec.forEach((f) => {
     perData[f.data] = perData[f.data] || {};
@@ -2958,7 +3008,7 @@ async function copiaFabbisognoMese() {
     perProfilo[pr][firma] = perProfilo[pr][firma] || { n: 0, celle: perData[d] };
     perProfilo[pr][firma].n++;
   });
-  const modello = {};
+  const modello = esito.modello;
   Object.keys(perProfilo).forEach((pr) => {
     let best = null;
     Object.keys(perProfilo[pr]).forEach((f) => {
@@ -2966,32 +3016,51 @@ async function copiaFabbisognoMese() {
     });
     if (best) modello[pr] = best.celle;
   });
-  const nuovi = [];
-  const riepilogo = {};
+  const riepilogo = esito.riepilogo;
   for (let g = 1; g <= nGiorni; g++) {
-    const dstr = _pianoMeseSel + '-' + String(g).padStart(2, '0');
+    const dstr = ym + '-' + String(g).padStart(2, '0');
     const pr = _pianoProfiloGiorno(dstr);
     const m = modello[pr];
     riepilogo[pr] = (riepilogo[pr] || 0) + 1;
     if (!m) continue;
     Object.keys(m).forEach((cod) => {
       if (giaPresenti.has(dstr + '|' + cod)) return;
-      nuovi.push({ data: dstr, turno_codice: cod, quantita: m[cod], reparto_dip: _pianoReparto() });
+      esito.nuovi.push({ data: dstr, turno_codice: cod, quantita: m[cod], reparto_dip: rep });
     });
+  }
+  esito.senzaModello = Object.keys(riepilogo).filter((k) => !modello[k]);
+  return esito;
+}
+// scrive le celle calcolate da _pianoFabbisognoCopiaCalcola (un passo di Annulla, chiuso dal registro)
+async function _pianoFabbisognoCopiaScrivi(calc, ym) {
+  const nuovi = calc.nuovi;
+  for (let i = 0; i < nuovi.length; i += 10) {
+    await Promise.all(nuovi.slice(i, i + 10).map((f) => secPost('piano_fabbisogni', f)));
+  }
+  logAzione(
+    'Piano: fabbisogno copiato per tipo di giornata',
+    calc.ymPrec + ' → ' + ym + ' (' + nuovi.length + ' celle)',
+  );
+  return nuovi.length;
+}
+async function copiaFabbisognoMese() {
+  // il fabbisogno si modifica solo con il permesso Modificare il fabbisogno (v359)
+  if (!_pianoAzioneAutoConsentita('fabbisogno')) return;
+  if (!puoGestirePiano()) return;
+  const calc = await _pianoFabbisognoCopiaCalcola(
+    _pianoMeseSel,
+    _pianoReparto(),
+    new Set(_pianoFabbCache.map((f) => f.data + '|' + f.turno_codice)),
+  );
+  const { ymPrec, nuovi, riepilogo, modello, senzaModello, nomiProfilo } = calc;
+  if (!calc.nPrec) {
+    toast('Nessun fabbisogno nel mese precedente (' + ymPrec + ')');
+    return;
   }
   if (!nuovi.length) {
     toast('Fabbisogno già presente per tutte le celle del mese');
     return;
   }
-  const nomiProfilo = {
-    FESTIVO: 'domeniche e festivi',
-    CHIUSURA5: 'venerdì, sabato e vigilie (chiusura alle 5)',
-    D1: 'lunedi',
-    D2: 'martedi',
-    D3: 'mercoledi',
-    D4: 'giovedi',
-  };
-  const senzaModello = Object.keys(riepilogo).filter((k) => !modello[k]);
   if (
     !(await chiediConferma(
       'Copiare il fabbisogno da ' +
@@ -3015,13 +3084,7 @@ async function copiaFabbisognoMese() {
   )
     return;
   try {
-    for (let i = 0; i < nuovi.length; i += 10) {
-      await Promise.all(nuovi.slice(i, i + 10).map((f) => secPost('piano_fabbisogni', f)));
-    }
-    logAzione(
-      'Piano: fabbisogno copiato per tipo di giornata',
-      ymPrec + ' → ' + _pianoMeseSel + ' (' + nuovi.length + ' celle)',
-    );
+    await _pianoFabbisognoCopiaScrivi(calc, _pianoMeseSel);
     toast('Fabbisogno copiato per tipo di giornata (' + nuovi.length + ' celle)');
     renderPiano();
   } catch (e) {
@@ -3178,5 +3241,5 @@ async function pianoCorreggiDurateNotte() {
 // ===== BENESSERE DEI COLLABORATORI =====
 // Fotografia oggettiva di come e' distribuito il carico di lavoro nell'anno,
 // separata tra personale fisso e ausiliario perche' hanno regole diverse.
-// Il punteggio (0-100) lo calcola il motore PianoRegole.indiceBenessere: qui
-// si raccolgono solo i dati dal piano.
+// Il calcolo e uno solo: pianoBenessereCalcola (js/piano-benessere.js), che confronta ogni
+// persona con le sue scelte e con i colleghi; la scheda e in piano-gestione.js.

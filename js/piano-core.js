@@ -2973,7 +2973,10 @@ async function _pianoInserisciCella(dati) {
 let _pianoScrittureInCorso = 0;
 async function _pianoConScrittura(fn) {
   if (window._pianoAutoInCorso) {
-    toastErrore('Generazione automatica del piano in corso su questo PC: riprova fra qualche minuto.');
+    toastErrore(
+      (window._pianoAutoInCorso.mesi ? 'Prepara più mesi' : 'Generazione automatica del piano') +
+        ' in corso su questo PC: riprova fra qualche minuto.',
+    );
     return false;
   }
   _pianoScrittureInCorso++;
@@ -3284,6 +3287,12 @@ async function _renderPianoCore() {
         );
         // Sistema
         let sis = '';
+        if (puoAuto && typeof pianoPreparaMesi === 'function')
+          sis += voce(
+            'Prepara più mesi',
+            'pianoPreparaMesi()',
+            'Prepara 3, 6 o fino a 12 mesi uno dopo l altro: copia il fabbisogno se manca, fa la bozza e la migliora, poi passa al mese dopo',
+          );
         if (puoAuto)
           sis += voce(
             'Migliora la bozza',
