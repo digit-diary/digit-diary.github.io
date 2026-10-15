@@ -28,12 +28,15 @@ async function _salvaEsegui() {
   // il turno di oggi diventava M).
   let malDal = '',
     malAl = '';
-  if (tipoSelezionato === nomeCorrente('Malattia')) {
+  // ASSENZA (attesa certificato): stesso periodo Dal/Al della malattia
+  const eAss = tipoSelezionato === nomeCorrente('Assenza');
+  if (_diarioTipoConPeriodo(tipoSelezionato)) {
     malDal = ((document.getElementById('inp-mal-dal') || {}).value || '').trim();
     malAl = ((document.getElementById('inp-mal-al') || {}).value || '').trim();
     if (malDal && malAl && malDal > malAl) {
       toastErrore(
-        'Malattia non salvata: la data "Al" (' +
+        (eAss ? 'Assenza' : 'Malattia') +
+          ' non salvata: la data "Al" (' +
           malAl.split('-').reverse().join('.') +
           ') è prima della data "Dal" (' +
           malDal.split('-').reverse().join('.') +
@@ -50,11 +53,18 @@ async function _salvaEsegui() {
   nome = await _verificaNome(nome, true);
   if (!nome) return; // finestra del nome chiusa senza scegliere: non si salva
   document.getElementById('inp-nome').value = nome;
+  // MALATTIA SOPRA UN ASSENZA IN ATTESA DI CERTIFICATO: la trasforma solo l HR (Certificato
+  // ricevuto), come nel database
+  if (
+    tipoSelezionato === nomeCorrente('Malattia') &&
+    (await _diarioMalattiaSopraAss(nome, { dal: malDal || oggiLocale(), al: malAl || malDal || oggiLocale() }))
+  )
+    return;
   const importo = parseFloat(document.getElementById('inp-importo').value) || 0;
   const valuta = importo ? document.getElementById('inp-valuta').value : '';
   const reparto = document.getElementById('inp-reparto').value;
-  // Malattia con range Dal/Al → crea registrazione per ogni giorno
-  if (tipoSelezionato === nomeCorrente('Malattia')) {
+  // Malattia (o Assenza) con range Dal/Al → crea registrazione per ogni giorno
+  if (_diarioTipoConPeriodo(tipoSelezionato)) {
     if (malDal && malAl) {
       const dInizio = new Date(malDal + 'T12:00:00'),
         dFine = new Date(malAl + 'T12:00:00');
@@ -64,9 +74,12 @@ async function _salvaEsegui() {
           nome +
             ': registrare ' +
             (nGiorni === 1
-              ? '1 giorno di malattia il ' + dInizio.toLocaleDateString('it-IT')
+              ? '1 giorno di ' +
+                (eAss ? 'assenza (attesa certificato)' : 'malattia') +
+                ' il ' +
+                dInizio.toLocaleDateString('it-IT')
               : nGiorni +
-                ' giorni di malattia dal ' +
+                (eAss ? ' giorni di assenza (attesa certificato) dal ' : ' giorni di malattia dal ') +
                 dInizio.toLocaleDateString('it-IT') +
                 ' al ' +
                 dFine.toLocaleDateString('it-IT')) +
@@ -84,10 +97,7 @@ async function _salvaEsegui() {
           '-' +
           String(d.getDate()).padStart(2, '0');
         const esiste = datiCache.find(
-          (e) =>
-            e.nome.toLowerCase() === nome.toLowerCase() &&
-            e.tipo === nomeCorrente('Malattia') &&
-            giornoDi(e.data) === dStr,
+          (e) => e.nome.toLowerCase() === nome.toLowerCase() && e.tipo === tipoSelezionato && giornoDi(e.data) === dStr,
         );
         if (!esiste) {
           const rec = {
@@ -122,9 +132,10 @@ async function _salvaEsegui() {
       }
       document.getElementById('inp-testo').value = '';
       resetMalFiltri();
-      logAzione('Malattia range', nome + ' · ' + creati + ' giorni');
+      logAzione(eAss ? 'Assenza range' : 'Malattia range', nome + ' · ' + creati + ' giorni');
       // PIANO: i giorni con un turno diventano M protetta, i C restano C (MC),
       // i CGF in piu' tornano C. Prima succedeva solo correggendo la registrazione.
+      // Assenza: ASS solo sui giorni con un turno, nei giorni liberi niente.
       if (creati && typeof sincronizzaMalattiaPiano === 'function') {
         try {
           const sync = await sincronizzaMalattiaPiano(
@@ -132,10 +143,12 @@ async function _salvaEsegui() {
             '',
             malDal,
             'dal ' + dInizio.toLocaleDateString('it-IT') + ' al ' + dFine.toLocaleDateString('it-IT'),
+            _diarioOpzSync(tipoSelezionato),
           );
-          if (sync && sync.messe) toast(nome + ': ' + sync.messe + ' turni del piano segnati M', 5000);
+          if (sync && sync.messe)
+            toast(nome + ': ' + sync.messe + ' turni del piano segnati ' + (eAss ? 'ASS' : 'M'), 5000);
         } catch (e) {
-          toastErrore('Piano non allineato alla malattia: ' + (e.message || ''));
+          toastErrore('Piano non allineato ' + (eAss ? 'all assenza: ' : 'alla malattia: ') + (e.message || ''));
         }
       }
       if (nonSalvati.length)
@@ -150,13 +163,24 @@ async function _salvaEsegui() {
         );
       else
         toast(
-          nome + ': ' + creati + (creati === 1 ? ' giorno di malattia registrato' : ' giorni di malattia registrati'),
+          nome +
+            ': ' +
+            creati +
+            (eAss
+              ? creati === 1
+                ? ' giorno di assenza (attesa certificato) registrato'
+                : ' giorni di assenza (attesa certificato) registrati'
+              : creati === 1
+                ? ' giorno di malattia registrato'
+                : ' giorni di malattia registrati'),
         );
       aggiornaNomi();
       render();
       updateStats();
-      // Popup copertura turno: chi copre / chi ha rifiutato
-      if (creati && typeof apriPopupCopertura === 'function') apriPopupCopertura(nome, malDal);
+      // COPERTURA: se la malattia ha lasciato scoperti dei turni nel piano, si propone
+      // subito chi li copre (Sostituisci chi e in malattia, gia compilata: il turno passa al
+      // collega). Altrimenti, o se si rinuncia, il popup dei punti come prima.
+      if (creati) _diarioAvvisoCopertura(nome, malDal, malAl);
       return;
     }
   }
@@ -300,12 +324,12 @@ async function _salvaEsegui() {
   try {
     await secPost('registrazioni', rec);
     datiCache.unshift(rec);
-    // malattia di un giorno solo: stesso allineamento del piano del periodo
-    if (tipoSelezionato === nomeCorrente('Malattia') && typeof sincronizzaMalattiaPiano === 'function') {
+    // malattia (o assenza) di un giorno solo: stesso allineamento del piano del periodo
+    if (_diarioTipoConPeriodo(tipoSelezionato) && typeof sincronizzaMalattiaPiano === 'function') {
       try {
-        await sincronizzaMalattiaPiano(nome, '', rec.data, rec.testo || '');
+        await sincronizzaMalattiaPiano(nome, '', rec.data, rec.testo || '', _diarioOpzSync(tipoSelezionato));
       } catch (e) {
-        toastErrore('Piano non allineato alla malattia: ' + (e.message || ''));
+        toastErrore('Piano non allineato ' + (eAss ? 'all assenza: ' : 'alla malattia: ') + (e.message || ''));
       }
     }
     document.getElementById('inp-testo').value = '';
@@ -334,9 +358,10 @@ async function _salvaEsegui() {
     if (tipoSelezionato === nomeCorrente('Richiesta')) {
       _suggerisciFollowUp(nome, testo);
     }
-    // Malattia (giorno singolo) → popup copertura turno
-    if (tipoSelezionato === nomeCorrente('Malattia') && typeof apriPopupCopertura === 'function') {
-      apriPopupCopertura(nome, oggiLocale());
+    // Malattia o Assenza (giorno singolo) → copertura del turno nel piano o popup dei punti
+    if (_diarioTipoConPeriodo(tipoSelezionato)) {
+      const oggiM = oggiLocale();
+      _diarioAvvisoCopertura(nome, oggiM, oggiM);
     }
   } catch (e) {
     toast('Errore salvataggio');
@@ -437,10 +462,10 @@ async function elimina(id) {
     pinnedIds.delete(id);
     // ND cancellata: modulo e piano tornano come prima ("Ex R22")
     if (_e && _e.tipo === nomeCorrente('Non Disponibilità')) await _diarioNdRiallinea([_e]);
-    // malattia cancellata: nel Piano tornano le sigle che la M aveva coperto ("Ex R23")
-    if (_e && _e.tipo === nomeCorrente('Malattia') && typeof sincronizzaMalattiaPiano === 'function') {
+    // malattia (o assenza) cancellata: nel Piano tornano le sigle che la M aveva coperto ("Ex R23")
+    if (_e && _diarioTipoConPeriodo(_e.tipo) && typeof sincronizzaMalattiaPiano === 'function') {
       try {
-        await sincronizzaMalattiaPiano(_e.nome, _e.testo || '', _e.data, '');
+        await sincronizzaMalattiaPiano(_e.nome, _e.testo || '', _e.data, '', _diarioOpzSync(_e.tipo));
       } catch (e2) {
         toastErrore('Registrazione nel cestino, ma il piano non è allineato: ' + ((e2 && e2.message) || e2));
       }
@@ -503,6 +528,7 @@ function modificaRegistrazione(id) {
     _malAl = (_yb < 100 ? 2000 + _yb : _yb) + '-' + _malDalAl[5].padStart(2, '0') + '-' + _malDalAl[4].padStart(2, '0');
   }
   const _isMalattia = e.tipo === nomeCorrente('Malattia');
+  const _conPeriodo = _diarioTipoConPeriodo(e.tipo);
   // Stato copertura attuale (mostrato nel modal per le malattie)
   let _copStatusHtml = '';
   if (_isMalattia && typeof eventiCopertura === 'function') {
@@ -549,7 +575,7 @@ function modificaRegistrazione(id) {
       )
       .join('') +
     '</div></div><div id="edit-malattia-dates" style="display:' +
-    (_isMalattia ? 'flex' : 'none') +
+    (_conPeriodo ? 'flex' : 'none') +
     ';gap:10px;margin-top:8px"><div class="pwd-field" style="flex:1"><label>Dal</label><input type="text" id="edit-mal-dal" value="' +
     (_malDal ? new Date(_malDal + 'T12:00:00').toLocaleDateString('it-IT') : '') +
     '" placeholder="GG/MM/AAAA" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)"></div><div class="pwd-field" style="flex:1"><label>Al</label><input type="text" id="edit-mal-al" value="' +
@@ -608,7 +634,7 @@ function modificaRegistrazione(id) {
       origClick();
       window._editTipoCorrente = btn.dataset.tipo;
       const malDiv = document.getElementById('edit-malattia-dates');
-      if (malDiv) malDiv.style.display = btn.dataset.tipo === nomeCorrente('Malattia') ? 'flex' : 'none';
+      if (malDiv) malDiv.style.display = _diarioTipoConPeriodo(btn.dataset.tipo) ? 'flex' : 'none';
     };
   });
 }
@@ -625,8 +651,8 @@ async function salvaModificaRegistrazione(id, conCopertura) {
     toast('Inserisci una descrizione');
     return;
   }
-  // Se malattia con dal/al, aggiorna la descrizione
-  if (tipo === nomeCorrente('Malattia')) {
+  // Se malattia (o assenza) con dal/al, aggiorna la descrizione
+  if (_diarioTipoConPeriodo(tipo)) {
     const dalEl = document.getElementById('edit-mal-dal'),
       alEl = document.getElementById('edit-mal-al');
     const dalVal = (dalEl ? dalEl.value : '').trim(),
@@ -690,6 +716,13 @@ async function salvaModificaRegistrazione(id, conCopertura) {
     const dataVecchia = eV ? eV.data : '';
     const nomeVecchio = eV ? eV.nome : '';
     const importoVecchio = eV ? parseFloat(eV.importo) || 0 : 0;
+    // MALATTIA SOPRA UN ASSENZA (tipo cambiato da Assenza, o date allargate): solo l HR, con
+    // Certificato ricevuto (come nel database)
+    if (
+      tipo === nomeCorrente('Malattia') &&
+      (await _diarioMalattiaSopraAss(nome, _pianoDateMalattia(testo, dataVecchia), eV && eV.tipo === tipo ? eV : null))
+    )
+      return;
     await secPatch('registrazioni', 'id=eq.' + id, update);
     const e = datiCache.find((x) => x.id === id);
     if (e) Object.assign(e, update);
@@ -700,7 +733,13 @@ async function salvaModificaRegistrazione(id, conCopertura) {
       { nome: nome, tipo: tipo, testo: testo, data: dataVecchia },
     );
     if (sync && (sync.tolte || sync.messe))
-      toast('Piano allineato: ' + sync.tolte + ' M tolte, ' + sync.messe + ' M messe');
+      toast(
+        'Piano allineato: ' +
+          sync.tolte +
+          (tipo === nomeCorrente('Assenza') ? ' celle tolte, ' : ' M tolte, ') +
+          sync.messe +
+          (tipo === nomeCorrente('Assenza') ? ' ASS messe' : ' M messe'),
+      );
     // ND modificata (date, persona o tipo): vecchi e nuovi mesi riallineati
     await _diarioNdRiallinea([
       { nome: nomeVecchio, tipo: eV ? eV.tipo : '', testo: testoVecchio },
@@ -733,9 +772,17 @@ async function salvaModificaRegistrazione(id, conCopertura) {
     renderAmmonimentiAlerts();
     toast('Registrazione modificata');
     // "Salva + Copertura": apre il popup chi copre / chi ha rifiutato
-    if (conCopertura && tipo === nomeCorrente('Malattia') && typeof apriPopupCopertura === 'function') {
+    if (conCopertura && _diarioTipoConPeriodo(tipo) && typeof apriPopupCopertura === 'function') {
       const dataRef = _copDataRef || (e && e.data ? giornoDi(e.data) : oggiLocale());
-      setTimeout(() => apriPopupCopertura(nome, dataRef), 150);
+      // turni ancora scoperti nel piano: prima chi li copre, poi i punti
+      const perC = e && typeof _periodoCopertura === 'function' ? _periodoCopertura(e) : null;
+      const alRef = perC && perC.al ? perC.al : dataRef;
+      setTimeout(async () => {
+        // chiesto con il pulsante: il popup dei punti si apre; i turni ancora scoperti
+        // restano nell avviso della pagina
+        apriPopupCopertura(nome, dataRef);
+        _diarioAvvisoCopertura(nome, dataRef, alRef);
+      }, 150);
     }
   } catch (e) {
     toast('Errore salvataggio');
@@ -748,6 +795,13 @@ function apriModal(id, tipo) {
   modalTipoSel = tipo;
   renderTipiUI();
   document.getElementById('modal-overlay').classList.remove('hidden');
+}
+// MALATTIA REGISTRATA: avviso discreto nella pagina (js/piano-cambi.js) con i turni da
+// coprire (Copri ora · Più tardi) o i punti della copertura. Mai una finestra.
+function _diarioAvvisoCopertura(nome, dal, al) {
+  if (typeof _pianoAvvisoCopertura === 'function')
+    _pianoAvvisoCopertura(nome, dal, al || dal).catch((e) => console.error('avviso copertura', e));
+  else if (typeof apriPopupCopertura === 'function') apriPopupCopertura(nome, dal);
 }
 // ND NEL PIANO GIA FATTO: se nei giorni di non disponibilita il jolly ha gia un turno
 // (piano del mese pubblicato), il programma lo dice e propone subito chi lo copre
@@ -838,11 +892,11 @@ async function _diarioNdRiallinea(righe) {
 // PIANO ALLINEATO A OGNI MODIFICA DI UNA MALATTIA nel Diario: date cambiate,
 // persona cambiata (le M del nome vecchio si tolgono), tipo cambiato da o verso
 // Malattia. Prima si allineava solo quando cambiava il testo, e sul nome nuovo.
+// Lo stesso per l ASSENZA (attesa certificato, celle ASS). Prima la malattia, poi l assenza:
+// Assenza -> Malattia (HR) trasforma gli ASS in M; Malattia -> Assenza riporta le M dei
+// turni ad ASS e le M dei giorni liberi alla sigla di prima.
 async function _diarioAllineaMalattiaPiano(vecchia, nuova) {
   if (typeof sincronizzaMalattiaPiano !== 'function') return null;
-  const malT = nomeCorrente('Malattia');
-  const eraMal = vecchia.tipo === malT;
-  const eMal = nuova.tipo === malT;
   const altraPersona = String(vecchia.nome || '').toLowerCase() !== String(nuova.nome || '').toLowerCase();
   const tot = { tolte: 0, messe: 0 };
   const somma = (r) => {
@@ -852,17 +906,82 @@ async function _diarioAllineaMalattiaPiano(vecchia, nuova) {
     }
   };
   try {
-    if (eraMal && eMal && !altraPersona) {
-      if (vecchia.testo !== nuova.testo)
-        somma(await sincronizzaMalattiaPiano(nuova.nome, vecchia.testo, vecchia.data, nuova.testo));
-      return tot;
+    for (const tipoX of [nomeCorrente('Malattia'), nomeCorrente('Assenza')]) {
+      const opz = _diarioOpzSync(tipoX);
+      const eraX = vecchia.tipo === tipoX;
+      const eX = nuova.tipo === tipoX;
+      if (eraX && eX && !altraPersona) {
+        if (vecchia.testo !== nuova.testo)
+          somma(await sincronizzaMalattiaPiano(nuova.nome, vecchia.testo, vecchia.data, nuova.testo, opz));
+        continue;
+      }
+      if (eraX) somma(await sincronizzaMalattiaPiano(vecchia.nome, vecchia.testo, vecchia.data, '', opz));
+      if (eX) somma(await sincronizzaMalattiaPiano(nuova.nome, '', nuova.data, nuova.testo, opz));
     }
-    if (eraMal) somma(await sincronizzaMalattiaPiano(vecchia.nome, vecchia.testo, vecchia.data, ''));
-    if (eMal) somma(await sincronizzaMalattiaPiano(nuova.nome, '', nuova.data, nuova.testo));
   } catch (e) {
     toastErrore('Piano non allineato alla malattia: ' + ((e && e.message) || e));
   }
   return tot;
+}
+// tipo con il periodo Dal/Al e le celle nel Piano: Malattia (M) o Assenza (ASS)
+function _diarioTipoConPeriodo(t) {
+  return !!t && (t === nomeCorrente('Malattia') || t === nomeCorrente('Assenza'));
+}
+// opzioni della sincronizzazione del Piano per il tipo (Assenza = celle ASS)
+function _diarioOpzSync(tipo) {
+  return tipo === nomeCorrente('Assenza') ? { codice: 'ASS' } : undefined;
+}
+// MALATTIA SOPRA UN ASSENZA IN ATTESA DI CERTIFICATO (senza Storico HR · modificare): la
+// malattia la registra l HR con «Certificato ricevuto».
+// esclusa: la registrazione che si sta modificando. true = fermato (avviso mostrato).
+// giorni: { dal, al } (date ISO) oppure l elenco delle date
+async function _diarioMalattiaSopraAss(nome, giorni, esclusa) {
+  if (typeof puoModificareStoricoHr === 'function' && puoModificareStoricoHr()) return false;
+  let gg = [];
+  if (Array.isArray(giorni)) gg = giorni.slice();
+  else if (giorni && giorni.dal) {
+    // { dal, al } dal form: tutti i giorni del periodo
+    const d = new Date(giorni.dal + 'T12:00:00');
+    for (let n = 0; n < 400 && dataLocaleISO(d) <= (giorni.al || giorni.dal); n++, d.setDate(d.getDate() + 1))
+      gg.push(dataLocaleISO(d));
+  }
+  if (!gg.length) return false;
+  gg = [...new Set(gg)].sort();
+  const tipoAss = nomeCorrente('Assenza');
+  const conAss = new Set();
+  (typeof datiCache !== 'undefined' ? datiCache : []).forEach((e) => {
+    if (e.eliminato || e.tipo !== tipoAss || (esclusa && e.id === esclusa.id)) return;
+    if (String(e.nome || '').toLowerCase() !== String(nome).toLowerCase()) return;
+    _pianoDateMalattia(e.testo || '', e.data).forEach((d) => gg.includes(d) && conAss.add(d));
+  });
+  try {
+    const celle =
+      (await secGet(
+        'piano?collaboratore=eq.' +
+          encodeURIComponent(nome) +
+          '&codice=eq.ASS&data=gte.' +
+          gg[0] +
+          '&data=lte.' +
+          gg[gg.length - 1] +
+          '&select=data',
+      )) || [];
+    celle.forEach((r) => gg.includes(String(r.data).substring(0, 10)) && conAss.add(String(r.data).substring(0, 10)));
+  } catch (e) {
+    /* senza lettura del piano: valgono le registrazioni */
+  }
+  if (!conAss.size) return false;
+  const elenco = [...conAss]
+    .sort()
+    .map((d) => d.substring(8, 10) + '.' + d.substring(5, 7))
+    .join(', ');
+  await mostraAvviso(
+    nome +
+      ' ha un assenza in attesa di certificato (ASS) il ' +
+      elenco +
+      '.\n\nLa malattia sopra un assenza la registra chi ha lo Storico HR (modificare), con «Certificato ricevuto» nella scheda del collaboratore o sulla cella ASS del Piano, quando arriva il certificato. Niente è stato salvato.',
+    { titolo: 'Assenza in attesa di certificato' },
+  );
+  return true;
 }
 function chiudiModal() {
   document.getElementById('modal-overlay').classList.add('hidden');
@@ -892,6 +1011,14 @@ async function confermaCambioTipo() {
     toastErrore(e0.nome + ' è fisso: la non disponibilità vale solo per i jolly.');
     return;
   }
+  // Assenza (attesa certificato) -> Malattia: solo l HR (Certificato ricevuto)
+  if (
+    e0 &&
+    modalTipoSel === nomeCorrente('Malattia') &&
+    e0.tipo !== modalTipoSel &&
+    (await _diarioMalattiaSopraAss(e0.nome, _pianoDateMalattia(e0.testo || '', e0.data)))
+  )
+    return;
   try {
     await secPatch('registrazioni', 'id=eq.' + modalEntryId, {
       tipo: modalTipoSel,

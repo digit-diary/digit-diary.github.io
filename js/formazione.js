@@ -3811,9 +3811,13 @@ function badgeCoperturaHtml(entry) {
 function _dataFineAssenza(assente, dataRif) {
   if (!assente || !dataRif) return dataRif;
   const tipoMal = typeof nomeCorrente === 'function' ? nomeCorrente('Malattia') : 'Malattia';
+  const tipoAss = typeof nomeCorrente === 'function' ? nomeCorrente('Assenza') : 'Assenza';
   const nomeL = assente.toLowerCase();
   const e = (typeof datiCache !== 'undefined' ? datiCache : []).find(
-    (x) => x.tipo === tipoMal && (x.nome || '').toLowerCase() === nomeL && _dataRifCopertura(x) === dataRif,
+    (x) =>
+      (x.tipo === tipoMal || x.tipo === tipoAss) &&
+      (x.nome || '').toLowerCase() === nomeL &&
+      _dataRifCopertura(x) === dataRif,
   );
   return e ? _periodoCopertura(e).al : dataRif;
 }

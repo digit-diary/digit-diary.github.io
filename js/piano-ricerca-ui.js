@@ -410,11 +410,22 @@ async function _ricercaPrepara(opz) {
     return _pianoViolazioniPersona(n, mese, mese.concat(bordoDi[n] || []), ctx);
   };
   // costo della persona e violazioni per tipo (stessi tipi del controllo finale)
+  // BLOCCHI COMPATTI (v453, qualita del piano, piano-genera.js): ogni buco costa il peso della
+  // regola (60): meno di un posto coperto, nessun vincolo. Prima nessun costo: le mosse
+  // "gratis" spostavano giorni a caso e Migliora spezzava i blocchi della bozza
+  // DUE TEMPI: durante la ricerca a caso i buchi non contano (la ricerca copre i posti come
+  // prima: col peso dentro la ricerca, anche solo un quinto e solo nell ultima parte, restavano
+  // 1-3 posti scoperti in piu, misura novembre e dicembre 2026 Slots e Tavoli, 3 semi); nella
+  // rifinitura finale (scambi di giorni e di turno, che non cambiano i posti coperti) contano
+  // col peso pieno. La compattezza non si paga mai con un posto scoperto.
+  const parBl = typeof _pianoBlocchiParam === 'function' ? _pianoBlocchiParam() : { attivo: false };
+  let pesoBlOra = 0;
   const valutaPersona = (n, mappa) => {
     const mese = righePersona(n, mappa);
     const viol = _pianoViolazioniPersona(n, mese, mese.concat(bordoDi[n] || []), ctx);
     let costo = 0;
     viol.forEach((v) => (costo += _ricercaPuntiDi(v.msg)));
+    if (pesoBlOra) costo += pesoBlOra * _pianoBlocchiPersona(n, mese, bordoDi[n] || [], ym, parBl).length;
     if (obiettivo[n] != null) {
       const infoO = _pianoCollabInfo(n) || {};
       const pct = parseFloat(infoO.percentuale) || 1;
@@ -531,6 +542,10 @@ async function _ricercaPrepara(opz) {
       fissi: opz.fissi || null,
       tipoNotte: tipoNotte,
       gruppoEquita: gruppoEquita,
+      // rifinitura finale: i buchi nei blocchi col peso pieno (vedi parBl)
+      primaDellaRifinitura: () => {
+        pesoBlOra = parBl.attivo ? parBl.peso || 0 : 0;
+      },
     },
   };
 }
@@ -605,6 +620,8 @@ function _ricercaMisuraUfficiale(righe, fabbOriginale, riservati) {
       oreSotto: sotto,
       tipi: tipi,
       scoperti: _ricercaScoperti(righe, fabbOriginale),
+      // buchi nei blocchi (qualita, non vincolo): per il resoconto
+      blocchi: typeof _pianoBlocchiMese === 'function' ? _pianoBlocchiMese(righe).length : 0,
     };
   } finally {
     _pianoRighe = salva;
@@ -668,6 +685,8 @@ async function pianoRicercaCalcola(secondi, onPasso, opz) {
   const variante = parseInt(opz.variante) || 0;
   const seme = opz.seme != null ? opz.seme : PianoRicerca.semeRicerca(prep.ym, prep.reparto, variante);
   const pn = parseFloat(_pianoRegolaVal('equita_notti_peso'));
+  // ITERAZIONI, non secondi: stesso numero di passi = stesso risultato (ripetibile)
+  const totIter = Math.max(1, opz.iterazioni || Math.round((Math.max(1, secondi) / 60) * RICERCA_ITER_MINUTO));
   const motore = PianoRicerca.crea(
     prep.problema,
     Object.assign(
@@ -681,14 +700,18 @@ async function pianoRicercaCalcola(secondi, onPasso, opz) {
         // se lo stato corrente e fuori dai vincoli (Slots novembre 2026, stessa bozza e seme:
         // 15 scoperti contro 17 con lo sforo pieno da subito, 19 in quadrato, 36 senza sforo)
         sforoCurva: 'lineare',
+        // blocchi compatti: niente scambio di giorni a caso (misura dicembre 2026 Tavoli, 3 semi: 2-3
+        // posti scoperti in piu); i blocchi li compatta la rifinitura finale, che li prova tutti
+        scambioGiorni: false,
+        // rifinitura dei blocchi: tante prove quante le iterazioni del tempo scelto (1 minuto =
+        // 42.000; dicembre 2026 Tavoli con la meta: 56 buchi invece di 19)
+        rifinituraScambi: totIter,
         tornaAlMigliore: 0.3,
         seme: seme,
       },
       opz.motore || {},
     ),
   );
-  // ITERAZIONI, non secondi: stesso numero di passi = stesso risultato (ripetibile)
-  const totIter = Math.max(1, opz.iterazioni || Math.round((Math.max(1, secondi) / 60) * RICERCA_ITER_MINUTO));
   const msFreno = Math.max(1, secondi) * 1000 * RICERCA_TEMPO_FRENO;
   const FETTA = 25; // ~30 ms: la pagina resta usabile
   const inizio = Date.now();
@@ -840,6 +863,9 @@ async function pianoMigliora(opz) {
     riga('di cui posti riservati (es. Supervisor)', P.riservati, D.riservati) +
     riga('Persone sotto il minimo di ore', P.oreSotto, D.oreSotto) +
     riga('Turni oltre il fabbisogno (doppioni)', res.eccesso.prima, res.eccesso.dopo) +
+    (P.blocchi || D.blocchi
+      ? riga('Buchi nei blocchi (giorni isolati, liberi soli fra blocchi corti; qualità)', P.blocchi, D.blocchi)
+      : '') +
     (nottiAccese
       ? riga('Squilibrio delle notti fra colleghi (più basso è meglio)', res.notti.prima, res.notti.dopo)
       : '\n• Divisione delle notti: non considerata (impostazione nelle Regole a 0)') +

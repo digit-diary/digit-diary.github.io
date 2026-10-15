@@ -2187,13 +2187,6 @@ function apriSchedaCollaboratore(nome) {
   const totReg = entries.length;
   const errori = entries.filter((e) => e.tipo === tipoErr);
   const totErr = errori.length;
-  const totErrCost = errori.reduce((s, e) => s + (parseFloat(e.importo) || 0), 0);
-  // Differenze cassa con segno: la direzione sta nel testo (ammanco/eccedenza)
-  const totAmmanchi = errori.reduce((s, e) => s + (/ammanco/i.test(e.testo || '') ? parseFloat(e.importo) || 0 : 0), 0);
-  const totEccedenze = errori.reduce(
-    (s, e) => s + (/eccedenza/i.test(e.testo || '') ? parseFloat(e.importo) || 0 : 0),
-    0,
-  );
   const _mal = _malattieDi(entries, tipoMal);
   const totMal = _mal.giorni;
   const totAmm = entries.filter((e) => e.tipo === tipoAmm).length;
@@ -2345,6 +2338,34 @@ function apriSchedaCollaboratore(nome) {
   const _kpiAttr = function (source, tipo) {
     return ' style="cursor:pointer" title="Clicca per vedere le voci"' + _kpiClick(source, tipo);
   };
+  // ASSENZE IN ATTESA DI CERTIFICATO (Assenza nel Diario, ASS nel Piano): non sono malattia,
+  // 0 ore. Chi ha Storico HR · modificare registra il certificato da qui.
+  const _assTipoS = nomeCorrente('Assenza');
+  const _assGgS = [];
+  entries
+    .filter((e) => e.tipo === _assTipoS && !e.eliminato)
+    .forEach((e) =>
+      (typeof _pianoDateMalattia === 'function' ? _pianoDateMalattia(e.testo || '', e.data) : []).forEach(
+        (d) => !_assGgS.includes(d) && _assGgS.push(d),
+      ),
+    );
+  if (_assGgS.length && _hrVede) {
+    _assGgS.sort();
+    html +=
+      '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 10px;padding:8px 12px;border-left:4px solid ' +
+      (typeof PIANO_COLORI_SPECIALI !== 'undefined' ? PIANO_COLORI_SPECIALI.ASS : '#8e5bb5') +
+      ';background:var(--paper2);border-radius:3px;font-size:var(--fs-md,.875rem)"><span><b>Assenza in attesa di certificato</b> (ASS, 0 ore): ' +
+      _assGgS.map((d) => d.substring(8, 10) + '.' + d.substring(5, 7) + '.' + d.substring(0, 4)).join(', ') +
+      '</span>' +
+      (_hrMod && typeof apriCertificatoRicevuto === 'function'
+        ? '<button class="btn-salva" style="padding:5px 12px" onclick="apriCertificatoRicevuto(\'' +
+          neS +
+          "','" +
+          _assGgS[0] +
+          '\')">Certificato ricevuto</button>'
+        : '<span style="color:var(--muted)">il certificato lo registra chi ha Storico HR · modificare</span>') +
+      '</div>';
+  }
   html += '<div class="scheda-kpi-grid">';
   html +=
     '<div class="scheda-kpi"' +
@@ -2358,21 +2379,8 @@ function apriSchedaCollaboratore(nome) {
     '><div class="kpi-val" style="color:var(--accent)">' +
     totErr +
     '</div><div class="kpi-lbl">Errori</div></div>';
-  if (totErrCost && _hrVede)
-    html +=
-      '<div class="scheda-kpi"' +
-      _kpiAttr('reg', tipoErr) +
-      '><div class="kpi-val" style="color:var(--accent)">' +
-      fmtCHF(totErrCost) +
-      ' CHF</div>' +
-      (totAmmanchi || totEccedenze
-        ? '<div style="font-size:11px;margin-top:2px;font-weight:600"><span style="color:var(--c-rosso,#c0392b)">-' +
-          fmtCHF(totAmmanchi) +
-          '</span> / <span style="color:var(--c-verde,#2c6e49)">+' +
-          fmtCHF(totEccedenze) +
-          '</span></div>'
-        : '') +
-      '<div class="kpi-lbl">Costo errori</div></div>';
+  // Niente totale delle differenze di cassa nella scheda (decisione del titolare, 15/10/2026):
+  // demoralizza nella valutazione; restano il numero degli errori e l importo di ogni registrazione.
   if (_hrVede)
     html +=
       '<div class="scheda-kpi"' +
@@ -3158,6 +3166,8 @@ var _HR_TIPO_STILE = {
   nota: { label: 'Nota', col: 'var(--muted)' },
   congedo_np: { label: 'Congedo non pagato', col: '#7b2d8b' },
   cessazione: { label: 'Fine contratto', col: '#c0392b' },
+  // Certificato ricevuto: le assenze in attesa di certificato (ASS) diventano malattia
+  certificato: { label: 'Certificato medico', col: '#1a7a6d' },
 };
 function _renderStoricoHrSezione(nome) {
   const _hrFull = typeof puoVedereStoricoHr === 'function' && puoVedereStoricoHr();
@@ -3789,21 +3799,6 @@ async function stampaSchedaPDF(nome) {
   var totAmm = entries.filter(function (e) {
     return e.tipo === tipoAmm;
   }).length;
-  var totErrCost = entries
-    .filter(function (e) {
-      return e.tipo === tipoErr;
-    })
-    .reduce(function (s, e) {
-      return s + (parseFloat(e.importo) || 0);
-    }, 0);
-  var _pdfAmm = 0,
-    _pdfEcc = 0;
-  entries.forEach(function (e) {
-    if (e.tipo !== tipoErr) return;
-    var v = parseFloat(e.importo) || 0;
-    if (/ammanco/i.test(e.testo || '')) _pdfAmm += v;
-    else if (/eccedenza/i.test(e.testo || '')) _pdfEcc += v;
-  });
   var allin = moduli.filter(function (m) {
     return m.tipo === 'allineamento';
   }).length;
@@ -3853,21 +3848,12 @@ async function stampaSchedaPDF(nome) {
   doc.setTextColor(0);
   y += 6;
 
-  // KPI table: costo errori, malattie e dati disciplinari solo con lo Storico HR
+  // KPI table: malattie e dati disciplinari solo con lo Storico HR (niente totale delle differenze di cassa)
   var _kpiTesta = ['Registrazioni', 'Errori'];
   var _kpiRiga = [entries.length, totErr];
   if (_pdfHr) {
-    _kpiTesta.push('Costo Errori', 'Malattie (giorni)', 'Amm. Verbali', 'Allineamenti');
-    _kpiRiga.push(
-      totErrCost
-        ? 'CHF ' +
-            fmtCHF(totErrCost) +
-            (_pdfAmm || _pdfEcc ? ' (-' + fmtCHF(_pdfAmm) + ' / +' + fmtCHF(_pdfEcc) + ')' : '')
-        : '0',
-      totMal,
-      totAmm,
-      allin,
-    );
+    _kpiTesta.push('Malattie (giorni)', 'Amm. Verbali', 'Allineamenti');
+    _kpiRiga.push(totMal, totAmm, allin);
   }
   _kpiTesta.push('Apprezzamenti');
   _kpiRiga.push(apprMod);

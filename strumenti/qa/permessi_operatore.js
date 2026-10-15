@@ -1,16 +1,5 @@
-// ============================================================
-// COPIA NEL REPOSITORY (versionata dal 11/10/2026, migrazione 20260913).
-// Originale: ~/DiarioProvaLocale/strumenti/qa/permessi_operatore.js (si lancia da li o da qui).
-// COSA SERVE: la copia di prova locale avviata, cioe
-//   - database di prova diario2 (porta 55432) con tutte le migrazioni applicate,
-//   - PostgREST (3000) e sito come IIS (8000): bash ~/DiarioProvaLocale/avvia_locale.sh
-//   - chiave pubblica di prova in ~/DiarioProvaLocale/pgprova/chiavi_prova.env (la crea avvia_locale.sh),
-//   - operatori di prova della copia locale (Camponovo Andrea / ProvaLocale1!, amministratore
-//     ProvaAdmin1!, Pistocchi Mara, Bonelli Flavio, HR, Sanvido Paolo).
-// COME SI LANCIA:  node strumenti/qa/permessi_operatore.js
-// MAI sul database vero: scrive e cancella dati di prova (prefissi 'W1B ', 'W4C ', 'W5I ' e 'W5M ').
-// ============================================================
-// PROVA DEI PERMESSI DEGLI OPERATORI NEL DATABASE (migrazioni 20260911, 20260913, 20260914 e 20260915)
+// PROVA DEI PERMESSI DEGLI OPERATORI NEL DATABASE (migrazioni 20260911, 20260913, 20260914 e 20260915;
+// regola del permesso Ripristinare una versione del mese)
 // Per ogni falla: la prova che la riproduce (deve risultare CHIUSA) e le azioni legittime
 // che devono continuare a funzionare (OK). Passa dal servizio REST come il programma
 // (http://127.0.0.1:8000/rest/v1/rpc/...), con la chiave pubblica della copia locale.
@@ -708,6 +697,28 @@ function pulisci() {
       sql(`delete from log_attivita where azione = 'Modello del documento modificato' and created_at >= ${lit(inizio)}`);
       esito(sql(`select valore from impostazioni where chiave = 'visibilita'`) === visPrima, '        visibilita rimessa com era');
     }
+    });
+    // RIPRISTINARE UNA VERSIONE DEL MESE (permesso piano_ripristino_versioni, 15/10/2026). Il
+    // controllo e nel programma (pulsante Riporta a prima, Annulla e Ripristina del ripristino):
+    // le celle si scrivono con piano_scrivi_celle come una modifica a mano, quindi il database
+    // non distingue un ripristino. Qui: la regola del permesso (la stessa che legge il
+    // programma) e la lettura delle versioni, libera per chi non ha il permesso.
+    await S(async () => {
+      const visPrima = sql(`select valore from impostazioni where chiave = 'visibilita'`);
+      const perm = (t) => sql(`select _sessione_permesso(${lit(t)}, 'piano_ripristino_versioni')`) === 't';
+      try {
+        sql(`update impostazioni set valore = (valore::jsonb - 'piano_ripristino_versioni')::text where chiave = 'visibilita'`);
+        esito(!perm(PIS), 'CHIUSA  responsabile che gestisce il piano SENZA il permesso non ripristina una versione (di base solo admin)');
+        esito(perm(ADM), 'FUNZIONA amministratore ripristina una versione');
+        const ver = await rpc('piano_storico_al', { p_token: PIS, p_reparto: 'slots', p_ym: '2026-10', p_quando: new Date().toISOString() });
+        esito(ver.ok && Array.isArray(ver.body), 'FUNZIONA senza il permesso le versioni si leggono (Vedi le differenze)', ver.status + ' ' + ver.msg);
+        sql(`update impostazioni set valore = (valore::jsonb || '{"piano_ripristino_versioni": {"tipo": "selezionati", "operatori": ["Pistocchi Mara"]}}'::jsonb)::text where chiave = 'visibilita'`);
+        esito(perm(PIS), 'FUNZIONA responsabile CON il permesso ripristina una versione');
+        esito(!perm(CAMP), 'CHIUSA  operatore non nominato resta senza il permesso');
+      } finally {
+        sql(`update impostazioni set valore = ${lit(visPrima)} where chiave = 'visibilita'`);
+        esito(sql(`select valore from impostazioni where chiave = 'visibilita'`) === visPrima, '        visibilita rimessa com era');
+      }
     });
     sql(`delete from operator_sessions where token in (${tutteSessioni.map(lit).join(',') || "''"})`);
   } catch (e) {

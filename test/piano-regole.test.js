@@ -748,6 +748,26 @@ console.log('== domeniche libere dell anno: una regola per Valida e bozza ==');
   );
 }
 
+console.log('\n== blocchi compatti (blocchiSpezzati, v453) ==');
+{
+  const B = (txt, par) =>
+    R.blocchiSpezzati(txt.split(''), Object.assign({ minimo: 2, riposoSingolo: true, maxCons: 5 }, par || {}));
+  const tipi = (v) => v.map((x) => x.tipo + '@' + x.i);
+  eq(tipi(B('RRLLLLRRLLLLLRR')), [], 'blocchi di 4 e 5 con riposi a coppie: nessun buco');
+  eq(tipi(B('RRLRRLLLL')), ['lavoro_isolato@2'], 'un giorno di lavoro fra due liberi: lavoro isolato');
+  eq(tipi(B('RLLLRLRR')), ['riposo_singolo@4', 'lavoro_isolato@5'], '3-1-1: libero solo e giorno isolato');
+  eq(tipi(B('RLLRLLR')), ['riposo_singolo@3'], '2-1-2: libero solo fra due blocchi corti');
+  eq(tipi(B('RLRLLLR')), ['lavoro_isolato@1', 'riposo_singolo@2'], '1-1-3');
+  eq(tipi(B('RLLLRLLLR')), [], '3-1-3 supera i giorni di fila (5): il libero solo serve');
+  eq(tipi(B('RLLRLLR', { riposoSingolo: false })), [], 'riposi a coppie spento');
+  eq(tipi(B('RRLRR', { minimo: 0 })), [], 'blocco minimo 0: il giorno isolato non conta');
+  eq(tipi(B('RLLRRR', { minimo: 3 })), ['lavoro_isolato@1'], 'blocco minimo 3: anche due giorni soli');
+  eq(tipi(B('XLRLLR')), [], 'accanto a una vacanza (X) non si giudica');
+  eq(tipi(B('LRL')), [], 'al bordo dei giorni letti non si giudica');
+  eq(tipi(B('RRLRRRLRR', { da: 5, a: 8 })), ['lavoro_isolato@6'], 'solo i giorni del mese (da-a)');
+  eq(B('RLLRLLR')[0].prima + '-' + B('RLLRLLR')[0].dopo, '2-2', 'riposo singolo: lunghezze dei due blocchi');
+}
+
 console.log('\n=======================================');
 console.log('  ' + passati + ' passati, ' + falliti + ' falliti');
 console.log('=======================================\n');

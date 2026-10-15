@@ -126,6 +126,19 @@ const PIANO_REGOLE_LEGGE = new Set([
 // lingua di chi la usa: niente HARD/SOFT/peso, ma "cosa fa", "dove agisce",
 // "da dove viene". tipo: 'sino' (interruttore), 'numero', 'testo'.
 const PIANO_REGOLE_GUIDA = {
+  // ASS = assenza in attesa di certificato (15.10.2026): dopo quanti giorni va regolarizzata
+  ass_giorni_regolarizzare: {
+    g: 'Ore e saldo',
+    n: 'Giorni dopo i quali un ASS (assenza in attesa di certificato) compare in Avvisi › ASS da regolarizzare',
+    t: 'numero',
+    d: 'Avvisi del mese (chi ha Storico HR · modificare)',
+  },
+  ass_regolarizzare_dal: {
+    g: 'Ore e saldo',
+    n: 'Giorno (AAAA-MM-GG) da cui le ASS sono da regolarizzare: le ASS di prima (Excel) no. Lo scrive il rilascio',
+    t: 'testo',
+    d: 'Avvisi del mese (chi ha Storico HR · modificare)',
+  },
   min_riposo_ore: {
     g: 'Riposo e giorni di lavoro',
     n: 'Ore minime di riposo fra due turni',
@@ -144,11 +157,25 @@ const PIANO_REGOLE_GUIDA = {
     t: 'sino',
     d: 'Controlla le regole e bozza',
   },
+  // BLOCCHI COMPATTI (v453): qualita del piano, come un pianificatore umano. Non e legge:
+  // legge e posti coperti vengono prima; un buco che non si puo evitare resta, contato e
+  // spiegato in Controlla le regole. Valori predefiniti dalle abitudini dei piani fatti a mano
+  // (Slots gennaio-ottobre 2026: SUP 0,35 giorni isolati e 0,40 buchi per persona al mese).
   blocchi_compatti: {
     g: 'Riposo e giorni di lavoro',
-    n: 'Preferisci blocchi di lavoro e riposo compatti',
+    n: 'Blocchi compatti: giorni di lavoro in blocchi e riposi raggruppati',
+    s: 'Sì: la bozza e Migliora evitano i "buchi" (un giorno di lavoro isolato fra due liberi, un libero solo fra due blocchi corti come 3-1-1, 2-1-2, 1-1-3); Controlla le regole li elenca come qualità del piano. La legge e i posti coperti vengono sempre prima.',
     t: 'sino',
-    d: 'Bozza (ordine dei candidati)',
+    p: 'TRUE',
+    d: 'Bozza, Migliora la bozza, Controlla le regole (qualità del piano)',
+  },
+  blocco_lavoro_minimo: {
+    g: 'Riposo e giorni di lavoro',
+    n: 'Blocco di lavoro minimo fra due liberi (giorni)',
+    s: '2 = un giorno di lavoro isolato fra due liberi è un buco; 3 = anche due giorni soli; 0 = non conta. Vale con "Blocchi compatti".',
+    t: 'numero',
+    p: '2',
+    d: 'Bozza, Migliora la bozza, Controlla le regole (con "blocchi compatti")',
   },
   pattern_lavoro: {
     g: 'Riposo e giorni di lavoro',
@@ -158,9 +185,19 @@ const PIANO_REGOLE_GUIDA = {
   },
   penalita_riposo_isolato: {
     g: 'Riposo e giorni di lavoro',
-    n: 'Evita il riposo di un giorno solo fra due blocchi',
+    n: 'Riposi a coppie: evita il libero di un giorno solo fra due blocchi corti',
+    s: 'Sì: un libero solo fra due blocchi che insieme starebbero nei giorni di fila massimi (3-1-1, 2-1-2, 1-1-3...) è un buco: il giorno libero poteva stare accanto a un altro. Vale con "Blocchi compatti".',
     t: 'sino',
-    d: 'Bozza (ordine dei candidati)',
+    p: 'TRUE',
+    d: 'Bozza, Migliora la bozza, Controlla le regole (con "blocchi compatti")',
+  },
+  blocchi_compatti_peso: {
+    g: 'Riposo e giorni di lavoro',
+    n: 'Quanto "Migliora la bozza" cerca i blocchi compatti',
+    s: 'Punti per ogni buco. 0 = non ci bada, 60 = normale. Sotto un posto coperto (300) e sotto ogni regola: un posto non resta mai scoperto per un blocco più bello.',
+    t: 'numero',
+    p: '60',
+    d: 'Migliora la bozza',
   },
   no_notte_riposo_presto: {
     g: 'Riposo e giorni di lavoro',
@@ -567,6 +604,8 @@ const PIANO_REGOLE_LIMITI = {
   riposo_domenica_lavorata_ore: [24, 96],
   max_consecutivi: [1, 7],
   pattern_lavoro: [1, 7],
+  blocco_lavoro_minimo: [0, 5],
+  blocchi_compatti_peso: [0, 250],
   equita_notti_peso: [0, 20],
   domeniche_libere_anno: [0, 52],
   tolleranza_ore: [0, 60],

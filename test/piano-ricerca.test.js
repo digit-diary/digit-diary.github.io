@@ -520,6 +520,45 @@ ok(
   'il punteggio finale non supera quello di partenza',
 );
 
+console.log('\n== scambio di giorni e rifinitura (blocchi compatti, v453) ==');
+{
+  // due persone, un posto M al giorno per 6 giorni, a giorni alterni: ognuno ha 3 giorni
+  // isolati. Con gli scambi di giorni i posti restano coperti e i blocchi si compattano.
+  const gg = giorni.slice(0, 6);
+  const fab = {};
+  gg.forEach((d) => (fab[d] = { M: 1 }));
+  const st = { Anna: {}, Bruno: {} };
+  gg.forEach((d, i) => (i % 2 ? (st.Bruno[d] = 'M') : (st.Anna[d] = 'M')));
+  const isolati = (mappa) => {
+    let k = 0;
+    gg.forEach((d, i) => {
+      const l = (j) => j >= 0 && j < gg.length && isLavoro(mappa[gg[j]]);
+      if (l(i) && !l(i - 1) && !l(i + 1)) k++;
+    });
+    return k;
+  };
+  const P = {
+    giorni: gg,
+    persone: ['Anna', 'Bruno'],
+    stato: st,
+    riposo: '',
+    fabbisogno: fab,
+    modificabile: () => true,
+    ammessi: () => ['M', ''],
+    costoPersona: (n, mappa) => 60 * isolati(mappa),
+  };
+  const tot = (r) => isolati(r.stato.Anna) + isolati(r.stato.Bruno);
+  const conR = R.cerca(P, { seme: 3, temperatura: 0 }, 1);
+  ok(conR.dopo.scoperti === 0, 'rifinitura: i posti restano coperti');
+  ok(tot(conR) < 6, 'rifinitura: meno giorni isolati (' + tot(conR) + ' su 6)');
+  const senza = R.cerca(P, { seme: 3, temperatura: 0, rifinituraScambi: 0, scambioGiorni: false }, 1);
+  ok(tot(conR) <= tot(senza), 'con la rifinitura mai peggio che senza');
+  // la rifinitura puo cambiare i pesi prima di partire (primaDellaRifinitura)
+  let chiamata = 0;
+  R.cerca(Object.assign({}, P, { primaDellaRifinitura: () => chiamata++ }), { seme: 3 }, 1);
+  ok(chiamata === 1, 'primaDellaRifinitura chiamata una volta');
+}
+
 console.log('\n=======================================');
 console.log('  ' + passati + ' passati, ' + falliti + ' falliti');
 console.log('=======================================');

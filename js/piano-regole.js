@@ -922,7 +922,57 @@
     };
   }
 
+  // BLOCCHI COMPATTI (qualita del piano, v453): come un pianificatore umano, giorni di lavoro
+  // in blocchi e riposi raggruppati. Non e una regola di legge: la legge (riposo minimo, giorni
+  // di fila, domeniche) e la copertura dei posti vengono prima; qui si contano i "buchi".
+  // tipi: un elemento per giorno, 'L' lavoro, 'R' riposo (anche cella vuota), 'X' altro
+  // (vacanza, malattia, assenza, giorno sconosciuto): X interrompe la sequenza e non si giudica
+  // (un blocco attaccato a una vacanza non e spezzato per scelta).
+  // par: { minimo: blocco di lavoro minimo (2 = vietato il giorno isolato; 0 o 1 = spento),
+  //        riposoSingolo: true = un riposo di un giorno solo fra due blocchi che insieme
+  //        starebbero nei giorni di fila (maxCons) e un buco (3-1-1, 2-1-2, 1-1-3...),
+  //        maxCons: giorni di lavoro di fila al massimo (legge), da: primo indice da giudicare,
+  //        a: ultimo indice da giudicare (i giorni fuori servono solo per leggere i blocchi) }
+  // Ritorna [{ tipo: 'lavoro_isolato' | 'riposo_singolo', i: indice del giorno, lungo,
+  //            prima, dopo }]: lungo = giorni del blocco di lavoro isolato; prima/dopo = giorni
+  //            dei due blocchi attorno al riposo singolo.
+  function blocchiSpezzati(tipi, par) {
+    par = par || {};
+    const t = tipi || [];
+    const minimo = parseInt(par.minimo) || 0;
+    const maxCons = parseInt(par.maxCons) || 0;
+    const da = par.da != null ? par.da : 0;
+    const a = par.a != null ? par.a : t.length - 1;
+    const runs = [];
+    for (let i = 0; i < t.length; i++) {
+      const c = t[i] === 'L' || t[i] === 'R' ? t[i] : 'X';
+      if (runs.length && runs[runs.length - 1].c === c) runs[runs.length - 1].n++;
+      else runs.push({ c: c, i: i, n: 1 });
+    }
+    const out = [];
+    for (let k = 1; k < runs.length - 1; k++) {
+      const r = runs[k];
+      const p = runs[k - 1];
+      const s = runs[k + 1];
+      // un blocco di lavoro corto fra due riposi
+      if (r.c === 'L' && minimo >= 2 && r.n < minimo && p.c === 'R' && s.c === 'R' && r.i >= da && r.i <= a)
+        out.push({ tipo: 'lavoro_isolato', i: r.i, lungo: r.n });
+      // un riposo di un giorno solo fra due blocchi di lavoro che insieme non arrivano ai
+      // giorni di fila: il giorno libero poteva stare accanto a un altro riposo
+      if (r.c === 'R' && r.n === 1 && par.riposoSingolo && p.c === 'L' && s.c === 'L' && r.i >= da && r.i <= a) {
+        // i due blocchi devono essere interi (chiusi da un riposo): accanto a una vacanza o
+        // al bordo dei giorni letti la lunghezza non si conosce e non si giudica
+        const chiusoPrima = k - 2 >= 0 && runs[k - 2].c === 'R';
+        const chiusoDopo = k + 2 < runs.length && runs[k + 2].c === 'R';
+        if (chiusoPrima && chiusoDopo && (!maxCons || p.n + s.n <= maxCons))
+          out.push({ tipo: 'riposo_singolo', i: r.i, prima: p.n, dopo: s.n });
+      }
+    }
+    return out;
+  }
+
   return {
+    blocchiSpezzati,
     oraNum,
     riposoOre,
     violazioniCella,

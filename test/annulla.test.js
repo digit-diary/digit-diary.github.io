@@ -308,9 +308,12 @@ function canaleSicuro(c, A) {
     ok(!!clic('annulla-btn') && !!clic('ripristina-btn'), 'i due pulsanti della barretta esistono in index.html');
     await vm.runInContext("secPatch('piano_vacanze', 'id=eq.7', { confermata: false })", ctx);
     eq(els['annulla-bar'].style.display, 'flex', 'dopo la modifica la barretta compare');
-    await vm.runInContext(clic('annulla-btn'), ctx);
+    // il clic mette il passo nella coda (un passo alla volta): si aspetta che finisca
+    vm.runInContext(clic('annulla-btn'), ctx);
+    await ctx._annullaCoda.vuota();
     eq(cf.db.piano_vacanze[0].confermata, true, 'clic su Annulla: la vacanza torna Definitiva');
-    await vm.runInContext(clic('ripristina-btn'), ctx);
+    vm.runInContext(clic('ripristina-btn'), ctx);
+    await ctx._annullaCoda.vuota();
     eq(cf.db.piano_vacanze[0].confermata, false, 'clic su Ripristina: torna Provvisoria');
     ok(!messaggi.some((m) => /^ERRORE/.test(m)), 'nessun messaggio di errore (' + messaggi.join(' / ') + ')');
   }

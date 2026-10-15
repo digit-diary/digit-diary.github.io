@@ -393,7 +393,22 @@ function renderTipiUI() {
   if (errRow) errRow.style.display = tipoSelezionato === nomeCorrente('Errore') ? 'block' : 'none';
   const malRow = document.getElementById('malattia-extra-row');
   if (malRow) {
-    malRow.style.display = tipoSelezionato === nomeCorrente('Malattia') ? 'block' : 'none';
+    // Dal / Al anche per l Assenza (attesa certificato): stesso periodo, nel Piano ASS sui turni
+    const conPeriodo = tipoSelezionato === nomeCorrente('Malattia') || tipoSelezionato === nomeCorrente('Assenza');
+    malRow.style.display = conPeriodo ? 'block' : 'none';
+    let nota = document.getElementById('malattia-extra-nota');
+    if (!nota) {
+      nota = document.createElement('div');
+      nota.id = 'malattia-extra-nota';
+      nota.style.cssText = 'font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:6px';
+      malRow.appendChild(nota);
+    }
+    nota.textContent =
+      tipoSelezionato === nomeCorrente('Assenza')
+        ? 'Assenza in attesa di certificato: nel Piano ASS solo nei giorni con un turno (0 ore, il turno resta da coprire). Quando arriva il certificato, chi ha lo Storico HR usa «Certificato ricevuto».'
+        : tipoSelezionato === nomeCorrente('Malattia')
+          ? 'Malattia con il certificato già presente. Se il certificato non c è ancora, scegli «Assenza».'
+          : '';
     _initMalFlatpickr();
   }
   const ndRow = document.getElementById('nd-extra-row');

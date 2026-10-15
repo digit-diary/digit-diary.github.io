@@ -110,6 +110,10 @@ async function stampaPianoPDF(soloNomi) {
 // documento "cambio_turno" (js/modelli-documenti.js); testiSovra = testi da usare al posto di
 // quelli salvati (anteprima). Chi chiama legge prima i modelli (modelliCarica).
 function _pdfCambioTurno(dati, testiSovra) {
+  // FOGLIO ARCHIVIATO: i testi del modello di quando e stato fatto (salvati nel foglio dalla
+  // v455, anche {} = testi originali). I fogli di prima non li hanno: valgono quelli di oggi.
+  if (testiSovra === undefined && dati && dati.modello_testi && typeof dati.modello_testi === 'object')
+    testiSovra = dati.modello_testi;
   // fogli archiviati con il nome breve del settore di allora (es. "Slots"): si stampa il nome nei documenti
   dati = Object.assign({}, dati, {
     a: Object.assign({}, dati.a, { settore: settoreNomeDocumento(dati.a && dati.a.settore) }),
@@ -441,6 +445,9 @@ async function apriCercaCambioLibero() {
     return nuove.length ? nuove[0].split('|').slice(2).join('|') : null;
   };
   const eLibero = (cod) => !cod || (!_pianoTurnoInfo(cod) && ['C', ''].includes(String(cod)));
+  // il richiedente libero il giorno X SENZA restituzione rispetta le regole? (es. il giorno
+  // libero non puo essere un riposo singolo vietato): se no, solo cambi con restituzione
+  const liberoOk = !problema(mappe[sel.nome] || {}, sel.data, 'C', sel.nome);
   // CANDIDATI: a riposo il giorno X, idonei al turno, regole rispettate
   const candidati = [];
   collaboratoriCache
@@ -489,6 +496,9 @@ async function apriCercaCambioLibero() {
         if (bloccate[c.nome + '|' + y] || bloccate[sel.nome + '|' + y]) continue;
         if (!_pianoIdoneoPerTurno(sel.nome, tSuo, y)) continue;
         if (problema(mioPiano, y, codSuo, sel.nome)) continue;
+        // e il collega che il giorno della restituzione va a riposo (C): anche per lui nessuna
+        // regola nuova, con il giorno X gia preso (C attorno alle vacanze, riposo singolo...)
+        if (problema(suoPiano, y, 'C', c.nome)) continue;
         // accompagnamento il giorno di restituzione: il collega esce (C), il
         // richiedente entra prendendo il turno del collega
         if (
@@ -501,6 +511,7 @@ async function apriCercaCambioLibero() {
         rest.push({ data: y, codice: codSuo, stesso: codSuo === r.codice, meseDopo: y.substring(0, 7) !== ym });
       }
       rest.sort((a, b) => (b.stesso ? 1 : 0) - (a.stesso ? 1 : 0) || (a.data < b.data ? -1 : 1));
+      if (!liberoOk && !rest.length) return;
       candidati.push({ nome: c.nome, jolly: c.impiego === 'jolly' || c.is_jolly, rest: rest });
     });
   candidati.sort((a, b) => b.rest.length - a.rest.length || a.nome.localeCompare(b.nome));
@@ -508,7 +519,7 @@ async function apriCercaCambioLibero() {
     toast('Nessun collega a riposo quel giorno può coprire ' + r.codice + ' rispettando le regole');
     return;
   }
-  _ccDati = { nome: sel.nome, data: sel.data, codice: r.codice, candidati: candidati };
+  _ccDati = { nome: sel.nome, data: sel.data, codice: r.codice, candidati: candidati, liberoOk: liberoOk };
   const dataIt = sel.data.split('-').reverse().join('.');
   let h =
     '<h3>Cerca cambio · ' +
@@ -519,7 +530,9 @@ async function apriCercaCambioLibero() {
     escP(sel.nome.split(' ')[0]) +
     ' cede il turno <b>' +
     escP(r.codice) +
-    '</b> a un collega a riposo e lo restituisce prendendo un turno del collega in un altro giorno. Tutte le proposte rispettano idoneità, riposo minimo e giorni consecutivi.</p>' +
+    '</b> a un collega a riposo e lo restituisce prendendo un turno del collega in un altro giorno. Tutte le proposte rispettano idoneità e le regole di Valida: riposo minimo, giorni di fila, riposo settimanale, ore della settimana.' +
+    (liberoOk ? '' : ' <b>Senza restituzione il giorno libero violerebbe le regole: serve una restituzione.</b>') +
+    '</p>' +
     '<div class="field" style="text-align:left"><label>Chi copre il ' +
     dataIt +
     '</label><select id="cc-collega" style="width:100%;padding:9px" onchange="ccAggiornaRestituzioni()">' +
@@ -610,7 +623,7 @@ function ccAggiornaRestituzioni() {
   const sel = document.getElementById('cc-rest');
   if (!sel || !c) return;
   sel.innerHTML =
-    '<option value="">senza restituzione (solo copertura)</option>' +
+    (_ccDati.liberoOk ? '<option value="">senza restituzione (solo copertura)</option>' : '') +
     c.rest
       .map(
         (x) =>
@@ -639,6 +652,14 @@ async function _confermaCercaCambioLiberoEsegui() {
   const dataRest = (document.getElementById('cc-rest') || {}).value || '';
   const motivo = ((document.getElementById('cc-motivo') || {}).value || '').trim();
   const rInfo = cand.rest.find((x) => x.data === dataRest);
+  if (!rInfo && !_ccDati.liberoOk) {
+    toastErrore(
+      'Senza restituzione il giorno libero di ' +
+        _ccDati.nome +
+        ' violerebbe le regole: scegli un giorno di restituzione',
+    );
+    return;
+  }
   // anche il giorno della RESTITUZIONE deve essere aperto (prima si controllava solo il primo)
   if (rInfo && !(await _pianoConsentiScrittura(dataRest))) return;
   const dataIt = _ccDati.data.split('-').reverse().join('.');
@@ -817,15 +838,22 @@ async function _confermaCercaCambioLiberoEsegui() {
 // si ristampa in qualsiasi momento dal menu della cella
 async function _salvaFoglioCambio(datiPdf, collaboratore, dataCambio) {
   try {
+    // i testi del modello usati per questo foglio (come i moduli, js/moduli.js): la ristampa
+    // usa quelli di quando e stato fatto, anche se il modello cambia dopo. {} = originali.
+    const testiUsati = typeof modelloTestiCambiati === 'function' ? modelloTestiCambiati('cambio_turno') : {};
     const rec = {
       tipo: 'cambio_turno',
       collaboratore: collaboratore,
       data_modulo: dataCambio,
-      dati: datiPdf,
+      dati: Object.assign({}, datiPdf, { modello_testi: testiUsati || {} }),
       operatore: getOperatore(),
       reparto_dip: _pianoReparto(),
     };
-    const saved = await secPost('moduli', rec);
+    // il foglio e parte del passo del Piano (seguito.foglio): Annulla dello scambio lo mette
+    // nel Cestino. Fuori dall Annulla generale: prima diventava un azione a parte, piu
+    // recente dello scambio, e il primo Ctrl+Z toglieva solo il foglio lasciando lo scambio
+    const scrivi = () => secPost('moduli', rec);
+    const saved = await (window.Annulla ? window.Annulla.senzaTraccia(scrivi) : scrivi());
     if (saved && saved[0] && typeof moduliCache !== 'undefined') moduliCache.unshift(saved[0]);
     return saved && saved[0] ? saved[0].id : null;
   } catch (e) {
@@ -1064,6 +1092,22 @@ async function _confermaScambioTurnoEsegui() {
       { nome: sel.nome, data: dataRest, codice: cbPre },
       { nome: collega, data: dataRest, codice: caPre },
     ]).forEach((a) => (a.nome === collega ? avB : avA).push(a.testo));
+    // LO SCAMBIO E LA RESTITUZIONE INSIEME: ogni giorno sopra e controllato da solo, sul
+    // piano di prima; se i due giorni sono vicini (es. uno dopo l altro) il riposo fra il
+    // turno scambiato e quello restituito non si vedeva
+    try {
+      const comb = await _pianoViolazioniMosse([
+        { nome: sel.nome, data: sel.data, codice: c2 },
+        { nome: collega, data: sel.data, codice: c1 },
+        { nome: sel.nome, data: dataRest, codice: cbPre || 'C' },
+        { nome: collega, data: dataRest, codice: caPre || 'C' },
+      ]);
+      const gia = new Set(av1.concat(av2, avA, avB));
+      (comb[sel.nome] || []).filter((v) => !v.ore && !gia.has(v.msg)).forEach((v) => avA.push(v.msg));
+      (comb[collega] || []).filter((v) => !v.ore && !gia.has(v.msg)).forEach((v) => avB.push(v.msg));
+    } catch (e) {
+      /* senza lettura restano i controlli dei singoli giorni */
+    }
     if (avA.length || avB.length) {
       const det = []
         .concat(avA.map((a) => sel.nome.split(' ')[0] + ': ' + a))
@@ -1316,10 +1360,335 @@ function _pianoIdoneoAMano(nome, turno) {
     _pianoCtxIdoneita({ modo: 'mano', storiaDi: () => _pianoStoriaGruppiDi(nome) }),
   ).ok;
 }
-// COPERTURA DI UNA NON DISPONIBILITA dal Diario: la stessa ricerca dei sostituti della
-// malattia, gia compilata, che alla conferma scrive ND (non M) con la nota del Diario
-async function apriCoperturaAssenza(nome, ym, gDa, gAl) {
-  if (!puoGestirePiano()) return;
+// NOTE DELLA COPERTURA (decisione 15.10, segnalazione del titolare "al sostituto non cambia
+// nulla"): chi copre ha "Ex C - copre Rossi Mario (malattia) - operatore", il malato
+// "Ex S7 - coperto da Bianchi Anna - operatore". La sigla di prima resta in testa ("Ex S7"):
+// togliendo la malattia torna al suo posto come sempre.
+// nd: true = non disponibilita, 'ASS' = assenza in attesa di certificato
+function _pianoNotaCopre(exCod, malato, nd, op) {
+  return (
+    'Ex ' +
+    (exCod || '-') +
+    ' - copre ' +
+    malato +
+    (nd === 'ASS' ? ' (assenza)' : nd ? ' (non disponibile)' : ' (malattia)') +
+    ' - ' +
+    op
+  ).substring(0, 400);
+}
+function _pianoCopreMalattiaDi(r, malato) {
+  const c = String((r && r.commento) || '');
+  return c.includes(' - copre ' + malato + ' (');
+}
+// TURNI LASCIATI SCOPERTI DA UNA MALATTIA nel periodo: celle M con la nota "Ex <sigla>"
+// che nessun collega copre ancora. Per i percorsi che scrivono la M senza cercare chi
+// copre (M a mano nel Piano, Diario, Rapporto). [{ data, codice }]
+// Anche le ASS (assenza in attesa di certificato): il turno resta scoperto come con la M.
+async function _pianoTurniScopertiMalattia(nome, dal, al) {
+  const righe =
+    (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=gte.' + dal + '&data=lte.' + al)) || [];
+  const conM = righe
+    .filter((r) => _pianoCodiceAssenteTurno(r.codice))
+    .map((r) => ({
+      data: String(r.data).substring(0, 10),
+      codice: _pianoSiglaSottoMalattia(r),
+      ass: r.codice === 'ASS',
+    }))
+    .filter((x) => x.codice && !['C', 'V', 'V1', 'CGF', 'WD', 'ND', 'M', 'M1'].includes(x.codice));
+  if (!conM.length) return [];
+  const giorno =
+    (await secGet(
+      'piano?data=in.(' + [...new Set(conM.map((x) => x.data))].join(',') + ')&select=collaboratore,data,commento',
+    )) || [];
+  return conM.filter(
+    (x) => !giorno.some((r) => String(r.data).substring(0, 10) === x.data && _pianoCopreMalattiaDi(r, nome)),
+  );
+}
+// MALATTIA TOLTA MA GIA COPERTA (decisione del titolare 15.10): togliendo la M dal Diario,
+// dal Rapporto o dal Piano, se un collega la copriva il programma chiede «Rimetto il turno a
+// X e tolgo la copertura a Y?». Le celle della copertura si ritrovano dalle note (il
+// sostituto «Ex C - copre X (malattia)», le mosse a catena «(copertura di X)», anche il giorno
+// prima) e tornano come erano prima della copertura: dallo storico del piano (la riga
+// "prima" della scrittura che ha messo la nota), altrimenti dalla sigla della nota «Ex».
+// Ritorna { ops, righe: [testo] }: le scritture condizionate (la cella deve essere ancora
+// quella letta) da mettere nella STESSA _pianoScriviCelle del malato.
+async function _pianoOpsTogliCopertura(nome, giorni) {
+  const out = { ops: [], righe: [] };
+  if (!nome || !giorni || !giorni.length) return out;
+  const sposta = (d, n) => {
+    const x = new Date(d + 'T12:00:00');
+    x.setDate(x.getDate() + n);
+    return dataLocaleISO(x);
+  };
+  const date = [...new Set(giorni.concat(giorni.map((d) => sposta(d, -1))))].sort();
+  const righe = (await secGet('piano?data=in.(' + date.join(',') + ')&limit=5000')) || [];
+  const catena = ' (copertura di ' + nome + ')';
+  const toccate = righe.filter(
+    (r) =>
+      r.collaboratore !== nome &&
+      ((giorni.includes(String(r.data).substring(0, 10)) && _pianoCopreMalattiaDi(r, nome)) ||
+        String(r.commento || '').includes(catena)),
+  );
+  const op = getOperatore();
+  const ora = new Date().toISOString();
+  const gg = (d) => String(d).substring(8, 10) + '.' + String(d).substring(5, 7);
+  for (const r of toccate) {
+    const d = String(r.data).substring(0, 10);
+    let prima;
+    // 1) com era, salvato dalla copertura stessa (dalla v455)
+    const pm = r.prima_malattia;
+    const exNota = _pianoSiglaSottoMalattia(r);
+    if (pm && typeof pm === 'object' && pm.codice && (!exNota || pm.codice === exNota)) {
+      prima = {
+        codice: pm.codice,
+        protetto: !!pm.protetto,
+        generato: !!pm.generato,
+        commento: pm.commento || null,
+        motivo_blocco: pm.motivo_blocco || null,
+        prima_malattia: null,
+      };
+    }
+    // 2) lo storico della cella: la scrittura che ha messo la nota (null = era vuota)
+    if (prima === undefined) {
+      try {
+        const st =
+          (await _rpcSicura('piano_storico_cella', {
+            p_token: getOpToken(),
+            p_collaboratore: r.collaboratore,
+            p_data: d,
+          })) || [];
+        const x = st.find((e) => e.a === r.codice && String(e.commento || '') === String(r.commento || ''));
+        if (x) prima = x.da ? { codice: x.da, protetto: false, generato: false, commento: null } : null;
+      } catch (e) {
+        /* storico non leggibile: vale la nota */
+      }
+    }
+    // 3) la sigla della nota «Ex C - copre ...» («Ex -» = era vuota)
+    if (prima === undefined) {
+      const ex = exNota || (String(r.commento || '').match(/^Ex (-)/) ? '-' : '');
+      prima = !ex || ex === '-' ? null : { codice: ex, protetto: false, generato: false, commento: null };
+    }
+    out.ops.push({
+      collaboratore: r.collaboratore,
+      data: d,
+      atteso: _pianoAttesoDi(r),
+      dati: prima ? Object.assign({}, prima, { operatore: op, updated_at: ora }) : null,
+    });
+    out.righe.push(
+      r.collaboratore + ' ' + gg(d) + ': ' + r.codice + ' torna ' + (prima && prima.codice ? prima.codice : 'vuota'),
+    );
+  }
+  return out;
+}
+// testo della domanda (giorni: le date della M che si toglie, con la sigla che torna)
+function _pianoTestoTogliCopertura(nome, ritorni, cop) {
+  const gg = (d) => String(d).substring(8, 10) + '.' + String(d).substring(5, 7);
+  return (
+    'Rimetto il turno a ' +
+    nome +
+    (ritorni.length ? ' (' + ritorni.map((x) => gg(x.data) + ' ' + x.codice).join(', ') + ')' : '') +
+    ' e tolgo la copertura?\n\n• ' +
+    cop.righe.join('\n• ') +
+    '\n\nSì = tutto torna com era prima della malattia, in una sola scrittura (Annulla la rimette). No = la copertura resta.'
+  );
+}
+// MALATTIA SCRITTA SENZA COPERTURA (M a mano nel Piano, Malattia nel Diario o nel Rapporto):
+// AVVISO DISCRETO NELLA PAGINA, mai una finestra (decisione del titolare 15.10: nel Rapporto
+// la finestra si apriva mentre si scriveva, all autosalvataggio). L avviso arriva dopo il
+// salvataggio: «Malattia di Rossi registrata: 2 turni da coprire — Copri ora · Più tardi».
+// Copri ora apre Sostituisci chi e in malattia gia compilata; Più tardi lo chiude e i turni
+// restano in Piano › Avvisi › Malattie da coprire. Corretta o cancellata la malattia
+// (sincronizzaMalattiaPiano) l avviso si aggiorna o sparisce.
+window._copAvvisi = window._copAvvisi || {};
+// stato della malattia nel periodo: quante M e quali turni restano scoperti
+async function _pianoMalattiaStato(nome, dal, al) {
+  const righe =
+    (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=gte.' + dal + '&data=lte.' + al)) || [];
+  // M e ASS (assenza in attesa di certificato): l avviso dice «Assenza» se sono tutte ASS
+  const nM = righe.filter((r) => _pianoCodiceAssenteTurno(r.codice)).length;
+  const nAss = righe.filter((r) => r.codice === 'ASS').length;
+  const scoperti = nM ? await _pianoTurniScopertiMalattia(nome, dal, al) : [];
+  return { nM: nM, nAss: nAss, scoperti: scoperti };
+}
+function _pianoAvvisoCopertura(nome, dal, al) {
+  if (!nome || !dal) return Promise.resolve();
+  const vecchio = window._copAvvisi[nome];
+  window._copAvvisi[nome] = {
+    dal: vecchio && vecchio.dal < dal ? vecchio.dal : dal,
+    al: vecchio && vecchio.al > (al || dal) ? vecchio.al : al || dal,
+    punti: true, // i punti della copertura si possono ancora segnare
+  };
+  return _pianoAvvisoCoperturaAggiorna(nome);
+}
+async function _pianoAvvisoCoperturaAggiorna(nome) {
+  const a = window._copAvvisi[nome];
+  if (!a) return;
+  try {
+    const st = await _pianoMalattiaStato(nome, a.dal, a.al);
+    const gestisce = typeof puoGestirePiano === 'function' && puoGestirePiano();
+    a.scoperti = gestisce ? st.scoperti : [];
+    a.ass = st.nAss > 0 && st.nAss === st.nM; // solo ASS: «Assenza di Rossi registrata»
+    a.conPunti =
+      a.punti &&
+      typeof apriPopupCopertura === 'function' &&
+      (typeof incentiviAttivi !== 'function' || incentiviAttivi('copertura'));
+    // malattia tolta, o niente da fare: l avviso sparisce
+    if (!st.nM || (!a.scoperti.length && !a.conPunti)) delete window._copAvvisi[nome];
+  } catch (e) {
+    /* senza rete l avviso resta com era */
+  }
+  _pianoAvvisoCoperturaRender();
+}
+function _pianoAvvisoCoperturaRender() {
+  let box = document.getElementById('cop-avvisi');
+  const nomi = Object.keys(window._copAvvisi);
+  const togli = Object.keys(window._copTogli || {});
+  if (!nomi.length && !togli.length) {
+    if (box) box.remove();
+    return;
+  }
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'cop-avvisi';
+    box.setAttribute('role', 'status');
+    box.style.cssText =
+      'position:fixed;left:16px;bottom:16px;z-index:900;max-width:min(460px,calc(100vw - 32px));display:flex;flex-direction:column;gap:8px';
+    document.body.appendChild(box);
+  }
+  const gg = (d) => d.substring(8, 10) + '.' + d.substring(5, 7);
+  const ja = (x) => "'" + String(x).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+  box.innerHTML = nomi
+    .map((n) => {
+      const a = window._copAvvisi[n];
+      const k = (a.scoperti || []).length;
+      return (
+        '<div class="cop-avviso" style="background:var(--paper,#fff);color:var(--ink,#222);border:1px solid var(--line,#ccc);border-left:4px solid var(--c-rosso,#c0392b);border-radius:3px;padding:10px 12px;box-shadow:0 4px 14px rgba(0,0,0,.18);font-size:var(--fs-md,.875rem)">' +
+        '<div>' +
+        (a.ass ? 'Assenza (attesa certificato)' : 'Malattia') +
+        ' di <b>' +
+        escP(n) +
+        '</b> registrata' +
+        (k
+          ? ': <b>' +
+            k +
+            (k === 1 ? ' turno da coprire' : ' turni da coprire') +
+            '</b> (' +
+            a.scoperti.map((x) => gg(x.data) + ' ' + escP(x.codice)).join(', ') +
+            ')'
+          : '') +
+        '</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">' +
+        (k
+          ? '<button type="button" class="btn-modal-ok" style="padding:5px 12px" onclick="pianoAvvisoCopriOra(' +
+            ja(n) +
+            ')">Copri ora</button>'
+          : '') +
+        (!k && a.conPunti
+          ? '<button type="button" class="btn-modal-ok" style="padding:5px 12px" onclick="pianoAvvisoPunti(' +
+            ja(n) +
+            ')">Chi ha coperto (punti)</button>'
+          : '') +
+        '<button type="button" class="btn-modal-cancel" style="padding:5px 12px" onclick="pianoAvvisoPiuTardi(' +
+        ja(n) +
+        ')">Più tardi</button></div></div>'
+      );
+    })
+    .concat(
+      togli.map(
+        (n) =>
+          '<div class="cop-avviso" style="background:var(--paper,#fff);color:var(--ink,#222);border:1px solid var(--line,#ccc);border-left:4px solid var(--c-oro,#8b6914);border-radius:3px;padding:10px 12px;box-shadow:0 4px 14px rgba(0,0,0,.18);font-size:var(--fs-md,.875rem)"><div>Malattia di <b>' +
+          escP(n) +
+          '</b> tolta (' +
+          window._copTogli[n].map(gg).join(', ') +
+          '): il turno è tornato a ' +
+          escP(n.split(' ')[0]) +
+          ', ma un collega lo copre ancora.</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button type="button" class="btn-modal-ok" style="padding:5px 12px" onclick="pianoAvvisoTogliCopertura(' +
+          ja(n) +
+          ')">Togli la copertura</button><button type="button" class="btn-modal-cancel" style="padding:5px 12px" onclick="pianoAvvisoLasciaCopertura(' +
+          ja(n) +
+          ')">Lascia</button></div></div>',
+      ),
+    )
+    .join('');
+}
+// MALATTIA TOLTA DAL RAPPORTO (si salva mentre si scrive, niente finestre) che qualcuno
+// copriva: avviso nella pagina «Togli la copertura · Lascia»
+window._copTogli = window._copTogli || {};
+function _pianoAvvisoTogliCopertura(nome, giorni) {
+  window._copTogli[nome] = [...new Set((window._copTogli[nome] || []).concat(giorni))].sort();
+  _pianoAvvisoCoperturaRender();
+}
+async function pianoAvvisoTogliCopertura(nome) {
+  const giorni = window._copTogli[nome] || [];
+  delete window._copTogli[nome];
+  _pianoAvvisoCoperturaRender();
+  return _pianoConScrittura(async () => {
+    const cop = await _pianoOpsTogliCopertura(nome, giorni);
+    if (!cop.ops.length) {
+      toast('Nessuna copertura da togliere per ' + nome);
+      return;
+    }
+    const passo = _pianoUndoSnap('tolta copertura malattia ' + nome.split(' ')[0]);
+    let es;
+    try {
+      es = await _pianoScriviCelle(cop.ops);
+    } catch (e) {
+      _pianoUndoScarta(passo);
+      _pianoErroreScrittura('Copertura NON tolta: ', e, false);
+      return;
+    }
+    if (!es.ok) {
+      _pianoUndoScarta(passo);
+      await _pianoAvvisaConflitti(es.conflitti, 'Copertura non tolta');
+      return;
+    }
+    _pianoMemoriaDopo(es.ops, es.righe);
+    logAzione('Piano: copertura malattia tolta', nome + ' · ' + cop.righe.join('; '));
+    toast('Copertura tolta: ' + cop.righe.join(', '), 6000);
+    if (typeof renderPiano === 'function' && localStorage.getItem('pagina_corrente') === 'piano') renderPiano();
+  });
+}
+function pianoAvvisoLasciaCopertura(nome) {
+  delete window._copTogli[nome];
+  _pianoAvvisoCoperturaRender();
+}
+async function pianoAvvisoCopriOra(nome) {
+  const a = window._copAvvisi[nome];
+  if (!a || !a.scoperti || !a.scoperti.length) return;
+  delete window._copAvvisi[nome];
+  _pianoAvvisoCoperturaRender();
+  const ym = a.scoperti[0].data.substring(0, 7);
+  const g = a.scoperti.filter((x) => x.data.startsWith(ym)).map((x) => parseInt(x.data.substring(8, 10)));
+  await _pianoApriCopertura(nome, ym, Math.min(...g), Math.max(...g), null);
+}
+function pianoAvvisoPunti(nome) {
+  const a = window._copAvvisi[nome];
+  delete window._copAvvisi[nome];
+  _pianoAvvisoCoperturaRender();
+  if (a && typeof apriPopupCopertura === 'function') apriPopupCopertura(nome, a.dal);
+}
+function pianoAvvisoPiuTardi(nome) {
+  delete window._copAvvisi[nome];
+  _pianoAvvisoCoperturaRender();
+}
+// TURNI DA COPRIRE DEL MESE APERTO (Piano › Avvisi › Malattie da coprire), dalle celle in
+// memoria: M con un turno nella nota «Ex» che nessun collega copre quel giorno
+function _pianoMalattieDaCoprire() {
+  const righe = typeof _pianoRighe !== 'undefined' ? _pianoRighe : [];
+  return righe
+    .filter((r) => _pianoCodiceAssenteTurno(r.codice))
+    .map((r) => ({
+      nome: r.collaboratore,
+      data: String(r.data).substring(0, 10),
+      codice: _pianoSiglaSottoMalattia(r),
+      ass: r.codice === 'ASS', // assenza in attesa di certificato
+    }))
+    .filter((x) => x.codice && _pianoTurnoInfo(x.codice))
+    .filter((x) => !righe.some((y) => String(y.data).substring(0, 10) === x.data && _pianoCopreMalattiaDi(y, x.nome)))
+    .sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : a.nome.localeCompare(b.nome)));
+}
+// apre Sostituisci chi e in malattia gia compilata (settore e mese del collaboratore) e
+// cerca subito i sostituti. ass: null = malattia, { codice: 'ND', nota } = non disponibilita
+async function _pianoApriCopertura(nome, ym, gDa, gAl, ass) {
   const info = _pianoCollabInfo(nome) || {};
   switchPage('piano');
   if (info.reparto_dip && typeof pianoCambiaReparto === 'function') pianoCambiaReparto(info.reparto_dip);
@@ -1327,12 +1696,21 @@ async function apriCoperturaAssenza(nome, ym, gDa, gAl) {
   _pianoTab = 'calendario';
   await renderPiano();
   apriCoperturaMalattia();
-  window._coperturaAssenza = { codice: 'ND', nota: _ND_NOTA_DIARIO };
+  window._coperturaAssenza = ass || null;
+  // ND: la sigla e decisa (niente scelta ASS / M)
+  const rigaCod = document.getElementById('mal-codice-riga');
+  if (rigaCod && ass) rigaCod.style.display = 'none';
   const sel = document.getElementById('mal-collab');
   if (sel) sel.value = nome;
   document.getElementById('mal-da').value = gDa;
   document.getElementById('mal-al').value = gAl;
   await cercaSostitutiMalattia();
+}
+// COPERTURA DI UNA NON DISPONIBILITA dal Diario: la stessa ricerca dei sostituti della
+// malattia, gia compilata, che alla conferma scrive ND (non M) con la nota del Diario
+async function apriCoperturaAssenza(nome, ym, gDa, gAl) {
+  if (!puoGestirePiano()) return;
+  await _pianoApriCopertura(nome, ym, gDa, gAl, { codice: 'ND', nota: _ND_NOTA_DIARIO });
 }
 function apriCoperturaMalattia() {
   if (!puoGestirePiano()) return;
@@ -1354,6 +1732,8 @@ function apriCoperturaMalattia() {
     '<div class="field" style="text-align:left"><label>Al giorno</label><input type="number" id="mal-al" min="1" max="' +
     nGiorni +
     '" style="width:80px;padding:8px"></div></div>' +
+    // ASS (attesa certificato) e la scelta di base quando un collaboratore chiama (15.10)
+    '<div class="field" id="mal-codice-riga" style="text-align:left;margin-top:8px"><label>Registra come</label><select id="mal-codice" style="width:100%;padding:8px"><option value="ASS">ASS · assenza in attesa di certificato (0 ore)</option><option value="M">M · malattia con certificato</option></select></div>' +
     '<div id="mal-risultati" style="text-align:left;margin-top:10px;max-height:40vh;overflow:auto"></div>' +
     '<div class="pwd-modal-btns" style="margin-top:14px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button>' +
     '<button class="btn-modal-ok" id="mal-btn-cerca" onclick="cercaSostitutiMalattia()">Cerca sostituti</button>' +
@@ -1498,16 +1878,40 @@ async function cercaSostitutiMalattia() {
     return accs.every((gr) => (conta[gr] || 0) > 1);
   };
   const giorni = [];
+  const giaM = new Set(); // giorni gia in M: si cerca solo il sostituto
+  const giaAss = new Set(); // di questi, quelli in ASS (assenza in attesa di certificato)
   for (let g = da; g <= al; g++) {
-    const cod = cella[nome + '|' + g] || '';
-    const t = _pianoTurnoInfo(cod);
+    let cod = cella[nome + '|' + g] || '';
+    let t = _pianoTurnoInfo(cod);
     if (!cod) {
       giorni.push({ g: g, salta: 'Nessun turno assegnato' });
       continue;
     }
-    if (cod === 'M' || cod === 'M1') {
-      giorni.push({ g: g, salta: 'Già in malattia' });
-      continue;
+    // GIA IN MALATTIA (M scritta a mano nel Piano, dal Diario o dal Rapporto): il turno
+    // che la M ha preso e nella nota "Ex C4 - operatore" e resta da coprire. Prima questi
+    // giorni si saltavano: la M c era ma al sostituto non arrivava niente.
+    if (_pianoCodiceAssenteTurno(cod)) {
+      const rM = rigaDi[nome + '|' + g];
+      const sotto = _pianoSiglaSottoMalattia(rM);
+      const tSotto = sotto ? _pianoTurnoInfo(sotto) : null;
+      const chiCopre = _pianoRighe.find(
+        (x) => x.data === _pianoGiornoDiIndice(g) && _pianoCopreMalattiaDi(x, nome) && x.collaboratore !== nome,
+      );
+      if (!tSotto || chiCopre) {
+        giorni.push({
+          g: g,
+          salta: chiCopre
+            ? 'Già coperto da ' + chiCopre.collaboratore + ' (' + chiCopre.codice + ')'
+            : cod === 'ASS'
+              ? 'Già in assenza (ASS)'
+              : 'Già in malattia',
+        });
+        continue;
+      }
+      giaM.add(g);
+      if (cod === 'ASS') giaAss.add(g);
+      cod = sotto;
+      t = tSotto;
     }
     if (!t) {
       const cs = _pianoCodiceInfo(cod);
@@ -1652,6 +2056,8 @@ async function cercaSostitutiMalattia() {
     if (migliore) {
       giorni.push({
         g: g,
+        giaM: giaM.has(g),
+        giaAss: giaAss.has(g),
         codice: cod,
         orari: (t.ora_inizio || '').substring(0, 5) + '-' + (t.ora_fine || '').substring(0, 5),
         sostituto: migliore,
@@ -1661,7 +2067,7 @@ async function cercaSostitutiMalattia() {
       cella[migliore + '|' + g] = cod; // override progressivo, come il greedy Turnivo
       oreMese[migliore] = (oreMese[migliore] || 0) + (parseFloat(t.durata_ore) || 0);
     } else {
-      giorni.push({ g: g, codice: cod, scoperto: true });
+      giorni.push({ g: g, giaM: giaM.has(g), giaAss: giaAss.has(g), codice: cod, scoperto: true });
     }
   }
   _malattiaPiano = { nome: nome, da: da, al: al, giorni: giorni };
@@ -1719,6 +2125,7 @@ async function cercaSostitutiMalattia() {
         escP(d.codice) +
         '</b> ' +
         d.orari +
+        (d.giaM ? ' <span style="color:var(--muted)">(già ' + (d.giaAss ? 'ASS' : 'M') + ')</span>' : '') +
         '</td><td style="text-align:left;color:var(--c-verde,#2c6e49);font-weight:700">' +
         escP(d.sostituto) +
         (d.era ? ' <span style="color:var(--muted);font-weight:400">(era ' + escP(d.era) + ')</span>' : '') +
@@ -1746,8 +2153,8 @@ async function cercaSostitutiMalattia() {
     '. Alla conferma: ' +
     (window._coperturaAssenza && window._coperturaAssenza.codice === 'ND'
       ? 'ND (protetta) al jolly non disponibile'
-      : 'M (protetta) al malato') +
-    ' su tutti i giorni; turni protetti SOLO per le soluzioni con la spunta' +
+      : 'la sigla scelta in «Registra come» (ASS o M, protetta) al malato') +
+    ' sui giorni non ancora in ASS o M; turni protetti SOLO per le soluzioni con la spunta' +
     (coperti ? ', punti incentivo con conferma' : '') +
     '. Le mosse a catena scrivono il commento anche sulle celle del giorno prima.</p>';
   h +=
@@ -1828,9 +2235,16 @@ async function stampaPropostaCopertura() {
 // cosi' la scheda collaboratore conta i giorni (i giorni C dentro il range,
 // mostrati come MC, sono inclusi). Un giorno gia' registrato non si duplica.
 // codiceSostituito: la sigla che la M ha preso (sceglie il Rapporto PRESTO o NOTTE)
-async function _pianoMalattiaNelDiario(nome, dal, al, chiedi, codiceSostituito) {
+// codice 'ASS': assenza in attesa di certificato (registrazione «Assenza»)
+async function _pianoMalattiaNelDiario(nome, dal, al, chiedi, codiceSostituito, codice) {
   if (typeof datiCache === 'undefined' || typeof secPost !== 'function') return 0;
-  const tipoMal = typeof nomeCorrente === 'function' ? nomeCorrente('Malattia') : 'Malattia';
+  const eAss = codice === 'ASS';
+  const parola = eAss ? 'l assenza (attesa certificato)' : 'la malattia';
+  const tipoMal = eAss
+    ? _pianoTipoAssenza()
+    : typeof nomeCorrente === 'function'
+      ? nomeCorrente('Malattia')
+      : 'Malattia';
   const dI = new Date(dal + 'T12:00:00'),
     dF = new Date(al + 'T12:00:00');
   const giorniNuovi = [];
@@ -1861,7 +2275,9 @@ async function _pianoMalattiaNelDiario(nome, dal, al, chiedi, codiceSostituito) 
     if (
       chiedi &&
       !(await chiediConferma(
-        'Registro la malattia di ' +
+        'Registro ' +
+          parola +
+          ' di ' +
           nome +
           ' anche nel Rapporto ' +
           tr +
@@ -1875,17 +2291,19 @@ async function _pianoMalattiaNelDiario(nome, dal, al, chiedi, codiceSostituito) 
     )
       return 0;
     try {
-      await _rapportoAggiungiAssenza(nome, dal, al, codiceSostituito);
+      await _rapportoAggiungiAssenza(nome, dal, al, codiceSostituito, codice);
       return giorniNuovi.length;
     } catch (e) {
       console.error('malattia nel rapporto', e);
-      toast('Rapporto non aggiornato: la malattia va solo nel Diario');
+      toast('Rapporto non aggiornato: ' + parola + ' va solo nel Diario');
     }
   }
   if (
     chiedi &&
     !(await chiediConferma(
-      'Registrare la malattia anche nel Diario di ' +
+      'Registrare ' +
+        parola +
+        ' anche nel Diario di ' +
         nome +
         ' (' +
         giorniNuovi.length +
@@ -1902,7 +2320,7 @@ async function _pianoMalattiaNelDiario(nome, dal, al, chiedi, codiceSostituito) 
       id: Date.now() + creati,
       nome: nome,
       tipo: tipoMal,
-      testo: 'Malattia registrata dal piano' + lbl,
+      testo: (eAss ? 'Assenza (attesa certificato) registrata dal piano' : 'Malattia registrata dal piano') + lbl,
       data: dStr + 'T08:00:00.000Z',
       operatore: getOperatore(),
       reparto_dip: _pianoReparto(),
@@ -1915,10 +2333,18 @@ async function _pianoMalattiaNelDiario(nome, dal, al, chiedi, codiceSostituito) 
       falliti.push(dStr.split('-').reverse().join('.'));
     }
   }
-  if (creati) logAzione('Malattia dal piano', nome + ' · ' + creati + ' giorni registrati nel Diario');
+  if (creati)
+    logAzione(
+      eAss ? 'Assenza dal piano' : 'Malattia dal piano',
+      nome + ' · ' + creati + ' giorni registrati nel Diario',
+    );
   if (falliti.length)
     toastErrore(
-      'Malattia di ' + nome + ' NON registrata nel Diario per ' + falliti.join(', ') + ': registrala dal Diario.',
+      (eAss ? 'Assenza di ' : 'Malattia di ') +
+        nome +
+        ' NON registrata nel Diario per ' +
+        falliti.join(', ') +
+        ': registrala dal Diario.',
       10000,
     );
   return creati;
@@ -1968,9 +2394,18 @@ async function _pianoPuntiCoperturaVia(nome, giorniDstr) {
   }
   return tolti;
 }
-async function _pianoMalattiaViaDiario(nome, giorniDstr) {
+// opz (Annulla di una copertura): { ids: le registrazioni scritte dalla copertura, tolte: []
+// riempito con quelle messe nel Cestino, per il Ripristina }
+// opz.codice 'ASS': le registrazioni «Assenza» (attesa certificato) invece della Malattia
+async function _pianoMalattiaViaDiario(nome, giorniDstr, opz) {
+  opz = opz || {};
   if (typeof datiCache === 'undefined' || typeof secPatch !== 'function') return 0;
-  const tipoMal = typeof nomeCorrente === 'function' ? nomeCorrente('Malattia') : 'Malattia';
+  const eAss = opz.codice === 'ASS';
+  const tipoMal = eAss
+    ? _pianoTipoAssenza()
+    : typeof nomeCorrente === 'function'
+      ? nomeCorrente('Malattia')
+      : 'Malattia';
   const suoi = datiCache.filter(
     (e) => (e.nome || '').toLowerCase() === nome.toLowerCase() && e.tipo === tipoMal && !e.eliminato,
   );
@@ -1987,14 +2422,20 @@ async function _pianoMalattiaViaDiario(nome, giorniDstr) {
   };
   const daTogliere = [];
   const periodiInteri = [];
-  suoi.forEach((e) => {
-    const gg = giorniDellaRiga(e);
-    if (!giorniDstr.some((d) => gg.includes(d))) return;
-    // una riga che copre anche giorni che restano in malattia non si cestina: toglierla
-    // cancellerebbe tutto il periodo (prima succedeva, con il messaggio "il giorno 30")
-    if (gg.some((d) => !giorniDstr.includes(d))) periodiInteri.push(e);
-    else daTogliere.push(e);
-  });
+  // ANNULLA DI UNA COPERTURA (15/10/2026): si tolgono ESATTAMENTE le registrazioni che la
+  // copertura ha scritto, tutte, anche se il periodo comprende un giorno di congedo (C) che
+  // non era diventato M. Prima si guardavano i giorni M: la riga del Rapporto "dal 04 al 06"
+  // copriva anche il C del 05, restava nel Diario e nel piano compariva MC.
+  if (Array.isArray(opz.ids)) suoi.filter((e) => opz.ids.includes(e.id)).forEach((e) => daTogliere.push(e));
+  else
+    suoi.forEach((e) => {
+      const gg = giorniDellaRiga(e);
+      if (!giorniDstr.some((d) => gg.includes(d))) return;
+      // una riga che copre anche giorni che restano in malattia non si cestina: toglierla
+      // cancellerebbe tutto il periodo (prima succedeva, con il messaggio "il giorno 30")
+      if (gg.some((d) => !giorniDstr.includes(d))) periodiInteri.push(e);
+      else daTogliere.push(e);
+    });
   if (periodiInteri.length) {
     const testo = periodiInteri
       .map((e) => {
@@ -2003,7 +2444,9 @@ async function _pianoMalattiaViaDiario(nome, giorniDstr) {
       })
       .join(', ');
     await mostraAvviso(
-      'Nel Diario la malattia di ' +
+      'Nel Diario ' +
+        (eAss ? 'l assenza' : 'la malattia') +
+        ' di ' +
         nome +
         ' e registrata come un periodo unico (' +
         testo +
@@ -2011,20 +2454,34 @@ async function _pianoMalattiaViaDiario(nome, giorniDstr) {
     );
   }
   if (!daTogliere.length) return 0;
+  // una riga con un periodo (Rapporto "dal 04 al 06") si dice con il periodo intero
+  const ggM = (d) => d.substring(8, 10) + '/' + d.substring(5, 7);
   const gg = daTogliere
-    .map((e) => String(e.data).substring(8, 10) + '/' + String(e.data).substring(5, 7))
+    .map((e) => {
+      const p = giorniDellaRiga(e);
+      return p.length > 1 ? 'dal ' + ggM(p[0]) + ' al ' + ggM(p[p.length - 1]) : ggM(String(e.data));
+    })
     .sort()
     .join(', ');
   const nG = daTogliere.length;
+  const conPeriodo = daTogliere.some((e) => giorniDellaRiga(e).length > 1);
   if (
     !(await chiediConferma(
       'Nel Diario ' +
         nome +
-        ' risulta in malattia ' +
-        (nG === 1 ? 'il giorno ' : 'nei giorni ') +
+        (eAss ? ' risulta assente (attesa certificato) ' : ' risulta in malattia ') +
+        (conPeriodo ? '' : nG === 1 ? 'il giorno ' : 'nei giorni ') +
         gg +
         '.\n\nTogliere ' +
-        (nG === 1 ? 'questo giorno' : 'questi ' + nG + ' giorni') +
+        (conPeriodo
+          ? nG === 1
+            ? eAss
+              ? 'questa assenza'
+              : 'questa malattia'
+            : 'queste ' + nG + ' registrazioni'
+          : nG === 1
+            ? 'questo giorno'
+            : 'questi ' + nG + ' giorni') +
         " anche dal Diario? Le registrazioni finiscono nel Cestino (recuperabili) e la scheda del collaboratore si aggiorna.\n\nOK = togli anche dal Diario · Annulla = il Diario resta com'e'",
     ))
   )
@@ -2040,6 +2497,7 @@ async function _pianoMalattiaViaDiario(nome, giorniDstr) {
       e.eliminato = true;
       _diarioTogliArchivioLeggero(e.id);
       tolte++;
+      if (Array.isArray(opz.tolte)) opz.tolte.push(e.id);
       // nata dal Rapporto giornaliero: la persona sparisce anche da li, come quando la
       // registrazione si cestina dal Diario (prima il Rapporto diceva ancora "malato")
       if (typeof _rapportoTogliRegistrazione === 'function') {
@@ -2054,16 +2512,57 @@ async function _pianoMalattiaViaDiario(nome, giorniDstr) {
     toastErrore('Diario NON aggiornato per ' + nonTolte.join(', ') + ': togli la malattia dal Diario.', 10000);
   datiCache = datiCache.filter((e) => !e.eliminato);
   if (tolte) {
-    logAzione('Malattia tolta dal piano', nome + ' · ' + tolte + ' giorni spostati nel cestino del Diario');
+    logAzione(
+      eAss ? 'Assenza tolta dal piano' : 'Malattia tolta dal piano',
+      nome + ' · ' + tolte + ' giorni spostati nel cestino del Diario',
+    );
     toast(
       'Diario aggiornato: ' +
         tolte +
         (tolte === 1 ? ' giorno' : ' giorni') +
-        ' di malattia nel Cestino' +
+        (eAss ? ' di assenza nel Cestino' : ' di malattia nel Cestino') +
         (rapportiTolti.length ? ' · tolto anche dal Rapporto ' + [...new Set(rapportiTolti)].join(', ') : ''),
     );
   }
   return tolte;
+}
+// RIPRISTINA DI UNA COPERTURA: le registrazioni della malattia che l Annulla aveva messo
+// nel Cestino tornano (le stesse, con il loro numero) e la persona torna nel Rapporto,
+// come il ripristino dal Cestino. Il piano non si tocca: le sue celle le rimette il
+// Ripristina del piano. Prima il Ripristina rimetteva solo il piano: malato nel piano, non
+// nel Diario ne nel Rapporto. Ritorna gli id rimessi.
+async function _pianoMalattiaRimettiDiario(nome, ids) {
+  const rimessi = [];
+  const nonRimessi = [];
+  for (const id of ids || []) {
+    try {
+      const r = ((await secGet('registrazioni?id=eq.' + id)) || [])[0];
+      if (!r) {
+        nonRimessi.push(id);
+        continue;
+      }
+      // tolta dal Cestino da qualcun altro nel frattempo: resta com e
+      if (!r.eliminato) continue;
+      await secPatch('registrazioni', 'id=eq.' + id, { eliminato: false, eliminato_da: null, eliminato_at: null });
+      Object.assign(r, { eliminato: false, eliminato_da: null, eliminato_at: null });
+      if (typeof datiCache !== 'undefined' && !datiCache.some((e) => e.id === r.id)) datiCache.unshift(r);
+      rimessi.push(id);
+      if (typeof _rapportoRimettiRegistrazione === 'function') await _rapportoRimettiRegistrazione(r);
+    } catch (e) {
+      nonRimessi.push(id);
+    }
+  }
+  if (rimessi.length)
+    logAzione(
+      'Malattia rimessa dal piano',
+      nome + ' · ' + rimessi.length + ' registrazioni del Diario tolte dal Cestino',
+    );
+  if (nonRimessi.length)
+    toastErrore(
+      'Ripristinato il piano, ma la malattia di ' + nome + ' non e tornata nel Diario: rimettila dal Cestino.',
+      10000,
+    );
+  return rimessi;
 }
 // una copertura alla volta: il doppio click su "Conferma copertura" la applicava due volte
 function confermaCoperturaMalattia() {
@@ -2106,16 +2605,21 @@ async function _confermaCoperturaMalattiaEsegui() {
       return;
     logAzione('Piano: domenica libera persa confermata', domPerse.join(' | '));
   }
+  // codice dell assenza: ASS (attesa certificato, la scelta di base), M (malattia con
+  // certificato) o ND (non disponibilita dal Diario)
+  const selCod = document.getElementById('mal-codice');
+  const ass = window._coperturaAssenza || { codice: selCod && selCod.value === 'M' ? 'M' : 'ASS', nota: '' };
   document.getElementById('pwd-modal').classList.add('hidden');
   const op = getOperatore();
-  // codice dell assenza: M (malattia) o ND (non disponibilita dal Diario)
-  const ass = window._coperturaAssenza || { codice: 'M', nota: '' };
   window._coperturaAssenza = null;
+  const eAss = ass.codice === 'ASS';
   const dstrDi = (g) => ym + '-' + String(g).padStart(2, '0');
   const rigaDi = {};
   _pianoRighe.forEach((r) => (rigaDi[r.collaboratore + '|' + parseInt(r.data.split('-')[2])] = r));
   const passo = _pianoUndoSnap(
-    'copertura ' + (ass.codice === 'ND' ? 'non disponibilità ' : 'malattia ') + _pianoMeseSel,
+    'copertura ' +
+      (ass.codice === 'ND' ? 'non disponibilità ' : eAss ? 'malattia (assenza ASS) ' : 'malattia ') +
+      _pianoMeseSel,
   );
   let nM = 0;
   let nSost = 0;
@@ -2126,67 +2630,103 @@ async function _confermaCoperturaMalattiaEsegui() {
   const ops = [];
   const adesso = new Date().toISOString();
   // cella da scrivere: modifica (riga) o nuova (senza riga), con il controllo di come si vedeva
+  // com era la cella di chi copre (o della mossa a catena) prima della copertura: torna tale e
+  // quale se la malattia si toglie («Rimetto il turno a ... e tolgo la copertura?»)
+  const comEra = (riga) =>
+    riga && riga.prima_malattia !== undefined ? { prima_malattia: _pianoPrimaMalattiaDi(riga) } : {};
   const metti = (nomeC, g, riga, dati) => {
     const d = Object.assign({ protetto: true, generato: false, operatore: op }, dati);
     if (riga) d.updated_at = adesso;
     else d.reparto_dip = _pianoReparto();
     ops.push({ collaboratore: nomeC, data: dstrDi(g), atteso: _pianoAttesoDi(riga || null), dati: d });
   };
+  const nd = ass.codice === 'ND';
   for (const d of m.giorni) {
     if (d.salta) continue;
+    const conSost = !!(d.sostituto && selGiorni.has(d.g));
+    const coperto = conSost ? ' - coperto da ' + d.sostituto : '';
     // M al malato (protetta)
     const rMal = rigaDi[m.nome + '|' + d.g];
-    if (rMal) {
+    if (d.giaM) {
+      // gia in M (scritta a mano, dal Diario o dal Rapporto): resta com e, la nota dice chi copre
+      if (rMal && conSost)
+        metti(m.nome, d.g, rMal, {
+          commento: ('Ex ' + d.codice + coperto + ' - ' + op).substring(0, 400),
+          operatore: op,
+        });
+    } else if (rMal) {
       const dM = {
         codice: ass.codice,
         // la malattia scioglie il blocco, come negli altri percorsi
         motivo_blocco: null,
-        commento: ('Ex ' + d.codice + ' - ' + (ass.nota ? ass.nota + ' - ' : '') + op).substring(0, 400),
+        // "Ex C5 - coperto da Bianchi Anna - Admin" (senza sostituto "Ex C5 - Admin")
+        commento: ('Ex ' + d.codice + coperto + ' - ' + (ass.nota ? ass.nota + ' - ' : '') + op).substring(0, 400),
       };
       // com era la cella sotto la malattia: torna tale e quale quando la malattia si toglie
-      if (ass.codice === 'M' && rMal.codice !== 'M' && rMal.prima_malattia !== undefined)
+      if ((ass.codice === 'M' || eAss) && rMal.codice !== 'M' && rMal.prima_malattia !== undefined)
         dM.prima_malattia = _pianoPrimaMalattiaDi(rMal);
       metti(m.nome, d.g, rMal, dM);
     } else metti(m.nome, d.g, null, { codice: ass.codice });
-    nM++;
+    if (!d.giaM) nM++;
     // turno al sostituto (protetto), SOLO se la soluzione ha la spunta
-    if (d.sostituto && selGiorni.has(d.g)) {
+    if (conSost) {
       // MOSSA A CATENA sul giorno prima, se prevista dalla proposta
       if (d.catena) {
         const g1 = d.catena.g1;
+        const perChi = ' (copertura di ' + m.nome + ')';
         const rX1 = rigaDi[d.sostituto + '|' + g1];
         if (d.catena.tipo === 'scambio') {
           const rZ = rigaDi[d.catena.con + '|' + g1];
           if (rX1 && rZ) {
             metti(d.sostituto, g1, rX1, {
+              ...comEra(rX1),
               codice: d.catena.turnoCon,
-              commento: ('Ex ' + d.catena.turnoX + ' - cambio per esigenze operative - ' + op).substring(0, 400),
+              commento: ('Ex ' + d.catena.turnoX + ' - cambio per esigenze operative' + perChi + ' - ' + op).substring(
+                0,
+                400,
+              ),
             });
             metti(d.catena.con, g1, rZ, {
+              ...comEra(rZ),
               codice: d.catena.turnoX,
-              commento: ('Ex ' + d.catena.turnoCon + ' - cambio per esigenze operative - ' + op).substring(0, 400),
+              commento: (
+                'Ex ' +
+                d.catena.turnoCon +
+                ' - cambio per esigenze operative' +
+                perChi +
+                ' - ' +
+                op
+              ).substring(0, 400),
             });
           }
         } else {
           // riassegna: il sostituto viene liberato, il suo turno passa al terzo
           if (rX1)
             metti(d.sostituto, g1, rX1, {
+              ...comEra(rX1),
               codice: 'C',
-              commento: ('Ex ' + d.catena.turnoX + ' - cambio per esigenze operative - ' + op).substring(0, 400),
+              commento: ('Ex ' + d.catena.turnoX + ' - cambio per esigenze operative' + perChi + ' - ' + op).substring(
+                0,
+                400,
+              ),
             });
           const rY = rigaDi[d.catena.con + '|' + g1];
           const commY = (
             (d.catena.eraCon ? 'Ex ' + d.catena.eraCon + ' - ' : '') +
-            'cambio per esigenze operative - ' +
+            'cambio per esigenze operative' +
+            perChi +
+            ' - ' +
             op
           ).substring(0, 400);
-          metti(d.catena.con, g1, rY || null, { codice: d.catena.turnoX, commento: commY });
+          metti(d.catena.con, g1, rY || null, Object.assign({ codice: d.catena.turnoX, commento: commY }, comEra(rY)));
           sostituti.add(d.catena.con); // si carica un turno in piu': incentivi con conferma
         }
       }
       const rS = rigaDi[d.sostituto + '|' + d.g];
-      const commento = ('Ex ' + (d.era || '-') + ' - cambio per esigenze operative - ' + op).substring(0, 400);
-      metti(d.sostituto, d.g, rS || null, { codice: d.codice, commento: commento });
+      // nota chiara: chi copre chi ("Ex C - copre Rossi Mario (malattia) - Admin")
+      // la nota dice cosa copre: assenza (ASS), malattia o non disponibilita
+      const commento = _pianoNotaCopre(d.era, m.nome, (d.giaM ? d.giaAss : eAss) ? 'ASS' : nd, op);
+      metti(d.sostituto, d.g, rS || null, Object.assign({ codice: d.codice, commento: commento }, comEra(rS)));
       sostituti.add(d.sostituto);
       nSost++;
     }
@@ -2248,35 +2788,75 @@ async function _confermaCoperturaMalattiaEsegui() {
       }
     }
     logAzione(
-      'Copertura malattia',
-      m.nome + ' ' + m.da + '-' + m.al + ' ' + ym + ': ' + nM + ' M, ' + nSost + ' sostituzioni',
+      eAss ? 'Copertura assenza' : 'Copertura malattia',
+      m.nome + ' ' + m.da + '-' + m.al + ' ' + ym + ': ' + nM + (eAss ? ' ASS, ' : ' M, ') + nSost + ' sostituzioni',
     );
     // piano, Rapporto e Diario sempre allineati: la malattia si registra nel Rapporto
     // del primo giorno e da li nel Diario
-    const primo = m.giorni.find((d) => !d.salta);
+    // i giorni gia in M (scritta prima a mano, dal Diario o dal Rapporto) hanno gia avuto
+    // questi collegamenti: qui solo le M nuove
+    const primo = m.giorni.find((d) => !d.salta && !d.giaM);
     // STESSI COLLEGAMENTI della M scritta a mano: CGF caduto in malattia (si
     // propone il giorno sostitutivo) e festivi con recupero non piu lavorati
-    const giorniM = m.giorni.filter((d) => !d.salta);
+    const giorniM = m.giorni.filter((d) => !d.salta && !d.giaM);
     for (const d of giorniM)
       if (d.codice === 'CGF' && typeof _pianoRimettiCgf === 'function') await _pianoRimettiCgf(m.nome, dstrDi(d.g));
     await _pianoFestiviPersiDopo(
       m.nome,
       giorniM.map((d) => ({ data: dstrDi(d.g), codice: d.codice })),
     );
-    const nDiario = await _pianoMalattiaNelDiario(m.nome, dstrDi(m.da), dstrDi(m.al), false, primo ? primo.codice : '');
+    // la malattia nel Rapporto e nel Diario e parte del passo della copertura (malattiaDiario
+    // qui sotto: Annulla della copertura propone di toglierla). Fuori dall Annulla generale:
+    // prima diventava un azione a parte, piu recente, e il primo Ctrl+Z toglieva la malattia
+    // dal Diario mentre la copertura restava nel piano (due Annulla sulle stesse celle)
+    const nelDiario = () =>
+      _pianoMalattiaNelDiario(
+        m.nome,
+        dstrDi(giorniM[0].g),
+        dstrDi(giorniM[giorniM.length - 1].g),
+        false,
+        primo ? primo.codice : '',
+        eAss ? 'ASS' : '',
+      );
+    // quali registrazioni scrive la copertura (Annulla toglie quelle, Ripristina le rimette)
+    const tipoMalC = eAss
+      ? _pianoTipoAssenza()
+      : typeof nomeCorrente === 'function'
+        ? nomeCorrente('Malattia')
+        : 'Malattia';
+    const regSue = () =>
+      (typeof datiCache !== 'undefined' ? datiCache : []).filter(
+        (e) => (e.nome || '').toLowerCase() === m.nome.toLowerCase() && e.tipo === tipoMalC && !e.eliminato,
+      );
+    const regPrima = new Set(regSue().map((e) => e.id));
+    const nDiario = giorniM.length ? await (window.Annulla ? window.Annulla.senzaTraccia(nelDiario) : nelDiario()) : 0;
+    const regNuove = regSue()
+      .filter((e) => !regPrima.has(e.id))
+      .map((e) => e.id);
     // Annulla di questa copertura: rimette le celle E propone di togliere la malattia dal
     // Diario (prima restava nel Diario: "malato" nel Diario, non nel piano)
-    if (ass.codice === 'M' && window._pianoUndo && window._pianoUndo.length) {
+    if ((ass.codice === 'M' || eAss) && window._pianoUndo && window._pianoUndo.length) {
       const ultimo = window._pianoUndo[window._pianoUndo.length - 1];
-      if (ultimo && /^copertura malattia/.test(ultimo.label || ''))
-        ultimo.malattiaDiario = { nome: m.nome, giorni: giorniM.map((d) => dstrDi(d.g)) };
+      // solo le M scritte da questa copertura: la M scritta prima (a mano, Diario) resta
+      if (ultimo && /^copertura malattia/.test(ultimo.label || '') && giorniM.length)
+        ultimo.malattiaDiario = {
+          nome: m.nome,
+          giorni: giorniM.map((d) => dstrDi(d.g)),
+          ids: regNuove,
+          codice: eAss ? 'ASS' : '',
+        };
+      // i punti della copertura si propongono di togliere anche se la M c era gia
+      else if (ultimo && /^copertura malattia/.test(ultimo.label || '') && nSost)
+        ultimo.puntiCopertura = {
+          nome: m.nome,
+          giorni: m.giorni.filter((d) => !d.salta).map((d) => dstrDi(d.g)),
+        };
     }
     toast(
       'Copertura registrata: ' +
-        nM +
-        ' giorni M, ' +
+        (nM ? nM + (eAss ? ' giorni ASS, ' : ' giorni M, ') : '') +
         nSost +
-        ' sostituzioni' +
+        (nSost === 1 ? ' sostituzione' : ' sostituzioni') +
         (nDiario ? ', ' + nDiario + ' giorni nel Diario' : '') +
         (puntiDati ? ', punti assegnati' : ''),
     );
@@ -2287,6 +2867,8 @@ async function _confermaCoperturaMalattiaEsegui() {
     _malattiaPiano = null;
     _pianoViolCelle = {};
     _pianoViolLista = null;
+    // coperto: l avviso dei turni da coprire si aggiorna (o sparisce)
+    if (window._copAvvisi && window._copAvvisi[m.nome]) _pianoAvvisoCoperturaAggiorna(m.nome);
     renderPiano();
   } catch (e) {
     // le celle sono scritte: qui si ferma solo il seguito (punti, Diario, CGF)

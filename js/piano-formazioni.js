@@ -33,7 +33,25 @@ const FORM_MODELLI_BASE = {
   SALA: { diurni: ['S22', 'S22'], notti: ['S7', 'S7', 'S7'] },
 };
 // codici di assenza: in quei giorni non si mette una formazione
-const FORM_ASSENZE = ['V', 'V1', 'M', 'M1', 'I', 'I1', 'ND', 'CGF', 'CNP', 'F', '1F', 'CS', 'LRD', 'FU', 'TR', 'AF'];
+const FORM_ASSENZE = [
+  'V',
+  'V1',
+  'M',
+  'M1',
+  'ASS',
+  'I',
+  'I1',
+  'ND',
+  'CGF',
+  'CNP',
+  'F',
+  '1F',
+  'CS',
+  'LRD',
+  'FU',
+  'TR',
+  'AF',
+];
 
 function puoPianificareFormazioni() {
   return typeof puoAzioniAutoPiano === 'function' && puoAzioniAutoPiano('formazioni');

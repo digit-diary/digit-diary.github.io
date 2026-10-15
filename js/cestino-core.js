@@ -162,6 +162,9 @@ async function _cestinoRiallineaRegistrazione(r) {
       await _diarioNdRiallinea([r]);
     if (r.tipo === nomeCorrente('Malattia') && typeof sincronizzaMalattiaPiano === 'function')
       await sincronizzaMalattiaPiano(r.nome, '', r.data, r.testo || '');
+    // assenza in attesa di certificato: tornano le ASS sui turni
+    if (r.tipo === nomeCorrente('Assenza') && typeof sincronizzaMalattiaPiano === 'function')
+      await sincronizzaMalattiaPiano(r.nome, '', r.data, r.testo || '', { codice: 'ASS' });
     if (typeof _rapportoRimettiRegistrazione === 'function') await _rapportoRimettiRegistrazione(r);
   } catch (e) {
     toastErrore('Ripristinata, ma piano o Rapporto non allineati: ' + ((e && e.message) || e));

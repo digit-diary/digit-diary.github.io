@@ -1672,6 +1672,17 @@ function pianoStoricoSort(campo) {
 // database (piano_storico). Si sceglie un momento e si riporta il mese di questo settore
 // a com era subito PRIMA (oppure a un giorno e un ora scelti). Il ripristino usa le
 // scritture normali: e registrato a sua volta e si annulla con Annulla.
+// PERMESSO PROPRIO (decisione del titolare 15/10/2026): riportare il mese a una versione
+// (e annullare o ripristinare quel ripristino) e di chi gestisce il piano E ha
+// "Piano · Ripristinare una versione del mese" (piano_ripristino_versioni; all inizio solo
+// l amministratore). Gli altri vedono le versioni e le differenze, senza il pulsante.
+const PIANO_PERMESSO_VERSIONI = 'Serve il permesso Ripristinare una versione';
+function puoRipristinareVersioni() {
+  return (
+    puoGestirePiano() &&
+    (isAdmin() || (typeof puoModificare === 'function' && puoModificare('piano_ripristino_versioni')))
+  );
+}
 async function _pianoVersioniHtml() {
   const ym = _pianoMeseSel;
   const rep = _pianoReparto();
@@ -1681,7 +1692,9 @@ async function _pianoVersioniHtml() {
   } catch (e) {
     return '<div class="main-card" style="margin-bottom:16px"><div class="card-header">Versioni del mese</div><div style="padding:12px 14px;color:var(--muted)">Lo storico delle celle non è ancora attivo su questo server: serve un aggiornamento del database (avvisa l IT).</div></div>';
   }
-  const puo = puoGestirePiano();
+  const puo = puoRipristinareVersioni();
+  const nota =
+    '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' + escP(PIANO_PERMESSO_VERSIONI) + '</span>';
   const ora = (t) => new Date(t).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
   let h =
     '<div class="main-card" style="margin-bottom:16px"><div class="card-header">Versioni del mese · ' +
@@ -1691,12 +1704,19 @@ async function _pianoVersioniHtml() {
     '</div><div style="padding:10px 14px">' +
     '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Ogni cambio di cella e registrato dal database con chi e quando (a mano, bozza, import, vacanze, Annulla), da qualsiasi PC. ' +
     (puo
-      ? 'Con <b>Riporta a prima</b> il mese torna com era subito prima di quel momento: vedi le differenze e confermi; i giorni chiusi restano come sono e tutto si annulla con Annulla.'
-      : 'Riportare il mese indietro e di chi gestisce il piano.') +
+      ? 'Con <b>Riporta a prima</b> il mese torna esattamente com era subito prima di quel momento (sigle, orari, protette, bozza, lucchetti): vedi le differenze e confermi. I giorni passati si rimettono solo con il permesso "Giorni chiusi" e un motivo; tutto si annulla con Annulla.'
+      : 'Con <b>Vedi le differenze</b> vedi com era il mese in quel momento. ' +
+        escP(PIANO_PERMESSO_VERSIONI) +
+        ' per riportarlo indietro.') +
     '</p>';
-  if (puo)
-    h +=
-      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><label for="storico-quando" style="font-size:var(--fs-sm,.8125rem)">Riporta il mese a com era il</label><input type="datetime-local" id="storico-quando" style="padding:4px 6px"><button class="btn-act" onclick="pianoStoricoRiportaA()">Vedi e riporta</button></div>';
+  h +=
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><label for="storico-quando" style="font-size:var(--fs-sm,.8125rem)">' +
+    (puo ? 'Riporta il mese a com era il' : 'Com era il mese il') +
+    '</label><input type="datetime-local" id="storico-quando" style="padding:4px 6px"><button class="btn-act" onclick="pianoStoricoRiportaA()">' +
+    (puo ? 'Vedi e riporta' : 'Vedi le differenze') +
+    '</button>' +
+    (puo ? '' : nota) +
+    '</div>';
   if (!momenti.length) {
     h +=
       '<p style="color:var(--muted)">Nessuna modifica registrata per questo mese (lo storico parte dall installazione).</p></div></div>';
@@ -1704,8 +1724,7 @@ async function _pianoVersioniHtml() {
   }
   h +=
     '<div style="overflow-x:auto;max-height:380px;overflow-y:auto"><table class="piano-table" style="min-width:640px;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Quando</th><th style="text-align:left">Chi</th><th>Celle</th><th style="text-align:left">Esempi</th>' +
-    (puo ? '<th></th>' : '') +
-    '</tr></thead><tbody>';
+    '<th></th></tr></thead><tbody>';
   momenti.forEach((m) => {
     const det = [
       m.nuove ? m.nuove + ' nuove' : '',
@@ -1731,7 +1750,11 @@ async function _pianoVersioniHtml() {
         ? '<td><button class="btn-act" title="Riporta il mese a com era subito prima di questo momento" onclick="pianoStoricoRiporta(\'' +
           _jsArg(m.primo) +
           '\')">Riporta a prima</button></td>'
-        : '') +
+        : '<td style="white-space:nowrap"><button class="btn-act" title="Com era il mese subito prima di questo momento (solo da vedere)" onclick="pianoStoricoRiporta(\'' +
+          _jsArg(m.primo) +
+          '\')">Vedi le differenze</button> ' +
+          nota +
+          '</td>') +
       '</tr>';
   });
   h += '</tbody></table></div></div></div>';
@@ -1746,74 +1769,228 @@ function pianoStoricoRiportaA() {
   // l ora scelta e quella di Lugano: la data locale del browser la converte
   pianoStoricoRiporta(new Date(v).toISOString(), true);
 }
+// RIPRISTINO DI UNA VERSIONE: CHE COSA SI RIMETTE (15/10/2026). Il ripristino e un
+// operazione voluta: il mese torna ESATTAMENTE com era (sigla, orari, nota, colore,
+// protetta, bozza, lucchetto), giorni passati compresi. Prima i giorni passati (chiusi)
+// restavano come erano oggi e l anteprima diceva solo "i giorni chiusi restano come sono":
+// da ieri all indietro il mese restava vuoto o sbagliato.
+// Restano come sono oggi, e l anteprima li elenca:
+//  - le malattie registrate nel Diario (vale il Diario, come nell importazione): la M di
+//    oggi resta se il Diario la registra; la M di allora non torna se il Diario non la
+//    registra piu (la registrazione e stata eliminata o corretta);
+//  - le assenze ND (decisione del titolare 15/10/2026: vale il modulo ND 1187, come per le
+//    malattie): una cella che oggi e ND, o che allora era ND, resta com e oggi; l ND si
+//    mette o si toglie dalla cella o dalla registrazione Non disponibilita, e il modulo
+//    1187 del mese si riallinea da solo;
+//  - le celle che oggi sono nel piano di un altro settore (le decide quel settore).
+// Funzione pura (test/piano-versioni.test.js): versione e oggi = righe del database del
+// settore; opz.bloccato(dstr) = giorno chiuso; opz.malattie = { 'nome|dstr': true } dal
+// Diario; opz.altroSettore = Set di 'nome|dstr' occupati oggi in un altro settore.
+// Ritorna { rimetti, passate, giorniPassati, malattia, nd, altroSettore } (chiavi 'nome|dstr').
+function _pianoVersioneCalcola(versione, oggi, opz) {
+  opz = opz || {};
+  const k = (r) => r.collaboratore + '|' + String(r.data).substring(0, 10);
+  const A = new Map((versione || []).map((r) => [k(r), r]));
+  const B = new Map((oggi || []).map((r) => [k(r), r]));
+  const mal = (r) => !!r && ['M', 'M1'].includes(String(r.codice || '').toUpperCase());
+  const malDiario = opz.malattie || {};
+  const altro = opz.altroSettore || new Set();
+  const nd = (r) => !!r && String(r.codice || '').toUpperCase() === 'ND';
+  const out = { rimetti: [], passate: [], giorniPassati: [], malattia: [], nd: [], altroSettore: [] };
+  const diverse = [...new Set([...A.keys(), ...B.keys()])]
+    .filter((x) => !_pianoCelleUguali(A.get(x), B.get(x)))
+    .sort((a, b) => a.split('|')[1].localeCompare(b.split('|')[1]) || a.localeCompare(b));
+  diverse.forEach((x) => {
+    const allora = A.get(x);
+    const ora = B.get(x);
+    if ((mal(ora) && malDiario[x]) || (mal(allora) && !mal(ora) && !malDiario[x])) out.malattia.push(x);
+    else if (nd(ora) || nd(allora)) out.nd.push(x);
+    else if (allora && !ora && altro.has(x)) out.altroSettore.push(x);
+    else {
+      out.rimetti.push(x);
+      if (opz.bloccato && opz.bloccato(x.split('|')[1])) out.passate.push(x);
+    }
+  });
+  out.giorniPassati = [...new Set(out.passate.map((x) => x.split('|')[1]))].sort();
+  return out;
+}
+// una cella in parole per l anteprima: "S5", "C (bozza)", "V (lucchetto)", "vuota"
+function _pianoVersioneCella(r) {
+  if (!r || !r.codice) return 'vuota';
+  const t = [];
+  if (r.motivo_blocco) t.push('lucchetto');
+  if (r.generato) t.push('bozza');
+  else if (r.protetto === false) t.push('non protetta');
+  return r.codice + (t.length ? ' (' + t.join(', ') + ')' : '');
+}
 async function pianoStoricoRiporta(quando, esatto) {
-  if (!puoGestirePiano()) return;
+  // senza il permesso: le differenze si vedono, il mese non si riporta
+  const puoRip = puoRipristinareVersioni();
   const ym = _pianoMeseSel;
   const rep = _pianoReparto();
   // "prima di questo momento": un millesimo prima della prima cella cambiata
   const istante = esatto ? quando : new Date(new Date(quando).getTime() - 1).toISOString();
+  const fine = ym + '-' + String(_pianoUltimoGiorno(ym)).padStart(2, '0');
+  const k = (r) => r.collaboratore + '|' + String(r.data).substring(0, 10);
   let stato;
   let cur;
+  const altroSettore = new Set();
   try {
     stato =
       (await _rpcSicura('piano_storico_al', { p_token: getOpToken(), p_reparto: rep, p_ym: ym, p_quando: istante })) ||
       [];
-    const fine = ym + '-' + String(_pianoUltimoGiorno(ym)).padStart(2, '0');
     cur = (await secGet('piano?data=gte.' + ym + '-01&data=lte.' + fine + '&reparto_dip=eq.' + rep + '')) || [];
+    // celle della versione che oggi mancano in questo settore: sono nel piano di un altro?
+    const oggi = new Set(cur.map(k));
+    const nomi = [...new Set(stato.filter((r) => !oggi.has(k(r))).map((r) => r.collaboratore))];
+    for (let i = 0; i < nomi.length; i += 40) {
+      const lista = nomi
+        .slice(i, i + 40)
+        .map((n) => encodeURIComponent(n))
+        .join(',');
+      const altre =
+        (await secGet(
+          'piano?collaboratore=in.(' + lista + ')&data=gte.' + ym + '-01&data=lte.' + fine + '&reparto_dip=neq.' + rep,
+        )) || [];
+      altre.forEach((r) => altroSettore.add(k(r)));
+    }
   } catch (e) {
     toastErrore('Storico non letto: ' + ((e && e.message) || e));
     return;
   }
-  const k = (r) => r.collaboratore + '|' + String(r.data).substring(0, 10);
-  const firma = (r) =>
-    r ? [r.codice, r.ora_inizio || '', r.ora_fine || '', r.commento || '', r.motivo_blocco || ''].join('|') : '';
+  const calc = _pianoVersioneCalcola(stato, cur, {
+    bloccato: _pianoGiornoBloccato,
+    malattie: _pianoMalattieMese(ym),
+    altroSettore: altroSettore,
+  });
   const prima = new Map(stato.map((r) => [k(r), r]));
   const oggi = new Map(cur.map((r) => [k(r), r]));
-  const diverse = [...new Set([...prima.keys(), ...oggi.keys()])].filter(
-    (x) => firma(prima.get(x)) !== firma(oggi.get(x)),
-  );
   const quandoIt = new Date(istante).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'medium' });
-  if (!diverse.length) {
+  const nTenute = calc.malattia.length + calc.nd.length + calc.altroSettore.length;
+  if (!calc.rimetti.length && !nTenute) {
     toast('Il mese e già com era il ' + quandoIt);
     return;
   }
-  diverse.sort((a, b) => a.split('|')[1].localeCompare(b.split('|')[1]) || a.localeCompare(b));
-  const esempi = diverse
-    .slice(0, 14)
-    .map((x) => {
-      const [n, d] = x.split('|');
-      return (
-        '\u2022 ' +
-        n +
-        ' ' +
-        d.split('-').reverse().join('.') +
-        ': oggi ' +
-        ((oggi.get(x) || {}).codice || 'vuota') +
-        ' \u2192 allora ' +
-        ((prima.get(x) || {}).codice || 'vuota')
-      );
-    })
-    .join('\n');
-  if (
-    !(await chiediConferma(
-      'Riporto ' +
-        ym +
-        ' (' +
-        repartoLabel(rep) +
-        ') a com era il ' +
-        quandoIt +
-        '?\n\n' +
-        diverse.length +
-        (diverse.length === 1 ? ' cella cambia:' : ' celle cambiano:') +
-        '\n' +
-        esempi +
-        (diverse.length > 14 ? '\n... e altre ' + (diverse.length - 14) : '') +
-        '\n\nI giorni chiusi restano come sono. Si torna indietro con Annulla.',
+  const gg = (d) => d.split('-').reverse().join('.');
+  const riga = (x) => {
+    const [n, d] = x.split('|');
+    let a = _pianoVersioneCella(oggi.get(x));
+    let b = _pianoVersioneCella(prima.get(x));
+    if (a === b) {
+      a += ' (orario, nota o colore)';
+      b = 'com era';
+    }
+    return '• ' + n + ' ' + gg(d) + ': oggi ' + a + ' → allora ' + b;
+  };
+  const elenco = (lista, max) =>
+    lista.slice(0, max).map(riga).join('\n') + (lista.length > max ? '\n... e altre ' + (lista.length - max) : '');
+  const nP = calc.passate.length;
+  const nF = calc.rimetti.length - nP;
+  const puoPassato = puoSbloccareGiorniChiusi();
+  const giorniTxt =
+    calc.giorniPassati.length +
+    (calc.giorniPassati.length === 1 ? ' giorno: ' : ' giorni: ') +
+    calc.giorniPassati.slice(0, 10).map(gg).join(', ') +
+    (calc.giorniPassati.length > 10 ? ', ...' : '');
+  let testo =
+    (puoRip ? 'Riporto ' : '') +
+    _pianoConfineMeseLabel(ym) +
+    ' (' +
+    repartoLabel(rep) +
+    (puoRip ? ') a com era il ' : '): differenze fra oggi e com era il ') +
+    quandoIt +
+    (puoRip ? '.\n\nRimetto ' : '.\n\nSi rimetterebbero ') +
+    calc.rimetti.length +
+    (calc.rimetti.length === 1 ? ' cella' : ' celle') +
+    ', di cui ' +
+    nP +
+    ' in giorni passati (bloccati)' +
+    (nP ? ' · ' + giorniTxt : '') +
+    '.';
+  const futureL = calc.rimetti.filter((x) => !calc.passate.includes(x));
+  if (nF) testo += '\n\nDa oggi in poi (' + nF + '):\n' + elenco(futureL, 10);
+  if (nP)
+    testo +=
+      '\n\nGiorni passati (' +
+      nP +
+      '):\n' +
+      elenco(calc.passate, 10) +
+      (!puoRip
+        ? ''
+        : puoPassato
+          ? '\n\nI giorni passati sono un documento: si rimettono solo se lo confermi, con un motivo che resta nel registro.'
+          : '\n\nQUESTE ' +
+            nP +
+            ' NON POSSO RIMETTERLE: i giorni passati sono chiusi e per riaprirli serve il permesso "Giorni chiusi" (o l admin). Restano come sono oggi: chiedi a chi ha il permesso di riportare il mese.');
+  if (calc.malattia.length)
+    testo +=
+      '\n\nRestano come oggi ' +
+      calc.malattia.length +
+      (calc.malattia.length === 1 ? ' cella' : ' celle') +
+      ' di malattia (vale il Diario: la malattia si toglie o si rimette dalla sua registrazione):\n' +
+      elenco(calc.malattia, 6);
+  if (calc.nd.length)
+    testo +=
+      '\n\nRestano come oggi ' +
+      calc.nd.length +
+      (calc.nd.length === 1 ? ' assenza' : ' assenze') +
+      ' ND (vale il modulo ND 1187: l ND si mette o si toglie dalla cella o dalla registrazione Non disponibilità):\n' +
+      elenco(calc.nd, 6);
+  if (calc.altroSettore.length)
+    testo +=
+      '\n\nRestano come oggi ' +
+      calc.altroSettore.length +
+      (calc.altroSettore.length === 1 ? ' cella ora' : ' celle ora') +
+      ' nel piano di un altro settore:\n' +
+      elenco(calc.altroSettore, 6);
+  if (!puoRip) {
+    await mostraAvviso(
+      testo +
+        '\n\n' +
+        PIANO_PERMESSO_VERSIONI +
+        ' (Impostazioni › Visibilità e permessi): puoi vedere le differenze, non riportare il mese.',
       { titolo: 'Versioni del mese' },
+    );
+    return;
+  }
+  testo += '\n\nTutto in una sola scrittura; si torna indietro con Annulla.';
+  // QUALI CELLE: tutte, solo da oggi in poi, o niente
+  let scelta;
+  if (!calc.rimetti.length || (!nF && !puoPassato)) {
+    await mostraAvviso(testo + '\n\nNon c e niente che io possa rimettere.', { titolo: 'Versioni del mese' });
+    return;
+  } else if (nP && puoPassato)
+    scelta = await chiediScelta(
+      testo,
+      [{ valore: 'tutto', etichetta: 'Rimetti tutto (anche ' + nP + ' nei giorni passati)' }].concat(
+        nF ? [{ valore: 'futuro', etichetta: 'Solo da oggi in poi (' + nF + ')' }] : [],
+      ),
+      { titolo: 'Versioni del mese' },
+    );
+  else
+    scelta = (await chiediConferma(testo, {
+      titolo: 'Versioni del mese',
+      ok: nP ? 'Rimetti le ' + nF + ' da oggi in poi' : 'Riporta il mese',
+    }))
+      ? 'futuro'
+      : null;
+  if (!scelta) return;
+  const passato = scelta === 'tutto' && nP > 0;
+  // i giorni passati si aprono con il motivo (registro), come lo sblocco di un giorno
+  if (
+    passato &&
+    !(await _pianoSbloccaGiorni(
+      calc.giorniPassati,
+      'Riporto ' + nP + ' celle dei giorni passati a com erano il ' + quandoIt + ' (Versioni del mese).',
     ))
   )
     return;
-  // Annulla: lo stato di adesso (dal database) va sulla pila del piano
+  const solo = new Set(passato ? calc.rimetti : futureL);
+  // il passo aperto di un operazione di prima finisce qui (le celle del ripristino non
+  // entrano nel suo Annulla)
+  _pianoUndoChiudiAperto();
+  // Annulla: lo stato di adesso (dal database) va sulla pila del piano; con il passato
+  // anche Annulla e Ripristina rimettono i giorni passati (con il permesso e il motivo)
   window._pianoUndo = window._pianoUndo || [];
   window._pianoUndo.push({
     ym: ym,
@@ -1821,14 +1998,41 @@ async function pianoStoricoRiporta(quando, esatto) {
     label: 'riporta a ' + quandoIt,
     quando: new Date().toISOString(),
     righe: _pianoMappaRighe(cur, rep),
+    passato: passato,
+    versione: true, // Annulla e Ripristina solo con il permesso
   });
+  const redoPrima = window._pianoRedo;
   window._pianoRedo = [];
   try {
-    const esito = await _pianoRipristinaStato({ ym: ym, rep: rep, righe: _pianoMappaRighe(stato, rep) });
-    logAzione('Piano: riportato a una versione', ym + ' ' + rep + ' · ' + quandoIt + ' · ' + esito.cambiate + ' celle');
-    toast('Mese riportato al ' + quandoIt + ' (' + esito.cambiate + ' celle)');
+    // UNA scrittura, tutto o niente, solo se le celle sono ancora come nell anteprima
+    const esito = await _pianoRipristinaStato(
+      { ym: ym, rep: rep, righe: _pianoMappaRighe(stato, rep) },
+      { memoria: cur, solo: solo, passato: passato },
+    );
+    logAzione(
+      'Piano: riportato a una versione',
+      ym +
+        ' ' +
+        rep +
+        ' · ' +
+        quandoIt +
+        ' · ' +
+        esito.cambiate +
+        ' celle' +
+        (passato ? ' (di cui ' + nP + ' nei giorni passati)' : nP ? ' (' + nP + ' dei giorni passati lasciate)' : ''),
+    );
+    toast(
+      'Mese riportato al ' +
+        quandoIt +
+        ' (' +
+        esito.cambiate +
+        ' celle' +
+        (passato ? ', giorni passati compresi' : nP ? ', giorni passati lasciati come oggi' : '') +
+        ')',
+    );
   } catch (e) {
     window._pianoUndo.pop();
+    window._pianoRedo = redoPrima;
     toastErrore('Ripristino non riuscito: ' + ((e && e.message) || e));
   }
   await renderPiano();

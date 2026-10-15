@@ -40,6 +40,8 @@
  *   tipoNotte     (codice) -> 1 notte, 0 turno di giorno, null non e un turno (facoltativo,
  *                 per l equita delle notti)
  *   gruppoEquita  (nome) -> chiave del gruppo di persone comparabili o null (facoltativo)
+ *   primaDellaRifinitura () -> niente (facoltativo): chiamata prima della rifinitura con gli
+ *                 scambi di giorni, per cambiare i pesi delle regole (costi ricalcolati dopo)
  * Opzioni:
  *   pesoScoperto  punti per ogni posto del fabbisogno senza nessuno (default 300)
  *   pesoEccesso   punti per ogni persona IN PIU del fabbisogno su un turno (default
@@ -88,6 +90,11 @@
  *                 di persone comparabili, dei quadrati degli scarti della quota di notti
  *                 dalla media del gruppo (punti percentuali al quadrato / 100; vedi scartoNotti)
  *   minTurniNotti chi ha meno turni pesa in proporzione nell equita (default 8)
+ *   scambioGiorniDa frazione della ricerca (0-1) da cui si usa lo scambio di giorni (default 0)
+ *   scambioGiorni false = senza la mossa "scambio di giorni" fra due persone (default con:
+ *                 sposta un giorno isolato accanto a un blocco, posti e ore invariati)
+ *   rifinituraScambi quante prove nella rifinitura finale (scambi di giorni e di turno; default 60000,
+ *                 0 = niente): dal migliore, tutti gli scambi di giorni vicini, solo i miglioramenti
  *   seme          numero per rendere la ricerca ripetibile (stesso seme e stesse iterazioni
  *                 = stesso risultato; vedi semeRicerca)
  */
@@ -662,6 +669,63 @@
       }
       return mossa;
     }
+    // 7) SCAMBIO DI GIORNI fra due persone (v453, blocchi compatti): n lavora d1 e riposa d2, x
+    //    il contrario; si scambiano i giorni (n prende il turno di x in d2, x quello di n in d1).
+    //    Le ore restano quasi uguali e i posti coperti identici: e la mossa con cui un
+    //    pianificatore sposta un giorno isolato accanto a un blocco. Prima non c era: per
+    //    spostare un giorno con i posti gia coperti servivano due mosse, la prima peggiore.
+    //    Meta delle volte d1 e un giorno di lavoro isolato di n e d2 un riposo accanto a un suo
+    //    blocco (il caso dei "buchi"), l altra meta due giorni a caso.
+    const indiceGiorno = {};
+    giorni.forEach((d, i) => (indiceGiorno[d] = i));
+    const accanto = (d, k) => {
+      const x = new Date(d + 'T12:00:00');
+      x.setDate(x.getDate() + k);
+      return x.toISOString().substring(0, 10);
+    };
+    const lavora = (n, d) => {
+      const c = stato[n][d];
+      return !!c && c !== riposo && c[0] !== '#';
+    };
+    function mossaScambioGiorni() {
+      const n = scegli(persone);
+      const lav = giorni.filter((d) => puo(n, d) && lavora(n, d));
+      const rip = giorni.filter((d) => puo(n, d) && (stato[n][d] || riposo) === riposo);
+      if (!lav.length || !rip.length) return null;
+      let d1;
+      let d2;
+      if (rnd() < 0.5) {
+        const isolati = lav.filter((d) => !lavora(n, accanto(d, -1)) || !lavora(n, accanto(d, 1)));
+        const vicini = rip.filter((d) => lavora(n, accanto(d, -1)) || lavora(n, accanto(d, 1)));
+        if (!isolati.length || !vicini.length) return null;
+        d1 = scegli(isolati);
+        d2 = scegli(vicini);
+      } else {
+        d1 = scegli(lav);
+        d2 = scegli(rip);
+      }
+      if (indiceGiorno[d1] == null || indiceGiorno[d2] == null) return null;
+      const c1 = stato[n][d1];
+      const x = persone.filter(
+        (y) =>
+          y !== n &&
+          puo(y, d1) &&
+          puo(y, d2) &&
+          (stato[y][d1] || riposo) === riposo &&
+          lavora(y, d2) &&
+          ammessi(y, d1).includes(c1) &&
+          ammessi(n, d2).includes(stato[y][d2]),
+      );
+      if (!x.length) return null;
+      const y = scegli(x);
+      const c2 = stato[y][d2];
+      return [
+        { n: n, d: d1, c: riposo },
+        { n: n, d: d2, c: c2 },
+        { n: y, d: d2, c: riposo },
+        { n: y, d: d1, c: c1 },
+      ];
+    }
     // 5) ripristina: una cella cambiata torna com era (con il peso dei cambi: meno cambi)
     function mossaRipristina() {
       const cand = [];
@@ -684,6 +748,11 @@
       mossaMirata,
       mossaMirata,
     ].concat(o.pesoCambio ? [mossaRipristina, mossaRipristina] : []);
+    // con lo scambio di giorni (dalla frazione o.scambioGiorniDa della ricerca, default da subito):
+    // prima solo le mosse di sempre (misura dicembre 2026 Tavoli: lo scambio di giorni da subito
+    // lasciava 3 posti scoperti in piu), poi anche lo scambio, per compattare i blocchi
+    const MOSSE_CON_SCAMBIO =
+      o.scambioGiorni === false ? MOSSE : MOSSE.concat([mossaScambioGiorni, mossaScambioGiorni]);
     // ricarica lo stato migliore trovato (per la rifinitura finale)
     function ricaricaMigliore() {
       persone.forEach((n) => (stato[n] = Object.assign({}, migliore.stato[n])));
@@ -760,7 +829,7 @@
       if (o.tornaAlMigliore != null && fr >= o.tornaAlMigliore && sforoOra > 0 && migliore.ammesso) ricaricaMigliore();
       let k = 0;
       while ((maxIter ? k < maxIter : Date.now() < fine) && totale > 0) {
-        const mossa = scegli(MOSSE)();
+        const mossa = scegli(fr >= (o.scambioGiorniDa || 0) ? MOSSE_CON_SCAMBIO : MOSSE)();
         k++;
         iterazioni++;
         if (mossa) prova(mossa, t0);
@@ -768,7 +837,132 @@
       return misura();
     }
     // il risultato: il piano migliore trovato e le celle cambiate
+    // RIFINITURA CON GLI SCAMBI DI GIORNI (v453): dal migliore trovato, si provano in ordine
+    // tutti gli scambi di giorni vicini (al massimo 5 giorni di distanza) fra due persone e gli scambi di turno nello stesso giorno, a
+    // temperatura zero: resta solo quello che fa scendere il punteggio, e il migliore cambia
+    // solo con un piano ammesso (stessi vincoli). La ricerca a caso trova raramente proprio lo
+    // scambio che chiude un buco nei blocchi; qui si guardano tutti. o.rifinituraScambi: quante
+    // prove al massimo (default 30000; 0 = niente rifinitura).
+    function rifinisciScambi() {
+      const maxProve = o.rifinituraScambi != null ? o.rifinituraScambi : 60000;
+      if (!(maxProve > 0)) return;
+      // il problema puo cambiare i pesi per la rifinitura (P.primaDellaRifinitura): i costi si
+      // ricalcolano da capo e il migliore riparte dal suo punteggio con i pesi nuovi
+      if (typeof P.primaDellaRifinitura === 'function') P.primaDellaRifinitura();
+      ricaricaMigliore();
+      if (migliore.ammesso) migliore.punteggio = totale;
+      let prove = 0;
+      // una mossa resta solo se il punteggio scende davvero; a pari si torna indietro
+      const provaStretta = (mossa) => {
+        prove++;
+        const primaT = totale;
+        const vecchi = mossa.map((m) => ({ n: m.n, d: m.d, c: stato[m.n][m.d] || '' }));
+        if (!prova(mossa, 0)) return false;
+        if (totale < primaT - 1e-9) return true;
+        prova(vecchi, 0);
+        return false;
+      };
+      for (let giro = 0; giro < 3 && prove < maxProve; giro++) {
+        let migliorati = 0;
+        for (const n of persone) {
+          for (const d1 of giorni) {
+            if (prove >= maxProve) break;
+            if (!puo(n, d1) || !lavora(n, d1)) continue;
+            // SCAMBIO DI GIORNI con chi riposa d1 e lavora d2 (fino a 5 giorni di distanza)
+            for (let k = -5; k <= 5 && lavora(n, d1); k++) {
+              if (!k) continue;
+              const c1 = stato[n][d1];
+              const d2 = accanto(d1, k);
+              if (indiceGiorno[d2] == null || !puo(n, d2) || (stato[n][d2] || riposo) !== riposo) continue;
+              for (const y of mobili[d2]) {
+                if (y === n || !puo(y, d1) || (stato[y][d1] || riposo) !== riposo || !lavora(y, d2)) continue;
+                const c2 = stato[y][d2];
+                if (!ammessi(y, d1).includes(c1) || !ammessi(n, d2).includes(c2)) continue;
+                if (
+                  provaStretta([
+                    { n: n, d: d1, c: riposo },
+                    { n: n, d: d2, c: c2 },
+                    { n: y, d: d2, c: riposo },
+                    { n: y, d: d1, c: c1 },
+                  ])
+                ) {
+                  migliorati++;
+                  break;
+                }
+              }
+            }
+            // SCAMBIO DI DUE GIORNI DI FILA (d1, d1+1 con d2, d2+1): sposta un pezzo di blocco
+            // intero, con la sua sequenza di turni (dopo una notte non si rientra il mattino: i
+            // giorni presi uno alla volta spesso non passano il riposo di 11 ore)
+            const d1b = accanto(d1, 1);
+            if (lavora(n, d1) && indiceGiorno[d1b] != null && puo(n, d1b) && lavora(n, d1b)) {
+              for (let k = -6; k <= 6; k++) {
+                if (Math.abs(k) < 2) continue;
+                const d2 = accanto(d1, k);
+                const d2b = accanto(d1, k + 1);
+                if (indiceGiorno[d2] == null || indiceGiorno[d2b] == null) continue;
+                if (!puo(n, d2) || !puo(n, d2b) || lavora(n, d2) || lavora(n, d2b)) continue;
+                if ((stato[n][d2] || riposo) !== riposo || (stato[n][d2b] || riposo) !== riposo) continue;
+                const a1 = stato[n][d1];
+                const a2 = stato[n][d1b];
+                const y = mobili[d2].find(
+                  (x) =>
+                    x !== n &&
+                    [d1, d1b, d2b].every((d) => puo(x, d)) &&
+                    (stato[x][d1] || riposo) === riposo &&
+                    (stato[x][d1b] || riposo) === riposo &&
+                    lavora(x, d2) &&
+                    lavora(x, d2b) &&
+                    ammessi(x, d1).includes(a1) &&
+                    ammessi(x, d1b).includes(a2) &&
+                    ammessi(n, d2).includes(stato[x][d2]) &&
+                    ammessi(n, d2b).includes(stato[x][d2b]),
+                );
+                if (!y) continue;
+                const b1 = stato[y][d2];
+                const b2 = stato[y][d2b];
+                if (
+                  provaStretta([
+                    { n: n, d: d1, c: riposo },
+                    { n: n, d: d1b, c: riposo },
+                    { n: n, d: d2, c: b1 },
+                    { n: n, d: d2b, c: b2 },
+                    { n: y, d: d2, c: riposo },
+                    { n: y, d: d2b, c: riposo },
+                    { n: y, d: d1, c: a1 },
+                    { n: y, d: d1b, c: a2 },
+                  ])
+                ) {
+                  migliorati++;
+                  break;
+                }
+              }
+            }
+            // SCAMBIO DI TURNO nello stesso giorno con un collega che lavora (es. notte e mattino):
+            // cambia la sequenza dei turni e apre altri scambi di giorni (riposo di 11 ore)
+            if (!lavora(n, d1)) continue;
+            for (const y of mobili[d1]) {
+              const c1 = stato[n][d1];
+              const c2 = stato[y][d1];
+              if (y === n || !lavora(y, d1) || c1 === c2) continue;
+              if (!ammessi(y, d1).includes(c1) || !ammessi(n, d1).includes(c2)) continue;
+              if (
+                provaStretta([
+                  { n: n, d: d1, c: c2 },
+                  { n: y, d: d1, c: c1 },
+                ])
+              ) {
+                migliorati++;
+                break;
+              }
+            }
+          }
+        }
+        if (!migliorati) break;
+      }
+    }
     function risultato() {
+      rifinisciScambi();
       if (o.pesoCambio) rifinisci();
       const cambi = [];
       persone.forEach((n) =>

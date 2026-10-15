@@ -289,6 +289,12 @@ function _getRangeMalattiaRec(rec) {
       i: m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0'),
       f: m[6] + '-' + m[5].padStart(2, '0') + '-' + m[4].padStart(2, '0'),
     };
+  // un giorno solo diverso da quello del rapporto: "dal 05/01/2027 (da rapporto ...)"
+  const m1 = t.match(/\bdal\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m1) {
+    const d1 = m1[3] + '-' + m1[2].padStart(2, '0') + '-' + m1[1].padStart(2, '0');
+    return { i: d1, f: d1 };
+  }
   if (rec.data) {
     const d = giornoDi(rec.data);
     return { i: d, f: d };
@@ -361,9 +367,15 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno, scelte) {
   const _rapLabel = 'da rapporto ' + turno + ' del ' + _rappDateStr;
   const _rapLabelOld = 'da rapporto ' + turno;
   const _malTipo = nomeCorrente('Malattia');
+  // ASSENZA IN ATTESA DI CERTIFICATO (decisione del titolare 15.10): chi chiama per malattia
+  // e di base un «Assenza» (nel Piano ASS sui turni, 0 ore); «Malattia» solo se il
+  // frammento dice che il certificato c e gia («Rossi malato con certificato»). Una
+  // registrazione gia esistente tiene il suo tipo (il certificato lo registra l HR).
+  const _assTipo = nomeCorrente('Assenza');
+  const _eTipoAss = (t) => t === _malTipo || t === _assTipo;
   // D1: snapshot esistenti per QUESTO rapporto, ESCLUSI i record con origine='manual'
   const _esistenti = datiCache.filter((e) => {
-    if (e.tipo !== _malTipo) return false;
+    if (!_eTipoAss(e.tipo)) return false;
     if ((e.reparto_dip || currentReparto) !== currentReparto) return false;
     if (e.origine === 'manual') return false;
     return _recIsCurrentRapporto(e, _rapLabel, _rapLabelOld, ds);
@@ -375,7 +387,7 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno, scelte) {
     skipped: [],
     errors: [],
     ambigui: [],
-    meta: { rapLabel: _rapLabel, malTipo: _malTipo, turno, ds, rappDateStr: _rappDateStr },
+    meta: { rapLabel: _rapLabel, malTipo: _malTipo, assTipo: _assTipo, turno, ds, rappDateStr: _rappDateStr },
   };
   if (!assenzeText.trim()) {
     // Tutte le esistenti diventano deletes
@@ -416,6 +428,10 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno, scelte) {
         const dalAlMatch = _rigaPulita.match(
           /dal\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?\s+al\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?/i,
         );
+        // un giorno solo: «assente il 14», «dal 12» senza «al» (vale quel giorno)
+        const unGiornoMatch = dalAlMatch
+          ? null
+          : _rigaPulita.match(/\b(?:il|dal)\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?\b/i);
         const _giorniSett = {
           lunedi: 1,
           lunedì: 1,
@@ -524,6 +540,13 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno, scelte) {
             mFine = finoMatch[2] ? parseInt(finoMatch[2]) - 1 : dataRapp.getMonth();
           dataFine = new Date(dataRapp.getFullYear(), mFine, gFine, 12);
           if (dataFine < dataInizio) dataFine.setFullYear(dataFine.getFullYear() + 1);
+        } else if (unGiornoMatch) {
+          const g1 = parseInt(unGiornoMatch[1]),
+            m1 = unGiornoMatch[2] ? parseInt(unGiornoMatch[2]) - 1 : dataRapp.getMonth();
+          const a1 = unGiornoMatch[3] ? parseInt(unGiornoMatch[3]) : null;
+          const y1 = a1 ? (a1 < 100 ? 2000 + a1 : a1) : dataRapp.getFullYear();
+          dataInizio = new Date(y1, m1, g1, 12);
+          dataFine = new Date(dataInizio);
         }
         // OMONIMI: chi ha gia la registrazione di questo rapporto vale come scelta
         const _sc = scegliCollaboratore(
@@ -581,24 +604,25 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno, scelte) {
         const dalStr = dataInizio.toLocaleDateString('it-IT'),
           alStr = dataFine.toLocaleDateString('it-IT');
         const codeTxt = isCodice ? ' (' + m[2].toUpperCase() + ')' : '';
+        // tipo: quello della registrazione gia esistente, altrimenti Assenza (Malattia solo
+        // con il certificato scritto nel frammento)
+        const _esisteT = _esistenti.find(
+          (e) => e.nome.toLowerCase() === nomeFinale.toLowerCase() && !_usedEsistentiIds.has(e.id),
+        );
+        const conCert = _rapportoConCertificato(riga);
+        const tipoVoce = _esisteT ? _esisteT.tipo : conCert ? _malTipo : _assTipo;
+        const prefisso =
+          tipoVoce === _assTipo
+            ? 'Assente (attesa certificato)'
+            : 'Assente per malattia' + (conCert ? ' con certificato' : '');
         const testo =
           nGiorni > 1
-            ? 'Assente per malattia' +
-              codeTxt +
-              ' dal ' +
-              dalStr +
-              ' al ' +
-              alStr +
-              ' (' +
-              nGiorni +
-              ' giorni, ' +
-              _rapLabel +
-              ')'
+            ? prefisso + codeTxt + ' dal ' + dalStr + ' al ' + alStr + ' (' + nGiorni + ' giorni, ' + _rapLabel + ')'
             : // un giorno solo: si scrive la data SEMPRE quando non e' il giorno del
               // rapporto (es. "domani"), altrimenti l'assenza risulterebbe datata al
               // giorno del rapporto e la copertura, registrata sul giorno vero, non
               // verrebbe piu' collegata
-              'Assente per malattia' +
+              prefisso +
               codeTxt +
               (dalStr !== new Date(ds + 'T12:00:00').toLocaleDateString('it-IT') ? ' dal ' + dalStr : '') +
               ' (' +
@@ -625,7 +649,7 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno, scelte) {
           const _newKeyI = dataLocaleISO(dataInizio);
           const _newKeyF = dataLocaleISO(dataFine);
           const _giaInAltro = datiCache.find((e) => {
-            if (e.tipo !== _malTipo) return false;
+            if (!_eTipoAss(e.tipo)) return false;
             if (e.nome.toLowerCase() !== nomeFinale.toLowerCase()) return false;
             if ((e.reparto_dip || currentReparto) !== currentReparto) return false;
             if (_recIsCurrentRapporto(e, _rapLabel, _rapLabelOld, ds)) return false;
@@ -668,7 +692,7 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno, scelte) {
             record: {
               id: Date.now() + Math.floor(Math.random() * 1000),
               nome: nomeFinale,
-              tipo: _malTipo,
+              tipo: tipoVoce,
               testo,
               data: _evtDate,
               operatore: getOperatore(),
@@ -849,7 +873,7 @@ async function _eseguiAssenzeOps(ops, ds, turno) {
     datiCache.unshift(fullRec);
     try {
       logAzione(
-        'Malattia creata da rapporto',
+        c.record.tipo === ops.meta.assTipo ? 'Assenza creata da rapporto' : 'Malattia creata da rapporto',
         c.nome +
           ' (' +
           c.nGiorni +
@@ -901,7 +925,13 @@ async function _eseguiAssenzeOps(ops, ds, turno) {
   if (typeof sincronizzaMalattiaPiano === 'function') {
     for (const { c } of salvate.creates) {
       try {
-        await sincronizzaMalattiaPiano(c.nome, '', c.record.data, c.record.testo || '');
+        await sincronizzaMalattiaPiano(
+          c.nome,
+          '',
+          c.record.data,
+          c.record.testo || '',
+          c.record.tipo === ops.meta.assTipo ? { codice: 'ASS' } : undefined,
+        );
       } catch (e) {
         toastErrore(c.nome + ': piano non allineato alla malattia (' + ((e && e.message) || e) + ')');
       }
@@ -909,7 +939,18 @@ async function _eseguiAssenzeOps(ops, ds, turno) {
     for (const u of salvate.updates) {
       try {
         const rec = datiCache.find((x) => x.id === u.id);
-        await sincronizzaMalattiaPiano(u.nome, u.vecchioTesto || '', rec ? rec.data : '', u.nuovoTesto || '');
+        // si salva mentre si scrive: nessuna finestra (una copertura da togliere diventa un avviso)
+        await sincronizzaMalattiaPiano(u.nome, u.vecchioTesto || '', rec ? rec.data : '', u.nuovoTesto || '', {
+          senzaDomande: true,
+          codice: rec && rec.tipo === ops.meta.assTipo ? 'ASS' : undefined,
+        });
+        // malattia corretta: l avviso dei turni da coprire segue le date nuove
+        const nuove =
+          typeof _pianoDateMalattia === 'function' && u.nuovoTesto
+            ? _pianoDateMalattia(u.nuovoTesto, rec ? rec.data : '')
+            : [];
+        if (nuove.length && typeof _pianoAvvisoCopertura === 'function')
+          _pianoAvvisoCopertura(u.nome, nuove[0], nuove[nuove.length - 1]).catch(() => {});
       } catch (e) {
         toastErrore(u.nome + ': piano non allineato alla malattia (' + ((e && e.message) || e) + ')');
       }
@@ -951,7 +992,18 @@ async function _eseguiAssenzeOps(ops, ds, turno) {
             '-' +
             String(c.dataInizio.getDate()).padStart(2, '0')
           : ds;
-      await apriPopupCopertura(c.nome, dIso);
+      // MAI UNA FINESTRA dal Rapporto (si salva da solo mentre si scrive): un avviso discreto
+      // nella pagina con i turni da coprire o i punti (decisione del titolare 15.10)
+      const dFine =
+        c.dataFine instanceof Date
+          ? c.dataFine.getFullYear() +
+            '-' +
+            String(c.dataFine.getMonth() + 1).padStart(2, '0') +
+            '-' +
+            String(c.dataFine.getDate()).padStart(2, '0')
+          : dIso;
+      if (typeof _pianoAvvisoCopertura === 'function') _pianoAvvisoCopertura(c.nome, dIso, dFine).catch(() => {});
+      else await apriPopupCopertura(c.nome, dIso);
     }
   }
 }
@@ -1335,7 +1387,7 @@ function _rapportoOrigineDi(rec) {
   if (!m) return null;
   const ds = m[4] + '-' + m[3].padStart(2, '0') + '-' + m[2].padStart(2, '0');
   const campo =
-    rec.tipo === nomeCorrente('Malattia')
+    rec.tipo === nomeCorrente('Malattia') || rec.tipo === nomeCorrente('Assenza')
       ? 'assenze'
       : /^Differenza cassa/.test(String(rec.testo || ''))
         ? 'differenze_cassa'
@@ -1457,8 +1509,7 @@ async function _rapportoRimettiRegistrazione(rec) {
     if (o.campo === 'assenze') {
       const rg = _getRangeMalattiaRec(rec);
       if (!rg) return false;
-      const f = (d) => d.split('-').reverse().join('/');
-      voce = parola + ' malato dal ' + f(rg.i) + ' al ' + f(rg.f);
+      voce = parola + ' ' + _rapportoVoceAssenza(rec, rg);
     } else {
       const segno = /eccedenza/i.test(rec.testo || '') ? '+' : '-';
       voce = parola + ' ' + segno + (parseFloat(rec.importo) || 0).toFixed(2);
@@ -1472,7 +1523,9 @@ async function _rapportoRimettiRegistrazione(rec) {
   }
 }
 // modificata nel Diario: la voce del Rapporto si riscrive con i dati nuovi
-async function _rapportoCorreggiRegistrazione(rec, nomeVecchio) {
+// opz.senzaRegistro: niente voce nel registro (chi chiama la scrive alla fine, cosi resta un
+// solo passo di Annulla: Certificato ricevuto)
+async function _rapportoCorreggiRegistrazione(rec, nomeVecchio, opz) {
   const o = _rapportoOrigineDi(rec);
   if (!o) return false;
   try {
@@ -1484,15 +1537,15 @@ async function _rapportoCorreggiRegistrazione(rec, nomeVecchio) {
     if (o.campo === 'assenze') {
       const rg = _getRangeMalattiaRec(rec);
       if (!rg) return false;
-      const f = (d) => d.split('-').reverse().join('/');
-      nuovo = parola + ' malato dal ' + f(rg.i) + ' al ' + f(rg.f);
+      nuovo = parola + ' ' + _rapportoVoceAssenza(rec, rg);
     } else {
       const segno = /eccedenza/i.test(rec.testo || '') ? '+' : '-';
       nuovo = parola + ' ' + segno + (parseFloat(rec.importo) || 0).toFixed(2);
     }
     const r = _rapportoTogliNome(vecchio, nomeVecchio || rec.nome, nuovo);
     await _rapportoScriviCampo(o, riga, r.testo);
-    logAzione('Rapporto corretto dal Diario', rec.nome + ' nel rapporto ' + o.turno + ' del ' + o.ds + ': ' + nuovo);
+    if (!(opz && opz.senzaRegistro))
+      logAzione('Rapporto corretto dal Diario', rec.nome + ' nel rapporto ' + o.turno + ' del ' + o.ds + ': ' + nuovo);
     return o;
   } catch (e) {
     console.error('rapporto: correggi', e);
@@ -1504,13 +1557,20 @@ async function _rapportoCorreggiRegistrazione(rec, nomeVecchio) {
 // aggiunge "Rossi malato dal 30/09/2026 al 02/10/2026" alle assenze del Rapporto del
 // primo giorno (PRESTO se il turno sostituito e diurno o era un riposo, NOTTE se
 // notturno) e il Rapporto crea la registrazione nel Diario, come sempre.
-async function _rapportoAggiungiAssenza(nome, dal, al, codiceSostituito) {
+// codice 'ASS': assenza in attesa di certificato («Rossi assente dal ...»); senza, la M
+// del Piano e una malattia con il certificato («Rossi malato con certificato dal ...»)
+async function _rapportoAggiungiAssenza(nome, dal, al, codiceSostituito, codice) {
   const t = codiceSostituito && typeof _pianoTurnoInfo === 'function' ? _pianoTurnoInfo(codiceSostituito) : null;
   const turno = t && String(t.tipo || '').toUpperCase() === 'NOTTURNO' ? 'NOTTE' : 'PRESTO';
   const o = { ds: dal, turno: turno, reparto: currentReparto, campo: 'assenze' };
   const riga = await _rapportoRiga(o);
   const f = (d) => d.split('-').reverse().join('/');
-  const voce = String(nome).trim() + ' malato dal ' + f(dal) + ' al ' + f(al);
+  const voce =
+    String(nome).trim() +
+    (codice === 'ASS' ? ' assente dal ' : ' malato con certificato dal ') +
+    f(dal) +
+    ' al ' +
+    f(al);
   const vecchio = riga ? riga.assenze || '' : '';
   const nuovo = _rapportoParolaNome(vecchio, nome)
     ? _rapportoTogliNome(vecchio, nome, voce).testo
@@ -1533,6 +1593,24 @@ async function _rapportoAggiungiAssenza(nome, dal, al, codiceSostituito) {
   } finally {
     window._rapportoDalPiano = false;
   }
-  logAzione('Malattia dal piano nel Rapporto', nome + ' ' + dal + '-' + al + ' · rapporto ' + turno);
+  logAzione(
+    codice === 'ASS' ? 'Assenza dal piano nel Rapporto' : 'Malattia dal piano nel Rapporto',
+    nome + ' ' + dal + '-' + al + ' · rapporto ' + turno,
+  );
   return o;
+}
+// il frammento del Rapporto dice che il certificato c e gia? («malato con certificato»,
+// «certificato medico fino a venerdi»); «senza certificato», «in attesa del certificato» no
+function _rapportoConCertificato(riga) {
+  const t = String(riga || '');
+  if (!/\bcertificat[oi]\b/i.test(t)) return false;
+  return !/\b(senza|attesa|aspett\w*|manca\w*|attende\w*|non\s+ha)\b[^,;]{0,25}\bcertificat/i.test(t);
+}
+// voce del Rapporto per una registrazione di assenza o malattia (Diario -> Rapporto): la
+// stessa che, riletta, ridà quel tipo («assente» = Assenza, «malato con certificato» = Malattia)
+function _rapportoVoceAssenza(rec, rg) {
+  const f = (d) => d.split('-').reverse().join('/');
+  const per = 'dal ' + f(rg.i) + ' al ' + f(rg.f);
+  if (rec.tipo === nomeCorrente('Assenza')) return 'assente ' + per;
+  return /certificat/i.test(rec.testo || '') ? 'malato con certificato ' + per : 'malato ' + per;
 }

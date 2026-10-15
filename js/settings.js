@@ -63,13 +63,15 @@ const VIS_ITEMS = {
     gestione_festivi: 'Festivi e CGF · gestire il calendario dei giorni festivi e i recuperi',
     sblocco_piano_chiuso:
       'Giorni chiusi · sbloccare un giorno passato del piano per correggerlo (con motivo obbligatorio, tracciato nel registro)',
+    piano_ripristino_versioni:
+      'Piano · Ripristinare una versione del mese: riportare il mese a com era un altro giorno o un altra ora (Piano > Storico > Versioni del mese) e annullarne o ripristinarne il ripristino; i giorni passati servono anche "Giorni chiusi"',
     vista_malattie_pct:
       'Andamento delle malattie · percentuali per giorno della settimana, avviso Lunedì/Venerdì e confronto con la media del team nella scheda collaboratore (analisi riservata, richiesta HR)',
     gestione_corsi: 'Corsi · pianificare corsi nel piano: data, orario e partecipanti (es. supervisor)',
     gestione_briefing:
       'Briefing · compilare e modificare il foglio del giorno e le pause (senza toccare la griglia turni)',
     storico_hr:
-      'Storico HR · VEDERE: contratto, anzianità, giubilei, congedi, allegati, costo errori, malattie e percorso disciplinare nella scheda (sezione riservata)',
+      'Storico HR · VEDERE: contratto, anzianità, giubilei, congedi, allegati, malattie e percorso disciplinare nella scheda (sezione riservata)',
     storico_hr_modifica:
       'Storico HR · MODIFICARE: inizio e fine contratto, data di nascita, giubilei, congedi non pagati (es. HR)',
     vista_valutazioni: 'Valutazioni · VEDERE le valutazioni annuali (chi le gestisce le vede comunque)',
@@ -407,6 +409,7 @@ const MATRICE_PROFILI = {
   gestione_regole: ['-', 'M', 'M', '-', 'M'],
   gestione_festivi: ['V', 'M', 'M', 'V', 'M'],
   sblocco_piano_chiuso: ['V', 'M', 'M', 'V', 'M'],
+  piano_ripristino_versioni: ['-', 'M', 'M', '-', '-'],
   vista_malattie_pct: ['V', 'V', 'V', '-', 'V'],
 };
 // Le voci dove basta la V per essere abilitati: sono viste riservate, non

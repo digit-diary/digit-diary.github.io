@@ -293,6 +293,13 @@ function mostraPianoCtx(e, nome, dstr) {
   if (r && r.motivo_blocco) h += voce('Sblocca questa cella', 'icx-lucchetto', "pianoCtxAzione('sblocca')", puoMod);
   else h += voce('Blocca questa cella (con motivo)', 'icx-lucchetto', "pianoCtxAzione('blocca')", puoMod && !!r);
   h += voce('Rimuovi cella', 'icx-cestino', "pianoCtxAzione('rimuovi')", puoMod && !!r);
+  // ASS (assenza in attesa di certificato): il certificato lo registra l HR (anche senza il piano)
+  h += voce(
+    'Certificato ricevuto (ASS → malattia)',
+    'icx-check',
+    "pianoCtxAzione('certificato')",
+    !!(r && r.codice === 'ASS' && typeof puoRegistrareCertificato === 'function' && puoRegistrareCertificato()),
+  );
   h += voce('Storia della cella', 'icx-clipboard', "pianoCtxAzione('storia')", true);
   h += voce('Copia cella', 'icx-modifica', "pianoCtxAzione('copia')", !!r);
   h += voce(
@@ -551,6 +558,7 @@ async function pianoCtxAzione(azione) {
   } else if (azione === 'ristampaCambio') ristampaFoglioCambio(sel.nome, sel.data);
   else if (azione === 'esigenze') apriCambioEsigenze(sel.nome, sel.data);
   else if (azione === 'storia') pianoStoriaCella(sel.nome, sel.data);
+  else if (azione === 'certificato') apriCertificatoRicevuto(sel.nome, sel.data);
   else if (azione === 'copia') {
     const r2 = _pianoRighe.find((x) => x.collaboratore === sel.nome && x.data === sel.data);
     if (r2) navigator.clipboard.writeText(r2.codice).then(() => toast('Copiato: ' + r2.codice));
@@ -763,8 +771,14 @@ function _pianoAccompagnamentoAvviso(overrides) {
     return [];
   }
 }
-async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
+// orari (facoltativo): { ora_inizio, ora_fine } della cella nuova, per i codici di lavoro con
+// l orario scritto sulla cella (JG, corsi): senza, il riposo e le ore non si potevano calcolare
+async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo, orari) {
   try {
+    const rigaNuova = Object.assign(
+      { collaboratore: nome, data: dstr, codice: codiceNuovo },
+      orari && orari.ora_inizio ? { ora_inizio: orari.ora_inizio, ora_fine: orari.ora_fine } : {},
+    );
     const maxSett = _pianoOreSettimanaMax();
     const d0 = new Date(dstr + 'T12:00:00');
     const weekend = d0.getDay() === 0 || d0.getDay() === 6;
@@ -859,9 +873,7 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
     // ore lavorate nella settimana lunedi-domenica (45.1): con la cella nuova
     if (maxSett && codiceNuovo !== undefined) {
       const lun = _pianoLunediDi(dstr);
-      const sim = righe
-        .filter((r) => String(r.data).substring(0, 10) !== dstr)
-        .concat([{ collaboratore: nome, data: dstr, codice: codiceNuovo }]);
+      const sim = righe.filter((r) => String(r.data).substring(0, 10) !== dstr).concat([rigaNuova]);
       const s = _pianoSettimaneOltre(sim, maxSett).find((x) => x.lunedi === lun);
       if (s)
         avvisiExtra.push(
@@ -882,9 +894,7 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
     if (codiceNuovo !== undefined) {
       const lun = _pianoLunediDi(dstr);
       const prima = _pianoRiposiSettimanali(righe).filter((x) => x.lunedi === lun);
-      const sim2 = righe
-        .filter((r) => String(r.data).substring(0, 10) !== dstr)
-        .concat([{ collaboratore: nome, data: dstr, codice: codiceNuovo }]);
+      const sim2 = righe.filter((r) => String(r.data).substring(0, 10) !== dstr).concat([rigaNuova]);
       _pianoRiposiSettimanali(sim2)
         .filter((x) => x.lunedi === lun && !prima.some((y) => y.tipo === x.tipo && y.ore <= x.ore))
         .forEach((x) => avvisiExtra.push(_pianoTestoRiposo(x)));
@@ -923,7 +933,13 @@ async function _pianoAvvisaViolazioniCella(nome, dstr, codiceNuovo) {
               const c = d === dstr ? cod : (perData[d] || {}).codice;
               if (!c) continue;
               const r = perData[d];
-              const riga = r && r.codice === c ? r : { collaboratore: nome, data: d, codice: c };
+              // la cella nuova con il suo orario (corso, JG); le altre come sono
+              const riga =
+                d === dstr && cod === codiceNuovo && rigaNuova.ora_inizio
+                  ? rigaNuova
+                  : r && r.codice === c
+                    ? r
+                    : { collaboratore: nome, data: d, codice: c };
               sett.push(riga);
               if (d.startsWith(ymC)) mese.push(riga);
             }
@@ -1105,6 +1121,25 @@ async function _pianoSalvaCellaBaseEsegui(nome, dstr, codice) {
   }
   const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
   const attuale = r ? r.codice : '';
+  // ASS (assenza in attesa di certificato) a mano: solo sopra un turno, come dal Diario; la
+  // M sopra un ASS passa da «Certificato ricevuto» (HR), che aggiorna anche Diario e Rapporto
+  if (codice === 'ASS' && attuale !== 'ASS' && !_pianoTurnoInfo(attuale)) {
+    toastErrore(
+      'ASS (assenza in attesa di certificato) si scrive solo su un giorno con un turno: qui ' +
+        (attuale || 'la cella è vuota') +
+        '.',
+      8000,
+    );
+    return false;
+  }
+  if (attuale === 'ASS' && (codice === 'M' || codice === 'M1')) {
+    toastErrore(
+      nome +
+        ': l ASS diventa malattia con «Certificato ricevuto» (tasto destro sulla cella, permesso Storico HR · modificare), che aggiorna anche Diario e Rapporto.',
+      9000,
+    );
+    return false;
+  }
   // CELLA PROTETTA: sovrascriverla e' possibile, ma si dice chiaramente cosa si
   // sta sostituendo. Le protette sono il piano consolidato, le vacanze e le
   // assenze confermate: non devono cambiare per un clic distratto.
@@ -1141,7 +1176,12 @@ async function _pianoSalvaCellaBaseEsegui(nome, dstr, codice) {
     // regole (non formato, riposo, consecutivi, accompagnamento), poi la nota
     // sulla cella protetta. Prima erano due finestre in fila e la prima
     // copriva la seconda: si leggeva "protetto" e non si vedeva "non formato".
-    const avvisi = _pianoTurnoInfo(codice) ? await _pianoAvvisaViolazioniCella(nome, dstr, codice) : [];
+    // anche i codici di lavoro che non sono turni (JG, corsi, U) con il loro orario: contano
+    // come lavoro per riposo, giorni di fila e ore (prima a mano passavano senza controllo)
+    const avvisi =
+      _pianoTurnoInfo(codice) || (_pianoIsLavoro(codice) && codice !== 'ND')
+        ? await _pianoAvvisaViolazioniCella(nome, dstr, codice, orarioJG)
+        : [];
     if (_pianoTurnoInfo(codice))
       _pianoAccompagnamentoAvviso([{ nome: nome, data: dstr, codice: codice }]).forEach((a) => avvisi.push(a.testo));
     const protetta = !!(r && r.protetto && codice !== attuale);
@@ -1211,25 +1251,66 @@ async function _pianoSalvaCellaBaseEsegui(nome, dstr, codice) {
     if (r) {
       dati.updated_at = new Date().toISOString();
       // la malattia scioglie il blocco con motivo: il giorno non e' piu' "da tenere libero"
-      if (r.motivo_blocco && (codice === 'M' || codice === 'M1' || codice === 'I')) dati.motivo_blocco = null;
+      if (r.motivo_blocco && (codice === 'M' || codice === 'M1' || codice === 'I' || codice === 'ASS'))
+        dati.motivo_blocco = null;
       if (commentoRegole) dati.commento = (commentoRegole + (r.commento ? ' · ' + r.commento : '')).substring(0, 400);
       // malattia scritta a mano sopra una sigla: stessa nota della malattia dal Diario
       // ("Ex R23 - operatore"), cosi togliendo la malattia la sigla torna, e com era la
       // cella (bozza o a mano, protetta, nota, blocco) resta in prima_malattia
-      const eM = (c) => c === 'M' || c === 'M1';
+      // (anche l ASS, assenza in attesa di certificato: il turno torna togliendola)
+      const eM = (c) => c === 'M' || c === 'M1' || c === 'ASS';
       if (eM(codice) && attuale && !eM(attuale)) {
         dati.commento = ('Ex ' + attuale + ' - ' + getOperatore()).substring(0, 400);
         if (r.prima_malattia !== undefined) dati.prima_malattia = _pianoPrimaMalattiaDi(r);
-      } else if (!eM(codice) && eM(attuale) && r.prima_malattia) dati.prima_malattia = null;
+        // (anche la cella di chi copriva: cambiata a mano, com era prima non vale piu)
+      } else if (!eM(codice) && r.prima_malattia) dati.prima_malattia = null;
     } else {
       dati.commento = commentoRegole ? commentoRegole.substring(0, 400) : null;
       dati.reparto_dip = rep0;
     }
     op = { collaboratore: nome, data: dstr, atteso: _pianoAttesoDi(r), dati: dati };
   }
+  // MALATTIA TOLTA CHE UN COLLEGA COPRIVA (decisione del titolare 15.10): «Rimetto il turno a
+  // X e tolgo la copertura a Y?». Sì = malato e sostituti tornano come prima della malattia
+  // nella STESSA scrittura (un passo di Annulla); No = si scrive solo questa cella.
+  const opsCop = [];
+  if (
+    _pianoCodiceAssenteTurno(attuale) &&
+    !_pianoCodiceAssenteTurno(codice) &&
+    !window._pianoScritturaBlocco &&
+    typeof _pianoOpsTogliCopertura === 'function'
+  ) {
+    let cop = { ops: [] };
+    try {
+      cop = await _pianoOpsTogliCopertura(nome, [dstr]);
+    } catch (e) {
+      /* senza lettura: si scrive solo la cella */
+    }
+    if (cop.ops.length) {
+      const sotto = _pianoSiglaSottoMalattia(r);
+      const ritorno = codice || sotto;
+      const si = await chiediConferma(
+        _pianoTestoTogliCopertura(nome, ritorno ? [{ data: dstr, codice: ritorno }] : [], cop),
+        {
+          titolo: (attuale === 'ASS' ? 'Assenza' : 'Malattia') + ' tolta: copertura',
+          ok: 'Sì, rimetti com era',
+          annulla: 'No, resta la copertura',
+        },
+      );
+      if (si) {
+        // cella cancellata o riscritta con la sigla di prima: torna com era prima della malattia
+        if ((!codice || codice === sotto) && sotto && r)
+          op.dati = Object.assign(_pianoRitornoDaMalattia(r, sotto), {
+            operatore: getOperatore(),
+            updated_at: new Date().toISOString(),
+          });
+        cop.ops.forEach((o) => opsCop.push(o));
+      }
+    }
+  }
   let esito;
   try {
-    esito = await _pianoScriviCelle([op]);
+    esito = await _pianoScriviCelle([op].concat(opsCop));
   } catch (e) {
     _pianoUndoScarta(passo);
     console.error(e);
@@ -1254,8 +1335,9 @@ async function _pianoSalvaCellaBaseEsegui(nome, dstr, codice) {
     if (!codice) {
       logAzione('Piano: turno rimosso', nome + ' ' + dstr + ' (era ' + attuale + ')');
       await _pianoFestiviPersiDopo(nome, [{ data: dstr, codice: attuale }]);
-      // era una malattia: proposta di toglierla anche dal Diario
+      // era una malattia: proposta di toglierla anche dal Diario (o l assenza ASS)
       if (attuale === 'M' || attuale === 'M1') await _pianoMalattiaViaDiario(nome, [dstr]);
+      else if (attuale === 'ASS') await _pianoMalattiaViaDiario(nome, [dstr], { codice: 'ASS' });
       if (!window._pianoScritturaBlocco) renderPiano();
       return;
     }
@@ -1266,11 +1348,15 @@ async function _pianoSalvaCellaBaseEsegui(nome, dstr, codice) {
     const bloccoFine = window._pianoScritturaBlocco;
     if (bloccoFine) {
       // scrittura su piu celle: Diario, ridisegno e formazione una volta sola alla fine
-      if (codice === 'M' || codice === 'M1') {
+      if (codice === 'M' || codice === 'M1' || codice === 'ASS') {
         if (attuale === 'CGF' && typeof _pianoRimettiCgf === 'function') await _pianoRimettiCgf(nome, dstr);
         (bloccoFine.malattie[nome] = bloccoFine.malattie[nome] || []).push({ data: dstr, prima: attuale });
       } else if (attuale === 'M' || attuale === 'M1')
         (bloccoFine.viaMalattia[nome] = bloccoFine.viaMalattia[nome] || []).push(dstr);
+      else if (attuale === 'ASS') {
+        bloccoFine.viaAss = bloccoFine.viaAss || {};
+        (bloccoFine.viaAss[nome] = bloccoFine.viaAss[nome] || []).push(dstr);
+      }
       const gNFb = _pianoGruppoNonFormato(nome, codice, '');
       if (gNFb) bloccoFine.nonFormati.push(nome + ' (' + gNFb + ')');
       bloccoFine.scritte++;
@@ -1283,11 +1369,22 @@ async function _pianoSalvaCellaBaseEsegui(nome, dstr, codice) {
       if (attuale === 'CGF' && typeof _pianoRimettiCgf === 'function') await _pianoRimettiCgf(nome, dstr);
       const nDia = await _pianoMalattiaNelDiario(nome, dstr, dstr, true, attuale);
       if (nDia) toast('Malattia registrata anche nel Rapporto e nel Diario: conta nella scheda di ' + nome);
+    } else if (codice === 'ASS') {
+      // ASS a mano: l assenza (attesa certificato) anche nel Rapporto e nel Diario
+      const nDiaA = await _pianoMalattiaNelDiario(nome, dstr, dstr, true, attuale, 'ASS');
+      if (nDiaA) toast('Assenza (attesa certificato) registrata anche nel Rapporto e nel Diario di ' + nome);
     } else if (attuale === 'M' || attuale === 'M1') {
       // la M e' stata sovrascritta con un turno: il giorno non e' piu' malattia
       await _pianoMalattiaViaDiario(nome, [dstr]);
+    } else if (attuale === 'ASS') {
+      await _pianoMalattiaViaDiario(nome, [dstr], { codice: 'ASS' });
     }
-    renderPiano();
+    await renderPiano();
+    // M SOPRA UN TURNO: il turno resta scoperto. Si propone subito chi lo copre (segnalazione
+    // del titolare 15.10: la M arrivava al malato, al sostituto niente)
+    if ((codice === 'M' || codice === 'M1' || codice === 'ASS') && _pianoTurnoInfo(attuale))
+      _pianoAvvisoCopertura(nome, dstr, dstr);
+    else if (window._copAvvisi && window._copAvvisi[nome]) _pianoAvvisoCoperturaAggiorna(nome);
     // rivalidazione del mese se era attiva (tutte le altre regole)
     if (_pianoViolLista !== null) {
       const rv = _pianoCalcolaViolazioni();

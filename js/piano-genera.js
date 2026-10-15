@@ -1201,6 +1201,122 @@ function _pianoViolazioniPersona(nome, righeMese, righeSett, ctx) {
   }
   return out;
 }
+// ===== BLOCCHI COMPATTI (qualita del piano, v453) =====
+// Segnalazione del titolare (bozza di novembre 2026 Slots): "turni con i buchi", 3-1-1, 2-1-2,
+// 1-1-3, giorni di lavoro isolati fra due liberi. Misura sui piani fatti a mano (Slots
+// gennaio-ottobre 2026, buchi per persona al mese): SUP 0,56, HOST 0,96, BO 1,4, jolly 1,9.
+// La bozza da sola: HOST 0,9, jolly 4,4 (giorni isolati per tappare i posti); dopo Migliora
+// HOST 4,2 e jolly 5,1: le sue mosse senza costo spostavano giorni a caso. Una regola sola
+// (PianoRegole.blocchiSpezzati) per la bozza (passata qui sotto in generaBozzaPiano), Migliora
+// (rifinitura finale) e Controlla le regole; non e legge e non vale mai un posto coperto.
+// valore di una regola con il predefinito del catalogo quando la riga non c e
+function _pianoRegolaOPred(nome) {
+  const v = _pianoRegolaVal(nome);
+  return v != null ? v : typeof _pianoRegolaPredefinita === 'function' ? _pianoRegolaPredefinita(nome) : null;
+}
+// parametri del settore aperto: { attivo, minimo, riposoSingolo, maxCons, peso }
+function _pianoBlocchiParam() {
+  const si = (x) => String(x == null ? '' : x).toUpperCase() === 'TRUE';
+  const attivo = si(_pianoRegolaOPred('blocchi_compatti'));
+  const minimo = parseInt(_pianoRegolaOPred('blocco_lavoro_minimo'));
+  const peso = parseFloat(_pianoRegolaOPred('blocchi_compatti_peso'));
+  return {
+    attivo: attivo,
+    minimo: isFinite(minimo) ? minimo : 2,
+    riposoSingolo: si(_pianoRegolaOPred('penalita_riposo_isolato')),
+    maxCons: _pianoLimitiLegge().maxCons,
+    peso: attivo && isFinite(peso) && peso >= 0 ? peso : attivo ? 60 : 0,
+  };
+}
+// tipo del giorno per i blocchi: 'L' lavoro (anche WD), 'R' riposo (cella vuota, congedi e
+// recuperi a 0 ore, CGF), 'X' altro (vacanze, malattie, assenze: interrompono il blocco)
+function _pianoTipoGiornoBlocchi(cod) {
+  const c = String(cod || '')
+    .toUpperCase()
+    .trim();
+  if (!c) return 'R';
+  if (c === 'WD' || _pianoIsLavoro(c)) return 'L';
+  if (c === 'CGF') return 'R';
+  const ci = typeof _pianoCodiceInfo === 'function' ? _pianoCodiceInfo(c) : null;
+  if (ci && ci.is_riposo && !(parseFloat(ci.ore) > 0)) return 'R';
+  return 'X';
+}
+// chi non si giudica: turni solo a mano (li scrive chi pianifica)
+function _pianoBlocchiEsente(nome) {
+  const info = _pianoCollabInfo(nome);
+  return !!(info && info.turni_solo_a_mano);
+}
+// testo di un buco (lo stesso in Controlla le regole e nel resoconto di Migliora)
+function _pianoTestoBlocco(v) {
+  return v.tipo === 'lavoro_isolato'
+    ? (v.lungo === 1 ? 'un giorno di lavoro isolato' : v.lungo + ' giorni di lavoro soli') +
+        ' fra due liberi (blocchi compatti)'
+    : 'un libero solo fra ' +
+        v.prima +
+        ' e ' +
+        v.dopo +
+        ' giorni di lavoro, ' +
+        v.prima +
+        '-1-' +
+        v.dopo +
+        ' (blocchi compatti: riposi a coppie)';
+}
+// BUCHI DI UNA PERSONA nel mese: stesse righe di _pianoViolazioniPersona (righeSett con le
+// settimane a cavallo: un blocco che continua nel mese prima o dopo si legge intero). Giorni
+// del mese senza cella = riposo; fuori dal mese senza cella = sconosciuto (non si giudica).
+// par: _pianoBlocchiParam() (facoltativo). Ritorna [{ nome, giorno, msg, celle, tipo }].
+function _pianoBlocchiPersona(nome, righeMese, righeSett, ym, par) {
+  par = par || _pianoBlocchiParam();
+  if (!par.attivo || _pianoBlocchiEsente(nome)) return [];
+  const nG = _pianoUltimoGiorno(ym);
+  const primo = new Date(ym + '-01T12:00:00');
+  const idx = (d) => 1 + Math.round((new Date(String(d).substring(0, 10) + 'T12:00:00') - primo) / 86400000);
+  const cod = {};
+  // fuori dal mese le settimane a cavallo, nel mese solo le righe del mese
+  (righeSett || []).forEach((r) => {
+    const k = idx(r.data);
+    if ((k >= -13 && k < 1) || (k > nG && k <= nG + 14)) cod[k] = r.codice;
+  });
+  (righeMese || []).forEach((r) => {
+    const k = idx(r.data);
+    if (k >= 1 && k <= nG) cod[k] = r.codice;
+  });
+  const tipi = [];
+  for (let k = -13; k <= nG + 14; k++)
+    tipi.push(k in cod ? _pianoTipoGiornoBlocchi(cod[k]) : k >= 1 && k <= nG ? 'R' : 'X');
+  return PianoRegole.blocchiSpezzati(tipi, {
+    minimo: par.minimo,
+    riposoSingolo: par.riposoSingolo,
+    maxCons: par.maxCons,
+    da: 14, // indice del giorno 1
+    a: 13 + nG,
+  }).map((v) => {
+    const g = v.i - 13;
+    return {
+      nome: nome,
+      giorno: g,
+      msg: _pianoTestoBlocco(v),
+      celle: [ym + '-' + String(g).padStart(2, '0')],
+      tipo: v.tipo,
+    };
+  });
+}
+// BUCHI DEL MESE APERTO per tutte le persone (Controlla le regole): righe = celle del mese
+function _pianoBlocchiMese(righe) {
+  const ym = _pianoMeseSel;
+  const par = _pianoBlocchiParam();
+  if (!par.attivo) return [];
+  const mese = {};
+  (righe || _pianoRighe).forEach((r) => (mese[r.collaboratore] = mese[r.collaboratore] || []).push(r));
+  const sett = {};
+  _pianoRigheSettimane().forEach((r) => (sett[r.collaboratore] = sett[r.collaboratore] || []).push(r));
+  const out = [];
+  Object.keys(mese).forEach((n) => {
+    if (!(mese[n] || []).some((r) => _pianoIsLavoro(r.codice))) return;
+    _pianoBlocchiPersona(n, mese[n], sett[n] || [], ym, par).forEach((v) => out.push(v));
+  });
+  return out.sort((a, b) => a.nome.localeCompare(b.nome) || a.giorno - b.giorno);
+}
 // regole fra persone: accompagnamento, limiti e minimi per gruppo (righe del mese)
 function _pianoViolazioniGruppi(righe, ctx) {
   const ym = ctx.ym;
@@ -1623,7 +1739,14 @@ function validaPiano() {
   const r = _pianoCalcolaViolazioni();
   _pianoViolCelle = r.celle;
   _pianoViolLista = r.lista.sort((a, b) => a.nome.localeCompare(b.nome) || a.giorno - b.giorno);
-  logAzione('Piano validato', _pianoMeseSel + ' · ' + r.lista.length + ' violazioni');
+  let nBl = 0;
+  try {
+    nBl = _pianoBlocchiMese().length;
+  } catch (e) {}
+  logAzione(
+    'Piano validato',
+    _pianoMeseSel + ' · ' + r.lista.length + ' violazioni' + (nBl ? ' · ' + nBl + ' buchi nei blocchi' : ''),
+  );
   renderPiano();
 }
 
@@ -2244,12 +2367,55 @@ function pianoAvvisiApri(btn) {
   btn.textContent = aperto ? "Nascondi l'elenco" : "Mostra l'elenco";
   btn.setAttribute('aria-expanded', aperto ? 'true' : 'false');
 }
+// BLOCCHI COMPATTI in Controlla le regole: un gruppo a parte, grigio (qualita del piano, non
+// regola): chi, che giorno e quale buco. Si ricalcola dalle celle del mese a ogni controllo.
+function _pianoHtmlBlocchi(bl) {
+  if (!bl.length) return { chip: '', corpo: '' };
+  const voci = bl
+    .map(
+      (v) =>
+        '<li' +
+        (typeof _attrCella === 'function' ? _attrCella(v.nome, v.celle[0]) : '') +
+        ' title="' +
+        escP(v.msg) +
+        '"><b>' +
+        escP(v.nome) +
+        '</b> <span class="pavv-quando">giorno ' +
+        v.giorno +
+        '</span> <span class="pavv-cosa">' +
+        escP(v.msg) +
+        '</span></li>',
+    )
+    .join('');
+  return {
+    chip:
+      '<span class="pavv-chip" style="border-color:var(--line)" title="Qualità del piano, non è una regola: la legge e i posti coperti vengono prima. Si imposta in Piano › Regole, Blocchi compatti">' +
+      bl.length +
+      (bl.length === 1 ? ' buco nei blocchi' : ' buchi nei blocchi') +
+      '</span>',
+    corpo:
+      '<div class="pavv-gruppo">Qualità del piano: blocchi compatti (giorni isolati e liberi soli fra blocchi corti; non è legge, la copertura viene prima)</div><ul class="pavv-lista">' +
+      voci +
+      '</ul>',
+  };
+}
 function _pianoRenderViolazioni() {
   const el = document.getElementById('piano-violazioni');
   if (!el || _pianoViolLista === null) return;
+  let bl = [];
+  try {
+    bl = _pianoBlocchiMese();
+  } catch (e) {}
+  const hb = _pianoHtmlBlocchi(bl);
   if (!_pianoViolLista.length) {
     el.innerHTML =
-      '<div class="pavv pavv-ok"><div class="pavv-riga"><i class="icx icx-check"></i><span class="pavv-tit">Controllo delle regole:</span> nessun problema nel mese.</div></div>';
+      '<div class="pavv pavv-ok"><div class="pavv-riga"><i class="icx icx-check"></i><span class="pavv-tit">Controllo delle regole:</span> nessun problema nel mese.' +
+      (hb.chip
+        ? hb.chip +
+          '<button type="button" class="btn-act pavv-apri" aria-expanded="false" onclick="pianoAvvisiApri(this)">Mostra l\'elenco</button></div><div class="pavv-corpo">' +
+          hb.corpo
+        : '') +
+      '</div></div>';
     return;
   }
   const rg = _pianoRiepilogoGravita(_pianoViolLista);
@@ -2267,8 +2433,10 @@ function _pianoRenderViolazioni() {
     (rg.legge ? 'pavv-grave' : 'pavv-medio') +
     '"><div class="pavv-riga"><i class="icx icx-avviso"></i><span class="pavv-tit">Controllo delle regole:</span>' +
     rg.html +
+    hb.chip +
     '<span class="pavv-nota">celle in rosso nel calendario</span><button type="button" class="btn-act pavv-apri" aria-expanded="false" onclick="pianoAvvisiApri(this)">Mostra l\'elenco</button></div><div class="pavv-corpo">' +
     _pianoElencoAvvisi(voci) +
+    hb.corpo +
     '</div></div>';
 }
 
@@ -3655,6 +3823,166 @@ async function generaBozzaPiano(usaCoperture) {
     }
   }
 
+  // ===== PASSATA BLOCCHI COMPATTI (v453) =====
+  // Il giro principale decide un giorno alla volta: chi copre un posto in un giorno puo
+  // restare con un giorno di lavoro isolato o con un libero solo fra due blocchi corti
+  // (3-1-1, 2-1-2, 1-1-3). Qui, persona per persona, ogni buco si prova a chiudere come
+  // farebbe chi pianifica a mano, con due mosse fra turni messi da QUESTA bozza:
+  //  - SCAMBIO DI GIORNI: A lavora d1 e riposa d2, B il contrario: A prende il turno di B in
+  //    d2 e B quello di A in d1 (posti coperti identici, ore quasi uguali);
+  //  - CESSIONE: il giorno isolato di A passa a B, libero quel giorno, se A e sopra le sue ore
+  //    e B sotto.
+  // Tutte le regole valgono per entrambi (candidatoOk: legge, domeniche, ore, idoneita); la
+  // mossa resta solo se i buchi di A e B insieme scendono e le ore non si allontanano
+  // dall obiettivo. La copertura non cambia mai: un buco che non si chiude resta e Controlla
+  // le regole lo elenca.
+  let blocchiChiusi = 0;
+  const parBl = _pianoBlocchiParam();
+  if (parBl.attivo) {
+    const tipiDi = (n) => {
+      const out = [];
+      for (let k = -13; k <= nGiorni + 14; k++) {
+        const c = codDi(n, k);
+        out.push(k >= 1 && k <= nGiorni ? _pianoTipoGiornoBlocchi(c) : c ? _pianoTipoGiornoBlocchi(c) : 'X');
+      }
+      return out;
+    };
+    const buchiDi = (n) =>
+      _pianoBlocchiEsente(n)
+        ? []
+        : PianoRegole.blocchiSpezzati(tipiDi(n), {
+            minimo: parBl.minimo,
+            riposoSingolo: parBl.riposoSingolo,
+            maxCons: maxCons,
+            da: 14,
+            a: 13 + nGiorni,
+          }).map((v) => Object.assign(v, { g: v.i - 13 }));
+    const dstrDiG = (g) => ym + '-' + String(g).padStart(2, '0');
+    const durDi = (cod) => parseFloat((_pianoTurnoInfo(cod) || {}).durata_ore) || 0;
+    // cella spostabile: turno messo da questa bozza (non un WD, non un giorno chiuso)
+    const mobileB = (n, g) =>
+      g >= 1 && g <= nGiorni && !giorniChiusi.has(g) && assegnatiRun.has(n + '|' + g) && !rigaDi[n + '|' + g];
+    const liberaB = (n, g) => g >= 1 && g <= nGiorni && !giorniChiusi.has(g) && !cella[n + '|' + g];
+    const togliB = (n, g) => {
+      const k = n + '|' + g;
+      const cod = cella[k];
+      togliAssegnazione(n, cod, g);
+      delete cella[k];
+      assegnatiRun.delete(k);
+      const i = nuove.findIndex((x) => x.collaboratore === n && x.data === dstrDiG(g) && x.codice === cod);
+      if (i >= 0) nuove.splice(i, 1);
+      oreMese[n] = (oreMese[n] || 0) - durDi(cod);
+      return cod;
+    };
+    const mettiB = (n, g, cod) => {
+      const k = n + '|' + g;
+      cella[k] = cod;
+      assegnatiRun.add(k);
+      registraAssegnazione(n, cod, g);
+      oreMese[n] = (oreMese[n] || 0) + durDi(cod);
+      nuove.push({
+        collaboratore: n,
+        data: dstrDiG(g),
+        codice: cod,
+        protetto: false,
+        generato: true,
+        reparto_dip: _pianoReparto(),
+      });
+    };
+    const puoB = (n, g, cod) => {
+      const t = _pianoTurnoInfo(cod);
+      const dstr = dstrDiG(g);
+      return !!t && candidatoOk(n, { turno_codice: cod }, t, g, dstr, new Date(dstr + 'T12:00:00').getDay(), false, 0);
+    };
+    // le ore si allontanano dall obiettivo (somma degli scarti di A e B) di piu di un ora?
+    const scartoOre = (nn) => nn.reduce((t, n) => t + Math.abs(gapOre(n)), 0);
+    // prova una mossa: togli [n,g], metti [n,g,cod]; resta se i buchi scendono
+    const prova = (togli, metti, chi) => {
+      const prima = chi.reduce((t, n) => t + buchiDi(n).length, 0);
+      const oreP = scartoOre(chi);
+      const tolti = togli.map(([n, g]) => [n, g, togliB(n, g)]);
+      const messi = [];
+      let ok = true;
+      for (const [n, g, cod] of metti) {
+        if (!puoB(n, g, cod)) {
+          ok = false;
+          break;
+        }
+        mettiB(n, g, cod);
+        messi.push([n, g]);
+      }
+      if (ok && chi.reduce((t, n) => t + buchiDi(n).length, 0) < prima && scartoOre(chi) <= oreP + 1.01) return true;
+      messi.forEach(([n, g]) => togliB(n, g));
+      tolti.forEach(([n, g, cod]) => mettiB(n, g, cod));
+      return false;
+    };
+    for (let giro = 0; giro < 3; giro++) {
+      let cambiati = 0;
+      for (const a of nomi) {
+        let buchi = buchiDi(a);
+        for (let tent = 0; buchi.length && tent < 12; tent++) {
+          const b0 = buchi[tent % buchi.length];
+          let fatto = false;
+          // giorni vicini al buco: quelli di lavoro di A che possono passare a un collega e
+          // quelli liberi in cui A puo prendere un turno
+          const lavA = [];
+          const libA = [];
+          for (let g = Math.max(1, b0.g - 6); g <= Math.min(nGiorni, b0.g + 6); g++) {
+            if (mobileB(a, g)) lavA.push(g);
+            else if (liberaB(a, g)) libA.push(g);
+          }
+          // CESSIONE del giorno isolato (A sopra le ore, B sotto)
+          if (b0.tipo === 'lavoro_isolato' && mobileB(a, b0.g) && gapOre(a) < 0) {
+            const cod = cella[a + '|' + b0.g];
+            for (const b of nomi) {
+              if (b === a || !liberaB(b, b0.g) || !(gapOre(b) > 0)) continue;
+              if (prova([[a, b0.g]], [[b, b0.g, cod]], [a, b])) {
+                fatto = true;
+                break;
+              }
+            }
+          }
+          // SCAMBIO DI GIORNI
+          for (const d1 of fatto ? [] : lavA) {
+            if (fatto) break;
+            const c1 = cella[a + '|' + d1];
+            for (const d2 of libA) {
+              if (fatto) break;
+              for (const b of nomi) {
+                if (b === a || !liberaB(b, d1) || !mobileB(b, d2)) continue;
+                const c2 = cella[b + '|' + d2];
+                if (Math.abs(durDi(c1) - durDi(c2)) > 1.01) continue;
+                if (
+                  prova(
+                    [
+                      [a, d1],
+                      [b, d2],
+                    ],
+                    [
+                      [a, d2, c2],
+                      [b, d1, c1],
+                    ],
+                    [a, b],
+                  )
+                ) {
+                  fatto = true;
+                  break;
+                }
+              }
+            }
+          }
+          if (fatto) {
+            blocchiChiusi++;
+            cambiati++;
+            buchi = buchiDi(a);
+            tent = -1;
+          }
+        }
+      }
+      if (!cambiati) break;
+    }
+  }
+
   // ===== CGF DEI FESTIVI LAVORATI IN QUESTO MESE =====
   // Chi ha appena ricevuto un turno in un festivo con diritto matura un
   // recupero: si mette nei giorni DOPO il festivo, con le stesse regole.
@@ -3761,6 +4089,9 @@ async function generaBozzaPiano(usaCoperture) {
         (riposiSistemati
           ? '\n• ' + riposiSistemati + ' riposi attorno alla domenica sistemati spostando un turno a un collega'
           : '') +
+        (blocchiChiusi
+          ? '\n• ' + blocchiChiusi + ' buchi nei blocchi chiusi scambiando giorni fra colleghi (Blocchi compatti)'
+          : '') +
         (riposiRestano.length
           ? '\n• riposo attorno alla domenica ancora da sistemare a mano: ' + riposiRestano.join(', ')
           : '') +
@@ -3810,6 +4141,7 @@ async function generaBozzaPiano(usaCoperture) {
         cgf: nCgfAuto,
         congedi: nCongedi,
         riposiDaSistemare: riposiRestano.slice(),
+        blocchiChiusi: blocchiChiusi,
       };
       return;
     }

@@ -3342,8 +3342,10 @@ async function _pianoSincronizzaCongedoNp(c, rimuovi) {
 // riposo settimanale concesso dal piano: non conta ne' come libera ne' come
 // lavorata. UNICO criterio per validatore, tabella Domeniche e Benessere
 // (prima ogni schermata escludeva codici diversi e i conteggi non tornavano).
+// ASS (assenza in attesa di certificato) come la M: la domenica era di lavoro e non si e
+// lavorata, non conta ne a favore ne contro (diventa M con il certificato)
 function _pianoDomenicaEsclusa(cod) {
-  return cod === 'V' || cod === 'V1' || cod === 'M' || cod === 'M1';
+  return cod === 'V' || cod === 'V1' || cod === 'M' || cod === 'M1' || cod === 'ASS';
 }
 // REGOLA CGF: il festivo che cade di DOMENICA non matura compensazione
 function _festivoCgfDefault(dstr) {

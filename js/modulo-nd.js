@@ -151,7 +151,11 @@ async function _ndRiallineaMese() {
       if (!chiavi.has(k)) nomi.add(k.split('|')[0]);
     });
   }
-  for (const n of nomi) if (n) await ndSincronizzaPersona(n, ym);
+  // il modulo segue il piano da solo: non e un azione di chi lavora, quindi resta fuori
+  // dall Annulla generale. Prima, 1,5 s dopo una ND scritta o annullata, il modulo creato
+  // o aggiornato diventava "l ultima azione" e il Ctrl+Z dopo toccava lui, non il piano.
+  const fuori = (fn) => (window.Annulla ? window.Annulla.senzaTraccia(fn) : fn());
+  for (const n of nomi) if (n) await fuori(() => ndSincronizzaPersona(n, ym));
 }
 
 // ---------------------------------------------------------------- PDF

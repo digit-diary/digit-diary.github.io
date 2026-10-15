@@ -2011,6 +2011,12 @@ async function apriFormulario(id) {
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
     const blob = new Blob([bytes], { type: f.mime || 'application/octet-stream' });
+    // PDF: l anteprima del programma (disegnata dentro la pagina, con Scarica e Stampa), non
+    // una scheda nuova del browser (bloccata o diversa a seconda del lettore PDF)
+    if (f.mime === 'application/pdf' && typeof mostraPdfBlob === 'function') {
+      await mostraPdfBlob(blob, f.nome + '.pdf', f.nome);
+      return;
+    }
     const url = URL.createObjectURL(blob);
     if (f.mime === 'application/pdf') {
       window.open(url, '_blank');

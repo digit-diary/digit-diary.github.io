@@ -2807,7 +2807,9 @@ function render() {
           gdBadge +
           rep +
           imp +
-          (e.tipo === nomeCorrente('Malattia') && typeof badgeCoperturaHtml === 'function'
+          // anche l Assenza (attesa certificato): il turno lasciato si copre come per la malattia
+          ((e.tipo === nomeCorrente('Malattia') || e.tipo === nomeCorrente('Assenza')) &&
+          typeof badgeCoperturaHtml === 'function'
             ? badgeCoperturaHtml(e)
             : '') +
           '</div><div class="entry-text">' +
@@ -2825,7 +2827,8 @@ function render() {
           '\')">Tipo</button><button class="btn-act edit" onclick="modificaRegistrazione(' +
           e.id +
           ')">Modifica</button>' +
-          (e.tipo === nomeCorrente('Malattia') && typeof apriPopupCopertura === 'function'
+          ((e.tipo === nomeCorrente('Malattia') || e.tipo === nomeCorrente('Assenza')) &&
+          typeof apriPopupCopertura === 'function'
             ? '<button class="btn-act" onclick="apriPopupCopertura(\'' +
               _jsArg(e.nome) +
               "','" +

@@ -1829,6 +1829,67 @@ async function corsoOrarioRapido(cod, inizio, fine) {
 async function _corsiSalvaLista() {
   if (!(await salvaImp('piano_corsi_lista', window._pianoCorsiLista.join(',')))) return;
 }
+// I CORSI CONTANO COME LAVORO (decisione del titolare 15.10): riposo 11 ore, giorni di fila,
+// ore. Il punto di verita e la regola "codici_lavoro" (piano-genera.js, _pianoCodiciLavoro);
+// ogni corso della lista ci entra da solo (migrazione 20260918 per quelli di prima).
+async function _corsiContaComeLavoro(codici) {
+  const manca = (codici || []).map((c) => String(c).toUpperCase()).filter((c) => c && !_pianoIsLavoro(c));
+  if (!manca.length) return true;
+  try {
+    const gen = pianoRegoleCache.find((x) => x.nome === 'codici_lavoro' && !String(x.settori || '').trim());
+    const base = gen
+      ? String(gen.valore || '')
+      : typeof _PIANO_CODICI_LAVORO !== 'undefined'
+        ? _PIANO_CODICI_LAVORO
+        : '';
+    const valore = [
+      ...new Set(
+        base
+          .split(/[\s,;]+/)
+          .filter(Boolean)
+          .concat(manca),
+      ),
+    ].join(',');
+    if (gen) {
+      await secPatch('piano_regole', 'id=eq.' + gen.id, { valore: valore });
+      gen.valore = valore;
+    } else {
+      const r = await secPost('piano_regole', {
+        nome: 'codici_lavoro',
+        valore: valore,
+        tipo: 'HARD',
+        peso: 0,
+        attivo: true,
+        descrizione:
+          'Codici di lavoro che non sono turni (JG, ufficio, corsi, formazione): contano come lavoro per riposo, giorni di fila e ore',
+      });
+      if (r && r[0]) pianoRegoleCache.push(r[0]);
+    }
+    // nuovo elenco: la cache dei codici di lavoro si rilegge (cambia il riferimento)
+    pianoRegoleCache = pianoRegoleCache.slice();
+    logAzione('Corsi', 'Contano come lavoro: ' + manca.join(', '));
+    return true;
+  } catch (e) {
+    toastErrore('Regola codici di lavoro non aggiornata: ' + ((e && e.message) || e));
+    return false;
+  }
+}
+async function corsiContaComeLavoro() {
+  if (!isAdmin()) return;
+  const lista = _corsiLista().map((c) => c.codice);
+  if (await _corsiContaComeLavoro(lista)) {
+    // e l orario, per contare le ore vere e il riposo prima e dopo
+    for (const c of lista) {
+      const cs = pianoCodiciCache.find((x) => String(x.codice).toUpperCase() === String(c).toUpperCase());
+      if (cs && !cs.richiede_orario) {
+        await secPatch('piano_codici', 'id=eq.' + cs.id, { richiede_orario: true }).catch(() => {});
+        cs.richiede_orario = true;
+      }
+    }
+    toast('I corsi contano come lavoro');
+    renderPiano();
+  }
+}
 async function corsoAggiungi() {
   if (!isAdmin()) return;
   const cod = ((document.getElementById('corso-nuovo-cod') || {}).value || '').trim().toUpperCase();
@@ -1853,7 +1914,7 @@ async function corsoAggiungi() {
         protetto: false,
         is_riposo: false,
         attivo: true,
-        richiede_orario: false,
+        richiede_orario: true, // un corso ha un orario: ore vere e riposo prima e dopo
       });
       if (nuovo && nuovo[0]) pianoCodiciCache.push(nuovo[0]);
     } else if (desc) {
@@ -1862,6 +1923,7 @@ async function corsoAggiungi() {
     }
     window._pianoCorsiLista = [...(window._pianoCorsiLista || []), cod];
     await _corsiSalvaLista();
+    await _corsiContaComeLavoro([cod]);
     logAzione('Corsi', 'Aggiunto corso ' + cod + ' (' + ore + 'h)');
     toast('Corso ' + cod + ' aggiunto');
     renderPiano();
@@ -2000,6 +2062,14 @@ function _renderPianoCorsiCard() {
     '<button class="btn-export" style="font-size:var(--fs-md,.875rem);padding:6px 16px;margin-top:10px" onclick="pianoInserisciCorso()">Inserisci nel piano</button>';
   // gestione della LISTA corsi (admin): aggiungi sigla, rinomina, rimuovi
   if (isAdmin()) {
+    const nonLav = corsi.filter((c) => !_pianoIsLavoro(c.codice)).map((c) => c.codice);
+    if (nonLav.length)
+      h +=
+        '<div id="corsi-non-lavoro" style="margin-top:14px;padding:8px 12px;border-left:3px solid var(--c-rosso,#c0392b);background:var(--paper2)">' +
+        escP(nonLav.join(', ')) +
+        ' non ' +
+        (nonLav.length === 1 ? 'conta' : 'contano') +
+        ' come lavoro: un corso dopo una notte non controlla il riposo di 11 ore né i giorni di fila. <button class="btn-act" onclick="corsiContaComeLavoro()">Conta come lavoro</button></div>';
     h +=
       '<p style="font-size:var(--fs-sm,.8125rem);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Gestisci corsi</p>';
     corsi.forEach((c) => {
@@ -2237,8 +2307,45 @@ async function corsoSalvaOrarioDefault() {
   if (!(await salvaImp('piano_corsi_orari', JSON.stringify(window._pianoCorsiOrari)))) return;
   toast('Orario predefinito di ' + cod + (inizio && fine ? ': ' + inizio + '-' + fine : ' rimosso'));
 }
-async function pianoInserisciCorso() {
-  if (!puoGestirePiano() && !(typeof puoModificare === 'function' && puoModificare('gestione_corsi'))) return;
+// CORSO NEL PIANO (segnalazione del titolare 15.10: "il corso non rispetta le 11 ore ne i
+// giorni di fila"). Il corso e lavoro con i suoi orari: chi lo riceve passa dalle stesse regole
+// di Valida (_pianoViolazioniMosse: riposo minimo con gli orari veri, giorni di fila anche a
+// cavallo del mese, riposo attorno alla domenica, ore della settimana...). Chi le violerebbe
+// NON lo riceve e si dice il motivo per persona; chi gestisce il piano puo forzare, con una
+// seconda conferma esplicita, e la violazione resta scritta nel commento della cella e nel
+// registro (come per una cella scritta a mano). Vacanze, malattie, ND, CGF e celle riservate
+// non si sovrascrivono mai da qui. Tutte le celle in UNA scrittura, con Annulla.
+function pianoInserisciCorso() {
+  return unaVoltaSola('piano-inserisci-corso', () => _pianoConScrittura(() => _pianoInserisciCorsoEsegui()));
+}
+// orario unito di un turno e del corso nello stesso giorno (per il riposo prima e dopo)
+function _corsoOrarioUnito(t, r, dstr, inizio, fine) {
+  const eff = typeof _pianoTurnoDelGiorno === 'function' ? _pianoTurnoDelGiorno(t, dstr) : null;
+  const ti0 = (r && r.ora_inizio) || (eff && eff.ora_inizio) || t.ora_inizio;
+  const tf0 = (r && r.ora_fine) || (eff && eff.ora_fine) || t.ora_fine;
+  const ti = _pianoOra(String(ti0 || '').substring(0, 5));
+  let tf = _pianoOra(String(tf0 || '').substring(0, 5));
+  const ci = _pianoOra(inizio);
+  let cf = _pianoOra(fine);
+  if (ti == null || tf == null || ci == null || cf == null) return null;
+  if (tf <= ti) tf += 24;
+  if (cf <= ci) cf += 24;
+  const hh = (x) =>
+    String(Math.floor((((x % 24) + 24) % 24) + 1e-9)).padStart(2, '0') +
+    ':' +
+    String(Math.round((x % 1) * 60) % 60).padStart(2, '0');
+  return {
+    sovrapposto: ci < tf && ti < cf,
+    ti: ti,
+    tf: tf,
+    ora_inizio: hh(Math.min(ti, ci)),
+    ora_fine: hh(Math.max(tf, cf)),
+  };
+}
+async function _pianoInserisciCorsoEsegui() {
+  const responsabile = puoGestirePiano();
+  if (!responsabile && !(typeof puoModificare === 'function' && puoModificare('gestione_corsi'))) return;
+  const avvisoRete = !!window._sessioneScadutaAvvisata;
   const cod = (document.getElementById('corso-cod') || {}).value;
   const data = (document.getElementById('corso-data') || {}).value;
   const inizio = (document.getElementById('corso-inizio') || {}).value;
@@ -2248,131 +2355,299 @@ async function pianoInserisciCorso() {
     toast('Scegli corso, data e almeno un partecipante');
     return;
   }
+  if (!inizio || !fine) {
+    // senza orario il riposo prima e dopo il corso non si puo controllare
+    toast('Scrivi l orario del corso (inizio e fine): serve per il riposo e le ore');
+    return;
+  }
   if (!(await _pianoConsentiScrittura(data))) return; // giorno chiuso: stessa regola del piano
+  const op = getOperatore();
+  const dataIt = data.split('-').reverse().join('.');
+  const etichettaCorso = 'Corso ' + cod + ' ' + inizio + '-' + fine;
+  let esistenti;
   try {
-    // celle di QUEL giorno di tutti i settori: chi lavora in due settori puo'
-    // avere la cella nell'altro piano (prima risultava libero e l'inserimento
-    // falliva a meta' per la riga doppia)
-    const esistenti = (await secGet('piano?data=eq.' + data + '&limit=2000')) || [];
-    const etichettaCorso = 'Corso ' + cod + (inizio && fine ? ' ' + inizio + '-' + fine : '');
-    const ci = _pianoOra(inizio);
-    const cf = _pianoOra(fine);
-    // classifica: liberi / turno COMPATIBILE (corso nel commento, turno
-    // intatto) / turno SOVRAPPOSTO (avviso!) / altre celle (assenze...)
-    const liberi = [];
-    const compatibili = [];
-    const conflitti = [];
-    const occupateAltre = [];
-    const fuoriContratto = []; // prima dell assunzione o dopo la fine del contratto: niente corso
-    for (const nome of nomi) {
-      if (typeof _pianoOperativoIl === 'function' && !_pianoOperativoIl(nome, data)) {
-        fuoriContratto.push(nome + ' (' + _pianoMotivoFuoriRapporto(nome, data) + ')');
-        continue;
-      }
-      const ex = esistenti.find((r) => r.collaboratore === nome);
-      if (!ex) {
-        liberi.push(nome);
-        continue;
-      }
-      const t = _pianoTurnoInfo(ex.codice);
-      if (t && t.ora_inizio && ci != null && cf != null) {
-        const ti = _pianoOra(t.ora_inizio);
-        let tf = _pianoOra(t.ora_fine);
-        if (tf <= ti) tf += 24;
-        if (ci < tf && ti < cf) conflitti.push({ nome: nome, ex: ex, t: t });
-        else compatibili.push({ nome: nome, ex: ex });
-      } else {
-        occupateAltre.push({ nome: nome, ex: ex });
-      }
+    // celle di QUEL giorno di tutti i settori: chi lavora in due settori puo avere la
+    // cella nell altro piano
+    esistenti = (await secGet('piano?data=eq.' + data + '&limit=2000')) || [];
+  } catch (e) {
+    _pianoErroreScrittura('Corso NON inserito: ', e, avvisoRete);
+    return;
+  }
+  const assente = _pianoAssenzeLettore(); // ND, malattie e congedi del Diario
+  const ricevono = []; // giorno libero: la cella diventa il corso
+  const compatibili = []; // turno che non si sovrappone: corso nel commento, turno intatto
+  const sovrapposti = []; // turno (o altro lavoro) negli stessi orari
+  const esclusi = []; // vacanza, malattia, ND, recupero, cella riservata: mai sovrascritte
+  const fuoriContratto = [];
+  for (const nome of nomi) {
+    if (typeof _pianoOperativoIl === 'function' && !_pianoOperativoIl(nome, data)) {
+      fuoriContratto.push(nome + ' (' + _pianoMotivoFuoriRapporto(nome, data) + ')');
+      continue;
     }
-    if (
-      !(await chiediConferma(
-        etichettaCorso +
-          ' del ' +
-          data.split('-').reverse().join('.') +
-          '\n\n• ' +
-          liberi.length +
-          ' con giorno libero: ricevono la cella ' +
-          cod +
-          (compatibili.length
-            ? '\n• ' +
-              compatibili.length +
-              ' con turno COMPATIBILE (turno intatto, corso nel commento): ' +
-              compatibili.map((x) => x.nome + ' (' + x.ex.codice + ')').join(', ')
-            : '') +
-          (conflitti.length
-            ? '\n\nATTENZIONE - turno SOVRAPPOSTO al corso, NON lo ricevono: ' +
-              conflitti
-                .map(
-                  (x) =>
-                    x.nome +
-                    ' (' +
-                    x.ex.codice +
-                    ' ' +
-                    _briefOrarioHM(x.t.ora_inizio) +
-                    '-' +
-                    _briefOrarioHM(x.t.ora_fine) +
-                    ')',
-                )
-                .join(', ')
-            : '') +
-          (occupateAltre.length
-            ? '\n• Altre celle (assenze/congedi), esclusi: ' +
-              occupateAltre.map((x) => x.nome + ' (' + x.ex.codice + ')').join(', ')
-            : '') +
-          (fuoriContratto.length ? '\n• Fuori dal contratto quel giorno, esclusi: ' + fuoriContratto.join(', ') : ''),
-      ))
-    )
-      return;
-    let sovrascrivi = false;
-    if (conflitti.length || occupateAltre.length)
-      sovrascrivi = await chiediConferma(
-        'Sovrascrivo comunque le celle di chi ha turno sovrapposto o altra cella?\n(Annulla = restano come sono, consigliato)',
-      );
-    let inseriti = 0;
-    let annotati = 0;
-    const datiCorso = {
+    const ex = esistenti.find((r) => r.collaboratore === nome) || null;
+    const c = ex ? String(ex.codice || '').toUpperCase() : '';
+    if (ex && c === String(cod).toUpperCase()) {
+      esclusi.push({ nome: nome, motivo: 'già iscritto a questo corso' });
+      continue;
+    }
+    if (ex && _pianoCellaRiservata(ex)) {
+      esclusi.push({ nome: nome, motivo: 'cella riservata (' + _pianoCellaRiservata(ex) + ')' });
+      continue;
+    }
+    if (assente(nome, data) && !(ex && _pianoTurnoInfo(c))) {
+      esclusi.push({ nome: nome, motivo: 'assente nel Diario (ND, malattia o congedo)' });
+      continue;
+    }
+    const t = ex ? _pianoTurnoInfo(c) : null;
+    if (t) {
+      const u = _corsoOrarioUnito(t, ex, data, inizio, fine);
+      if (u && !u.sovrapposto) compatibili.push({ nome: nome, ex: ex, t: t, u: u });
+      else
+        sovrapposti.push({
+          nome: nome,
+          ex: ex,
+          testo: c + ' ' + _briefOrarioHM(t.ora_inizio) + '-' + _briefOrarioHM(t.ora_fine),
+        });
+      continue;
+    }
+    const cs = ex ? _pianoCodiceInfo(c) : null;
+    const riposo = !ex || !c || c === 'C' || (cs && cs.is_riposo && !/^V|^M|^CGF$|^WD$|^ND$/.test(c));
+    // le C messe dal programma attorno alle vacanze (generate e protette) restano
+    if (riposo && !(ex && ex.protetto && ex.generato && c === 'C' && _pianoCongediAttornoVacanze())) {
+      ricevono.push({ nome: nome, ex: ex });
+      continue;
+    }
+    if (ex && _pianoIsLavoro(c)) {
+      sovrapposti.push({ nome: nome, ex: ex, testo: c + ' (altro lavoro)' });
+      continue;
+    }
+    const nomeC =
+      c === 'V' || c === 'V1'
+        ? 'vacanza'
+        : c === 'M' || c === 'M1'
+          ? 'malattia'
+          : c === 'CGF'
+            ? 'recupero festivo'
+            : c === 'C'
+              ? 'congedo attorno alle vacanze'
+              : (cs && cs.descrizione) || c;
+    esclusi.push({ nome: nome, motivo: nomeC + ' (' + c + ')' });
+  }
+  // REGOLE: una lettura per tutti, con tutte le celle nuove insieme
+  const mossaCorso = (x) => ({ nome: x.nome, data: data, codice: cod, ora_inizio: inizio, ora_fine: fine });
+  let viol = {};
+  try {
+    viol = await _pianoViolazioniMosse(
+      ricevono
+        .map(mossaCorso)
+        .concat(sovrapposti.map(mossaCorso))
+        .concat(
+          compatibili.map((x) => ({
+            nome: x.nome,
+            data: data,
+            codice: x.ex.codice,
+            ora_inizio: x.u.ora_inizio,
+            ora_fine: x.u.ora_fine,
+          })),
+        ),
+    );
+  } catch (e) {
+    _pianoErroreScrittura('Corso NON inserito (controllo delle regole non riuscito): ', e, avvisoRete);
+    return;
+  }
+  // per chi tiene il turno contano solo i riposi (le ore del giorno unito sono gonfiate)
+  const motivi = (nome, soloRiposi) =>
+    (viol[nome] || []).filter((v) => !v.ore && (!soloRiposi || /riposo/i.test(v.msg))).map((v) => v.msg);
+  const noteOre = (nome) => (viol[nome] || []).filter((v) => v.ore).map((v) => v.msg);
+  const okRic = ricevono.filter((x) => !motivi(x.nome).length);
+  const noRic = ricevono.filter((x) => motivi(x.nome).length);
+  const okComp = compatibili.filter((x) => !motivi(x.nome, true).length);
+  const noComp = compatibili.filter((x) => motivi(x.nome, true).length);
+  const riga = (n, m) => '\n   – ' + n + ': ' + m.join('; ');
+  const conOre = okRic.concat(okComp).filter((x) => noteOre(x.nome).length);
+  const nonLavoro = !_pianoIsLavoro(cod);
+  let testo =
+    etichettaCorso +
+    ' del ' +
+    dataIt +
+    '\n\n• ' +
+    okRic.length +
+    ' ricevono la cella ' +
+    cod +
+    (okRic.length
+      ? ': ' + okRic.map((x) => x.nome + (x.ex && x.ex.codice ? ' (era ' + x.ex.codice + ')' : '')).join(', ')
+      : '') +
+    (okComp.length
+      ? '\n• ' +
+        okComp.length +
+        ' con un turno negli altri orari (turno intatto, corso nel commento): ' +
+        okComp.map((x) => x.nome + ' (' + x.ex.codice + ')').join(', ')
+      : '') +
+    (noRic.length || noComp.length
+      ? '\n\nNON LO RICEVONO, violerebbero le regole:' +
+        noRic.map((x) => riga(x.nome, motivi(x.nome))).join('') +
+        noComp.map((x) => riga(x.nome + ' (con ' + x.ex.codice + ')', motivi(x.nome, true))).join('')
+      : '') +
+    (sovrapposti.length
+      ? '\n\nTurno negli stessi orari del corso, NON lo ricevono: ' +
+        sovrapposti.map((x) => x.nome + ' (' + x.testo + ')').join(', ')
+      : '') +
+    (esclusi.length ? '\n\nEsclusi: ' + esclusi.map((x) => x.nome + ' (' + x.motivo + ')').join(', ') : '') +
+    (fuoriContratto.length ? '\n\nFuori dal contratto quel giorno, esclusi: ' + fuoriContratto.join(', ') : '') +
+    (conOre.length
+      ? '\n\nSolo avviso (tolleranza ore, regola aziendale):' +
+        conOre.map((x) => riga(x.nome, noteOre(x.nome))).join('')
+      : '') +
+    (nonLavoro
+      ? '\n\nATTENZIONE: ' +
+        cod +
+        ' non è tra i codici di lavoro (Regole › codici di lavoro): il piano non lo conta come lavoro né come ore.'
+      : '');
+  const nOk = okRic.length + okComp.length;
+  const daForzare = noRic.concat(noComp).concat(sovrapposti);
+  if (!nOk && !(responsabile && daForzare.length)) {
+    await mostraAvviso(testo + '\n\nNessuno può ricevere il corso: niente è stato scritto.', {
+      titolo: 'Corso ' + cod,
+    });
+    return;
+  }
+  if (!(await chiediConferma(testo, { titolo: 'Corso ' + cod, ok: nOk ? 'Inserisci (' + nOk + ')' : 'Avanti' })))
+    return;
+  // FORZARE: solo chi gestisce il piano, con una seconda conferma che dice cosa si rompe
+  let forzati = [];
+  if (responsabile && daForzare.length) {
+    const elenco = daForzare
+      .map((x) =>
+        riga(
+          x.nome,
+          sovrapposti.includes(x)
+            ? ['il turno ' + x.testo + ' viene tolto e resta scoperto'].concat(motivi(x.nome))
+            : motivi(x.nome, compatibili.includes(x)),
+        ),
+      )
+      .join('');
+    const forza = await chiediConferma(
+      'FORZARE LE REGOLE? Il corso va scritto anche a:' +
+        elenco +
+        '\n\nSolo se il corso è obbligatorio quel giorno e la violazione è decisa dal responsabile: resta scritta nel commento della cella (⚠) e nel registro. Annulla = il corso va solo a chi rispetta le regole.',
+      { titolo: 'Forzare le regole', ok: 'Forza le regole', annulla: 'No, solo gli altri' },
+    );
+    if (forza) forzati = daForzare;
+  }
+  if (!nOk && !forzati.length) return;
+  const ora = new Date().toISOString();
+  const ops = [];
+  const cellaCorso = (x, nota, exTurno) => {
+    const dati = {
       codice: cod,
-      ora_inizio: inizio || null,
-      ora_fine: fine || null,
+      ora_inizio: inizio,
+      ora_fine: fine,
+      fasce: null,
       protetto: true,
       generato: false,
-      commento: etichettaCorso + ' - ' + getOperatore(),
+      commento: (
+        (nota ? '⚠ ' + nota + ' · ' : '') +
+        (exTurno ? 'Ex ' + exTurno + ' - ' : '') +
+        etichettaCorso +
+        ' - ' +
+        op
+      ).substring(0, 400),
+      operatore: op,
     };
-    const errori = [];
-    for (const nome of liberi) {
-      try {
-        await _pianoInserisciCella(
-          Object.assign({ collaboratore: nome, data: data, reparto_dip: _pianoReparto() }, datiCorso),
-        );
-        inseriti++;
-      } catch (e) {
-        errori.push(nome + ': ' + (e.message || 'errore'));
-      }
-    }
-    for (const cx of compatibili) {
-      await secPatch('piano', 'id=eq.' + cx.ex.id, {
-        commento: etichettaCorso + ' poi ' + cx.ex.codice + ' - ' + getOperatore(),
+    if (x.ex) dati.updated_at = ora;
+    else dati.reparto_dip = _pianoReparto();
+    ops.push({ collaboratore: x.nome, data: data, atteso: x.ex ? _pianoAttesoDi(x.ex) : null, dati: dati });
+  };
+  const notaTurno = (x, nota) => {
+    const vecchia = String(x.ex.commento || '').trim();
+    ops.push({
+      collaboratore: x.nome,
+      data: data,
+      atteso: _pianoAttesoDi(x.ex),
+      dati: {
+        commento: (
+          (nota ? '⚠ ' + nota + ' · ' : '') +
+          etichettaCorso +
+          ' e poi ' +
+          x.ex.codice +
+          ' - ' +
+          op +
+          (vecchia ? ' · ' + vecchia : '')
+        ).substring(0, 400),
         protetto: true,
-      });
-      annotati++;
-    }
-    if (sovrascrivi) {
-      for (const cx of conflitti.concat(occupateAltre)) {
-        await secPatch('piano', 'id=eq.' + cx.ex.id, datiCorso);
-        inseriti++;
-      }
-    }
-    logAzione(
-      'Corso inserito nel piano',
-      cod + ' ' + data + ' · ' + inseriti + ' celle, ' + annotati + ' annotati sul turno',
-    );
-    if (errori.length) toastErrore('Corso non inserito per: ' + errori.join('; '));
-    else
-      toast('Corso ' + cod + ': ' + inseriti + ' celle' + (annotati ? ' + ' + annotati + ' annotati sul turno' : ''));
-    if (_pianoMeseSel === data.substring(0, 7)) renderPiano();
+        operatore: op,
+        updated_at: ora,
+      },
+    });
+  };
+  okRic.forEach((x) => cellaCorso(x, '', ''));
+  okComp.forEach((x) => notaTurno(x, ''));
+  forzati.forEach((x) => {
+    if (compatibili.includes(x)) notaTurno(x, motivi(x.nome, true).join(' · '));
+    else if (sovrapposti.includes(x))
+      cellaCorso(x, ['turno ' + x.ex.codice + ' tolto per il corso'].concat(motivi(x.nome)).join(' · '), x.ex.codice);
+    else cellaCorso(x, motivi(x.nome).join(' · '), '');
+  });
+  const passo = _pianoUndoSnap('corso ' + cod + ' ' + dataIt);
+  let esito;
+  try {
+    esito = await _pianoScriviCelle(ops);
   } catch (e) {
-    console.error(e);
-    toastErrore('Errore inserimento corso: ' + (e.message || ''));
+    _pianoUndoScarta(passo);
+    _pianoErroreScrittura('Corso NON inserito: ', e, avvisoRete);
+    return;
   }
+  if (!esito.ok) {
+    _pianoUndoScarta(passo);
+    await _pianoAvvisaConflitti(esito.conflitti, 'Corso non inserito');
+    return;
+  }
+  _pianoMemoriaDopo(esito.ops, esito.righe);
+  const nCelle = okRic.length + forzati.filter((x) => !compatibili.includes(x)).length;
+  const nNote = okComp.length + forzati.filter((x) => compatibili.includes(x)).length;
+  logAzione(
+    'Corso inserito nel piano',
+    cod +
+      ' ' +
+      data +
+      ' · ' +
+      nCelle +
+      ' celle, ' +
+      nNote +
+      ' annotati sul turno' +
+      (forzati.length ? ', ' + forzati.length + ' forzati' : ''),
+  );
+  if (forzati.length)
+    logAzione(
+      'Corso: regole forzate',
+      cod +
+        ' ' +
+        data +
+        ' da ' +
+        op +
+        ' · ' +
+        forzati
+          .map(
+            (x) =>
+              x.nome +
+              ': ' +
+              (sovrapposti.includes(x) ? 'turno ' + x.ex.codice + ' tolto; ' : '') +
+              motivi(x.nome).join('; '),
+          )
+          .join(' | '),
+    );
+  const nonRic = daForzare.length - forzati.length;
+  toast(
+    'Corso ' +
+      cod +
+      ': ' +
+      nCelle +
+      ' celle' +
+      (nNote ? ' + ' + nNote + ' annotati sul turno' : '') +
+      (nonRic ? ' · ' + nonRic + ' non inseriti' : '') +
+      (forzati.length ? ' · ' + forzati.length + ' con regole forzate' : ''),
+    6000,
+  );
+  window._corsoCache = null; // gli stati del giorno si rileggono
+  if (_pianoMeseSel === data.substring(0, 7)) renderPiano();
 }

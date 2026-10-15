@@ -238,12 +238,18 @@ function getTuttiTipi() {
     }),
     ...tipiPersonalizzati,
   ];
-  if (tipiOrdine.length)
-    list.sort((a, b) => {
-      const ia = tipiOrdine.indexOf(a.nome),
-        ib = tipiOrdine.indexOf(b.nome);
-      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
-    });
+  if (tipiOrdine.length) {
+    // un tipo predefinito nuovo che l ordine salvato non conosce (Assenza, 15.10.2026) va
+    // accanto al suo vicino (prima di Malattia), non in fondo
+    const vicino = { Assenza: 'Malattia' };
+    const pos = (t) => {
+      const i = tipiOrdine.indexOf(t.nome);
+      if (i !== -1) return i;
+      const v = t._orig && vicino[t._orig] ? tipiOrdine.indexOf(nomeCorrente(vicino[t._orig])) : -1;
+      return v !== -1 ? v - 0.5 : 999;
+    };
+    list.sort((a, b) => pos(a) - pos(b));
+  }
   return list;
 }
 function getColore(n) {

@@ -51,6 +51,9 @@ const TIPI_DEFAULT = [
   { nome: 'Richiesta', colore: '#2c6e49' },
   { nome: 'Errore', colore: '#c0392b' },
   { nome: 'Ammonimento Verbale', colore: '#7b2d8b' },
+  // ASSENZA (attesa certificato): chi chiama per malattia, prima del certificato (15.10.2026).
+  // Nel Piano ASS sui giorni con turno, 0 ore; il certificato (HR) la fa diventare Malattia
+  { nome: 'Assenza', colore: '#8e5bb5' },
   { nome: 'Malattia', colore: '#1a7a6d' },
   { nome: 'Non Disponibilità', colore: '#5d6d7e' },
   { nome: 'Nota', colore: '#8b6914' },

@@ -61,6 +61,8 @@ const PIANO_COLORI_SPECIALI = {
   C: '#FBD4B4',
   RC: '#FFC000',
   ND: '#F2DBDB',
+  // assenza in attesa di certificato: colore proprio, diverso dalla M (giallo)
+  ASS: '#D7B8F3',
 };
 
 // REGOLE e FESTIVI: erano riservati ad admin e per gli altri la scheda restava
@@ -1175,9 +1177,20 @@ function _pianoSiglaSottoMalattia(r) {
   const m = String((r && r.commento) || '').match(/^(?:Malattia dal Diario · era|Ex) ([A-Z0-9]+)\b/);
   return m ? m[1] : '';
 }
+// ASS = ASSENZA IN ATTESA DI CERTIFICATO (decisione del titolare 15.10): come la M lascia
+// scoperto il turno della persona (Copertura, Avvisi), ma vale 0 ore e non e malattia.
+// Il tipo di registrazione del Diario e «Assenza» (rinominabile come gli altri).
+function _pianoTipoAssenza() {
+  return typeof nomeCorrente === 'function' ? nomeCorrente('Assenza') : 'Assenza';
+}
+// celle che lasciano scoperto il turno: malattia (M, M1) e assenza in attesa di certificato
+function _pianoCodiceAssenteTurno(c) {
+  return c === 'M' || c === 'M1' || c === 'ASS';
+}
 // ore di una cella in un giorno di malattia; null se il giorno non e malattia
 function _pianoOreGiornoMalattia(r, info) {
   if (!r || !r.collaboratore || !r.data) return null;
+  if (r.codice === 'ASS') return null; // l ASS non e malattia: valore del codice (0 ore)
   const dstr = String(r.data).substring(0, 10);
   const eM = r.codice === 'M' || r.codice === 'M1';
   const n = _pianoGiornoDiMalattia(r.collaboratore, dstr) || (eM ? 1 : 0);
@@ -1328,6 +1341,9 @@ function _pianoDateMalattia(testo, dataReg) {
   let a = da;
   const mRange = testo.match(/dal\s+(\d{1,2})[./](\d{1,2})[./](\d{4})\s+al\s+(\d{1,2})[./](\d{1,2})[./](\d{4})/i);
   const mIl = testo.match(/\bil\s+(\d{1,2})[./](\d{1,2})[./](\d{4})/i);
+  // "dal X" senza "al" (Rapporto: un giorno solo diverso da quello del rapporto, «malato
+  // domani»): vale da quel giorno. Prima si leggeva il giorno della registrazione.
+  const mDal = testo.match(/\bdal\s+(\d{1,2})[./](\d{1,2})[./](\d{4})/i);
   const mGiorni = testo.match(/(\d+)\s*giorn[oi]/i);
   if (mRange) {
     da = mRange[3] + '-' + mRange[2].padStart(2, '0') + '-' + mRange[1].padStart(2, '0');
@@ -1335,6 +1351,14 @@ function _pianoDateMalattia(testo, dataReg) {
   } else if (mIl) {
     da = mIl[3] + '-' + mIl[2].padStart(2, '0') + '-' + mIl[1].padStart(2, '0');
     a = da;
+  } else if (mDal) {
+    da = mDal[3] + '-' + mDal[2].padStart(2, '0') + '-' + mDal[1].padStart(2, '0');
+    a = da;
+    if (mGiorni) {
+      const d = new Date(da + 'T12:00:00');
+      d.setDate(d.getDate() + parseInt(mGiorni[1]) - 1);
+      a = d.toISOString().substring(0, 10);
+    }
   } else if (mGiorni && da) {
     const d = new Date(da + 'T12:00:00');
     d.setDate(d.getDate() + parseInt(mGiorni[1]) - 1);
@@ -1354,7 +1378,17 @@ function _pianoDateMalattia(testo, dataReg) {
 // SINCRONIZZAZIONE PIANO dopo la correzione di una malattia nel Diario:
 // le M salvate nei giorni non piu' coperti vengono tolte, i giorni nuovi
 // ricevono la M protetta. Chiamata da salvaModificaRegistrazione
-async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNuovo) {
+// opz.senzaDomande: niente finestre (Rapporto, che si salva mentre si scrive): una copertura
+// da togliere diventa un avviso nella pagina
+// opz.codice 'ASS': ASSENZA IN ATTESA DI CERTIFICATO (registrazione «Assenza»): l ASS va
+// SOLO sui giorni con un turno (nei riposi, vacanze, CGF e celle vuote niente), toglierla
+// rimette il turno. Malattia (codice M, come prima): sopra un ASS la cella diventa M solo
+// con Storico HR · modificare (Certificato ricevuto) e tiene il turno sotto; una M tolta
+// dove c e ancora un Assenza torna ASS. opz.idReg: la registrazione che cambia (le altre
+// che coprono lo stesso giorno lo tengono; senza, vale la data come prima).
+async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNuovo, opz) {
+  opz = opz || {};
+  const modoAss = opz.codice === 'ASS';
   try {
     // testo vuoto = nessun giorno (malattia nuova o cancellata). Prima un testo vuoto
     // valeva come "il giorno della registrazione": una malattia di un giorno appena
@@ -1372,18 +1406,51 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
     // salvato nel Diario come una registrazione per giorno, e accorciarne una
     // non deve cancellare le M dei giorni delle altre
     const tipoMal = typeof nomeCorrente === 'function' ? nomeCorrente('Malattia') : 'Malattia';
+    const tipoAss = _pianoTipoAssenza();
+    const tipoReg = modoAss ? tipoAss : tipoMal;
     const dataVecchiaStr = String(dataVecchia || '').substring(0, 10);
-    const copertoAltrove = (d) =>
+    const copertoDa = (tipo, d, escludi) =>
       (typeof datiCache !== 'undefined' ? datiCache : []).some(
         (e) =>
-          e.tipo === tipoMal &&
+          e.tipo === tipo &&
           !e.eliminato &&
           String(e.nome || '').toLowerCase() === String(nome).toLowerCase() &&
-          String(e.data || '').substring(0, 10) !== dataVecchiaStr &&
+          (!escludi ||
+            (opz.idReg != null ? e.id !== opz.idReg : String(e.data || '').substring(0, 10) !== dataVecchiaStr)) &&
           _pianoDateMalattia(e.testo || '', e.data).includes(d),
       );
+    const copertoAltrove = (d) => copertoDa(tipoReg, d, true);
+    // M tolta in un giorno dove resta un Assenza: torna ASS (il turno resta scoperto)
+    const restaAss = (d) => !modoAss && copertoDa(tipoAss, d, false);
+    // ASS da mettere in un giorno gia di malattia: resta la M
+    const giaMal = (d) => modoAss && copertoDa(tipoMal, d, false);
+    const puoCert = typeof puoModificareStoricoHr === 'function' && puoModificareStoricoHr();
     // le scritture del Diario non entrano nell Annulla dell ultima operazione del Piano
     _pianoFuoriDalPasso();
+    // MALATTIA TOLTA CHE QUALCUNO COPRIVA: si chiede se rimettere tutto com era (anche le
+    // celle di chi copre, nella stessa scrittura). Senza finestre (Rapporto): avviso.
+    // Una M che torna ASS (o un ASS sotto una malattia) lascia il turno scoperto: la
+    // copertura resta valida.
+    const giorniVia = daTogliere.filter((d) => !copertoAltrove(d) && !restaAss(d) && !giaMal(d));
+    let togliCop = false;
+    let passoCop = null;
+    let cop0 = { ops: [] };
+    if (giorniVia.length && typeof _pianoOpsTogliCopertura === 'function' && puoGestirePiano()) {
+      cop0 = await _pianoOpsTogliCopertura(info ? info.nome : nome, giorniVia).catch(() => ({ ops: [] }));
+      if (cop0.ops.length && opz.senzaDomande) {
+        if (typeof _pianoAvvisoTogliCopertura === 'function')
+          _pianoAvvisoTogliCopertura(info ? info.nome : nome, giorniVia);
+      } else if (cop0.ops.length) {
+        togliCop = await chiediConferma(_pianoTestoTogliCopertura(info ? info.nome : nome, [], cop0), {
+          titolo: (modoAss ? 'Assenza' : 'Malattia') + ' tolta: copertura',
+          ok: 'Sì, rimetti com era',
+          annulla: 'No, resta la copertura',
+        });
+        // con Annulla: diventa un passo del Piano (malato e sostituti insieme)
+        if (togliCop)
+          passoCop = _pianoUndoSnap('tolta copertura ' + (modoAss ? 'assenza ' : 'malattia ') + nome.split(' ')[0]);
+      }
+    }
     const festCgf = typeof _pianoFestiviCgfSet === 'function' ? _pianoFestiviCgfSet() : new Set();
     // giorni chiusi: un inserimento li chiede come sempre (le M sopra una sigla no)
     const nuoveSenzaCella = [];
@@ -1397,6 +1464,7 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
       const cgfPersi = []; // giorni di CGF caduti in malattia: il recupero va rimesso
       let tolte = 0;
       let messe = 0;
+      const assFerme = []; // ASS che senza certificato (HR) restano ASS
       const op = getOperatore();
       const ora = new Date().toISOString();
       const daLeggere = [...new Set(daTogliere.filter((d) => !copertoAltrove(d)).concat(daMettere))];
@@ -1411,11 +1479,19 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
       for (const d of daTogliere) {
         if (copertoAltrove(d)) continue;
         const r = cellaDi.get(d);
-        if (!r || (r.codice !== 'M' && r.codice !== 'M1')) continue;
+        if (!r || !(modoAss ? r.codice === 'ASS' : r.codice === 'M' || r.codice === 'M1')) continue;
         // la M aveva coperto un altra sigla (turno, V, CGF, JG...): quella torna al suo posto
         // nota "Ex C0 - operatore" (dal 30.09) o quella vecchia "Malattia dal Diario · era C0"
         // (torna la cella com era: bozza o a mano, protetta, nota, blocco)
         const era = String(r.commento || '').match(/^(?:Malattia dal Diario \u00b7 era|Ex) ([A-Z0-9]+)\b/);
+        // M tolta dove resta un Assenza sopra un turno: torna ASS, con la stessa cella sotto
+        if (era && era[1] && restaAss(d) && _pianoTurnoInfo(era[1])) {
+          const dA = { codice: 'ASS', commento: r.commento || null, operatore: op, updated_at: ora };
+          if (r.prima_malattia !== undefined) dA.prima_malattia = r.prima_malattia;
+          ops.push({ collaboratore: r.collaboratore, data: d, atteso: _pianoAttesoDi(r), dati: dA });
+          tolte++;
+          continue;
+        }
         ops.push({
           collaboratore: r.collaboratore,
           data: d,
@@ -1437,6 +1513,38 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
       // malattia dal Diario la M senza nota si cancella (sopra).
       for (const d of daMettere) {
         const r = cellaDi.get(d);
+        // ASSENZA IN ATTESA DI CERTIFICATO: solo sopra un turno (nei giorni liberi niente) e
+        // non dove c e gia una malattia. Il turno resta da coprire; un festivo non e lavorato.
+        if (modoAss) {
+          if (!r || !_pianoTurnoInfo(r.codice) || giaMal(d)) continue;
+          if (festCgf.has(d)) festiviPersi.push(d);
+          const pA = {
+            codice: 'ASS',
+            protetto: true,
+            generato: false,
+            motivo_blocco: null,
+            commento: ('Ex ' + r.codice + ' - ' + op).substring(0, 400),
+            operatore: op,
+            updated_at: ora,
+          };
+          if (r.prima_malattia !== undefined) pA.prima_malattia = _pianoPrimaMalattiaDi(r);
+          ops.push({ collaboratore: r.collaboratore, data: d, atteso: _pianoAttesoDi(r), dati: pA });
+          messe++;
+          continue;
+        }
+        // MALATTIA SOPRA UN ASS: diventa M solo con il certificato (Storico HR · modificare,
+        // come nel database) e tiene il turno sotto e la nota ("Ex S7 - coperto da ...")
+        if (r && r.codice === 'ASS') {
+          if (!puoCert) {
+            assFerme.push(d);
+            continue;
+          }
+          const pC = { codice: 'M', commento: r.commento || null, operatore: op, updated_at: ora };
+          if (r.prima_malattia !== undefined) pC.prima_malattia = r.prima_malattia;
+          ops.push({ collaboratore: r.collaboratore, data: d, atteso: _pianoAttesoDi(r), dati: pC });
+          messe++;
+          continue;
+        }
         if (r && festCgf.has(d) && _pianoTurnoInfo(r.codice)) festiviPersi.push(d);
         if (r && r.codice === 'CGF') cgfPersi.push(d);
         if (r && r.codice !== 'M' && r.codice !== 'M1') {
@@ -1464,12 +1572,31 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
           messe++;
         }
       }
-      return { ops, festiviPersi, cgfPersi, tolte, messe };
+      // le celle di chi copre come lette alla domanda: cambiate nel frattempo = niente scritto
+      if (togliCop) cop0.ops.forEach((o) => ops.push(o));
+      return { ops, festiviPersi, cgfPersi, tolte, messe, assFerme };
     };
     let p = await prepara();
     for (const d of [...new Set(nuoveSenzaCella)])
       if (!(await _pianoConsentiScrittura(d))) throw new Error('giorno chiuso: ' + d);
-    let es = await _pianoScriviCelle(p.ops);
+    let es;
+    try {
+      es = await _pianoScriviCelle(p.ops);
+    } catch (e) {
+      if (passoCop) _pianoUndoScarta(passoCop);
+      throw e;
+    }
+    // COPERTURA DA TOGLIERE e una cella cambiata nel frattempo: niente e scritto, si dice
+    // quale (nessun secondo tentativo alla cieca sulle celle dei colleghi)
+    if (!es.ok && togliCop) {
+      _pianoUndoScarta(passoCop);
+      throw new Error(
+        'niente è stato scritto nel piano: ' +
+          (es.conflitti || []).map(_pianoConflittoTesto).join('; ') +
+          '. La M e la copertura sono rimaste: ricarica il piano e sistemale a mano',
+      );
+    }
+    if (passoCop) _pianoUndoChiudi(passoCop);
     // una cella cambiata da un collega fra la lettura e la scrittura: si rilegge e si
     // riprova UNA volta (la malattia prevale, la nota "Ex" prende la sigla nuova)
     if (!es.ok) {
@@ -1477,7 +1604,7 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
       es = await _pianoScriviCelle(p.ops);
       if (!es.ok) throw _pianoErroreConflitto(es.conflitti);
     }
-    const { festiviPersi, cgfPersi, tolte, messe } = p;
+    const { festiviPersi, cgfPersi, tolte, messe, assFerme } = p;
     if (typeof _pianoRighe !== 'undefined') _pianoMemoriaDopo(es.ops, es.righe);
     // festivo saltato per malattia: i recuperi automatici in piu' tornano C
     for (const ymM of new Set(festiviPersi.map((d) => d.substring(0, 7))))
@@ -1485,11 +1612,25 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
     // CGF caduto in malattia: si propone subito un giorno sostitutivo nello stesso mese
     if (cgfPersi.length && typeof _pianoRimettiCgf === 'function')
       for (const d of cgfPersi) await _pianoRimettiCgf(nome, d);
+    // avviso dei turni da coprire nella pagina: si aggiorna (o sparisce) con la malattia
+    if (typeof _pianoAvvisoCoperturaAggiorna === 'function' && window._copAvvisi && window._copAvvisi[nome])
+      _pianoAvvisoCoperturaAggiorna(nome);
     if (tolte || messe) {
-      logAzione('Malattia: piano allineato', nome + ' · ' + tolte + ' M tolte, ' + messe + ' celle diventate M');
+      if (modoAss)
+        logAzione('Assenza: piano allineato', nome + ' · ' + tolte + ' ASS tolte, ' + messe + ' turni diventati ASS');
+      else logAzione('Malattia: piano allineato', nome + ' · ' + tolte + ' M tolte, ' + messe + ' celle diventate M');
       if (typeof _pianoRighe !== 'undefined' && _pianoRighe.length && typeof renderPiano === 'function') renderPiano();
     }
-    return { tolte: tolte, messe: messe };
+    // ASS rimaste: la malattia sopra un assenza la registra l HR con Certificato ricevuto
+    if (assFerme && assFerme.length)
+      toast(
+        nome +
+          ': ASS restano il ' +
+          assFerme.map((d) => d.substring(8, 10) + '.' + d.substring(5, 7)).join(', ') +
+          ' (assenza in attesa di certificato): le trasforma in malattia chi ha Storico HR · modificare, con «Certificato ricevuto».',
+        9000,
+      );
+    return { tolte: tolte, messe: messe, assFerme: assFerme || [] };
   } catch (e) {
     // l errore arriva a chi chiama, che lo mostra ("Piano non allineato alla malattia"):
     // prima si scriveva solo in console e l utente leggeva "salvato" con le M sbagliate
@@ -1773,6 +1914,10 @@ function _pianoProblemiMese(v, l) {
     anno: { r: annoG, c: anno - annoG },
     scoperti: { r: l ? l.scoperti.length : 0, c: 0 },
     malattie: { r: l ? l.malattie.filter((m) => m.giorno > 14).length : 0, c: 0 },
+    // turni rimasti scoperti per una malattia (avviso "Più tardi" nella pagina)
+    malcop: { r: (v.malcop || []).length, c: 0 },
+    // ASS da regolarizzare (solo chi ha il permesso HR: per gli altri la lista e vuota)
+    assreg: { r: 0, c: typeof _pianoAssDaRegolarizzareN === 'function' ? _pianoAssDaRegolarizzareN(v.assreg) : 0 },
     vacanze: { r: 0, c: l && l.vacanze ? l.vacanze.length : 0 },
   };
   let r = 0;
@@ -1869,6 +2014,9 @@ function _pianoAvvisiMeseSommario() {
         '<span class="pavv-chip pavv-contr" title="' + spiega + '">' + p.daControllare + ' da controllare</span>',
       );
   }
+  // ASS da regolarizzare (assenze in attesa di certificato, solo chi ha il permesso HR)
+  const nAss = p && p.per && p.per.assreg ? p.per.assreg.c : 0;
+  if (nAss) parti.push('<span class="pam-voce">ASS da regolarizzare: ' + nAss + '</span>');
   // i numeri sono quelli della scheda Avvisi: di la l elenco completo
   const aEl = document.getElementById('pam-avvisi');
   if (aEl)
@@ -2392,6 +2540,96 @@ function _pianoAttesoVisto(nome, dstr, rigaDb) {
   const info = typeof _pianoCollabInfo === 'function' ? _pianoCollabInfo(nome) : null;
   if (String(dstr).startsWith(_pianoMeseSel + '-') && info && _pianoAppartieneAlReparto(info)) return null;
   return _pianoAttesoDi(rigaDb || null);
+}
+// REGOLE PER UNA SCRITTURA DI PIU CELLE (corsi, incolla, copertura, scambi con
+// restituzione): per ogni persona toccata le violazioni NUOVE che TUTTE le sue celle nuove
+// insieme creerebbero, con il motore di Valida (_pianoViolazioniPersona: riposo minimo con
+// gli orari veri, giorni di fila anche a cavallo del mese, riposo singolo dopo 4 giorni,
+// riposo attorno alla domenica, ore della settimana, chi fa cosa, ND del Diario). Prima
+// ogni percorso controllava a modo suo (o non controllava): il corso nessuna regola,
+// l incolla nessuna, la restituzione dello scambio senza lo scambio del primo giorno.
+// mosse: [{ nome, data, codice, ora_inizio?, ora_fine? }] (codice '' = cella vuota).
+// Ritorna { nome: [{ data, msg, ore }] } solo per chi ha violazioni nuove; ore = true per
+// le ore del mese oltre la tolleranza (regola aziendale, non di legge).
+async function _pianoViolazioniMosse(mosse) {
+  const out = {};
+  if (!mosse || !mosse.length) return out;
+  const sposta = (d, n) => {
+    const x = new Date(d + 'T12:00:00');
+    x.setDate(x.getDate() + n);
+    return dataLocaleISO(x);
+  };
+  const perNome = {};
+  mosse.forEach((m) => {
+    const d = String(m.data).substring(0, 10);
+    (perNome[m.nome] = perNome[m.nome] || {})[d] = m;
+  });
+  const date = mosse.map((m) => String(m.data).substring(0, 10)).sort();
+  // il mese di ogni giorno toccato e quelli accanto, con le due settimane a cavallo
+  const da = sposta(sposta(date[0], -14).substring(0, 7) + '-01', -14);
+  const a = sposta(date[date.length - 1], 14 + 31 + 14);
+  const nomi = Object.keys(perNome);
+  // tutti i settori: chi lavora in due settori ha celle anche nell altro piano
+  const righe = [];
+  for (let i = 0; i < nomi.length; i += 40) {
+    const lista = nomi
+      .slice(i, i + 40)
+      .map((n) => encodeURIComponent(n))
+      .join(',');
+    const parte = (await secGet('piano?collaboratore=in.(' + lista + ')&data=gte.' + da + '&data=lte.' + a)) || [];
+    parte.forEach((r) => righe.push(r));
+  }
+  const reali = {};
+  righe.forEach((r) => ((reali[r.collaboratore] = reali[r.collaboratore] || {})[String(r.data).substring(0, 10)] = r));
+  const chiave = (v) => v.giorno + '|' + v.msg.replace(/[0-9]+([.,][0-9]+)?/g, '#');
+  const ctxPer = {};
+  for (const nome of nomi) {
+    const prima = reali[nome] || {};
+    const dopo = Object.assign({}, prima);
+    Object.keys(perNome[nome]).forEach((d) => {
+      const m = perNome[nome][d];
+      if (!m.codice) {
+        delete dopo[d];
+        return;
+      }
+      const r0 = prima[d];
+      const riga = Object.assign({}, r0 || {}, { collaboratore: nome, data: d, codice: m.codice });
+      // una cella che cambia sigla non tiene l orario della sigla vecchia
+      if (!r0 || r0.codice !== m.codice || m.ora_inizio !== undefined) {
+        riga.ora_inizio = m.ora_inizio || null;
+        riga.ora_fine = m.ora_fine || null;
+      }
+      if (!r0 || r0.codice !== m.codice) riga.protetto = true;
+      dopo[d] = riga;
+    });
+    const mesi = new Set();
+    Object.keys(perNome[nome]).forEach((d) => [-14, 0, 14].forEach((o) => mesi.add(sposta(d, o).substring(0, 7))));
+    const viste = new Set();
+    for (const ym of [...mesi].sort()) {
+      const ctx = ctxPer[ym] || (ctxPer[ym] = _pianoCtxViolazioni(ym));
+      const nG = _pianoUltimoGiorno(ym);
+      const viol = (stato) => {
+        const mese = [];
+        const sett = [];
+        for (let k = -13; k <= nG + 14; k++) {
+          const r = stato[sposta(ym + '-01', k - 1)];
+          if (!r || !r.codice) continue;
+          sett.push(r);
+          if (k >= 1 && k <= nG) mese.push(r);
+        }
+        return _pianoViolazioniPersona(nome, mese, sett, ctx).filter((v) => !/SOTTO il minimo/.test(v.msg));
+      };
+      const gia = new Set(viol(prima).map(chiave));
+      viol(dopo).forEach((v) => {
+        const k = ym + '|' + chiave(v);
+        if (gia.has(chiave(v)) || viste.has(k)) return;
+        viste.add(k);
+        const dataV = (v.celle && v.celle[0]) || (v.giorno > 0 ? ym + '-' + String(v.giorno).padStart(2, '0') : ym);
+        (out[nome] = out[nome] || []).push({ data: dataV, msg: v.msg, ore: /^ore mese/.test(v.msg) });
+      });
+    }
+  }
+  return out;
 }
 // i campi di una cella (per ripristini e confronti); solo le colonne che la riga ha
 function _pianoCampiDi(r) {
@@ -3099,7 +3337,7 @@ async function _renderPianoCore() {
           pericolo +=
             '<button type="button" class="btn-export pbar-btn pbar-pericolo" title="Riporta questo mese a com\'era quando hai iniziato a modificarlo in questa sessione (' +
             ssnap.n +
-            ' operazioni tue)" onclick="pianoAnnullaTutto()"><i class="icx icx-refresh"></i>Annulla tutto (' +
+            ' operazioni tue)" onclick="annullaTuttoPiano()"><i class="icx icx-refresh"></i>Annulla tutto (' +
             ssnap.n +
             ')</button>';
       }
@@ -3462,6 +3700,10 @@ async function _renderPianoCore() {
               escP(infoC.lingue) +
               '</span>'
             : '') +
+          // TURNI SOLO A MANO (Preferenze collaboratori): fuori dalla bozza, segno accanto al nome
+          (infoC && infoC.turni_solo_a_mano
+            ? ' <i class="icx icx-penna" style="color:var(--muted);font-size:.85em" role="img" aria-label="Turni solo a mano" title="Turni solo a mano: Prepara il mese, Migliora la bozza e Copri i buchi non le scrivono celle e non la contano fra i disponibili; le celle scritte a mano restano, Controlla le regole la controlla come tutti. Si cambia in Piano › Impostazioni › Preferenze collaboratori"></i>'
+            : '') +
           // il collaboratore non e' dell'anagrafica di QUESTO settore (o non
           // c'e' affatto): si segnala, cosi' l'anomalia non passa inosservata
           (!infoC
@@ -3587,6 +3829,10 @@ async function _renderPianoCore() {
       h +=
         '<span><span class="piano-leg piano-comm" style="background:var(--paper2)"></span> triangolo = commento (passa il mouse)</span>';
       h += '<span><span class="piano-leg piano-malattia-c"></span> MC = malattia su giorno di congedo (0 ore)</span>';
+      h +=
+        '<span><span class="piano-leg" style="background:' +
+        PIANO_COLORI_SPECIALI.ASS +
+        ';color:#222">ASS</span> = assenza in attesa di certificato (0 ore, turno da coprire)</span>';
       h +=
         '<span><span class="piano-leg piano-dom-valida" style="background:var(--paper2)">C</span> rossa = domenica libera valida (conta per le 12)</span>';
       h +=
@@ -4020,12 +4266,34 @@ async function _rimuoviPianoCellaEsegui(giaChiuso) {
     ))
   )
     return;
+  // MALATTIA CHE UN COLLEGA COPRIVA: «Rimetto il turno a X e tolgo la copertura a Y?»
+  // (stessa domanda della cella scritta a mano: Sì = tutto come prima della malattia)
+  const opR = { collaboratore: sel.nome, data: sel.data, atteso: _pianoAttesoDi(r), dati: null };
+  const opsCop = [];
+  if (_pianoCodiceAssenteTurno(r.codice) && typeof _pianoOpsTogliCopertura === 'function') {
+    const cop = await _pianoOpsTogliCopertura(sel.nome, [sel.data]).catch(() => ({ ops: [] }));
+    const sotto = _pianoSiglaSottoMalattia(r);
+    if (
+      cop.ops.length &&
+      (await chiediConferma(
+        _pianoTestoTogliCopertura(sel.nome, sotto ? [{ data: sel.data, codice: sotto }] : [], cop),
+        { titolo: 'Malattia tolta: copertura', ok: 'Sì, rimetti com era', annulla: 'No, resta la copertura' },
+      ))
+    ) {
+      if (sotto)
+        opR.dati = Object.assign(_pianoRitornoDaMalattia(r, sotto), {
+          operatore: getOperatore(),
+          updated_at: new Date().toISOString(),
+        });
+      cop.ops.forEach((o) => opsCop.push(o));
+    }
+  }
   const passo = _pianoUndoSnap('rimozione cella');
   if (!giaChiuso) document.getElementById('pwd-modal').classList.add('hidden');
   // solo se la cella e ancora quella mostrata (un collega puo averla cambiata)
   let es;
   try {
-    es = await _pianoScriviCelle([{ collaboratore: sel.nome, data: sel.data, atteso: _pianoAttesoDi(r), dati: null }]);
+    es = await _pianoScriviCelle([opR].concat(opsCop));
   } catch (e) {
     _pianoUndoScarta(passo);
     _pianoErroreScrittura('Cella NON rimossa: ', e, avvisoRete);
@@ -4041,6 +4309,7 @@ async function _rimuoviPianoCellaEsegui(giaChiuso) {
     logAzione('Piano: cella rimossa', sel.nome + ' ' + sel.data + ' (era ' + r.codice + ')');
     toast('Cella rimossa');
     if (r.codice === 'M' || r.codice === 'M1') await _pianoMalattiaViaDiario(sel.nome, [sel.data]);
+    else if (r.codice === 'ASS') await _pianoMalattiaViaDiario(sel.nome, [sel.data], { codice: 'ASS' });
     await _pianoFestiviPersiDopo(sel.nome, [{ data: sel.data, codice: r.codice }]);
     renderPiano();
   } catch (e) {
