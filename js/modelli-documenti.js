@@ -509,7 +509,8 @@ async function modelliApriEditor(tipoIniziale) {
   let bozza = {}; // testi a video del documento aperto {k: testo}
   let atteso = null;
   let ultimoCampo = null;
-  let urlAnteprima = null;
+  let genAnteprima = 0; // ogni anteprima nuova ferma quella prima
+  let pdfAnteprima = null;
   let timerAnteprima = null;
   const velo = document.createElement('div');
   velo.className = 'finestra-velo';
@@ -519,12 +520,12 @@ async function modelliApriEditor(tipoIniziale) {
     '<p class="mdl-aiuto">Qui si cambiano i <b>testi fissi</b> dei documenti stampati: titoli, frasi standard, diciture e firme. I campi che compila chi fa il modulo (nomi, descrizioni, date) e l impaginazione del PDF restano come sono. I campi automatici fra graffe, per esempio <b>{nome}</b>, diventano il dato vero nel PDF.</p>' +
     '<div class="mdl-corpo"><nav class="mdl-elenco" aria-label="Documenti"></nav>' +
     '<div class="mdl-campi"></div>' +
-    '<div class="mdl-anteprima"><div class="mdl-ant-testa"><span>Anteprima del PDF (dati di esempio)</span><select class="mdl-variante" aria-label="Esempio"></select><button type="button" class="btn-secondario mdl-ant-agg"><i class="icx icx-refresh"></i> Aggiorna</button></div><iframe class="mdl-ant-pdf" title="Anteprima del PDF"></iframe></div></div>' +
+    '<div class="mdl-anteprima"><div class="mdl-ant-testa"><span>Anteprima del PDF (dati di esempio)</span><select class="mdl-variante" aria-label="Esempio"></select><button type="button" class="btn-secondario mdl-ant-agg"><i class="icx icx-refresh"></i> Aggiorna</button></div><div class="mdl-ant-pdf" role="document" aria-label="Anteprima del PDF" style="overflow:auto;background:#525659;padding:10px;display:flex;flex-direction:column;align-items:center;gap:10px"></div></div></div>' +
     '<div class="finestra-pulsanti mdl-pulsanti"><span class="mdl-stato"></span><button type="button" class="finestra-no">Chiudi</button><button type="button" class="finestra-ok">Salva il modello</button></div></div>';
   const elenco = velo.querySelector('.mdl-elenco');
   const campi = velo.querySelector('.mdl-campi');
   const sel = velo.querySelector('.mdl-variante');
-  const iframe = velo.querySelector('.mdl-ant-pdf');
+  const riquadro = velo.querySelector('.mdl-ant-pdf');
   const stato = velo.querySelector('.mdl-stato');
   const okBtn = velo.querySelector('.finestra-ok');
   const salvati = () => modelloPulisci(tipo, (_modelliDi(tipo) || {}).testi || {});
@@ -569,11 +570,23 @@ async function modelliApriEditor(tipoIniziale) {
     try {
       const doc = await _modelliAnteprimaDoc(tipo, modelloPulisci(tipo, bozza), variante);
       if (!doc) return;
-      if (urlAnteprima) URL.revokeObjectURL(urlAnteprima);
-      urlAnteprima = URL.createObjectURL(doc.output('blob'));
-      iframe.src = urlAnteprima + '#toolbar=0&navpanes=0';
+      // pagine disegnate nel programma (come Anteprima PDF, js/utils.js): non dipende dal
+      // lettore PDF del browser
+      const g = ++genAnteprima;
+      const pdf = await pdfDisegnaPagine(
+        doc.output('blob'),
+        riquadro,
+        g,
+        (x) => x === genAnteprima && velo.isConnected,
+      );
+      if (pdfAnteprima) pdfAnteprima.destroy();
+      pdfAnteprima = pdf;
     } catch (e) {
       console.error(e);
+      riquadro.innerHTML =
+        '<p style="color:#fff;margin:auto;text-align:center">Anteprima non disponibile: ' +
+        escP((e && e.message) || String(e)) +
+        '</p>';
     }
   };
   const avvisoCampo = (c, ta) => {
@@ -773,7 +786,9 @@ async function modelliApriEditor(tipoIniziale) {
   const chiudi = () => {
     clearTimeout(timerAnteprima);
     document.removeEventListener('keydown', tasti, true);
-    if (urlAnteprima) URL.revokeObjectURL(urlAnteprima);
+    genAnteprima++;
+    if (pdfAnteprima) pdfAnteprima.destroy();
+    pdfAnteprima = null;
     velo.remove();
     if (typeof renderModelliUI === 'function') renderModelliUI();
   };

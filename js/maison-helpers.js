@@ -2227,6 +2227,11 @@ function apriHrAllegato(id) {
   const bin = atob(a.dati);
   const arr = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  // i PDF passano dall anteprima del programma (non dipende dal lettore PDF del browser)
+  if (/pdf/i.test(a.mime || '') && typeof mostraPdfBlob === 'function') {
+    mostraPdfBlob(new Blob([arr], { type: 'application/pdf' }), a.filename, a.filename);
+    return;
+  }
   const url = URL.createObjectURL(new Blob([arr], { type: a.mime }));
   const w = window.open(url, '_blank');
   if (!w) {

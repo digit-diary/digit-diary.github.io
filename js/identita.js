@@ -244,7 +244,8 @@ function identitaLogoPdf(doc, x, y, w, h, centrato) {
   const lx = centrato ? x - lw / 2 : x;
   const ly = y + (h - lh) / 2;
   try {
-    doc.addImage(_logoB64, _identitaFormatoImg(_logoB64), lx, ly, lw, lh);
+    // alias: il logo entra nel PDF una volta sola anche su piu pagine; FAST = compresso
+    doc.addImage(_logoB64, _identitaFormatoImg(_logoB64), lx, ly, lw, lh, 'identita-logo', 'FAST');
   } catch (e) {
     return null;
   }

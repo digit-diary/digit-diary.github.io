@@ -192,7 +192,7 @@ async function _ndLogoRitagliato() {
 function _ndDisegnaLogo(doc, logo) {
   if (!logo) return;
   if (logo.intero) identitaLogoPdf(doc, 18, 5, 30, 14.3, false);
-  else doc.addImage(logo.url, 'PNG', 18, 5, 30, 30 * logo.ratio);
+  else doc.addImage(logo.url, 'PNG', 18, 5, 30, 30 * logo.ratio, 'logo-nd', 'FAST');
 }
 // modulo 1187 · stessa impaginazione dell originale (A4, misure in mm). I testi fissi
 // vengono dal modello del documento "nd1187" (js/modelli-documenti.js); testiSovra = testi

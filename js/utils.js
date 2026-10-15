@@ -277,35 +277,205 @@ async function salvaImp(k, v) {
   }
 }
 
-// PDF PREVIEW
+// ANTEPRIMA PDF: unica strada per TUTTI i PDF del programma (moduli, scheda, piano,
+// rapporti...). Le pagine si disegnano DENTRO il programma con pdf.js (libs/pdf.min.js),
+// senza passare dal lettore PDF del browser. Prima il PDF andava in un iframe come blob:
+// funzionava solo se il browser lo apriva lui; con il lettore di Chrome disattivato, con
+// l estensione di Adobe Acrobat (che si prende i PDF e apre una scheda sua) o sul
+// telefono si vedeva una scheda con il contenuto grezzo del file, illeggibile, oppure
+// niente. "Scarica PDF" salva il file vero con il suo nome; "Stampa" stampa le pagine.
 let _pdfPreviewBlob = null,
-  _pdfPreviewName = '';
+  _pdfPreviewName = '',
+  _pdfPreviewGen = 0, // ogni anteprima nuova ferma il disegno di quella prima
+  _pdfPreviewDoc = null; // documento pdf.js aperto (per la stampa)
+function _pdfNomeFile(n) {
+  let s = String(n || 'documento.pdf')
+    .replace(/[\\/:*?"<>|]+/g, '_')
+    .trim();
+  if (!/\.pdf$/i.test(s)) s += '.pdf';
+  return s;
+}
+// contenitore delle pagine al posto dell iframe (creato una volta) + pulsante Stampa
+function _pdfPreviewPagine() {
+  const iframe = document.getElementById('pdf-preview-iframe');
+  let box = document.getElementById('pdf-preview-pagine');
+  if (!box && iframe) {
+    box = document.createElement('div');
+    box.id = 'pdf-preview-pagine';
+    box.setAttribute('role', 'document');
+    box.style.cssText =
+      'flex:1;overflow:auto;background:#525659;padding:14px 10px;display:flex;flex-direction:column;align-items:center;gap:12px;-webkit-overflow-scrolling:touch';
+    iframe.parentNode.insertBefore(box, iframe);
+    const scarica = document.querySelector('#pdf-preview-modal .btn-export-pdf');
+    if (scarica && !document.getElementById('pdf-preview-stampa')) {
+      const st = document.createElement('button');
+      st.id = 'pdf-preview-stampa';
+      st.type = 'button';
+      st.className = scarica.className;
+      st.style.cssText = scarica.style.cssText;
+      st.textContent = 'Stampa';
+      st.addEventListener('click', stampaPdfPreview);
+      scarica.parentNode.insertBefore(st, scarica.nextSibling);
+    }
+  }
+  if (iframe) {
+    iframe.style.display = 'none';
+    iframe.removeAttribute('src');
+  }
+  return box;
+}
+// pdf.js pronto (libreria + worker dello stesso sito)
+async function _pdfJsPronto() {
+  await libreria('pdf');
+  if (pdfjsLib.GlobalWorkerOptions.workerSrc !== 'libs/pdf.worker.min.js')
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
+  return pdfjsLib;
+}
+// disegna tutte le pagine di un PDF (blob) dentro box, larghe quanto il box.
+// gen: se nel frattempo e partita un altra anteprima si smette. Ritorna il documento pdf.js.
+async function pdfDisegnaPagine(blob, box, gen, controlla) {
+  const lib = await _pdfJsPronto();
+  const dati = new Uint8Array(await blob.arrayBuffer());
+  const pdf = await lib.getDocument({ data: dati, isEvalSupported: false }).promise;
+  const ancora = () => !controlla || controlla(gen);
+  if (!ancora()) {
+    pdf.destroy();
+    return null;
+  }
+  box.innerHTML = '';
+  const larghezza = Math.max(280, Math.min(box.clientWidth - 24, 900));
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  for (let n = 1; n <= pdf.numPages; n++) {
+    const pag = await pdf.getPage(n);
+    if (!ancora()) {
+      pdf.destroy();
+      return null;
+    }
+    const v1 = pag.getViewport({ scale: 1 });
+    const scala = Math.max(1, (larghezza / v1.width) * dpr);
+    const vp = pag.getViewport({ scale: scala });
+    const cv = document.createElement('canvas');
+    cv.width = Math.floor(vp.width);
+    cv.height = Math.floor(vp.height);
+    cv.style.cssText =
+      'width:' + larghezza + 'px;max-width:100%;height:auto;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.4)';
+    cv.setAttribute('aria-label', 'Pagina ' + n + ' di ' + pdf.numPages);
+    box.appendChild(cv);
+    await pag.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+  }
+  return pdf;
+}
 function mostraPdfPreview(doc, filename, titolo) {
-  _pdfPreviewName = filename;
-  const blob = doc.output('blob');
+  // il blob si fa subito (errori di jsPDF a chi chiama, come prima)
+  return mostraPdfBlob(doc.output('blob'), filename, titolo);
+}
+// stessa anteprima per un PDF gia fatto (blob o byte), per esempio un allegato
+async function mostraPdfBlob(blob, filename, titolo) {
+  if (!(blob instanceof Blob)) blob = new Blob([blob], { type: 'application/pdf' });
+  else if (blob.type !== 'application/pdf') blob = new Blob([blob], { type: 'application/pdf' });
+  const gen = ++_pdfPreviewGen;
+  if (_pdfPreviewDoc) {
+    try {
+      _pdfPreviewDoc.destroy();
+    } catch (e) {}
+    _pdfPreviewDoc = null;
+  }
+  _pdfPreviewName = _pdfNomeFile(filename);
   _pdfPreviewBlob = blob;
-  const url = URL.createObjectURL(blob);
   document.getElementById('pdf-preview-title').textContent = titolo || 'Anteprima PDF';
-  document.getElementById('pdf-preview-iframe').src = url;
+  const box = _pdfPreviewPagine();
+  box.innerHTML = '<p style="color:#fff;margin:auto;font-size:var(--fs-sm,.8125rem)">Preparazione del PDF...</p>';
   document.getElementById('pdf-preview-modal').classList.remove('hidden');
+  const attuale = (g) =>
+    g === _pdfPreviewGen && !document.getElementById('pdf-preview-modal').classList.contains('hidden');
+  try {
+    const pdf = await pdfDisegnaPagine(blob, box, gen, attuale);
+    if (pdf && attuale(gen)) _pdfPreviewDoc = pdf;
+    else if (pdf) pdf.destroy();
+  } catch (e) {
+    console.error('Anteprima PDF', e);
+    if (gen !== _pdfPreviewGen) return;
+    // senza anteprima il PDF resta comunque scaricabile con il suo nome
+    box.innerHTML =
+      '<div style="margin:auto;max-width:420px;text-align:center;color:#fff;line-height:1.5"><p>Anteprima non disponibile in questo browser (' +
+      escP((e && e.message) || String(e)) +
+      ').</p><p>Il PDF è pronto: premi <b>Scarica PDF</b> e aprilo dal computer.</p></div>';
+  }
 }
 function scaricaPdfPreview() {
   if (!_pdfPreviewBlob) return;
+  const url = URL.createObjectURL(_pdfPreviewBlob);
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(_pdfPreviewBlob);
+  a.href = url;
   a.download = _pdfPreviewName || 'documento.pdf';
+  document.body.appendChild(a);
   a.click();
-  toast('PDF scaricato!');
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  toast('PDF scaricato: ' + (_pdfPreviewName || 'documento.pdf'));
+}
+// stampa: pagine ridisegnate a ~200 dpi in un riquadro nascosto, poi la stampa del browser
+async function stampaPdfPreview() {
+  const pdf = _pdfPreviewDoc;
+  if (!pdf) {
+    toast('Il PDF non è ancora pronto');
+    return;
+  }
+  const fr = document.createElement('iframe');
+  fr.setAttribute('aria-hidden', 'true');
+  fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  document.body.appendChild(fr);
+  try {
+    const imgs = [];
+    let formato = '';
+    for (let n = 1; n <= pdf.numPages; n++) {
+      const pag = await pdf.getPage(n);
+      const v1 = pag.getViewport({ scale: 1 });
+      if (n === 1) formato = v1.width > v1.height ? 'A4 landscape' : 'A4 portrait';
+      const vp = pag.getViewport({ scale: 200 / 72 });
+      const cv = document.createElement('canvas');
+      cv.width = Math.floor(vp.width);
+      cv.height = Math.floor(vp.height);
+      await pag.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+      imgs.push(cv.toDataURL('image/png'));
+    }
+    const d = fr.contentDocument;
+    d.open();
+    d.write(
+      '<!doctype html><html><head><title>' +
+        escP(_pdfPreviewName) +
+        '</title><style>@page{size:' +
+        formato +
+        ';margin:0}html,body{margin:0;padding:0}img{display:block;width:100%;page-break-after:always;break-after:page}img:last-child{page-break-after:auto;break-after:auto}</style></head><body>' +
+        imgs.map((s) => '<img src="' + s + '">').join('') +
+        '</body></html>',
+    );
+    d.close();
+    await Promise.all([...d.images].map((i) => (i.complete ? null : new Promise((ok) => (i.onload = i.onerror = ok)))));
+    fr.contentWindow.focus();
+    fr.contentWindow.print();
+  } catch (e) {
+    toastErrore('Stampa non riuscita: ' + ((e && e.message) || e) + '. Scarica il PDF e stampalo dal computer.');
+  }
+  setTimeout(() => fr.remove(), 60000);
 }
 function chiudiPdfPreview() {
+  _pdfPreviewGen++;
   document.getElementById('pdf-preview-modal').classList.add('hidden');
+  const box = document.getElementById('pdf-preview-pagine');
+  if (box) box.innerHTML = '';
+  if (_pdfPreviewDoc) {
+    try {
+      _pdfPreviewDoc.destroy();
+    } catch (e) {}
+    _pdfPreviewDoc = null;
+  }
   const iframe = document.getElementById('pdf-preview-iframe');
-  if (iframe.src) {
+  if (iframe && iframe.src) {
     URL.revokeObjectURL(iframe.src);
-    iframe.src = '';
+    iframe.removeAttribute('src');
   }
 }
-_pdfPreviewBlob = null;
 
 // MALATTIA DAL/AL
 let _malFpInit = false;

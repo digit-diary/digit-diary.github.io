@@ -327,8 +327,9 @@ async function generaModuloPDF(tipo) {
     _highlightField('mod-collaboratore');
     return;
   }
-  // finestra "Nome simile" chiusa (clic fuori o Esc): il modulo non si genera
-  collab = await _verificaNome(collab, true);
+  // finestra "Nome simile" chiusa (clic fuori o Esc): il modulo non si genera. La RISTAMPA
+  // non chiede: il nome e quello del modulo salvato (anche di chi non e piu nella lista)
+  if (!_isRistampaSnap) collab = await _verificaNome(collab, true);
   if (!collab) return;
   document.getElementById('mod-collaboratore').value = collab;
   // ALLINEAMENTO e RDI finiscono nel fascicolo personale: se mancano la non
@@ -366,12 +367,12 @@ async function generaModuloPDF(tipo) {
       ? existingQr.dati.qr_code
       : Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
   // MODELLO DEL DOCUMENTO (testi fissi): quello in uso; la RISTAMPA di un modulo salvato usa
-  // i testi di quando e stato fatto (salvati nel modulo solo se diversi dagli originali)
+  // i testi di quando e stato fatto (salvati nel modulo solo se diversi dagli originali):
+  // senza modello_testi il modulo e stato fatto con i testi ORIGINALI ({}), non con quelli
+  // cambiati dopo
   if (typeof modelliCarica === 'function') await modelliCarica();
   const testiSalvati =
-    _isRistampaSnap && existingQr && existingQr.dati && existingQr.dati.modello_testi
-      ? existingQr.dati.modello_testi
-      : undefined;
+    _isRistampaSnap && existingQr ? (existingQr.dati && existingQr.dati.modello_testi) || {} : undefined;
   const doc = _pdfModuloDisciplinare(
     tipo,
     {
