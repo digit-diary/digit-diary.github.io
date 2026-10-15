@@ -2807,14 +2807,13 @@ function render() {
           gdBadge +
           rep +
           imp +
-          // anche l Assenza (attesa certificato): il turno lasciato si copre come per la malattia
-          ((e.tipo === nomeCorrente('Malattia') || e.tipo === nomeCorrente('Assenza')) &&
-          typeof badgeCoperturaHtml === 'function'
-            ? badgeCoperturaHtml(e)
-            : '') +
+          // Malattia e Assenza: i punti della copertura (incentivi) e, sotto il testo, i turni da
+          // coprire giorno per giorno (diario.js)
+          (typeof _diarioBadgePunti === 'function' ? _diarioBadgePunti(e) : '') +
           '</div><div class="entry-text">' +
           esc(e.testo) +
           '</div>' +
+          (typeof _diarioCopTurniSegnaposto === 'function' ? _diarioCopTurniSegnaposto(e) : '') +
           (metaLines.length ? '<div class="entry-meta">' + metaLines.join(' · ') + '</div>' : '') +
           '</div><div class="entry-actions"><button class="btn-act pin" onclick="togglePin(' +
           e.id +
@@ -2827,13 +2826,12 @@ function render() {
           '\')">Tipo</button><button class="btn-act edit" onclick="modificaRegistrazione(' +
           e.id +
           ')">Modifica</button>' +
-          ((e.tipo === nomeCorrente('Malattia') || e.tipo === nomeCorrente('Assenza')) &&
-          typeof apriPopupCopertura === 'function'
+          (typeof _diarioConPunti === 'function' && _diarioConPunti(e)
             ? '<button class="btn-act" onclick="apriPopupCopertura(\'' +
               _jsArg(e.nome) +
               "','" +
               _dataRifCopertura(e) +
-              '\')" title="Chi copre / chi ha rifiutato">Copertura</button>'
+              '\')" title="Segna chi ha coperto o rifiutato (punti degli incentivi). I turni si coprono con «Copri i turni»">Punti</button>'
             : '') +
           (typeof isVis !== 'function' || isVis('promemoria')
             ? '<button class="btn-act" onclick="promemoriaDaRegistrazione(' +
@@ -2846,6 +2844,7 @@ function render() {
         );
       })
       .join('') + _diarioPiedeArchivio();
+  if (typeof _diarioCopTurniRiempi === 'function') _diarioCopTurniRiempi();
   _saveFiltri();
 }
 function getNomiLista() {

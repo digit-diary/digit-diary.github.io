@@ -10592,3 +10592,134 @@ body:not(.piano-segn-mostra):not(.segn-aperte):has(#page-piano.active #piano-avv
   margin-top: 12px;
   font-size: var(--fs-sm);
 }
+
+/* ===== TURNI DA COPRIRE (Diario: Malattia e Assenza, riga e Modifica) ===== */
+.cop-turni {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: var(--paper2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--c-verdeacqua);
+  border-radius: 3px;
+  font-size: var(--fs-md, 0.875rem);
+  color: var(--ink);
+  text-align: left;
+}
+.cop-turni-riga {
+  margin-top: 6px;
+  padding: 6px 10px;
+}
+.cop-turni-testa {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.cop-turni-tit {
+  font-weight: 700;
+  margin-right: 4px;
+}
+.cop-turni-lista {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  max-height: 220px;
+  overflow: auto;
+}
+.cop-turni-riga .cop-turni-lista {
+  max-height: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 16px;
+}
+.cop-turni-lista li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 2px 0;
+}
+.cop-g {
+  font-variant-numeric: tabular-nums;
+  min-width: 4.6em;
+  color: var(--muted);
+}
+.cop-ex {
+  font-weight: 700;
+}
+.cop-ok .cop-st {
+  color: var(--c-verdeacqua);
+}
+.cop-ko .cop-st {
+  color: var(--c-rosso);
+  font-weight: 700;
+}
+.cop-neutro .cop-st {
+  color: var(--muted);
+}
+.cop-chip {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 2px;
+  font-size: var(--fs-sm, 0.8125rem);
+  font-weight: 700;
+  line-height: 1.5;
+  color: #fff;
+}
+.cop-chip-rosso {
+  background: var(--c-rosso);
+}
+.cop-chip-verde {
+  background: var(--c-verdeacqua);
+}
+.cop-chip-neutro {
+  background: var(--muted);
+}
+.cop-chip-ng {
+  background: none;
+  color: var(--c-viola);
+  border: 1px dashed var(--c-viola);
+  font-weight: 600;
+}
+body.dark-theme .cop-chip-rosso,
+body.dark-theme .cop-chip-verde,
+body.dark-theme .cop-chip-neutro {
+  color: #111;
+}
+.cop-turni .cop-turni-nota {
+  text-align: left;
+}
+.cop-turni-nota {
+  margin: 6px 0 0;
+  font-size: var(--fs-sm, 0.8125rem);
+  color: var(--muted);
+}
+.cop-turni-testa .cop-turni-nota {
+  margin: 0;
+}
+.cop-turni-azioni {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.btn-act.cop-btn-copri {
+  color: #fff;
+  background: var(--c-verdeacqua);
+  border-color: var(--c-verdeacqua);
+}
+body.dark-theme .btn-act.cop-btn-copri {
+  color: #111;
+}
+.cop-punti {
+  margin-top: 6px;
+  padding: 6px 12px;
+  border-left: 3px solid var(--line);
+  font-size: var(--fs-sm, 0.8125rem);
+  text-align: left;
+}
+/* ASSENZA NON GIUSTIFICATA nel Piano (Certificato non ricevuto): ASS con bordo tratteggiato */
+.piano-ass-ng {
+  outline: 2px dashed var(--c-viola);
+  outline-offset: -3px;
+}

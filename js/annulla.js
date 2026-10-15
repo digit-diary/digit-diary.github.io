@@ -716,16 +716,37 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     await window.Annulla.senzaTraccia(() => _annullaMalattie(g, annullato));
     // CERTIFICATO RICEVUTO annullato o rimesso (assenze.js): lo Storico HR e un registro (le
     // righe le cancella solo l amministratore), si aggiunge una riga che lo dice
-    const mCert = /^Certificato ricevuto · ([^·]+?) · (.+)$/.exec(String(g.etichetta || ''));
+    // Lo stesso per CERTIFICATO NON RICEVUTO (assenza non giustificata)
+    const mCert = /^Certificato (non )?ricevuto · ([^·]+?) · (.+)$/.exec(String(g.etichetta || ''));
     if (mCert && typeof _insertHrEvento === 'function')
       await window.Annulla.senzaTraccia(() =>
         _insertHrEvento(
-          mCert[1].trim(),
-          'certificato',
-          (annullato ? 'Annullato (Annulla): ' : 'Rimesso (Ripristina): ') + mCert[2].trim(),
+          mCert[2].trim(),
+          mCert[1] ? 'assenza_ng' : 'certificato',
+          (annullato ? 'Annullato (Annulla): ' : 'Rimesso (Ripristina): ') + mCert[3].trim(),
           oggiLocale(),
         ),
       );
+    // le note «non giustificata» delle celle seguono le registrazioni rimesse (anche le M di
+    // un certificato annullato che tornano ASS non giustificate)
+    if (mCert && typeof _assAllineaNote === 'function') {
+      const giorni = [];
+      (g.ops || []).forEach((o) => {
+        if (o.table !== 'registrazioni') return;
+        (o.righe || o.prima || []).forEach((r) =>
+          _pianoDateMalattia(r.testo || '', r.data).forEach((d) => giorni.push(d)),
+        );
+      });
+      const per = /\bdal (\d{2})\/(\d{2})\/(\d{4}) al (\d{2})\/(\d{2})\/(\d{4})|\bil (\d{2})\/(\d{2})\/(\d{4})/.exec(
+        mCert[3],
+      );
+      if (per) _pianoDateMalattia(per[0], '2000-01-01T12:00:00').forEach((d) => giorni.push(d));
+      try {
+        await window.Annulla.senzaTraccia(() => _assAllineaNote(mCert[2].trim(), giorni));
+      } catch (e) {
+        toastErrore('Note «non giustificata» del piano non riallineate: ' + ((e && e.message) || e));
+      }
+    }
     // non disponibilita del Diario annullate o ripristinate: modulo e piano si riallineano
     // (il piano non fa parte di Annulla: le ND scritte sopra i turni tornano al turno)
     const regND = [];

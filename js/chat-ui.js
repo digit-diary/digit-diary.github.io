@@ -2342,29 +2342,60 @@ function apriSchedaCollaboratore(nome) {
   // 0 ore. Chi ha Storico HR · modificare registra il certificato da qui.
   const _assTipoS = nomeCorrente('Assenza');
   const _assGgS = [];
+  // ASSENZE NON GIUSTIFICATE (Certificato non ricevuto): separate, solo il numero dei giorni e
+  // le date (nessun provvedimento proposto)
+  const _ngGgS = [];
   entries
     .filter((e) => e.tipo === _assTipoS && !e.eliminato)
-    .forEach((e) =>
+    .forEach((e) => {
+      const ng = typeof _assNgGiorniReg === 'function' ? _assNgGiorniReg(e) : [];
+      ng.forEach((d) => !_ngGgS.includes(d) && _ngGgS.push(d));
       (typeof _pianoDateMalattia === 'function' ? _pianoDateMalattia(e.testo || '', e.data) : []).forEach(
-        (d) => !_assGgS.includes(d) && _assGgS.push(d),
-      ),
-    );
-  if (_assGgS.length && _hrVede) {
-    _assGgS.sort();
-    html +=
-      '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 10px;padding:8px 12px;border-left:4px solid ' +
-      (typeof PIANO_COLORI_SPECIALI !== 'undefined' ? PIANO_COLORI_SPECIALI.ASS : '#8e5bb5') +
-      ';background:var(--paper2);border-radius:3px;font-size:var(--fs-md,.875rem)"><span><b>Assenza in attesa di certificato</b> (ASS, 0 ore): ' +
-      _assGgS.map((d) => d.substring(8, 10) + '.' + d.substring(5, 7) + '.' + d.substring(0, 4)).join(', ') +
-      '</span>' +
-      (_hrMod && typeof apriCertificatoRicevuto === 'function'
-        ? '<button class="btn-salva" style="padding:5px 12px" onclick="apriCertificatoRicevuto(\'' +
-          neS +
-          "','" +
-          _assGgS[0] +
-          '\')">Certificato ricevuto</button>'
-        : '<span style="color:var(--muted)">il certificato lo registra chi ha Storico HR · modificare</span>') +
-      '</div>';
+        (d) => !_assGgS.includes(d) && !ng.includes(d) && _assGgS.push(d),
+      );
+    });
+  const _ggS = (d) => d.substring(8, 10) + '.' + d.substring(5, 7) + '.' + d.substring(0, 4);
+  const _assAttesa = _assGgS.filter((d) => !_ngGgS.includes(d)).sort();
+  if ((_assAttesa.length || _ngGgS.length) && _hrVede) {
+    _ngGgS.sort();
+    const _bordoAss = typeof PIANO_COLORI_SPECIALI !== 'undefined' ? PIANO_COLORI_SPECIALI.ASS : '#8e5bb5';
+    if (_assAttesa.length)
+      html +=
+        '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 10px;padding:8px 12px;border-left:4px solid ' +
+        _bordoAss +
+        ';background:var(--paper2);border-radius:3px;font-size:var(--fs-md,.875rem)"><span><b>Assenza in attesa di certificato</b> (ASS, 0 ore): ' +
+        _assAttesa.map(_ggS).join(', ') +
+        '</span>' +
+        (_hrMod && typeof apriCertificatoRicevuto === 'function'
+          ? '<button class="btn-salva" style="padding:5px 12px" onclick="apriCertificatoRicevuto(\'' +
+            neS +
+            "','" +
+            _assAttesa[0] +
+            '\')">Certificato ricevuto</button><button class="btn-modal-cancel" style="padding:5px 12px" onclick="apriCertificatoNonRicevuto(\'' +
+            neS +
+            "','" +
+            _assAttesa[0] +
+            '\')">Certificato non ricevuto</button>'
+          : '<span style="color:var(--muted)">il certificato lo registra chi ha Storico HR · modificare</span>') +
+        '</div>';
+    if (_ngGgS.length)
+      html +=
+        '<div class="scheda-ass-ng" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 10px;padding:8px 12px;border-left:4px dashed ' +
+        _bordoAss +
+        ';background:var(--paper2);border-radius:3px;font-size:var(--fs-md,.875rem)"><span><b>Assenze non giustificate: ' +
+        _ngGgS.length +
+        (_ngGgS.length === 1 ? ' giorno' : ' giorni') +
+        '</b> (certificato non ricevuto, ASS a 0 ore): ' +
+        _ngGgS.map(_ggS).join(', ') +
+        '</span>' +
+        (_hrMod && typeof apriCertificatoRicevuto === 'function'
+          ? '<button class="btn-modal-cancel" style="padding:5px 12px" title="Il certificato è arrivato dopo: i giorni diventano malattia" onclick="apriCertificatoRicevuto(\'' +
+            neS +
+            "','" +
+            _ngGgS[0] +
+            '\')">Certificato arrivato dopo</button>'
+          : '') +
+        '</div>';
   }
   html += '<div class="scheda-kpi-grid">';
   html +=
@@ -3168,6 +3199,8 @@ var _HR_TIPO_STILE = {
   cessazione: { label: 'Fine contratto', col: '#c0392b' },
   // Certificato ricevuto: le assenze in attesa di certificato (ASS) diventano malattia
   certificato: { label: 'Certificato medico', col: '#1a7a6d' },
+  // Certificato non ricevuto: l ASS resta ASS (0 ore) ma non giustificata
+  assenza_ng: { label: 'Assenza non giustificata', col: '#8e5bb5' },
 };
 function _renderStoricoHrSezione(nome) {
   const _hrFull = typeof puoVedereStoricoHr === 'function' && puoVedereStoricoHr();

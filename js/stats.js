@@ -114,7 +114,15 @@ function renderStatistiche() {
     nomeCorrente('Malattia') +
     ' (giorni)' +
     _trendBadge(_malCurr, _malPrev, _tPrevName) +
-    '</div></div><div class="stat"><div class="stat-num gold">' +
+    '</div></div>' +
+    // ASSENZE NON GIUSTIFICATE (Certificato non ricevuto): separate dalla malattia, solo per
+    // chi vede lo Storico HR
+    (typeof assNonGiustificateGiorni === 'function' && typeof puoVedereStoricoHr === 'function' && puoVedereStoricoHr()
+      ? '<div class="stat"><div class="stat-num" style="color:#8e5bb5">' +
+        assNonGiustificateGiorni(_ds) +
+        '</div><div class="stat-label">Assenze non giustificate (giorni)</div></div>'
+      : '') +
+    '<div class="stat"><div class="stat-num gold">' +
     (totImp ? fmtCHF(totImp) : '0') +
     '</div><div class="stat-label">Importo totale</div></div></div>';
   // Grafico mensile (full width, primo)

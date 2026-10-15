@@ -527,26 +527,32 @@ function modificaRegistrazione(id) {
       (_ya < 100 ? 2000 + _ya : _ya) + '-' + _malDalAl[2].padStart(2, '0') + '-' + _malDalAl[1].padStart(2, '0');
     _malAl = (_yb < 100 ? 2000 + _yb : _yb) + '-' + _malDalAl[5].padStart(2, '0') + '-' + _malDalAl[4].padStart(2, '0');
   }
-  const _isMalattia = e.tipo === nomeCorrente('Malattia');
   const _conPeriodo = _diarioTipoConPeriodo(e.tipo);
-  // Stato copertura attuale (mostrato nel modal per le malattie)
-  let _copStatusHtml = '';
-  if (_isMalattia && typeof eventiCopertura === 'function') {
+  // TURNI DA COPRIRE (Malattia e Assenza): lo stato giorno per giorno dal Piano, con Copri i
+  // turni e, per l Assenza, il certificato. Si riempie dopo l apertura (_diarioCopTurniCarica).
+  let _copStatusHtml = _conPeriodo
+    ? '<div id="edit-cop-turni" class="cop-turni" aria-live="polite">' + _diarioCopTurniHtml(e, null, false) + '</div>'
+    : '';
+  // PUNTI DELLA COPERTURA (incentivi): chi ha coperto e chi ha rifiutato, separati dai turni
+  const _conPunti =
+    _conPeriodo &&
+    typeof eventiCopertura === 'function' &&
+    typeof apriPopupCopertura === 'function' &&
+    (typeof incentiviAttivi !== 'function' || incentiviAttivi('copertura'));
+  if (_conPunti) {
     const _per = typeof _periodoCopertura === 'function' ? _periodoCopertura(e) : null;
     const _ev = _per ? eventiCopertura(e.nome, _per.dal, _per.al) : eventiCopertura(e.nome, _dataRifCopertura(e));
     const _cop = _ev.find((p) => p.azione === 'copertura');
     const _rif = _ev.filter((p) => p.azione === 'disponibilita_negata').length;
-    _copStatusHtml =
-      '<div style="margin-top:8px;padding:8px 12px;background:var(--paper2);border-radius:3px;border-left:3px solid ' +
-      (_cop ? '#1a7a6d' : 'var(--muted)') +
-      ';font-size:var(--fs-md,.875rem)"><strong>Copertura turno:</strong> ' +
+    _copStatusHtml +=
+      '<div class="cop-punti"><strong>Punti copertura:</strong> ' +
       (_cop
         ? '<span style="color:var(--c-verdeacqua,#1a7a6d);font-weight:700">' +
           escP(_cop.collaboratore) +
           ' (+' +
           _cop.punti +
           ')</span>'
-        : '<span style="color:var(--muted)">nessuna registrata</span>') +
+        : '<span style="color:var(--muted)">nessuno segnato</span>') +
       (_rif
         ? ' · <span style="color:var(--accent);font-weight:600">' +
           _rif +
@@ -554,7 +560,7 @@ function modificaRegistrazione(id) {
           (_rif === 1 ? 'o' : 'i') +
           '</span>'
         : '') +
-      '<br><span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">Usa "Salva + Copertura" per inserire o correggere</span></div>';
+      ' <span style="color:var(--muted)">· con «Salva + punti»</span></div>';
   }
   b.innerHTML =
     '<h3>Modifica registrazione</h3><div class="pwd-field"><label>Collaboratore</label><div class="ac-wrap"><input type="text" id="edit-nome" value="' +
@@ -605,15 +611,16 @@ function modificaRegistrazione(id) {
         '>EUR</option></select></div></div>'
       : '') +
     '<div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button>' +
-    (_isMalattia
-      ? '<button class="btn-modal-ok" style="background:#1a7a6d" onclick="salvaModificaRegistrazione(' +
+    (_conPunti
+      ? '<button class="btn-modal-ok" style="background:#1a7a6d" title="Salva e segna chi ha coperto o rifiutato (punti degli incentivi)" onclick="salvaModificaRegistrazione(' +
         id +
-        ',true)">Salva + Copertura</button>'
+        ',true)">Salva + punti</button>'
       : '') +
     '<button class="btn-modal-ok" onclick="salvaModificaRegistrazione(' +
     id +
     ')">Salva</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
+  if (_conPeriodo) _diarioCopTurniCarica(e, document.getElementById('edit-cop-turni'), false);
   let editTipo = e.tipo;
   document.querySelectorAll('#edit-tipo-tags .tipo-tag').forEach((btn) => {
     btn.onclick = () => {
@@ -673,16 +680,29 @@ async function salvaModificaRegistrazione(id, conCopertura) {
         const nGiorni = Math.round((d2 - d1) / 86400000) + 1;
         const dalFmt = d1.toLocaleDateString('it-IT'),
           alFmt = d2.toLocaleDateString('it-IT');
-        // Rimuovi vecchio dal/al dalla descrizione
-        testo = testo
-          .replace(
-            /\s*dal\s+\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4}\s+al\s+\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4}\s*\(\d+ giorni[^)]*\)/gi,
-            '',
-          )
-          .trim();
-        testo = testo.replace(/\s*\(\d+ giorni[^)]*\)/gi, '').trim();
-        if (nGiorni > 1) testo += ' dal ' + dalFmt + ' al ' + alFmt + ' (' + nGiorni + ' giorni)';
-        else if (nGiorni === 1) testo += ' il ' + dalFmt + ' (1 giorno)';
+        // REGISTRAZIONE «UN GIORNO PER RIGA» (periodo come etichetta finale «(dal .. al ..)»):
+        // con le stesse date il testo resta com e; con date nuove l etichetta si toglie (prima
+        // restava davanti al periodo nuovo e il Piano leggeva ancora le date vecchie)
+        const _rpg = testo.match(
+          /\(dal (\d{1,2})[\/.](\d{1,2})[\/.](\d{4}) al (\d{1,2})[\/.](\d{1,2})[\/.](\d{4})\)\s*$/,
+        );
+        const _stesse =
+          _rpg &&
+          new Date(+_rpg[3], +_rpg[2] - 1, +_rpg[1], 12).getTime() === d1.getTime() &&
+          new Date(+_rpg[6], +_rpg[5] - 1, +_rpg[4], 12).getTime() === d2.getTime();
+        if (!_stesse) {
+          if (_rpg) testo = testo.substring(0, _rpg.index).trim();
+          // Rimuovi vecchio dal/al dalla descrizione
+          testo = testo
+            .replace(
+              /\s*dal\s+\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4}\s+al\s+\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4}\s*\(\d+ giorni[^)]*\)/gi,
+              '',
+            )
+            .trim();
+          testo = testo.replace(/\s*\(\d+ giorni[^)]*\)/gi, '').trim();
+          if (nGiorni > 1) testo += ' dal ' + dalFmt + ' al ' + alFmt + ' (' + nGiorni + ' giorni)';
+          else if (nGiorni === 1) testo += ' il ' + dalFmt + ' (1 giorno)';
+        }
         _copDataRef =
           d1.getFullYear() +
           '-' +
@@ -802,6 +822,294 @@ function _diarioAvvisoCopertura(nome, dal, al) {
   if (typeof _pianoAvvisoCopertura === 'function')
     _pianoAvvisoCopertura(nome, dal, al || dal).catch((e) => console.error('avviso copertura', e));
   else if (typeof apriPopupCopertura === 'function') apriPopupCopertura(nome, dal);
+}
+// ================= TURNI DA COPRIRE (Malattia e Assenza nel Diario) =================
+// Decisione del titolare 15.10: aprendo una malattia o un assenza (riga del Diario e
+// Modifica) si vede subito chi copre i turni, giorno per giorno («11.01 · Ex S7 · coperto da
+// Bianchi» oppure «da coprire»), con «Copri i turni» (Sostituisci chi è in malattia già
+// compilata) e, per l Assenza, il certificato (Storico HR · modificare). Lo stato si legge dal
+// Piano per il periodo SALVATO: cambiando le date nella Modifica si aggiorna dopo Salva.
+// Senza il permesso del Piano: sola lettura, con la spiegazione.
+// giorni della registrazione: tutto il periodo (Modifica) o solo i suoi (riga per giorno)
+function _diarioCopGiorni(e, soloPropri) {
+  if (soloPropri && typeof _assGiorniPropri === 'function') return _assGiorniPropri(e);
+  return _pianoDateMalattia(e.testo || '', e.data);
+}
+function _diarioCopGg(d) {
+  const g = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'][new Date(d + 'T12:00:00').getDay()];
+  return g + ' ' + d.substring(8, 10) + '.' + d.substring(5, 7);
+}
+// HTML del riquadro. stato: null = in lettura, { errore } = non letto, altrimenti l elenco di
+// _pianoStatoTurniMalattia per i giorni della registrazione. compatto = riga del Diario.
+function _diarioCopTurniHtml(e, stato, compatto) {
+  const giorni = _diarioCopGiorni(e, compatto);
+  const eAss = e.tipo === nomeCorrente('Assenza');
+  const oggi = oggiLocale();
+  const gestisce = typeof puoGestirePiano === 'function' && puoGestirePiano();
+  const hr = eAss && typeof puoRegistrareCertificato === 'function' && puoRegistrareCertificato();
+  const titolo = '<span class="cop-turni-tit">Turni da coprire</span>';
+  if (!stato)
+    return '<div class="cop-turni-testa">' + titolo + '<span class="cop-turni-nota">lettura del Piano…</span></div>';
+  if (stato.errore)
+    return (
+      '<div class="cop-turni-testa">' +
+      titolo +
+      '<span class="cop-turni-nota">Piano non letto: ' +
+      escP(stato.errore) +
+      '</span></div>'
+    );
+  const per = new Map(stato.map((x) => [x.data, x]));
+  const conTurno = stato.filter((x) => !x.libero);
+  const daCoprire = conTurno.filter((x) => !x.da && x.data >= oggi);
+  const nonCoperti = conTurno.filter((x) => !x.da && x.data < oggi);
+  const coperti = conTurno.filter((x) => x.da);
+  let chip;
+  if (!conTurno.length)
+    chip =
+      '<span class="cop-chip cop-chip-neutro">' +
+      (stato.length ? 'nessun turno da coprire' : 'nessun turno nel Piano') +
+      '</span>';
+  else if (daCoprire.length)
+    chip =
+      '<span class="cop-chip cop-chip-rosso">' +
+      daCoprire.length +
+      (daCoprire.length === 1 ? ' da coprire' : ' da coprire') +
+      '</span>' +
+      (coperti.length ? '<span class="cop-chip cop-chip-verde">' + coperti.length + ' coperti</span>' : '');
+  else if (!nonCoperti.length) chip = '<span class="cop-chip cop-chip-verde">tutti coperti</span>';
+  else
+    chip =
+      (coperti.length ? '<span class="cop-chip cop-chip-verde">' + coperti.length + ' coperti</span>' : '') +
+      '<span class="cop-chip cop-chip-neutro">' +
+      nonCoperti.length +
+      ' passati senza copertura</span>';
+  // giorni: nella riga solo quelli con un turno (i liberi si contano), nella Modifica tutti
+  const righe = (compatto ? giorni.filter((d) => per.has(d) && !per.get(d).libero) : giorni).map((d) => {
+    const x = per.get(d);
+    let stTxt;
+    let cls;
+    if (!x) {
+      stTxt = 'nessun turno nel Piano';
+      cls = 'cop-neutro';
+    } else if (x.libero) {
+      stTxt = 'giorno libero' + (x.codice ? ' (' + escP(x.codice) + ')' : '') + ', niente da coprire';
+      cls = 'cop-neutro';
+    } else if (x.da) {
+      stTxt = 'coperto da <b>' + escP(x.da) + '</b>';
+      cls = 'cop-ok';
+    } else if (d < oggi) {
+      stTxt = 'non coperto (giorno passato)';
+      cls = 'cop-neutro';
+    } else {
+      stTxt = 'da coprire';
+      cls = 'cop-ko';
+    }
+    return (
+      '<li class="' +
+      cls +
+      '"><span class="cop-g">' +
+      _diarioCopGg(d) +
+      '</span>' +
+      (x && !x.libero ? '<span class="cop-ex">Ex ' + escP(x.codice) + '</span>' : '') +
+      '<span class="cop-st">' +
+      stTxt +
+      '</span>' +
+      (x && x.nonGiust ? '<span class="cop-chip cop-chip-ng">non giustificata</span>' : '') +
+      '</li>'
+    );
+  });
+  const liberi = compatto ? giorni.filter((d) => per.has(d) && per.get(d).libero).length : 0;
+  const idArg = _jsArg(String(e.id));
+  let azioni = '';
+  if (daCoprire.length && gestisce)
+    azioni +=
+      '<button type="button" class="btn-act cop-btn-copri" onclick="diarioCopriTurni(\'' +
+      idArg +
+      '\')">Copri i turni</button>';
+  if (hr)
+    azioni +=
+      '<button type="button" class="btn-act" onclick="diarioCertificato(\'' +
+      idArg +
+      '\',false)" title="Il certificato è arrivato: le ASS diventano malattia">Certificato ricevuto</button>' +
+      '<button type="button" class="btn-act" onclick="diarioCertificato(\'' +
+      idArg +
+      '\',true)" title="Il certificato non arriva: restano ASS a 0 ore, non giustificate">Certificato non ricevuto</button>';
+  const info = typeof _pianoCollabInfo === 'function' ? _pianoCollabInfo(e.nome) : null;
+  const sett = info && info.reparto_dip && typeof repartoLabel === 'function' ? repartoLabel(info.reparto_dip) : '';
+  const solaLettura =
+    !gestisce && daCoprire.length
+      ? '<p class="cop-turni-nota">Sola lettura: i turni li copre chi gestisce il Piano' +
+        (sett ? ' del settore ' + escP(sett) : '') +
+        ' (permesso Gestione piano). Li trova anche in Piano › Avvisi › Malattie da coprire.</p>'
+      : '';
+  const piede = compatto
+    ? ''
+    : '<p class="cop-turni-nota">Dal Piano, per il periodo salvato (' +
+      _diarioCopGg(giorni[0]) +
+      (giorni.length > 1 ? ' – ' + _diarioCopGg(giorni[giorni.length - 1]) : '') +
+      '). Se cambi le date, il riquadro si aggiorna dopo Salva.</p>';
+  return (
+    '<div class="cop-turni-testa">' +
+    titolo +
+    chip +
+    '</div>' +
+    (righe.length ? '<ul class="cop-turni-lista">' + righe.join('') + '</ul>' : '') +
+    (liberi
+      ? '<p class="cop-turni-nota">' +
+        liberi +
+        (liberi === 1 ? ' giorno libero' : ' giorni liberi') +
+        ', niente da coprire.</p>'
+      : '') +
+    solaLettura +
+    (azioni ? '<div class="cop-turni-azioni">' + azioni + '</div>' : '') +
+    piede
+  );
+}
+async function _diarioCopTurniCarica(e, el, compatto) {
+  if (!el) return;
+  const giorni = _diarioCopGiorni(e, false);
+  let html;
+  try {
+    const st = giorni.length ? await _pianoStatoTurniMalattia(e.nome, giorni[0], giorni[giorni.length - 1]) : [];
+    html = _diarioCopTurniHtml(e, st, compatto);
+  } catch (er) {
+    html = _diarioCopTurniHtml(e, { errore: (er && er.message) || String(er) }, compatto);
+  }
+  if (el.isConnected) el.innerHTML = html;
+}
+// RIGA DEL DIARIO: segnaposto (con l ultimo stato letto, niente salti) riempito dopo il
+// disegno da _diarioCopTurniRiempi, con due letture per tutte le righe visibili. Solo le
+// assenze recenti o future (dal 7 giorni fa): le vecchie restano pulite (Modifica le mostra).
+window._diarioCopCache = window._diarioCopCache || {};
+function _diarioCopTurniSegnaposto(e) {
+  if (!e || e.eliminato || !_diarioTipoConPeriodo(e.tipo)) return '';
+  const gg = _diarioCopGiorni(e, true);
+  if (!gg.length || gg[gg.length - 1] < _assSposta(oggiLocale(), -7)) return '';
+  const k = e.id + '|' + e.tipo + '|' + e.testo;
+  const c = window._diarioCopCache[k];
+  return (
+    '<div class="cop-turni cop-turni-riga" data-cop-reg="' +
+    escP(String(e.id)) +
+    '" data-cop-k="' +
+    escP(k) +
+    '">' +
+    (c || _diarioCopTurniHtml(e, null, true)) +
+    '</div>'
+  );
+}
+function _diarioCopTurniRiempi() {
+  clearTimeout(window._diarioCopTimer);
+  window._diarioCopTimer = setTimeout(_diarioCopTurniRiempiOra, 120);
+}
+async function _diarioCopTurniRiempiOra() {
+  const box = [...document.querySelectorAll('#entries-list .cop-turni-riga')].slice(0, 40);
+  if (!box.length) return;
+  const voci = box
+    .map((el) => ({ el: el, e: datiCache.find((x) => String(x.id) === el.dataset.copReg) }))
+    .filter((v) => v.e);
+  voci.forEach((v) => (v.giorni = _diarioCopGiorni(v.e, true)));
+  const nomi = [...new Set(voci.map((v) => v.e.nome))];
+  const tutti = [...new Set([].concat(...voci.map((v) => v.giorni)))].sort();
+  if (!nomi.length || !tutti.length) return;
+  let righe;
+  let giorno;
+  try {
+    righe =
+      (await secGet(
+        'piano?collaboratore=in.(' +
+          nomi.map((n) => encodeURIComponent(n)).join(',') +
+          ')&data=gte.' +
+          tutti[0] +
+          '&data=lte.' +
+          tutti[tutti.length - 1] +
+          '&codice=in.(M,M1,ASS)',
+      )) || [];
+    const gM = [...new Set(righe.map((r) => String(r.data).substring(0, 10)))];
+    giorno = gM.length
+      ? (await secGet(
+          'piano?data=in.(' + gM.join(',') + ')&commento=like.*copre*&select=collaboratore,data,commento',
+        )) || []
+      : [];
+  } catch (er) {
+    return; // senza rete resta lo stato di prima
+  }
+  voci.forEach((v) => {
+    const st = _pianoStatoTurniDaRighe(
+      v.e.nome,
+      righe.filter((r) => r.collaboratore === v.e.nome && v.giorni.includes(String(r.data).substring(0, 10))),
+      giorno,
+    );
+    const html = _diarioCopTurniHtml(v.e, st, true);
+    window._diarioCopCache[v.el.dataset.copK] = html;
+    if (v.el.isConnected) v.el.innerHTML = html;
+  });
+}
+// PUNTI DELLA COPERTURA (incentivi accesi): pulsante «Punti» e, se segnati, il badge
+function _diarioConPunti(e) {
+  return (
+    !!e &&
+    _diarioTipoConPeriodo(e.tipo) &&
+    typeof apriPopupCopertura === 'function' &&
+    (typeof incentiviAttivi !== 'function' || incentiviAttivi('copertura'))
+  );
+}
+function _diarioBadgePunti(e) {
+  if (!_diarioConPunti(e) || typeof eventiCopertura !== 'function' || typeof _periodoCopertura !== 'function')
+    return '';
+  const per = _periodoCopertura(e);
+  const cop = eventiCopertura(e.nome, per.dal, per.al).find((p) => p.azione === 'copertura');
+  return cop
+    ? '<span class="cop-chip cop-chip-verde" style="margin-left:6px" title="Punti degli incentivi">Punti: ' +
+        escP(cop.collaboratore) +
+        '</span>'
+    : '';
+}
+// «Copri i turni»: Sostituisci chi è in malattia già compilata (persona, mese, giorni,
+// Registra come: ASS per l Assenza, M per la Malattia). Un mese alla volta.
+async function diarioCopriTurni(id) {
+  const e = datiCache.find((x) => String(x.id) === String(id));
+  if (!e) return;
+  if (typeof puoGestirePiano !== 'function' || !puoGestirePiano()) {
+    toast('I turni li copre chi gestisce il Piano');
+    return;
+  }
+  const giorni = _diarioCopGiorni(e, false);
+  let st;
+  try {
+    st = await _pianoStatoTurniMalattia(e.nome, giorni[0], giorni[giorni.length - 1]);
+  } catch (er) {
+    toastErrore('Piano non letto: ' + ((er && er.message) || er));
+    return;
+  }
+  const oggi = oggiLocale();
+  const da = st.filter((x) => !x.libero && !x.da && x.data >= oggi);
+  if (!da.length) {
+    toast('Nessun turno da coprire per ' + e.nome);
+    render();
+    return;
+  }
+  document.getElementById('pwd-modal').classList.add('hidden');
+  const ym = da[0].data.substring(0, 7);
+  const g = da.filter((x) => x.data.startsWith(ym)).map((x) => parseInt(x.data.substring(8, 10)));
+  const altri = [...new Set(da.filter((x) => !x.data.startsWith(ym)).map((x) => x.data.substring(0, 7)))];
+  await _pianoApriCopertura(
+    e.nome,
+    ym,
+    Math.min(...g),
+    Math.max(...g),
+    null,
+    e.tipo === nomeCorrente('Assenza') ? 'ASS' : 'M',
+  );
+  if (altri.length)
+    toast('Dopo questo mese restano turni da coprire in ' + altri.join(', ') + ': di nuovo «Copri i turni»', 8000);
+}
+// «Certificato ricevuto» / «Certificato non ricevuto» dalla registrazione Assenza
+function diarioCertificato(id, non) {
+  const e = datiCache.find((x) => String(x.id) === String(id));
+  if (!e) return;
+  document.getElementById('pwd-modal').classList.add('hidden');
+  const d = _diarioCopGiorni(e, true)[0] || giornoDi(e.data);
+  return non ? apriCertificatoNonRicevuto(e.nome, d) : apriCertificatoRicevuto(e.nome, d);
 }
 // ND NEL PIANO GIA FATTO: se nei giorni di non disponibilita il jolly ha gia un turno
 // (piano del mese pubblicato), il programma lo dice e propone subito chi lo copre

@@ -615,7 +615,7 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno, scelte) {
           tipoVoce === _assTipo
             ? 'Assente (attesa certificato)'
             : 'Assente per malattia' + (conCert ? ' con certificato' : '');
-        const testo =
+        let testo =
           nGiorni > 1
             ? prefisso + codeTxt + ' dal ' + dalStr + ' al ' + alStr + ' (' + nGiorni + ' giorni, ' + _rapLabel + ')'
             : // un giorno solo: si scrive la data SEMPRE quando non e' il giorno del
@@ -629,6 +629,15 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno, scelte) {
               _rapLabel +
               ')';
         _nomiProcessati.add(nomeFinale.toLowerCase());
+        // assenza gia NON GIUSTIFICATA (Certificato non ricevuto): il contrassegno resta (lo
+        // mette e lo toglie solo l HR, da assenze.js)
+        if (_esisteT && _esisteT.tipo === _assTipo && typeof _assNgGiorniReg === 'function') {
+          const _ngE = _assNgGiorniReg(_esisteT);
+          if (_ngE.length) {
+            const _recN = Object.assign({}, _esisteT, { testo: testo });
+            testo = _assNgTestoReg(testo, _ngE, _assGiorniPropri(_recN));
+          }
+        }
         const esiste = _esistenti.find(
           (e) => e.nome.toLowerCase() === nomeFinale.toLowerCase() && !_usedEsistentiIds.has(e.id),
         );
@@ -1611,6 +1620,18 @@ function _rapportoConCertificato(riga) {
 function _rapportoVoceAssenza(rec, rg) {
   const f = (d) => d.split('-').reverse().join('/');
   const per = 'dal ' + f(rg.i) + ' al ' + f(rg.f);
-  if (rec.tipo === nomeCorrente('Assenza')) return 'assente ' + per;
+  if (rec.tipo === nomeCorrente('Assenza')) {
+    // ASSENZA NON GIUSTIFICATA (Certificato non ricevuto, assenze.js): tutta o solo alcuni giorni
+    const ng = typeof _assNgGiorniReg === 'function' ? _assNgGiorniReg(rec) : [];
+    if (!ng.length) return 'assente ' + per;
+    const tutti = typeof _assGiorniPropri === 'function' ? _assGiorniPropri(rec) : ng;
+    return ng.length >= tutti.length
+      ? 'assente non giustificato ' + per
+      : 'assente ' +
+          per +
+          ' (non giustificato: ' +
+          ng.map((d) => d.substring(8, 10) + '.' + d.substring(5, 7)).join(', ') +
+          ')';
+  }
   return /certificat/i.test(rec.testo || '') ? 'malato con certificato ' + per : 'malato ' + per;
 }

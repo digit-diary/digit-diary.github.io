@@ -91,7 +91,7 @@ function _assGiorniPropri(e) {
 }
 // testo della registrazione senza il periodo e senza "(N giorni ...)"
 function _assTestoBase(t) {
-  return String(t || '')
+  return _assNgTogli(t)
     .replace(/\s*\(?dal\s+\d{1,2}[./]\d{1,2}[./]\d{4}\s+al\s+\d{1,2}[./]\d{1,2}[./]\d{4}\)?/gi, '')
     .replace(/\s*\(\d+\s*giorn[oi][^)]*\)/gi, '')
     .replace(/\s*·\s*certificato medico.*$/i, '')
@@ -102,6 +102,269 @@ function _assPeriodoTesto(a, b) {
   return n > 1
     ? 'dal ' + _assDataIt(a) + ' al ' + _assDataIt(b) + ' (' + n + ' giorni)'
     : 'il ' + _assDataIt(a) + ' (1 giorno)';
+}
+
+// ================= ASSENZA NON GIUSTIFICATA (Certificato non ricevuto) =================
+// Il collaboratore non porta il certificato: l ASS resta ASS a 0 ore, senza conteggi, ma e
+// NON GIUSTIFICATA. Dove si vede:
+//  - registrazione Assenza: il testo comincia con «Assenza non giustificata (certificato non
+//    ricevuto) · »; se solo alcuni giorni della registrazione lo sono, sono scritti
+//    «(certificato non ricevuto: 06.01, 07.01)». Tipo e date non cambiano (Piano, Rapporto,
+//    Annulla e cestino continuano a leggerla come un Assenza);
+//  - cella ASS del piano: la nota finisce con « · non giustificata»;
+//  - Rapporto: «Rossi assente non giustificato dal ...».
+// La registrazione e la parte che conta: le note delle celle si riallineano a lei
+// (_assAllineaNote), anche dopo Annulla e Ripristina.
+const _ASS_NG_NOTA = ' · non giustificata';
+const _ASS_NG_RE = /^Assenza non giustificata \(certificato non ricevuto(?::\s*([0-9.,\s]+))?\)\s*·\s*/;
+function _assNgNota(c) {
+  return /·\s*non giustificata\s*$/i.test(String(c || ''));
+}
+// cella ASS con la nota «non giustificata»
+function _assNgCella(r) {
+  return !!r && r.codice === 'ASS' && _assNgNota(r.commento);
+}
+// nota della cella con (si) o senza la parte «non giustificata»
+function _assNgCommento(c, si) {
+  const base = String(c || '')
+    .replace(/\s*·\s*non giustificata\s*$/i, '')
+    .trim();
+  if (!si) return base || null;
+  return (base ? base.substring(0, 370) : 'Assenza') + _ASS_NG_NOTA;
+}
+// testo della registrazione senza il contrassegno
+function _assNgTogli(t) {
+  return String(t || '').replace(_ASS_NG_RE, '');
+}
+// i giorni non giustificati di una registrazione Assenza
+function _assNgGiorniReg(e) {
+  if (!e || e.eliminato || e.tipo !== _pianoTipoAssenza()) return [];
+  const m = _ASS_NG_RE.exec(String(e.testo || ''));
+  if (!m) return [];
+  const propri = _assGiorniPropri(e);
+  if (!m[1]) return propri;
+  const gg = m[1].split(/[,\s]+/).filter(Boolean);
+  return propri.filter((d) => gg.includes(_assGg(d)));
+}
+// testo con il contrassegno dei giorni marcati (nessuno: senza contrassegno)
+function _assNgTestoReg(testo, marcati, propri) {
+  const base = _assNgTogli(testo);
+  const mm = propri.filter((d) => marcati.includes(d));
+  if (!mm.length) return base;
+  return (
+    'Assenza non giustificata (certificato non ricevuto' +
+    (mm.length === propri.length ? '' : ': ' + mm.map(_assGg).join(', ')) +
+    ') · ' +
+    base
+  );
+}
+// giorni non giustificati di una lista di registrazioni (scheda, statistiche)
+function assNonGiustificateGiorni(entries) {
+  const set = new Set();
+  (entries || []).forEach((e) => _assNgGiorniReg(e).forEach((d) => set.add((e.nome || '') + '|' + d)));
+  return set.size;
+}
+// LE NOTE DELLE CELLE ALLINEATE ALLE REGISTRAZIONI: nei giorni dati, una cella ASS di un
+// giorno non giustificato ha la nota « · non giustificata», tutte le altre no (anche la M
+// del certificato arrivato dopo). forzaSi: giorni non giustificati senza registrazione (ASS
+// scritte solo nel piano). Una scrittura sola, condizionata (cella ancora come letta).
+async function _assAllineaNote(nome, giorni, forzaSi) {
+  const gg = [...new Set(giorni || [])].sort();
+  if (!gg.length) return { cambiate: 0 };
+  const celle =
+    (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=in.(' + gg.join(',') + ')')) || [];
+  const marcati = new Set(forzaSi || []);
+  _assRegistrazioniDi(nome).forEach((e) => _assNgGiorniReg(e).forEach((d) => marcati.add(d)));
+  const op = getOperatore();
+  const ora = new Date().toISOString();
+  const ops = [];
+  celle.forEach((r) => {
+    const d = String(r.data).substring(0, 10);
+    const vuole = r.codice === 'ASS' && marcati.has(d);
+    if (vuole === _assNgNota(r.commento)) return;
+    ops.push({
+      collaboratore: r.collaboratore,
+      data: d,
+      atteso: _pianoAttesoDi(r),
+      dati: { commento: _assNgCommento(r.commento, vuole), operatore: op, updated_at: ora },
+    });
+  });
+  if (!ops.length) return { cambiate: 0 };
+  if (typeof _pianoFuoriDalPasso === 'function') _pianoFuoriDalPasso();
+  const es = await _pianoScriviCelle(ops);
+  if (!es.ok) throw _pianoErroreConflitto(es.conflitti);
+  if (typeof _pianoRighe !== 'undefined') _pianoMemoriaDopo(es.ops, es.righe);
+  return { cambiate: ops.length };
+}
+
+// finestra: periodo proposto = le ASS di fila attorno al giorno indicato, ancora da regolarizzare
+async function apriCertificatoNonRicevuto(nome, dataVicina) {
+  if (!puoRegistrareCertificato()) {
+    await mostraAvviso(
+      'L assenza non giustificata la registra chi ha il permesso Storico HR · modificare (o l amministratore).',
+      { titolo: 'Certificato non ricevuto' },
+    );
+    return;
+  }
+  let celle = [];
+  try {
+    celle = await _assCelleDi(nome);
+  } catch (e) {
+    toastErrore('Piano non letto: ' + ((e && e.message) || e));
+    return;
+  }
+  const giorniAss = celle.map((r) => String(r.data).substring(0, 10));
+  _assRegistrazioniDi(nome).forEach((e) => _assGiorniPropri(e).forEach((d) => giorniAss.push(d)));
+  const seg = _assSegmenti(giorniAss);
+  let prop = seg.find((s) => dataVicina && s[0] <= dataVicina && dataVicina <= s[1]) || seg[seg.length - 1] || null;
+  if (!prop) prop = [dataVicina || oggiLocale(), dataVicina || oggiLocale()];
+  const elenco = celle.length
+    ? celle
+        .map(
+          (r) =>
+            _assGg(r.data) +
+            ' (' +
+            escP(_pianoSiglaSottoMalattia(r) || 'ASS') +
+            (_assNgCella(r) ? ', già non giustificata' : '') +
+            ')',
+        )
+        .join(', ')
+    : 'nessuna nel piano';
+  window._certNoCtx = { nome: nome };
+  const b = document.getElementById('pwd-modal-content');
+  b.innerHTML =
+    '<h3>Certificato non ricevuto · ' +
+    escP(nome) +
+    '</h3><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px;text-align:left">Assenze in attesa di certificato (ASS): ' +
+    elenco +
+    '.<br>Nei giorni scelti l assenza diventa <b>non giustificata</b>: la sigla resta <b>ASS</b> a 0 ore, senza conteggi; Diario e Rapporto lo scrivono, la cella lo mostra e i giorni escono dagli avvisi «ASS da regolarizzare». Se il certificato arriva dopo, «Certificato ricevuto» li trasforma in malattia. Nessun provvedimento automatico. Annulla rimette tutto.</p>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap"><div class="field" style="text-align:left"><label>Non giustificata dal</label><input type="date" id="certno-dal" value="' +
+    prop[0] +
+    '" style="padding:8px"></div><div class="field" style="text-align:left"><label>al</label><input type="date" id="certno-al" value="' +
+    prop[1] +
+    '" style="padding:8px"></div></div>' +
+    '<div class="field" style="text-align:left;margin-top:8px"><label>Nota (facoltativa)</label><input type="text" id="certno-nota" maxlength="200" placeholder="es. sollecitato il 20.01, nessuna risposta" style="width:100%;padding:8px"></div>' +
+    '<div class="pwd-modal-btns" style="margin-top:14px"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button>' +
+    '<button class="btn-modal-ok" onclick="confermaCertificatoNonRicevuto()">Registra: non giustificata</button></div>';
+  document.getElementById('pwd-modal').classList.remove('hidden');
+}
+function confermaCertificatoNonRicevuto() {
+  const c = window._certNoCtx || {};
+  const dal = ((document.getElementById('certno-dal') || {}).value || '').trim();
+  const al = ((document.getElementById('certno-al') || {}).value || '').trim();
+  const nota = ((document.getElementById('certno-nota') || {}).value || '').trim();
+  if (!c.nome || !/^\d{4}-\d{2}-\d{2}$/.test(dal) || !/^\d{4}-\d{2}-\d{2}$/.test(al) || dal > al) {
+    toastErrore('Date non valide (dal ≤ al)');
+    return;
+  }
+  document.getElementById('pwd-modal').classList.add('hidden');
+  return unaVoltaSola('certificato-no|' + c.nome, () => registraCertificatoNonRicevuto(c.nome, dal, al, nota));
+}
+// CERTIFICATO NON RICEVUTO: registrazioni (Diario), Rapporto, note delle celle, Storico HR e
+// registro come UN passo dell Annulla generale (le note delle celle seguono le registrazioni)
+async function registraCertificatoNonRicevuto(nome, dal, al, nota) {
+  if (!puoRegistrareCertificato()) {
+    toastErrore('Permesso mancante: Storico HR · modificare');
+    return null;
+  }
+  const P = _assGiorni(dal, al);
+  if (!P.length || P.length > 366) {
+    toastErrore('Periodo non valido');
+    return null;
+  }
+  const Pset = new Set(P);
+  let celle = [];
+  try {
+    celle = await _assCelleDi(nome, dal, al);
+  } catch (e) {
+    toastErrore('NON registrato: piano non letto (' + ((e && e.message) || e) + ')', 9000);
+    return null;
+  }
+  const giorniCelle = celle.map((r) => String(r.data).substring(0, 10));
+  const regs = _assRegistrazioniDi(nome).map((e) => ({ e: e, propri: _assGiorniPropri(e) }));
+  // i giorni: quelli dell assenza (registrazioni Assenza o celle ASS) dentro il periodo
+  const giorni = [...new Set(giorniCelle.concat(...regs.map((x) => x.propri.filter((d) => Pset.has(d)))))].sort();
+  if (!giorni.length) {
+    await mostraAvviso(
+      nome +
+        ': nel periodo ' +
+        _assPeriodoTesto(dal, al) +
+        ' non ci sono assenze in attesa di certificato (ASS). Niente è stato registrato.',
+      { titolo: 'Certificato non ricevuto' },
+    );
+    return null;
+  }
+  const op = getOperatore();
+  const oggiIt = new Date().toLocaleDateString('it-IT');
+  const errori = [];
+  // 1) DIARIO: il contrassegno sulle registrazioni dei giorni scelti (tipo e date restano)
+  const toccate = [];
+  for (const x of regs) {
+    const giaNg = _assNgGiorniReg(x.e);
+    const marcati = [...new Set(giaNg.concat(x.propri.filter((d) => Pset.has(d))))];
+    const testo = _assNgTestoReg(x.e.testo, marcati, x.propri).substring(0, 2000);
+    if (testo === x.e.testo) continue;
+    const dati = { testo: testo, modificato_da: op + ' il ' + oggiIt + ' (certificato non ricevuto)' };
+    try {
+      await secPatch('registrazioni', 'id=eq.' + x.e.id, dati);
+      Object.assign(x.e, dati);
+      toccate.push(x.e);
+    } catch (e) {
+      errori.push(_assGg(String(x.e.data).substring(0, 10)) + ': ' + ((e && e.message) || e));
+    }
+  }
+  // 2) RAPPORTO: «Rossi assente non giustificato dal ...»
+  const rapporti = [];
+  for (const e of toccate) {
+    if (typeof _rapportoOrigineDi !== 'function' || !_rapportoOrigineDi(e)) continue;
+    try {
+      const o = await _rapportoCorreggiRegistrazione(e, e.nome, { senzaRegistro: true });
+      if (o) rapporti.push(o.turno + ' del ' + o.ds.split('-').reverse().join('.'));
+    } catch (er) {
+      errori.push('Rapporto: ' + ((er && er.message) || er));
+    }
+  }
+  // 3) PIANO: la nota delle celle ASS (anche quelle senza registrazione nel Diario)
+  const senzaReg = giorniCelle.filter((d) => !regs.some((x) => x.propri.includes(d)));
+  try {
+    await _assAllineaNote(nome, giorni, senzaReg);
+  } catch (e) {
+    errori.push('piano: ' + ((e && e.message) || e));
+  }
+  // 4) STORICO HR e registro (chiude il passo dell Annulla)
+  const desc =
+    'Certificato non ricevuto ' +
+    _assPeriodoTesto(dal, al) +
+    ', registrato il ' +
+    oggiIt +
+    ': assenza non giustificata ' +
+    giorni.map(_assGg).join(', ') +
+    ' (ASS, 0 ore)' +
+    (nota ? ' · ' + nota : '');
+  if (typeof _insertHrEvento === 'function') {
+    const hrIns = () => _insertHrEvento(nome, 'assenza_ng', desc, oggiLocale());
+    await (window.Annulla ? window.Annulla.senzaTraccia(hrIns) : hrIns());
+  }
+  logAzione('Certificato non ricevuto', nome + ' · ' + desc);
+  if (typeof render === 'function') render();
+  if (typeof updateStats === 'function') updateStats();
+  if (errori.length)
+    toastErrore('Registrato, ma non tutto: ' + errori.join('; ') + '. Controlla Diario, Rapporto e piano.', 12000);
+  else
+    toast(
+      nome +
+        ': assenza non giustificata ' +
+        giorni.map(_assGg).join(', ') +
+        (rapporti.length ? ' · Rapporto ' + [...new Set(rapporti)].join(', ') : ''),
+      7000,
+    );
+  if (
+    typeof _pianoRighe !== 'undefined' &&
+    typeof renderPiano === 'function' &&
+    localStorage.getItem('pagina_corrente') === 'piano'
+  )
+    renderPiano();
+  return { giorni: giorni, registrazioni: toccate.length, errori: errori };
 }
 
 // ================= CERTIFICATO RICEVUTO =================
@@ -175,6 +438,16 @@ async function registraCertificatoRicevuto(nome, dal, al, nota) {
   const tipoAss = _pianoTipoAssenza();
   const op = getOperatore();
   const oggiIt = new Date().toLocaleDateString('it-IT');
+  // giorni NON GIUSTIFICATI prima del certificato (arrivato dopo «Certificato non ricevuto»):
+  // diventano malattia come gli altri, lo Storico HR lo dice; fuori dal periodo restano tali
+  const ngPrima = new Set();
+  _assRegistrazioniDi(nome).forEach((e) => _assNgGiorniReg(e).forEach((d) => ngPrima.add(d)));
+  try {
+    (await _assCelleDi(nome, dal, al)).filter(_assNgCella).forEach((r) => ngPrima.add(String(r.data).substring(0, 10)));
+  } catch (e) {
+    /* lettura non riuscita: valgono le registrazioni */
+  }
+  const ngNelCert = [...ngPrima].filter((d) => Cset.has(d)).sort();
   // 1) PIANO: la malattia di tutto il periodo, come oggi (ASS -> M con il turno sotto,
   //    turni -> M, C -> M "Ex C" a 0 ore, CGF e festivi come sempre), in una scrittura
   let sync = null;
@@ -261,21 +534,25 @@ async function registraCertificatoRicevuto(nome, dal, al, nota) {
     });
   });
   // parti fuori dal certificato che nessuna registrazione tiene piu: Assenza nuova
+  // (i giorni gia non giustificati lo restano)
   _assSegmenti(fuori.filter((d) => !tienePropri.has(d) && !Cset.has(d))).forEach((s) =>
     nuove.push({
       id: Date.now() + nuove.length,
       nome: nome,
       tipo: tipoAss,
-      testo:
+      testo: _assNgTestoReg(
         'Assente (attesa certificato) dal ' +
-        _assDataIt(s[0]) +
-        ' al ' +
-        _assDataIt(s[1]) +
-        ' (fuori dal certificato del ' +
-        _assGg(dal) +
-        '-' +
-        _assGg(al) +
-        ')',
+          _assDataIt(s[0]) +
+          ' al ' +
+          _assDataIt(s[1]) +
+          ' (fuori dal certificato del ' +
+          _assGg(dal) +
+          '-' +
+          _assGg(al) +
+          ')',
+        _assGiorni(s[0], s[1]).filter((d) => ngPrima.has(d)),
+        _assGiorni(s[0], s[1]),
+      ),
       data: s[0] + 'T08:00:00.000Z',
       operatore: op,
       reparto_dip: (_pianoCollabInfo(nome) || {}).reparto_dip || currentReparto,
@@ -320,6 +597,13 @@ async function registraCertificatoRicevuto(nome, dal, al, nota) {
       errori.push('Rapporto: ' + ((e && e.message) || e));
     }
   }
+  // 3b) NOTE DELLE CELLE: la M del certificato non porta piu «non giustificata»; le ASS
+  //     non giustificate fuori dal periodo la tengono
+  try {
+    await _assAllineaNote(nome, C.concat(fuori));
+  } catch (e) {
+    errori.push('note del piano: ' + ((e && e.message) || e));
+  }
   // 4) ASS fuori dal periodo (restano da regolarizzare): nello Storico HR e in un avviso
   let resto = [];
   try {
@@ -339,6 +623,9 @@ async function registraCertificatoRicevuto(nome, dal, al, nota) {
     ': ' +
     ((sync && sync.messe) || 0) +
     ' giorni del piano in malattia (M)' +
+    (ngNelCert.length
+      ? '; erano assenze non giustificate (certificato arrivato dopo): ' + ngNelCert.map(_assGg).join(', ')
+      : '') +
     (resto.length ? '; fuori dal certificato restano ASS: ' + resto.map(_assGg).join(', ') : '') +
     (nota ? ' · ' + nota : '');
   // lo Storico HR e un registro (le righe le cancella solo l amministratore): la riga resta
@@ -401,7 +688,11 @@ function _pianoAssDaRegolarizzare() {
   const per = {};
   righe
     .filter(
-      (r) => r.codice === 'ASS' && String(r.data).substring(0, 10) <= limite && String(r.data).substring(0, 10) >= dal,
+      (r) =>
+        r.codice === 'ASS' &&
+        !_assNgCella(r) && // non giustificata: regolarizzata (Certificato non ricevuto)
+        String(r.data).substring(0, 10) <= limite &&
+        String(r.data).substring(0, 10) >= dal,
     )
     .forEach((r) => (per[r.collaboratore] = per[r.collaboratore] || []).push(String(r.data).substring(0, 10)));
   return Object.keys(per)

@@ -4975,7 +4975,7 @@ async function _renderPianoAvvisiTab() {
   sez.assreg =
     '<p class="avv-intro">Assenze in attesa di certificato (<b>ASS</b>, 0 ore) da più di ' +
     (typeof _assGiorniRegolarizzare === 'function' ? _assGiorniRegolarizzare() : 3) +
-    ' giorni (regola ass_giorni_regolarizzare). Quando arriva il certificato: <b>Certificato ricevuto</b>, con le sue date: i giorni diventano malattia.</p>' +
+    ' giorni (regola ass_giorni_regolarizzare). Quando arriva il certificato: <b>Certificato ricevuto</b>, con le sue date: i giorni diventano malattia. Se non arriva: <b>Certificato non ricevuto</b>, i giorni restano ASS ma non giustificati ed escono da qui.</p>' +
     (!window._avvAssreg.length
       ? vuoto('Nessuna assenza da regolarizzare.')
       : tabella(
@@ -4995,7 +4995,11 @@ async function _renderPianoAvvisiTab() {
               i +
               '].nome, window._avvAssreg[' +
               i +
-              '].dal)">Certificato ricevuto</button></td></tr>',
+              '].dal)">Certificato ricevuto</button> <button class="btn-act" onclick="apriCertificatoNonRicevuto(window._avvAssreg[' +
+              i +
+              '].nome, window._avvAssreg[' +
+              i +
+              '].dal)">Certificato non ricevuto</button></td></tr>',
           ),
         ));
   // vacanze del file che nel piano non ci sono

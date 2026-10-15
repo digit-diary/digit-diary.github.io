@@ -300,6 +300,13 @@ function mostraPianoCtx(e, nome, dstr) {
     "pianoCtxAzione('certificato')",
     !!(r && r.codice === 'ASS' && typeof puoRegistrareCertificato === 'function' && puoRegistrareCertificato()),
   );
+  // il certificato non arriva: l ASS resta ASS (0 ore) ma non giustificata (stesso permesso)
+  h += voce(
+    'Certificato non ricevuto (non giustificata)',
+    'icx-check',
+    "pianoCtxAzione('certificatoNo')",
+    !!(r && r.codice === 'ASS' && typeof puoRegistrareCertificato === 'function' && puoRegistrareCertificato()),
+  );
   h += voce('Storia della cella', 'icx-clipboard', "pianoCtxAzione('storia')", true);
   h += voce('Copia cella', 'icx-modifica', "pianoCtxAzione('copia')", !!r);
   h += voce(
@@ -559,6 +566,7 @@ async function pianoCtxAzione(azione) {
   else if (azione === 'esigenze') apriCambioEsigenze(sel.nome, sel.data);
   else if (azione === 'storia') pianoStoriaCella(sel.nome, sel.data);
   else if (azione === 'certificato') apriCertificatoRicevuto(sel.nome, sel.data);
+  else if (azione === 'certificatoNo') apriCertificatoNonRicevuto(sel.nome, sel.data);
   else if (azione === 'copia') {
     const r2 = _pianoRighe.find((x) => x.collaboratore === sel.nome && x.data === sel.data);
     if (r2) navigator.clipboard.writeText(r2.codice).then(() => toast('Copiato: ' + r2.codice));

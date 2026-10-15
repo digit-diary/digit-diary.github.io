@@ -559,6 +559,30 @@ console.log('\n== scambio di giorni e rifinitura (blocchi compatti, v453) ==');
   ok(chiamata === 1, 'primaDellaRifinitura chiamata una volta');
 }
 
+// RIFINITURA DEI POSTI SCOPERTI (v456): un posto che si copre solo con una catena di due
+// (Anna passa al giorno scoperto, Bruno prende il suo turno) si copre anche senza la ricerca
+// a caso; senza la rifinitura dei posti resta scoperto
+{
+  const gg = ['2026-11-01', '2026-11-02', '2026-11-03'];
+  const P = {
+    giorni: gg,
+    persone: ['Anna', 'Bruno'],
+    stato: { Anna: { '2026-11-02': 'M' }, Bruno: {} },
+    riposo: '',
+    fabbisogno: { '2026-11-02': { M: 1 }, '2026-11-03': { M: 1 } },
+    modificabile: () => true,
+    // Bruno il 3 non puo; Anna non lavora due giorni di fila (una regola)
+    ammessi: (n, d) => (n === 'Bruno' && d === '2026-11-03' ? [''] : ['M', '']),
+    costoPersona: (n, m) => (m['2026-11-02'] && m['2026-11-03'] ? 20000 : 0),
+  };
+  const r = R.crea(P, { seme: 1 }).risultato();
+  ok(r.dopo.scoperti === 0, 'rifinitura dei posti: la catena di due copre il posto');
+  ok(r.stato.Anna['2026-11-03'] === 'M' && r.stato.Bruno['2026-11-02'] === 'M', 'Anna passa al 3, Bruno prende il 2');
+  ok(r.dopo.regole === 0, 'rifinitura dei posti: nessuna regola in piu');
+  const r0 = R.crea(P, { seme: 1, rifinituraScoperti: 0 }).risultato();
+  ok(r0.dopo.scoperti === 1, 'senza la rifinitura dei posti resta scoperto');
+}
+
 console.log('\n=======================================');
 console.log('  ' + passati + ' passati, ' + falliti + ' falliti');
 console.log('=======================================');

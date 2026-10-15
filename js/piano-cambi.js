@@ -1385,24 +1385,48 @@ function _pianoCopreMalattiaDi(r, malato) {
 // copre (M a mano nel Piano, Diario, Rapporto). [{ data, codice }]
 // Anche le ASS (assenza in attesa di certificato): il turno resta scoperto come con la M.
 async function _pianoTurniScopertiMalattia(nome, dal, al) {
+  return (await _pianoStatoTurniMalattia(nome, dal, al))
+    .filter((x) => !x.libero && !x.da)
+    .map((x) => ({ data: x.data, codice: x.codice, ass: x.ass }));
+}
+// STATO DEI TURNI DI UNA MALATTIA O ASSENZA, giorno per giorno (Diario › «Turni da coprire»,
+// Copri ora, Avvisi): le celle M/ASS del periodo con il turno che c era sotto («Ex S7») e
+// chi lo copre ora (la nota «copre Rossi (...)» del collega). Due letture.
+// [{ data, codice, ass, libero, nonGiust, da }] (libero: sotto c era un riposo, niente da coprire)
+async function _pianoStatoTurniMalattia(nome, dal, al) {
   const righe =
     (await secGet('piano?collaboratore=eq.' + encodeURIComponent(nome) + '&data=gte.' + dal + '&data=lte.' + al)) || [];
-  const conM = righe
-    .filter((r) => _pianoCodiceAssenteTurno(r.codice))
-    .map((r) => ({
-      data: String(r.data).substring(0, 10),
-      codice: _pianoSiglaSottoMalattia(r),
-      ass: r.codice === 'ASS',
-    }))
-    .filter((x) => x.codice && !['C', 'V', 'V1', 'CGF', 'WD', 'ND', 'M', 'M1'].includes(x.codice));
-  if (!conM.length) return [];
-  const giorno =
-    (await secGet(
-      'piano?data=in.(' + [...new Set(conM.map((x) => x.data))].join(',') + ')&select=collaboratore,data,commento',
-    )) || [];
-  return conM.filter(
-    (x) => !giorno.some((r) => String(r.data).substring(0, 10) === x.data && _pianoCopreMalattiaDi(r, nome)),
-  );
+  const conM = righe.filter((r) => _pianoCodiceAssenteTurno(r.codice));
+  const giorni = [...new Set(conM.map((r) => String(r.data).substring(0, 10)))];
+  const giorno = giorni.length
+    ? (await secGet(
+        'piano?data=in.(' + giorni.join(',') + ')&commento=like.*copre*&select=collaboratore,data,commento',
+      )) || []
+    : [];
+  return _pianoStatoTurniDaRighe(nome, conM, giorno);
+}
+// la parte di calcolo (senza letture): righe = celle della persona, giorno = celle dei
+// colleghi negli stessi giorni (almeno quelle con la nota «copre»)
+function _pianoStatoTurniDaRighe(nome, righe, giorno) {
+  return righe
+    .filter((r) => r.collaboratore === nome && _pianoCodiceAssenteTurno(r.codice))
+    .map((r) => {
+      const d = String(r.data).substring(0, 10);
+      const codice = _pianoSiglaSottoMalattia(r);
+      const libero = !codice || ['C', 'V', 'V1', 'CGF', 'WD', 'ND', 'M', 'M1'].includes(codice);
+      const chi = libero
+        ? null
+        : (giorno || []).find((y) => String(y.data).substring(0, 10) === d && _pianoCopreMalattiaDi(y, nome));
+      return {
+        data: d,
+        codice: codice,
+        ass: r.codice === 'ASS',
+        libero: libero,
+        nonGiust: typeof _assNgCella === 'function' && _assNgCella(r),
+        da: chi ? chi.collaboratore : null,
+      };
+    })
+    .sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0));
 }
 // MALATTIA TOLTA MA GIA COPERTA (decisione del titolare 15.10): togliendo la M dal Diario,
 // dal Rapporto o dal Piano, se un collega la copriva il programma chiede «Rimetto il turno a
@@ -1658,7 +1682,7 @@ async function pianoAvvisoCopriOra(nome) {
   _pianoAvvisoCoperturaRender();
   const ym = a.scoperti[0].data.substring(0, 7);
   const g = a.scoperti.filter((x) => x.data.startsWith(ym)).map((x) => parseInt(x.data.substring(8, 10)));
-  await _pianoApriCopertura(nome, ym, Math.min(...g), Math.max(...g), null);
+  await _pianoApriCopertura(nome, ym, Math.min(...g), Math.max(...g), null, a.ass ? 'ASS' : 'M');
 }
 function pianoAvvisoPunti(nome) {
   const a = window._copAvvisi[nome];
@@ -1688,7 +1712,8 @@ function _pianoMalattieDaCoprire() {
 }
 // apre Sostituisci chi e in malattia gia compilata (settore e mese del collaboratore) e
 // cerca subito i sostituti. ass: null = malattia, { codice: 'ND', nota } = non disponibilita
-async function _pianoApriCopertura(nome, ym, gDa, gAl, ass) {
+// codice: 'ASS' o 'M' preimpostato in «Registra come» (dal Diario: il tipo della registrazione)
+async function _pianoApriCopertura(nome, ym, gDa, gAl, ass, codice) {
   const info = _pianoCollabInfo(nome) || {};
   switchPage('piano');
   if (info.reparto_dip && typeof pianoCambiaReparto === 'function') pianoCambiaReparto(info.reparto_dip);
@@ -1700,6 +1725,8 @@ async function _pianoApriCopertura(nome, ym, gDa, gAl, ass) {
   // ND: la sigla e decisa (niente scelta ASS / M)
   const rigaCod = document.getElementById('mal-codice-riga');
   if (rigaCod && ass) rigaCod.style.display = 'none';
+  const selCod = document.getElementById('mal-codice');
+  if (selCod && !ass && (codice === 'ASS' || codice === 'M')) selCod.value = codice;
   const sel = document.getElementById('mal-collab');
   if (sel) sel.value = nome;
   document.getElementById('mal-da').value = gDa;
@@ -2649,9 +2676,10 @@ async function _confermaCoperturaMalattiaEsegui() {
     const rMal = rigaDi[m.nome + '|' + d.g];
     if (d.giaM) {
       // gia in M (scritta a mano, dal Diario o dal Rapporto): resta com e, la nota dice chi copre
+      // (un assenza non giustificata lo resta: la nota la tiene)
       if (rMal && conSost)
         metti(m.nome, d.g, rMal, {
-          commento: ('Ex ' + d.codice + coperto + ' - ' + op).substring(0, 400),
+          commento: _assNgCommento(('Ex ' + d.codice + coperto + ' - ' + op).substring(0, 370), _assNgCella(rMal)),
           operatore: op,
         });
     } else if (rMal) {

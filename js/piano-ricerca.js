@@ -95,6 +95,9 @@
  *                 sposta un giorno isolato accanto a un blocco, posti e ore invariati)
  *   rifinituraScambi quante prove nella rifinitura finale (scambi di giorni e di turno; default 60000,
  *                 0 = niente): dal migliore, tutti gli scambi di giorni vicini, solo i miglioramenti
+ *   rifinituraScoperti quante prove nella rifinitura dei posti scoperti (default 20000, 0 = niente):
+ *                 dal migliore, per ogni posto scoperto tutte le mosse corte (chi riposa, catene di
+ *                 due con un giorno vicino, cambio di turno nello stesso giorno), si tiene la migliore
  *   seme          numero per rendere la ricerca ripetibile (stesso seme e stesse iterazioni
  *                 = stesso risultato; vedi semeRicerca)
  */
@@ -843,12 +846,19 @@
     // solo con un piano ammesso (stessi vincoli). La ricerca a caso trova raramente proprio lo
     // scambio che chiude un buco nei blocchi; qui si guardano tutti. o.rifinituraScambi: quante
     // prove al massimo (default 30000; 0 = niente rifinitura).
+    // i pesi della rifinitura (P.primaDellaRifinitura) si cambiano una volta sola, prima della
+    // prima rifinitura che parte (posti scoperti o scambi di giorni)
+    let pesiRifinitura = false;
+    function pesiDellaRifinitura() {
+      if (!pesiRifinitura && typeof P.primaDellaRifinitura === 'function') P.primaDellaRifinitura();
+      pesiRifinitura = true;
+    }
     function rifinisciScambi() {
       const maxProve = o.rifinituraScambi != null ? o.rifinituraScambi : 60000;
       if (!(maxProve > 0)) return;
       // il problema puo cambiare i pesi per la rifinitura (P.primaDellaRifinitura): i costi si
       // ricalcolano da capo e il migliore riparte dal suo punteggio con i pesi nuovi
-      if (typeof P.primaDellaRifinitura === 'function') P.primaDellaRifinitura();
+      pesiDellaRifinitura();
       ricaricaMigliore();
       if (migliore.ammesso) migliore.punteggio = totale;
       let prove = 0;
@@ -961,8 +971,147 @@
         if (!migliorati) break;
       }
     }
+    // RIFINITURA DEI POSTI SCOPERTI (v456): dal migliore trovato, per ogni posto ancora
+    // scoperto si provano in ordine TUTTE le mosse corte, a temperatura zero (resta solo cio
+    // che fa scendere il punteggio, il migliore cambia solo con un piano ammesso):
+    //   1 chi riposa quel giorno prende il posto;
+    //   2 chi riposa quel giorno prende il posto e lascia un suo turno di un giorno vicino (fino
+    //     a 6 giorni prima o dopo) a chi riposa quel giorno, o a nessuno se non serve: cosi
+    //     tornano a posto il riposo di 11 ore, i giorni di fila e le ore della settimana;
+    //   3 chi lavora quel giorno un altro turno passa al posto scoperto e il suo turno lo prende
+    //     chi riposa (o nessuno).
+    // La ricerca a caso trovava raramente proprio queste mosse: Slots novembre 2026, dopo
+    // Migliora di 1 minuto restavano 10-16 posti che si coprivano con una sola persona libera o
+    // con una catena di due, senza nessuna regola in piu. o.rifinituraScoperti: quante prove al
+    // massimo (default 20000; 0 = niente).
+    function rifinisciScoperti() {
+      const maxProve = o.rifinituraScoperti != null ? o.rifinituraScoperti : 20000;
+      if (!(maxProve > 0)) return;
+      // con i pesi della rifinitura (i buchi nei blocchi contano): un posto si copre con la
+      // mossa che lascia i blocchi piu compatti
+      pesiDellaRifinitura();
+      ricaricaMigliore();
+      if (migliore.ammesso) migliore.punteggio = totale;
+      let prove = 0;
+      // filtro veloce: la persona da sola, con le celle cambiate, non ha piu regole di legge di
+      // adesso (le regole fra persone e i vincoli li controlla poi prova sulla mossa intera)
+      const memoPersona = {};
+      const personaRegge = (n, celle) => {
+        const k = n + '|' + celle.map((x) => x.d + '=' + x.c).join(',');
+        if (k in memoPersona) return memoPersona[k];
+        const vecchi = celle.map((x) => stato[n][x.d]);
+        celle.forEach((x) => (stato[n][x.d] = x.c));
+        const v = valP(n);
+        celle.forEach((x, i) => (stato[n][x.d] = vecchi[i]));
+        const prima = contiP[n] || {};
+        const dopo = v.conti || {};
+        const ok = !Object.keys(dopo).some((t) => /^legge/.test(t) && (dopo[t] || 0) > (prima[t] || 0));
+        memoPersona[k] = ok;
+        return ok;
+      };
+      const libero = (n, d) => (stato[n][d] || riposo) === riposo;
+      // il riposo di quella cella: nei giorni WD (deve lavorare di giorno) il riposo e il WD
+      const riposoDi = (n, d) => {
+        const a = ammessi(n, d);
+        return a.includes(riposo) ? riposo : a.includes('WD') ? 'WD' : null;
+      };
+      const manca = (d, c) => ((fab[d] || {})[c] || 0) > (assegnati[d][c] || 0);
+      // punti che la mossa farebbe guadagnare (negativo = meglio), senza tenerla; null = non passa
+      const guadagno = (mossa) => {
+        prove++;
+        const primaT = totale;
+        const vecchi = mossa.map((m) => ({ n: m.n, d: m.d, c: stato[m.n][m.d] || '' }));
+        if (!prova(mossa, 0)) return null;
+        const g = totale - primaT;
+        prova(vecchi, Infinity); // si torna sempre indietro (temperatura infinita: accettata)
+        return g;
+      };
+      // le mosse possibili per il posto (d, c), gia filtrate persona per persona
+      const mosseDi = (d, c) => {
+        const out = [];
+        // 1 chi riposa
+        const liberi = mobili[d].filter((n) => libero(n, d) && ammessi(n, d).includes(c));
+        liberi.forEach((n) => {
+          if (personaRegge(n, [{ d: d, c: c }])) out.push([{ n: n, d: d, c: c }]);
+        });
+        // 2 chi riposa, lasciando un suo turno vicino
+        liberi.forEach((n) => {
+          for (let k = -6; k <= 6; k++) {
+            if (!k) continue;
+            const d2 = accanto(d, k);
+            if (indiceGiorno[d2] == null || !puo(n, d2) || !lavora(n, d2)) continue;
+            const c2 = stato[n][d2];
+            const r2 = riposoDi(n, d2);
+            if (r2 == null) continue;
+            const base = [
+              { n: n, d: d, c: c },
+              { n: n, d: d2, c: r2 },
+            ];
+            if (
+              !personaRegge(n, [
+                { d: d, c: c },
+                { d: d2, c: r2 },
+              ])
+            )
+              continue;
+            mobili[d2].forEach((y) => {
+              if (y !== n && libero(y, d2) && ammessi(y, d2).includes(c2) && personaRegge(y, [{ d: d2, c: c2 }]))
+                out.push(base.concat([{ n: y, d: d2, c: c2 }]));
+            });
+            out.push(base);
+          }
+        });
+        // 3 chi lavora quel giorno un altro turno
+        mobili[d].forEach((x) => {
+          const c3 = stato[x][d];
+          if (!lavora(x, d) || c3 === c || !ammessi(x, d).includes(c) || manca(d, c3)) return;
+          if (!personaRegge(x, [{ d: d, c: c }])) return;
+          mobili[d].forEach((y) => {
+            if (y !== x && libero(y, d) && ammessi(y, d).includes(c3) && personaRegge(y, [{ d: d, c: c3 }]))
+              out.push([
+                { n: x, d: d, c: c },
+                { n: y, d: d, c: c3 },
+              ]);
+          });
+          out.push([{ n: x, d: d, c: c }]);
+        });
+        return out;
+      };
+      // si prova ogni mossa e si tiene la MIGLIORE (non la prima): a parita di posto coperto,
+      // quella con meno buchi nei blocchi e ore piu vicine all obiettivo
+      const copri = (d, c) => {
+        let best = null;
+        let bestG = -1e-9;
+        for (const m of mosseDi(d, c)) {
+          if (prove >= maxProve) break;
+          const g = guadagno(m);
+          if (g != null && g < bestG) {
+            bestG = g;
+            best = m;
+          }
+        }
+        return !!best && prova(best, 0);
+      };
+      for (let giro = 0; giro < 3 && prove < maxProve; giro++) {
+        let migliorati = 0;
+        for (const d of giorni) {
+          for (const c of Object.keys(fab[d] || {})) {
+            while (manca(d, c) && prove < maxProve) {
+              if (!copri(d, c)) break;
+              migliorati++;
+              // una mossa accettata cambia i costi: il filtro veloce riparte da capo
+              Object.keys(memoPersona).forEach((k) => delete memoPersona[k]);
+            }
+          }
+        }
+        if (!migliorati) break;
+      }
+    }
     function risultato() {
+      rifinisciScoperti();
       rifinisciScambi();
+      // gli scambi di giorni aprono altre catene corte (giorni di fila, riposi): un secondo giro
+      rifinisciScoperti();
       if (o.pesoCambio) rifinisci();
       const cambi = [];
       persone.forEach((n) =>

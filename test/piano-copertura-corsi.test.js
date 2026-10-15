@@ -10,6 +10,10 @@
  *  - note della copertura malattia (js/piano-cambi.js): "Ex C - copre Rossi (malattia)" e
  *    "Ex S7 - coperto da ...": la sigla di prima resta leggibile da _pianoSiglaSottoMalattia;
  *  - _pianoTurniScopertiMalattia: le M con un turno sotto che nessuno copre ancora.
+ *  - _pianoStatoTurniMalattia: lo stato giorno per giorno (riquadro «Turni da coprire» del
+ *    Diario): coperto da chi, giorno libero, assenza non giustificata;
+ *  - assenza non giustificata (js/assenze.js): nota della cella e contrassegno della
+ *    registrazione, tutta o solo alcuni giorni.
  *   node test/piano-copertura-corsi.test.js
  */
 const fs = require('fs');
@@ -135,10 +139,31 @@ vm.runInContext(
       '_pianoNotaCopre',
       '_pianoCopreMalattiaDi',
       '_pianoTurniScopertiMalattia',
+      '_pianoStatoTurniMalattia',
+      '_pianoStatoTurniDaRighe',
       '_pianoOpsTogliCopertura',
       '_pianoMalattieDaCoprire',
     ]),
-    estrai('piano-core.js', ['_pianoAttesoDi']),
+    estrai('piano-core.js', ['_pianoAttesoDi', '_pianoDateMalattia']),
+    // costanti e funzioni dell assenza non giustificata
+    fs
+      .readFileSync(path.join(__dirname, '..', 'js', 'assenze.js'), 'utf8')
+      .split('\n')
+      .filter((l) => /^const _ASS_NG_[A-Z]+ = /.test(l))
+      .join('\n')
+      .replace(/^const /gm, 'var '),
+    estrai('assenze.js', [
+      '_assGg',
+      '_assRigaPerGiorno',
+      '_assGiorniPropri',
+      '_assNgNota',
+      '_assNgCella',
+      '_assNgCommento',
+      '_assNgTogli',
+      '_assNgGiorniReg',
+      '_assNgTestoReg',
+      'assNonGiustificateGiorni',
+    ]),
   ].join('\n'),
   ctx,
 );
@@ -268,6 +293,74 @@ const D = (g) => '2027-01-' + String(g).padStart(2, '0');
   ok(
     ctx._pianoCodiceAssenteTurno('ASS') && ctx._pianoCodiceAssenteTurno('M') && !ctx._pianoCodiceAssenteTurno('C'),
     'ASS, M e M1 lasciano il turno scoperto; C no',
+  );
+
+  console.log('_pianoStatoTurniMalattia (riquadro Turni da coprire del Diario)');
+  DB = [
+    riga('Rossi Mario', D(11), 'M', { commento: 'Ex S22 - Admin' }),
+    riga('Rossi Mario', D(12), 'M', { commento: 'Ex S7 - coperto da Verdi Anna - Admin' }),
+    riga('Rossi Mario', D(13), 'M', { commento: 'Ex C - Admin' }),
+    riga('Rossi Mario', D(14), 'ASS', { commento: 'Ex L1 - Admin · non giustificata' }),
+    riga('Verdi Anna', D(12), 'S7', { commento: ctx._pianoNotaCopre('C', 'Rossi Mario', false, 'Admin') }),
+  ];
+  const st = await ctx._pianoStatoTurniMalattia('Rossi Mario', D(10), D(15));
+  ok(st.length === 4, '4 giorni di malattia/assenza nel periodo (' + st.length + ')');
+  ok(st[0].data === D(11) && st[0].codice === 'S22' && !st[0].da && !st[0].libero, '11: Ex S22, da coprire');
+  ok(st[1].da === 'Verdi Anna' && st[1].codice === 'S7', '12: Ex S7 coperto da Verdi Anna');
+  ok(st[2].libero === true, '13: era C, giorno libero');
+  ok(st[3].ass === true && st[3].nonGiust === true && st[3].codice === 'L1', '14: ASS non giustificata, Ex L1');
+  const scS = await ctx._pianoTurniScopertiMalattia('Rossi Mario', D(10), D(15));
+  ok(scS.map((x) => x.data).join() === [D(11), D(14)].join(), 'scoperti: 11 e 14 (stessa fonte del riquadro)');
+
+  console.log('assenza non giustificata (Certificato non ricevuto)');
+  ctx.giornoDi = (v) => String(v).substring(0, 10);
+  ctx._pianoTipoAssenza = () => 'Assenza';
+  const cN = ctx._assNgCommento('Ex S1 - Admin', true);
+  ok(cN === 'Ex S1 - Admin · non giustificata', 'nota della cella: ' + cN);
+  ok(ctx._assNgCommento(cN, false) === 'Ex S1 - Admin', 'nota tolta: torna com era');
+  ok(ctx._assNgCommento(cN, true) === cN, 'nota messa due volte: una sola');
+  ok(ctx._pianoSiglaSottoMalattia({ commento: cN }) === 'S1', 'la sigla sotto resta leggibile (S1)');
+  ok(
+    ctx._assNgCella({ codice: 'ASS', commento: cN }) && !ctx._assNgCella({ codice: 'M', commento: cN }),
+    'solo una cella ASS',
+  );
+  const regP = {
+    tipo: 'Assenza',
+    nome: 'Rossi Mario',
+    data: D(6) + 'T08:00:00Z',
+    testo: 'Assente dal 06/01/2027 al 08/01/2027 (3 giorni, da rapporto PRESTO del 06/01/2027)',
+  };
+  const propri = ctx._assGiorniPropri(regP);
+  const tParz = ctx._assNgTestoReg(regP.testo, [D(7), D(8)], propri);
+  ok(
+    /^Assenza non giustificata \(certificato non ricevuto: 07\.01, 08\.01\) · Assente dal/.test(tParz),
+    'parte dei giorni: ' + tParz,
+  );
+  ok(ctx._pianoDateMalattia(tParz, regP.data).join() === propri.join(), 'le date della registrazione non cambiano');
+  ok(
+    ctx._assNgGiorniReg(Object.assign({}, regP, { testo: tParz })).join() === [D(7), D(8)].join(),
+    'giorni non giustificati: 07 e 08',
+  );
+  const tTutti = ctx._assNgTestoReg(regP.testo, propri, propri);
+  ok(/^Assenza non giustificata \(certificato non ricevuto\) · /.test(tTutti), 'tutti i giorni: senza elenco');
+  ok(
+    ctx._assNgTogli(tTutti) === regP.testo && ctx._assNgTestoReg(tTutti, [], propri) === regP.testo,
+    'tolto il contrassegno: testo di prima',
+  );
+  const regG = {
+    tipo: 'Assenza',
+    nome: 'Rossi Mario',
+    data: D(12) + 'T08:00:00Z',
+    testo: 'Assenza non giustificata (certificato non ricevuto) · Chiamata (dal 12/01/2027 al 13/01/2027)',
+  };
+  ok(ctx._assNgGiorniReg(regG).join() === D(12), 'riga per giorno: solo il suo giorno');
+  ok(
+    ctx.assNonGiustificateGiorni([
+      regG,
+      Object.assign({}, regP, { testo: tParz }),
+      { tipo: 'Malattia', testo: tTutti, data: D(1) },
+    ]) === 3,
+    'conteggio: 3 giorni (la Malattia no)',
   );
 
   console.log('_pianoOpsTogliCopertura (malattia tolta che un collega copriva)');

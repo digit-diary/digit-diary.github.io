@@ -3581,6 +3581,11 @@ async function _renderPianoCore() {
               cls += ' piano-comm';
               titolo += (titolo ? ' · ' : '') + r.commento;
             }
+            // ASSENZA NON GIUSTIFICATA (Certificato non ricevuto, assenze.js): ASS a 0 ore, segnata
+            if (typeof _assNgCella === 'function' && _assNgCella(r)) {
+              cls += ' piano-ass-ng';
+              titolo = 'Assenza NON giustificata (certificato non ricevuto) · ASS, 0 ore · ' + titolo;
+            }
             // MALATTIA SU GIORNO DI CONGEDO: il giorno C dentro un periodo di
             // malattia si mostra come MC (0 ore, la C resta nei dati) così la
             // malattia si vede anche dove non c'era un turno da coprire
