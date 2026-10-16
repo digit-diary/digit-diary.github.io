@@ -935,6 +935,20 @@ function _ripartisciPx(px, n) {
   out[n - 1] += tot - base * n;
   return out;
 }
+// NUMERO DI BUONI PROPOSTO DA SOLO (come fino a settembre 2026, richiesta del titolare 16/10):
+// importo diviso il valore del buono, arrotondato in su (si supera il valore = un buono in
+// piu': 30 CHF con BU da 15 = 2, 31 = 3). Calcolo in centesimi, cosi' 45/15 resta 3.
+// Riga con piu' nomi ("A / B"): il buono e' del primo nome e non puo' superare le sue persone,
+// altrimenti "Aili BL / Bertaggia" 360 CHF darebbe 9 BL ad Aili e 0 CHF a Bertaggia (il motivo
+// per cui il 24/09 il calcolo era stato tolto del tutto). null = niente da proporre.
+function _buoniAutoQty(importo, valore, nNomi, pxPrimo) {
+  const imp = Math.round((parseFloat(importo) || 0) * 100);
+  const val = Math.round((parseFloat(valore) || 0) * 100);
+  if (imp <= 0 || val <= 0) return null;
+  let q = Math.ceil(imp / val);
+  if ((parseInt(nNomi) || 1) > 1) q = Math.min(q, Math.max(1, parseInt(pxPrimo) || 1));
+  return Math.max(1, q);
+}
 // Il budget Maison e' mensile ("CHF/mese"): lo speso si confronta con il MESE CORRENTE
 // (o con l'anno corrente dove l'utente lo sceglie, budget x12). Un'unica funzione per lista
 // Budget, alert, Home e dashboard: prima ogni schermata usava un periodo diverso.
@@ -1000,7 +1014,7 @@ function _parseMaisonNome(raw) {
   const _wlM = (nome + ' ' + note).match(/(\d*)\s*(?:welcome\s*lounge|w\.?\s*lounge|\bw\.?\s*l\.?\b)/i);
   if (_wlM || /welcome\s*lounge|w\.?\s*lounge|\bw\.?\s*l\.?\b/i.test(_checkWL)) {
     const _wlQty = _wlM && _wlM[1] ? parseInt(_wlM[1]) : 1;
-    tipiBuono.push({ tipo: 'WL', qty: _wlQty });
+    tipiBuono.push({ tipo: 'WL', qty: _wlQty, scritta: !!(_wlM && _wlM[1]) });
     if (!tipoBuono) tipoBuono = 'WL';
     note = (note ? note + ', ' : '') + 'Welcome Lounge';
     nome = nome.replace(/\d*\s*(?:welcome\s*lounge|w\.?\s*lounge|\bw\.?\s*l\.?\b)/gi, '').trim();
@@ -1012,7 +1026,7 @@ function _parseMaisonNome(raw) {
   );
   if (_cgM || /gou?r?met|gouret|gourme\w?t?\b/i.test(_checkCG)) {
     const _cgQty = _cgM && _cgM[1] ? parseInt(_cgM[1]) : 1;
-    tipiBuono.push({ tipo: 'CG', qty: _cgQty || 1 });
+    tipiBuono.push({ tipo: 'CG', qty: _cgQty || 1, scritta: !!(_cgM && _cgM[1]) });
     if (!tipoBuono) tipoBuono = 'CG';
     note = (note ? note + ', ' : '') + 'C. Gourmet';
     nome = nome
@@ -1034,7 +1048,7 @@ function _parseMaisonNome(raw) {
   const buM = nome.match(/\s*\+?\s*(\d*)\s*b\.?\s*u(?:nico)?\b/i);
   if (buM) {
     const _buQty = buM[1] ? parseInt(buM[1]) : 1;
-    tipiBuono.push({ tipo: 'BU', qty: _buQty || 1 });
+    tipiBuono.push({ tipo: 'BU', qty: _buQty || 1, scritta: !!buM[1] });
     if (!tipoBuono) tipoBuono = 'BU';
     note = (note ? note + ', ' : '') + (_buQty || 1) + 'BU';
     nome = nome.replace(buM[0], '').trim();
@@ -1043,7 +1057,7 @@ function _parseMaisonNome(raw) {
   const blM = nome.match(/\s*\+?\s*(\d*)\s*b\.?\s*l+(?:ounge)?\b/i);
   if (blM) {
     const _blQty = blM[1] ? parseInt(blM[1]) : 1;
-    tipiBuono.push({ tipo: 'BL', qty: _blQty || 1 });
+    tipiBuono.push({ tipo: 'BL', qty: _blQty || 1, scritta: !!blM[1] });
     if (!tipoBuono) tipoBuono = 'BL';
     note = (note ? note + ', ' : '') + (_blQty || 1) + 'BL';
     nome = nome.replace(blM[0], '').trim();
@@ -1067,7 +1081,7 @@ function _parseMaisonNome(raw) {
       const mT = mNome || note.match(re);
       if (!mT) return;
       const q = mT[1] ? parseInt(mT[1]) : 1;
-      tipiBuono.push({ tipo: t.codice, qty: q || 1 });
+      tipiBuono.push({ tipo: t.codice, qty: q || 1, scritta: !!mT[1] });
       if (!tipoBuono) tipoBuono = t.codice;
       // trovato nel nome: si toglie da li e si scrive nella nota; gia nella nota: resta com e
       if (mNome) {
@@ -1324,8 +1338,26 @@ async function caricaMaisonFile(input, forzaSostituisci) {
         const nNomiNoSeven = parsedAll.filter((p) => !p.isSeven && p.nome).length;
         const nNomi = nNomiNoSeven || 1;
         const rigaHaSeven = parsedAll.some((p) => p.isSeven);
-        // Quote di costo e persone per i nomi non-Seven della riga: la quantita' di buoni e'
-        // quella scritta nel file (default 1), mai ricavata dal costo (vedi _ripartisciCostoBuoni)
+        // Numero di buoni non scritto nel file ("Rossi BL" e non "Rossi 2BL"), riga con un solo
+        // nome e un solo tipo: si ricava dal costo come fino al 24/09 (_buoniAutoQty, 80 CHF con
+        // BL da 40 = 2BL). Un numero scritto nel file vale sempre, anche 1. Con piu' nomi resta
+        // quello scritto (default 1): ricavarlo dal costo dell intera riga dava 9 BL a chi ne
+        // aveva usato uno solo (vedi _ripartisciCostoBuoni).
+        if (nNomiNoSeven === 1 && !rigaHaSeven)
+          parsedAll.forEach((p) => {
+            if (!p.nome || p.isSeven || !p.tipiBuono || p.tipiBuono.length !== 1 || p.tipiBuono[0].scritta) return;
+            const tb = p.tipiBuono[0];
+            const q = _buoniAutoQty(costo, BUONO_VALORI[tb.tipo], 1, px);
+            if (!q || q === tb.qty) return;
+            const prima = tb.qty + tb.tipo;
+            tb.qty = q;
+            // la nota porta il numero ("2BL") letto da conteggi e pareggio buoni
+            const reN = new RegExp('(^|[\\s,])' + _buoniEsc(prima) + '(?![A-Za-z0-9])', 'i');
+            p.note = reN.test(p.note || '')
+              ? p.note.replace(reN, (m, a) => a + q + tb.tipo)
+              : q + tb.tipo + (p.note ? ', ' + p.note : '');
+          });
+        // Quote di costo e persone per i nomi non-Seven della riga (vedi _ripartisciCostoBuoni)
         const _idxNoSeven = parsedAll.map((p, i) => i).filter((i) => !parsedAll[i].isSeven && parsedAll[i].nome);
         const _quote = _ripartisciCostoBuoni(
           costo,

@@ -4537,71 +4537,207 @@ async function generaBozzaPiano(usaCoperture) {
   }
 }
 
+// SVUOTA IL MESE E GIORNI CHIUSI (16/10/2026, segnalazione del titolare): prima Svuota
+// cancellava tutto il mese con un unica cancellazione per intervallo, anche i giorni
+// passati chiusi dal lucchetto, senza permesso e senza dirlo; il suo Annulla poi non li
+// rimetteva ("i giorni chiusi non si toccano") e l 1-15 ottobre restava vuoto.
+// Ora Svuota toglie solo i giorni aperti (dal primo giorno non chiuso alla fine del mese)
+// e dice quante celle dei giorni chiusi restano. Anche i giorni chiusi solo con il
+// permesso "Giorni chiusi" (o da admin), scegliendolo apposta e scrivendo il motivo, che
+// resta nel registro. Funzione pura (test/piano-svuota.test.js): righe del settore,
+// ultimo giorno del mese, bloccato(dstr) -> { daAperto, aperte, chiuse, giorniChiusi, assenze }.
+// ASSENZE (16/10/2026): le ND (modulo 1187) e le malattie M / M1 (Diario) non si svuotano
+// mai, nei giorni aperti come in quelli chiusi: il modulo ND 1187 segue le celle ND del
+// mese (modulo-nd.js) e uno Svuota lo toglieva o lo accorciava da solo; le malattie si
+// tolgono dalla loro registrazione. Restano in assenze, fuori da aperte e chiuse.
+const PIANO_SVUOTA_TIENI = ['ND', 'M', 'M1'];
+function _pianoSvuotaCalcola(righe, ym, ultimo, bloccato) {
+  let daAperto = null;
+  for (let g = 1; g <= ultimo; g++) {
+    const d = ym + '-' + String(g).padStart(2, '0');
+    if (!bloccato(d)) {
+      daAperto = d;
+      break;
+    }
+  }
+  const dt = (r) => String(r.data).substring(0, 10);
+  const assenza = (r) => PIANO_SVUOTA_TIENI.includes(String(r.codice || '').toUpperCase());
+  const assenze = (righe || []).filter(assenza);
+  const altre = (righe || []).filter((r) => !assenza(r));
+  const chiuse = altre.filter((r) => !daAperto || dt(r) < daAperto);
+  const aperte = altre.filter((r) => daAperto && dt(r) >= daAperto);
+  return { daAperto, aperte, chiuse, giorniChiusi: [...new Set(chiuse.map(dt))].sort(), assenze };
+}
+function _pianoSvuotaStato() {
+  const ym = _pianoMeseSel;
+  const mieC = _pianoRighe.filter((r) => _repartoDi(r) === _pianoReparto());
+  return Object.assign(
+    { ym: ym, mieC: mieC },
+    _pianoSvuotaCalcola(mieC, ym, _pianoUltimoGiorno(ym), _pianoGiornoBloccato),
+  );
+}
+function _pianoGiorniTxt(giorni) {
+  const gg = (d) => d.split('-').reverse().join('.');
+  if (!giorni.length) return '';
+  return giorni.length === 1 ? 'il ' + gg(giorni[0]) : 'dal ' + gg(giorni[0]) + ' al ' + gg(giorni[giorni.length - 1]);
+}
 async function cancellaBozzaPiano() {
   if (!_pianoAzioneAutoConsentita('genera')) return; // azione automatica: permesso apposito
   // IDENTICO a Turnivo (cancella_piano): elimina le celle NON protette del mese;
   // opzione "cancella tutto" per includere anche le protette.
   if (!puoGestirePiano()) return;
   const ym = _pianoMeseSel;
-  const da = ym + '-01';
-  const a = ym + '-' + String(_pianoUltimoGiorno(ym)).padStart(2, '0');
   // si contano SOLO le celle di questo settore, come quelle che si cancellano (prima si
   // contavano anche quelle di chi copre da un altro settore: "TUTTE (120)" e poi "110 rimosse")
-  const mieC = _pianoRighe.filter((r) => _repartoDi(r) === _pianoReparto());
-  const nonProtette = mieC.filter((r) => !r.protetto).length;
-  const protette = mieC.length - nonProtette;
+  const sv = _pianoSvuotaStato();
+  const nonProtette = sv.aperte.filter((r) => !r.protetto).length;
+  const protette = sv.aperte.length - nonProtette;
+  const nChiuse = sv.chiuse.length;
+  const puoPassato = puoSbloccareGiorniChiusi();
   const meseTxt = new Date(ym + '-01T12:00:00').toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
   const b = document.getElementById('pwd-modal-content');
+  const chiusiTxt = nChiuse
+    ? '<p style="margin-bottom:14px;font-size:var(--fs-md,.875rem)"><b>Giorni chiusi (' +
+      escP(_pianoGiorniTxt(sv.giorniChiusi)) +
+      '): ' +
+      nChiuse +
+      (nChiuse === 1 ? ' cella resta come è.' : ' celle restano come sono.') +
+      '</b> I giorni passati sono un documento: ' +
+      (puoPassato
+        ? 'per svuotare anche quelli spunta la casella qui sotto; ti chiedo il motivo, che resta nel registro.'
+        : 'per svuotarli serve il permesso "Giorni chiusi" (o l amministratore).') +
+      '</p>' +
+      (puoPassato
+        ? '<label style="display:flex;gap:8px;align-items:center;margin-bottom:14px;font-size:var(--fs-md,.875rem)"><input type="checkbox" id="svuota-anche-chiusi"> Svuota anche i giorni chiusi (' +
+          nChiuse +
+          ' celle, serve un motivo)</label>'
+        : '')
+    : '';
+  const daTxt =
+    sv.daAperto && sv.daAperto > ym + '-01'
+      ? ' dal ' + sv.daAperto.split('-').reverse().join('.') + ' alla fine del mese'
+      : '';
   b.innerHTML =
     '<h3>Svuota il piano di ' +
     escP(meseTxt) +
     ' · ' +
     escP(typeof repartoLabel === 'function' ? repartoLabel(_pianoReparto()) : _pianoReparto()) +
     '</h3><p style="margin-bottom:14px;font-size:var(--fs-md,.875rem)">' +
-    nonProtette +
-    ' celle scritte dalla bozza o senza lucchetto, ' +
-    protette +
-    ' con il lucchetto (vacanze, scritte a mano). Si può annullare con Annulla.</p>' +
+    (sv.daAperto
+      ? 'Giorni aperti' +
+        daTxt +
+        ': ' +
+        nonProtette +
+        ' celle scritte dalla bozza o senza lucchetto, ' +
+        protette +
+        ' con il lucchetto (vacanze, scritte a mano).'
+      : 'Il mese è tutto chiuso: nessun giorno aperto da svuotare.') +
+    ' Si può annullare con Annulla.</p>' +
+    chiusiTxt +
+    (sv.assenze.length
+      ? '<p style="margin-bottom:14px;font-size:var(--fs-md,.875rem)">Restano sempre ' +
+        sv.assenze.length +
+        ' assenze (ND del modulo 1187, malattie M): si tolgono dalla cella o dalla loro registrazione, mai con Svuota.</p>'
+      : '') +
     '<div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button>' +
     '<button class="btn-modal-ok" onclick="eseguiCancellaPiano(false)">Solo senza lucchetto (' +
     nonProtette +
     ')</button>' +
     (puoAzioniAutoPiano('cancella')
       ? '<button class="btn-modal-ok" style="background:var(--accent)" onclick="eseguiCancellaPiano(true)">TUTTE (' +
-        mieC.length +
+        sv.aperte.length +
         ')</button>'
       : '') +
     '</div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
 }
-async function eseguiCancellaPiano(tutto) {
+async function eseguiCancellaPiano(tutto, ancheChiusi) {
   // solo le celle generate = Genera piano; anche le protette = Cancellazioni di massa
   if (!_pianoAzioneAutoConsentita(tutto ? 'cancella' : 'genera')) return;
+  if (ancheChiusi === undefined) {
+    const cb = document.getElementById('svuota-anche-chiusi');
+    ancheChiusi = !!(cb && cb.checked);
+  }
   document.getElementById('pwd-modal').classList.add('hidden');
-  const ym = _pianoMeseSel;
-  const da = ym + '-01';
+  const sv = _pianoSvuotaStato();
+  const ym = sv.ym;
   const a = ym + '-' + String(_pianoUltimoGiorno(ym)).padStart(2, '0');
-  const mie = _pianoRighe.filter((r) => _repartoDi(r) === _pianoReparto()); // non le celle degli altri settori
-  const n = tutto ? mie.length : mie.filter((r) => !r.protetto).length;
+  const filtroTutto = (l) => (tutto ? l : l.filter((r) => !r.protetto));
+  const chiuseTolte = ancheChiusi ? filtroTutto(sv.chiuse) : [];
+  const chiuseLasciate = ancheChiusi ? sv.chiuse.length - chiuseTolte.length : sv.chiuse.length;
+  const n = filtroTutto(sv.aperte).length + chiuseTolte.length;
   if (!n) {
-    toast('Niente da cancellare');
+    toast(
+      sv.chiuse.length && !ancheChiusi
+        ? 'Niente da cancellare nei giorni aperti: le ' + sv.chiuse.length + ' celle dei giorni chiusi restano'
+        : 'Niente da cancellare',
+    );
     return;
   }
   if (
     tutto &&
     !(await chiediConferma(
-      'ATTENZIONE: verranno eliminate ANCHE le celle protette (vacanze, inserimenti manuali). Confermi?',
+      'ATTENZIONE: verranno eliminate ANCHE le celle protette (vacanze, inserimenti manuali)' +
+        (chiuseTolte.length ? ', anche nei giorni chiusi (' + _pianoGiorniTxt(sv.giorniChiusi) + ')' : '') +
+        '. Confermi?',
     ))
   )
     return;
-  _pianoUndoSnap('cancella piano ' + _pianoMeseSel + (tutto ? ' (tutto)' : ''));
+  // i giorni chiusi si svuotano solo con il permesso e il motivo (registro)
+  if (chiuseTolte.length) {
+    if (!puoSbloccareGiorniChiusi()) {
+      toast('Giorni chiusi: per svuotarli serve il permesso "Giorni chiusi"');
+      return;
+    }
+    if (
+      !(await _pianoSbloccaGiorni(
+        [...new Set(chiuseTolte.map((r) => String(r.data).substring(0, 10)))].sort(),
+        'Svuota il mese anche nei giorni passati: ' + chiuseTolte.length + ' celle tolte.',
+      ))
+    )
+      return;
+  }
+  const da = chiuseTolte.length || !sv.daAperto ? ym + '-01' : sv.daAperto;
+  _pianoUndoSnap(
+    'cancella piano ' + ym + (tutto ? ' (tutto)' : '') + (chiuseTolte.length ? ' (giorni chiusi compresi)' : ''),
+  );
   try {
     await secDel(
       'piano',
-      'data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + (tutto ? '' : '&protetto=eq.false'),
+      'data=gte.' +
+        da +
+        '&data=lte.' +
+        a +
+        '&reparto_dip=eq.' +
+        _pianoReparto() +
+        (tutto ? '' : '&protetto=eq.false') +
+        // ND e malattie restano sempre (vedi _pianoSvuotaCalcola)
+        PIANO_SVUOTA_TIENI.map((c) => '&codice=neq.' + c).join(''),
     );
-    logAzione('Piano: cancellato', ym + ' · ' + n + ' celle (tutto=' + tutto + ')');
-    toast('Piano svuotato: ' + n + ' celle tolte (si può annullare con Annulla)');
+    logAzione(
+      'Piano: cancellato',
+      ym +
+        ' · ' +
+        n +
+        ' celle (tutto=' +
+        tutto +
+        ')' +
+        (chiuseTolte.length
+          ? ' · giorni chiusi compresi (' + chiuseTolte.length + ')'
+          : chiuseLasciate
+            ? ' · ' + chiuseLasciate + ' celle dei giorni chiusi lasciate'
+            : ''),
+    );
+    toast(
+      'Piano svuotato: ' +
+        n +
+        ' celle tolte' +
+        (!ancheChiusi && chiuseLasciate
+          ? '; ' + chiuseLasciate + ' dei giorni chiusi (' + _pianoGiorniTxt(sv.giorniChiusi) + ') restano'
+          : '') +
+        ' (si può annullare con Annulla)',
+      6000,
+    );
     _pianoViolCelle = {};
     _pianoViolLista = null;
     renderPiano();

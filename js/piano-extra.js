@@ -264,8 +264,14 @@ async function _pianoAnnullaFinestra(st, opz) {
   const mod = await _pianoMieModifiche(st.finestre || [st], opz);
   const chiave = (c) => c.collaboratore + '|' + String(c.data).substring(0, 10);
   let celle = mod.filter((c) => !_pianoCelleUguali(c.prima, c.dopo) && (!opz.tieni || opz.tieni(c)));
-  const chiusi = celle.filter((c) => !_pianoGiornoScrivibile(String(c.data).substring(0, 10))).map(chiave);
-  celle = celle.filter((c) => _pianoGiornoScrivibile(String(c.data).substring(0, 10)));
+  let chiusi = celle.filter((c) => !_pianoGiornoScrivibile(String(c.data).substring(0, 10))).map(chiave);
+  // GIORNI CHIUSI (16/10/2026): Annulla riporta a uno stato di prima, come il ripristino di
+  // una versione (v455). Le celle dei giorni chiusi che l operazione ha cambiato (es. Svuota
+  // il mese) tornano anche loro, con il permesso "Giorni chiusi" e il motivo; senza, restano
+  // e l avviso dice perche e come rimetterle. Prima restavano sempre: l Annulla di uno
+  // Svuota lasciava vuoti i giorni passati.
+  if (chiusi.length && (await _pianoRiapriChiusi(chiusi, opz.etichetta || st.label))) chiusi = [];
+  celle = celle.filter((c) => !chiusi.includes(chiave(c)));
   const ora = new Date().toISOString();
   let ops = celle.map((c) => ({
     collaboratore: c.collaboratore,
@@ -357,7 +363,23 @@ async function _pianoMieModifiche(finestre, opz) {
   );
   return [...per.values()];
 }
+// le celle dei giorni chiusi di un Annulla / Ripristina: con il permesso "Giorni chiusi" si
+// riaprono i giorni con il motivo (registro) e tornano anche loro. Ritorna true se aperti.
+async function _pianoRiapriChiusi(chiusi, etichetta) {
+  if (!chiusi.length) return true;
+  if (!puoSbloccareGiorniChiusi()) return false;
+  return _pianoSbloccaGiorni(
+    [...new Set(chiusi.map((k) => k.split('|')[1]))].sort(),
+    'Annulla / Ripristina di "' +
+      (etichetta || 'operazione') +
+      '": ' +
+      chiusi.length +
+      (chiusi.length === 1 ? ' cella di un giorno passato torna' : ' celle di giorni passati tornano') +
+      ' com era prima (ripristino di uno stato precedente).',
+  );
+}
 async function _pianoAvvisoGiorniChiusi(chiusi) {
+  const permesso = puoSbloccareGiorniChiusi();
   await mostraAvviso(
     chiusi.length +
       (chiusi.length === 1 ? ' cella di un giorno chiuso non e stata' : ' celle di giorni chiusi non sono state') +
@@ -367,7 +389,11 @@ async function _pianoAvvisoGiorniChiusi(chiusi) {
         .map((k) => '\u2022 ' + k.split('|')[0] + ' ' + k.split('|')[1].split('-').reverse().join('.'))
         .join('\n') +
       (chiusi.length > 15 ? '\n... e altre ' + (chiusi.length - 15) : '') +
-      '\n\nPer correggerle: sblocca il giorno (permesso "Giorni chiusi") e modificale a mano.',
+      (permesso
+        ? '\n\nSenza motivo i giorni passati restano chiusi.'
+        : '\n\nI giorni passati sono chiusi e per riaprirli serve il permesso "Giorni chiusi" (o l amministratore).') +
+      ' Si rimettono com erano da Piano \u203a Storico \u203a Versioni del mese: "Riporta a prima" del momento della modifica, poi "Rimetti tutto" con il motivo' +
+      (permesso ? '.' : ' (lo fa chi ha il permesso).'),
     { titolo: 'Giorni chiusi' },
   );
 }
@@ -423,7 +449,7 @@ async function _pianoRipristinaStato(st, opz) {
   if (chiusi.length && opz.passato) chiusi = [];
   else if (
     chiusi.length &&
-    st.passato &&
+    (st.passato || opz.riapri) &&
     (await _pianoSbloccaGiorni(
       [...new Set(chiusi.map((k) => k.split('|')[1]))].sort(),
       'Il passo "' + (st.label || 'ripristino') + '" aveva cambiato anche i giorni passati: li riporto com erano.',
@@ -501,7 +527,7 @@ async function _pianoRipristinaUltimoSnapshot(messaggio) {
     if (await _pianoPassoConFinestra(st)) {
       const esito = await _pianoAnnullaFinestra(st, { tieni: _pianoFiltroPasso(st) });
       if (esito.inizio) _pianoSessFinestra(st.ym, st.rep, { t0: esito.inizio, t1: esito.fine });
-    } else await _pianoRipristinaStato(st, { memoria: _pianoMemoriaDi(st) });
+    } else await _pianoRipristinaStato(st, { memoria: _pianoMemoriaDi(st), riapri: true });
     toast(messaggio || 'Operazione annullata');
   } catch (e) {
     toastErrore('Ripristino non riuscito: ' + (e.message || '') + '. Usa "Annulla" dal piano.');
@@ -627,7 +653,7 @@ async function pianoAnnulla() {
       };
     } catch (e) {}
     try {
-      const esito = await _pianoRipristinaStato(st, { memoria: memoria });
+      const esito = await _pianoRipristinaStato(st, { memoria: memoria, riapri: true });
       _pianoTogliDallaPila(u, st);
       ok = true;
       if (redo) (window._pianoRedo = window._pianoRedo || []).push(redo);
@@ -762,7 +788,7 @@ async function pianoAnnullaTutto() {
               ? snap.finestre
               : [{ t0: snap.t0, t1: _pianoOraServer() }],
         },
-        { reparto: snap.rep, da: snap.ym + '-01', a: fineM },
+        { reparto: snap.rep, da: snap.ym + '-01', a: fineM, etichetta: 'Annulla tutto (' + snap.n + ' operazioni)' },
       );
     } catch (e) {
       toastErrore('Annulla tutto non riuscito: ' + ((e && e.message) || e));
@@ -794,7 +820,7 @@ async function pianoAnnullaTutto() {
       };
     } catch (e) {}
     try {
-      await _pianoRipristinaStato(snap, { memoria: memoria });
+      await _pianoRipristinaStato(snap, { memoria: memoria, riapri: true });
     } catch (e) {
       toastErrore('Annulla tutto non riuscito: ' + ((e && e.message) || e));
       await renderPiano();
@@ -891,7 +917,7 @@ async function pianoRipristina() {
     return false;
   }
   try {
-    await _pianoRipristinaStato(st, { memoria: memoria });
+    await _pianoRipristinaStato(st, { memoria: memoria, riapri: true });
   } catch (e) {
     toastErrore('Ripristina non riuscito: ' + ((e && e.message) || e));
     await renderPiano();

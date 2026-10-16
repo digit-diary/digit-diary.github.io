@@ -1786,7 +1786,9 @@ function pianoStoricoRiportaA() {
 // Funzione pura (test/piano-versioni.test.js): versione e oggi = righe del database del
 // settore; opz.bloccato(dstr) = giorno chiuso; opz.malattie = { 'nome|dstr': true } dal
 // Diario; opz.altroSettore = Set di 'nome|dstr' occupati oggi in un altro settore.
-// Ritorna { rimetti, passate, giorniPassati, malattia, nd, altroSettore } (chiavi 'nome|dstr').
+// opz.ndSvuota = Set di 'nome|dstr': ND cancellate da uno Svuota il mese (_pianoNdDaSvuota),
+// che si rimettono come le altre celle (con il passato, il modulo 1187 si riallinea da solo).
+// Ritorna { rimetti, passate, giorniPassati, malattia, nd, altroSettore, ndSvuota } (chiavi 'nome|dstr').
 function _pianoVersioneCalcola(versione, oggi, opz) {
   opz = opz || {};
   const k = (r) => r.collaboratore + '|' + String(r.data).substring(0, 10);
@@ -1796,7 +1798,7 @@ function _pianoVersioneCalcola(versione, oggi, opz) {
   const malDiario = opz.malattie || {};
   const altro = opz.altroSettore || new Set();
   const nd = (r) => !!r && String(r.codice || '').toUpperCase() === 'ND';
-  const out = { rimetti: [], passate: [], giorniPassati: [], malattia: [], nd: [], altroSettore: [] };
+  const out = { rimetti: [], passate: [], giorniPassati: [], malattia: [], nd: [], altroSettore: [], ndSvuota: [] };
   const diverse = [...new Set([...A.keys(), ...B.keys()])]
     .filter((x) => !_pianoCelleUguali(A.get(x), B.get(x)))
     .sort((a, b) => a.split('|')[1].localeCompare(b.split('|')[1]) || a.localeCompare(b));
@@ -1804,7 +1806,12 @@ function _pianoVersioneCalcola(versione, oggi, opz) {
     const allora = A.get(x);
     const ora = B.get(x);
     if ((mal(ora) && malDiario[x]) || (mal(allora) && !mal(ora) && !malDiario[x])) out.malattia.push(x);
-    else if (nd(ora) || nd(allora)) out.nd.push(x);
+    else if (nd(allora) && !nd(ora) && opz.ndSvuota && opz.ndSvuota.has(x)) {
+      // ND cancellata da uno Svuota il mese (un errore, non una scelta sul modulo 1187): torna
+      out.ndSvuota.push(x);
+      out.rimetti.push(x);
+      if (opz.bloccato && opz.bloccato(x.split('|')[1])) out.passate.push(x);
+    } else if (nd(ora) || nd(allora)) out.nd.push(x);
     else if (allora && !ora && altro.has(x)) out.altroSettore.push(x);
     else {
       out.rimetti.push(x);
@@ -1813,6 +1820,61 @@ function _pianoVersioneCalcola(versione, oggi, opz) {
   });
   out.giorniPassati = [...new Set(out.passate.map((x) => x.split('|')[1]))].sort();
   return out;
+}
+// ND CANCELLATE DA UNO SVUOTA IL MESE (16/10/2026). Fino alla v458 Svuota cancellava anche le
+// ND (e il modulo 1187 si toglieva o si accorciava da solo); dalla v459 non le tocca piu. Nelle
+// Versioni del mese una ND cancellata da uno Svuota torna, una ND tolta di proposito (dalla
+// cella o dalla registrazione Non disponibilita) resta com e oggi. Come si riconosce, dallo
+// storico del database e dal Registro: la PRIMA modifica della cella dopo l istante scelto e
+// la sua cancellazione con la ND, e entro 2 minuti dopo il Registro ha "Piano: cancellato"
+// di questo mese e settore (lo scrive solo Svuota il mese, subito dopo la cancellazione).
+// Quello che e stato scritto dopo sulla cella vuota (la bozza di Prepara il mese) si toglie
+// come ogni altra cella della versione. Senza la riga del Registro (cancellata a mano,
+// Cancella selezione, un collega) o se la ND era stata cambiata prima, la ND resta com e oggi.
+// Funzione pura (test/piano-svuota.test.js): eventi = { 'nome|dstr': [ { quando, azione, da } ] }
+// (piano_storico_cella), svuota = [ { created_at } ] -> Set delle chiavi da rimettere.
+function _pianoNdDaSvuota(eventi, svuota, istante) {
+  const t0 = Date.parse(istante);
+  const tempi = (svuota || []).map((l) => Date.parse(l.created_at)).filter((t) => !isNaN(t));
+  const out = new Set();
+  Object.keys(eventi || {}).forEach((x) => {
+    const dopo = (eventi[x] || [])
+      .filter((e) => Date.parse(e.quando) > t0)
+      .sort((a, b) => Date.parse(a.quando) - Date.parse(b.quando));
+    const ult = dopo[0];
+    if (!ult || ult.azione !== 'cancellata' || String(ult.da || '').toUpperCase() !== 'ND') return;
+    const tq = Date.parse(ult.quando);
+    if (tempi.some((t) => t >= tq - 1000 && t <= tq + 120000)) out.add(x);
+  });
+  return out;
+}
+// legge storico e Registro per le ND della versione che oggi mancano (chiavi 'nome|dstr')
+async function _pianoNdDaSvuotaLeggi(chiavi, rep, ym, istante) {
+  if (!chiavi.length) return new Set();
+  const svuota = (
+    (await secGet(
+      'log_attivita?azione=eq.' +
+        encodeURIComponent('Piano: cancellato') +
+        '&reparto_dip=eq.' +
+        rep +
+        '&created_at=gte.' +
+        encodeURIComponent(istante) +
+        '&order=created_at.asc&limit=500',
+    )) || []
+  ).filter((l) => String(l.dettaglio || '').startsWith(ym));
+  if (!svuota.length) return new Set();
+  const eventi = {};
+  for (let i = 0; i < chiavi.length; i += 10) {
+    await Promise.all(
+      chiavi.slice(i, i + 10).map(async (x) => {
+        const [n, d] = x.split('|');
+        const ev =
+          (await _rpcSicura('piano_storico_cella', { p_token: getOpToken(), p_collaboratore: n, p_data: d })) || [];
+        eventi[x] = ev.filter((e) => (e.reparto_dip || 'slots') === rep);
+      }),
+    );
+  }
+  return _pianoNdDaSvuota(eventi, svuota, istante);
 }
 // una cella in parole per l anteprima: "S5", "C (bozza)", "V (lucchetto)", "vuota"
 function _pianoVersioneCella(r) {
@@ -1858,10 +1920,28 @@ async function pianoStoricoRiporta(quando, esatto) {
     toastErrore('Storico non letto: ' + ((e && e.message) || e));
     return;
   }
+  // ND della versione che oggi mancano: cancellate da uno Svuota il mese?
+  let ndSvuota = new Set();
+  try {
+    const oggiK = new Set(cur.map(k));
+    const oggiR = new Map(cur.map((r) => [k(r), r]));
+    const cand = stato
+      .filter(
+        (r) =>
+          String(r.codice || '').toUpperCase() === 'ND' &&
+          !altroSettore.has(k(r)) &&
+          (!oggiK.has(k(r)) || String((oggiR.get(k(r)) || {}).codice || '').toUpperCase() !== 'ND'),
+      )
+      .map(k);
+    ndSvuota = await _pianoNdDaSvuotaLeggi(cand, rep, ym, istante);
+  } catch (e) {
+    console.warn('ND dello Svuota non lette', e); // restano come oggi, come prima
+  }
   const calc = _pianoVersioneCalcola(stato, cur, {
     bloccato: _pianoGiornoBloccato,
     malattie: _pianoMalattieMese(ym),
     altroSettore: altroSettore,
+    ndSvuota: ndSvuota,
   });
   const prima = new Map(stato.map((r) => [k(r), r]));
   const oggi = new Map(cur.map((r) => [k(r), r]));
@@ -1922,6 +2002,12 @@ async function pianoStoricoRiporta(quando, esatto) {
           : '\n\nQUESTE ' +
             nP +
             ' NON POSSO RIMETTERLE: i giorni passati sono chiusi e per riaprirli serve il permesso "Giorni chiusi" (o l admin). Restano come sono oggi: chiedi a chi ha il permesso di riportare il mese.');
+  if (calc.ndSvuota.length)
+    testo +=
+      '\n\nRimetto anche ' +
+      calc.ndSvuota.length +
+      (calc.ndSvuota.length === 1 ? ' assenza ND cancellata' : ' assenze ND cancellate') +
+      ' da Svuota il mese (il modulo 1187 si riallinea da solo).';
   if (calc.malattia.length)
     testo +=
       '\n\nRestano come oggi ' +

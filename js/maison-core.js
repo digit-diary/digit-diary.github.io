@@ -140,8 +140,9 @@ async function _salvaMaisonManualeEsegui() {
     return;
   }
   const tipo = document.getElementById('maison-man-tipo').value || null;
-  // La quantita' di buoni e' quella scritta dall'operatore (default 1): ricavarla dal costo
-  // dell'intera riga assegnava 9 BL a chi ne aveva usato uno solo
+  // Numero di buoni: quello proposto da solo (importo / valore, _autoCalcolaBuoniManuale) o la
+  // correzione scritta a mano per questi dati; si riallinea qui se un dato e' cambiato senza evento
+  _autoCalcolaBuoniManuale();
   const qty = Math.max(1, parseInt(document.getElementById('maison-man-qty').value) || 1);
   const dataVal = document.getElementById('maison-man-data').value || getGiornataCasino();
   // Gestione nomi multipli con /
@@ -232,6 +233,8 @@ async function _salvaMaisonManualeEsegui() {
     document.getElementById('maison-man-px').value = '1';
     document.getElementById('maison-man-tipo').value = '';
     document.getElementById('maison-man-qty').value = '1';
+    delete document.getElementById('maison-man-qty').dataset.manuale;
+    delete document.getElementById('maison-man-tipo').dataset.auto;
     const fp = document.getElementById('maison-man-data');
     if (fp && fp._flatpickr) fp._flatpickr.clear();
     renderMaisonDashboard();

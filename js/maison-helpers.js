@@ -896,12 +896,20 @@ function acFiltraMaison(inputId, dropId) {
     .join('');
   drop.classList.add('show');
 }
+// Cliente scelto (elenco, Invio o nome scritto per intero): la categoria del budget
+// imposta il tipo di buono come prima. Se il tipo era stato messo da qui per il cliente
+// precedente e il nuovo cliente non ha buoni, si torna a Normale (prima restava il buono
+// dell altro cliente). Un tipo scelto a mano non si tocca.
 function _preimpostaTipoMaison(cat) {
   const catToTipo = { bu: 'BU', bl: 'BL', cg: 'CG', wl: 'WL' };
   // Sezione Maison
   const tipoSel = document.getElementById('maison-man-tipo');
   if (tipoSel && catToTipo[cat]) {
     tipoSel.value = catToTipo[cat];
+    tipoSel.dispatchEvent(new Event('change'));
+    tipoSel.dataset.auto = '1';
+  } else if (tipoSel && tipoSel.dataset.auto === '1' && tipoSel.value) {
+    tipoSel.value = '';
     tipoSel.dispatchEvent(new Event('change'));
   }
   // Sezione Inventario - Buono a Cliente
@@ -912,13 +920,57 @@ function _preimpostaTipoMaison(cat) {
   // Ricalcola qty se c'è già un importo
   _autoCalcolaBuoniManuale();
 }
-// Il numero di buoni resta quello scritto dall'operatore (default 1): ricavarlo dal costo
-// (ceil(importo/valore)) proponeva 9 BL per una cena da 360 CHF condivisa con un ospite
-function _autoCalcolaBuoniManuale() {
-  const tipo = (document.getElementById('maison-man-tipo') || {}).value;
+// Nome scritto a mano senza sceglierlo dall elenco: se e' un cliente del budget (nome intero)
+// vale come averlo scelto; con piu' nomi ("A / B") cambia solo il conteggio dei nomi
+function _maisonManNomeCambiato() {
+  const el = document.getElementById('maison-man-nome');
+  if (!el) return;
+  const v = el.value.trim().toLowerCase();
+  const b = v && !v.includes('/') ? getBudgetReparto().find((x) => x.nome.toLowerCase() === v) : null;
+  if (b) _preimpostaTipoMaison(b.categoria || '');
+  else _autoCalcolaBuoniManuale();
+}
+// Dati di partenza del numero di buoni: quanti nomi, PX, importo, tipo
+function _maisonManFonte() {
+  const val = (id) => ((document.getElementById(id) || {}).value || '').trim();
+  const nNomi =
+    val('maison-man-nome')
+      .split(/\s*\/\s*/)
+      .filter((n) => n).length || 1;
+  return [
+    nNomi,
+    parseInt(val('maison-man-px')) || 1,
+    parseFloat(val('maison-man-importo')) || 0,
+    val('maison-man-tipo'),
+  ].join('|');
+}
+// Numero di buoni proposto per il modulo (null se manca tipo o importo)
+function _maisonManAutoQty() {
+  const [nNomi, px, importo, tipo] = _maisonManFonte().split('|');
+  if (!tipo || !BUONO_VALORI[tipo]) return null;
+  return _buoniAutoQty(importo, BUONO_VALORI[tipo], +nNomi, _ripartisciPx(+px, +nNomi)[0]);
+}
+// L operatore corregge a mano il numero di buoni: la correzione vale per questi dati di partenza
+function _maisonManQtyAMano() {
   const qtyEl = document.getElementById('maison-man-qty');
-  if (!tipo || !qtyEl) return;
-  if (!(parseInt(qtyEl.value) >= 1)) qtyEl.value = 1;
+  if (!qtyEl) return;
+  qtyEl.dataset.manuale = '1';
+  qtyEl.dataset.fonte = _maisonManFonte();
+}
+// NUMERO DI BUONI DA SOLO (ripristinato 16/10/2026, era cosi' da marzo al 24/09): scegliendo il
+// tipo o il cliente con la categoria, o cambiando importo, PX o numero di nomi, N buoni diventa
+// importo / valore del buono arrotondato in su (_buoniAutoQty). Una correzione a mano resta
+// finche' non cambia uno di quei dati; se cambia, il calcolo riparte (il dato nuovo vince).
+function _autoCalcolaBuoniManuale() {
+  const qtyEl = document.getElementById('maison-man-qty');
+  if (!qtyEl) return;
+  const fonte = _maisonManFonte();
+  if (qtyEl.dataset.manuale === '1' && qtyEl.dataset.fonte === fonte) return;
+  delete qtyEl.dataset.manuale;
+  qtyEl.dataset.fonte = fonte;
+  const q = _maisonManAutoQty();
+  if (q) qtyEl.value = q;
+  else if (!(parseInt(qtyEl.value) >= 1)) qtyEl.value = 1;
 }
 // Export
 function esportaMaisonCSV() {

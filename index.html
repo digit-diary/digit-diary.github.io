@@ -1618,6 +1618,7 @@
                   placeholder="Nome..."
                   oninput="acFiltraMaison('maison-man-nome', 'ac-maison-man')"
                   onfocus="acFiltraMaison('maison-man-nome', 'ac-maison-man')"
+                  onchange="_maisonManNomeCambiato()"
                 />
                 <div class="ac-drop" id="ac-maison-man"></div>
               </div>
@@ -1630,6 +1631,7 @@
                 value="1"
                 min="1"
                 style="width: 80px"
+                oninput="_autoCalcolaBuoniManuale()"
               />
             </div>
             <div class="field">
@@ -1651,6 +1653,7 @@
                 onchange="
                   document.getElementById('maison-man-qty-wrap').style.display =
                     this.value ? '' : 'none';
+                  delete this.dataset.auto;
                   _autoCalcolaBuoniManuale();
                 "
               >
@@ -1666,6 +1669,7 @@
                 min="1"
                 max="10"
                 style="width: 70px"
+                oninput="_maisonManQtyAMano()"
               />
             </div>
             <div class="field">

@@ -89,7 +89,23 @@ async function ndSincronizzaPersona(nome, ym, opz) {
       reparto: info.reparto_dip || (typeof _pianoReparto === 'function' ? _pianoReparto() : currentReparto),
     };
     const cache = typeof moduliCache !== 'undefined' ? moduliCache : [];
-    if (attivo) {
+    // MODULO TOLTO DA SOLO (nessun ND rimasto, eliminato senza "eliminato da"): quando le ND
+    // tornano (Annulla, Versioni del mese, ND riscritte) si riprende lui invece di farne uno
+    // nuovo, cosi il mese ha sempre un modulo solo con la sua storia (16/10/2026: dopo uno
+    // Svuota il mese si accumulavano moduli nuovi e il vecchio restava nel Cestino). Un
+    // modulo eliminato da una persona resta eliminato.
+    const tolto =
+      !attivo && giorni.length
+        ? esistenti.filter((m) => m.eliminato && !m.eliminato_da).sort((x, y) => y.id - x.id)[0]
+        : null;
+    if (tolto) {
+      const patch = { dati: dati, eliminato: false };
+      await secPatch('moduli', 'id=eq.' + tolto.id, patch);
+      const c = cache.find((m) => m.id === tolto.id);
+      if (c) Object.assign(c, patch);
+      else cache.unshift(Object.assign({}, tolto, patch));
+      if (!senzaLog) logAzione('Modulo non disponibilità', nome + ' ' + ym + ' ripreso: ' + giorni.length + ' giorni');
+    } else if (attivo) {
       const patch = giorni.length ? { dati: dati } : { eliminato: true };
       await secPatch('moduli', 'id=eq.' + attivo.id, patch);
       const c = cache.find((m) => m.id === attivo.id);
