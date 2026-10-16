@@ -273,12 +273,20 @@ function _pianoPunteggioQualita(t, codice, g, dstr, dowG, nomiLv, cella, livello
   const regole = _pianoRegoleGruppoDi((t.gruppo || '').toUpperCase())
     .concat(_pianoRegoleGruppoDi('*'))
     .filter((rg) => /^(minimo_competenza_giorno|equilibrio_livelli)$/.test(String(rg.tipo_regola || '').toLowerCase()));
-  if (!regole.length) return () => 0;
+  if (!regole.length) {
+    const zero = () => 0;
+    zero.primo = zero;
+    return zero;
+  }
   const rT = { codice: codice, data: dstr };
   const dowPy = (dowG + 6) % 7;
   const inGruppo = (tx, grR) => tx && (grR === '*' || String(tx.gruppo || '').toUpperCase() === grR);
   const media = (a) => (a.length ? a.reduce((x, v) => x + v, 0) / a.length : null);
   const funzioni = [];
+  // PRIMA DI TUTTO (16/10/2026, "gli S5 di norma a chi fa accoglienza"): un minimo con una
+  // competenza SU CERTI TURNI ancora da coprire mette davanti chi ha la competenza, prima delle
+  // ore e del pattern (con -3 nel pattern veniva dopo: 0 S5 su 13 all accoglienza)
+  const primi = [];
   for (const rg of regole) {
     const tr = String(rg.tipo_regola || '').toLowerCase();
     const p = String(rg.valore || '').split('|');
@@ -304,7 +312,10 @@ function _pianoPunteggioQualita(t, codice, g, dstr, dowG, nomiLv, cella, livello
         if (fascia && !_pianoInFascia({ codice: cod, data: dstr }, fascia)) continue;
         if (_pianoHaCompetenza(_pianoCollabInfo(x), comp)) gia++;
       }
-      if (gia < nMin) funzioni.push((n) => (_pianoHaCompetenza(_pianoCollabInfo(n), comp) ? -3 : 0));
+      if (gia < nMin) {
+        funzioni.push((n) => (_pianoHaCompetenza(_pianoCollabInfo(n), comp) ? -3 : 0));
+        if (soloTurni.length) primi.push((n) => (_pianoHaCompetenza(_pianoCollabInfo(n), comp) ? -1 : 0));
+      }
     } else {
       const dows = p[4] ? p[4].split(',').map((x) => parseInt(x)) : null;
       if (dows && !dows.includes(dowPy)) continue;
@@ -336,7 +347,9 @@ function _pianoPunteggioQualita(t, codice, g, dstr, dowG, nomiLv, cella, livello
       });
     }
   }
-  return (n) => funzioni.reduce((tot, fn) => tot + fn(n), 0);
+  const out = (n) => funzioni.reduce((tot, fn) => tot + fn(n), 0);
+  out.primo = (n) => primi.reduce((tot, fn) => tot + fn(n), 0);
+  return out;
 }
 function _pianoRiposiSettimanali(righe) {
   const minLib = parseFloat(_pianoRegolaVal('riposo_domenica_libera_ore')) || 0;
@@ -1113,18 +1126,19 @@ function _pianoViolazioniPersona(nome, righeMese, righeSett, ctx) {
         if (prima >= 4 && _pianoIsLavoro(giorni[g + 1] || ''))
           aggiungi(g, 'riposo singolo dopo ' + prima + ' giorni di lavoro (vietato 4+1+1)');
       }
-      // 4) turno diurno il giorno prima delle vacanze
-      // (il giorno prima nel mese prima resta del mese prima: si segna li)
-      if (
-        g >= 2 &&
-        ctx.diurnoPreV &&
-        (cod === 'V' || cod === 'V1') &&
-        (giorni[g - 1] || '') &&
-        _pianoIsLavoro(giorni[g - 1])
-      ) {
-        const tp = _pianoTurnoInfo(giorni[g - 1]);
-        if (tp && tp.tipo === 'NOTTURNO')
-          aggiungi(g - 1, 'turno notturno il giorno prima delle vacanze (deve essere diurno)');
+      // 4) turno diurno l ultimo giorno di lavoro prima delle vacanze (regola
+      // diurno_prima_vacanza; "prima delle vacanze si finisce col presto"). Prima si guardava
+      // solo il giorno subito prima della V: con le C prima delle vacanze (c_prima_dopo_vacanza)
+      // quel giorno e una C e la regola non scattava mai. Ora si salta il blocco di C e si guarda
+      // il giorno prima (16/10/2026). Il giorno nel mese prima resta del mese prima.
+      if (ctx.diurnoPreV && (cod === 'V' || cod === 'V1') && !['V', 'V1'].includes(String(giorni[g - 1] || ''))) {
+        let k = g - 1;
+        while (k >= g - 7 && String(giorni[k] || '').toUpperCase() === 'C') k--;
+        if (k >= 1 && _pianoIsLavoro(giorni[k] || '')) {
+          const tp = _pianoTurnoInfo(giorni[k]);
+          if (tp && tp.tipo === 'NOTTURNO')
+            aggiungi(k, 'turno notturno il giorno prima delle vacanze (deve essere diurno)');
+        }
       }
       // 5) regole "chi fa cosa" del settore (regole di gruppo turni_solo_funzioni
       //    e funzione_turni_giorni: create e modificate dalla scheda Regole di gruppo)
@@ -1339,6 +1353,8 @@ function _pianoBlocchiPar(par, da, a, conPreferito) {
 }
 // peso di un blocco accettato ma non preferito (5 invece di 4) rispetto a un buco
 const PIANO_BLOCCHI_PESO_PREFERITO = 0.25;
+// PASSATA DEI BLOCCHI NELLA BOZZA: cessioni vicine al buco (16/10/2026) e giri
+const PIANO_BLOCCHI_BOZZA = { cessioni: true, giri: 5 };
 // PESO DI UN BUCO (moltiplica il peso dei blocchi compatti, 60): il giorno di lavoro isolato
 // (1 giorno fra due liberi, anche dentro un 3-1-1) pesa PIANO_BLOCCHI_PESO_ISOLATO volte un buco
 // normale, cioe 150 = mezzo posto scoperto (decisione del titolare 15/10/2026: "mai 3-1-1 o
@@ -3215,8 +3231,17 @@ async function generaBozzaPiano(usaCoperture) {
   };
   // nonCopre: passate che non coprono un posto scoperto (riposo attorno alla domenica,
   // livelli, blocchi): niente sabato oltre le 23 a chi e indietro con le domeniche
+  // ULTIMO GIORNO DI LAVORO PRIMA DELLE VACANZE (regola diurno_prima_vacanza, 16/10/2026): dopo
+  // g vengono solo C e poi la V. Li un turno notturno non si mette mai (si finisce col presto)
+  const diurnoPreV = _pianoRegolaVal('diurno_prima_vacanza') === 'TRUE';
+  const primaDelleVacanze = (n, g) => {
+    let k = g + 1;
+    while (k <= g + 7 && String(codDi(n, k) || '').toUpperCase() === 'C') k++;
+    return ['V', 'V1'].includes(String(codDi(n, k) || '').toUpperCase());
+  };
   const candidatoOk = (n, f, t, g, dstr, dowG, ignoraOccupato, oreDelta, nonCopre) => {
     const esistente = cella[n + '|' + g];
+    if (diurnoPreV && String(t.tipo || '').toUpperCase() === 'NOTTURNO' && primaDelleVacanze(n, g)) return false;
     if (altroSettore[n + '|' + g]) return false; // quel giorno lavora in un altro settore
     if (malattie[n + '|' + dstr]) return false;
     if (ndDiario[n + '|' + dstr]) return false; // non disponibile (dal Diario)
@@ -3586,6 +3611,7 @@ async function generaBozzaPiano(usaCoperture) {
                 wd: cella[n + '|' + g] === 'WD' ? 0 : 1,
                 area: manca ? 0 : 1,
                 coord: coordPref(n), // un coordinatore scelto in apertura/chiusura, se manca
+                qprimo: qualita.primo(n), // competenza richiesta su questo turno (es. accoglienza su S5)
                 classe: classe(n, j),
                 j: j,
                 quota: j ? quota(n) : 0,
@@ -3608,6 +3634,7 @@ async function generaBozzaPiano(usaCoperture) {
                   x.wd - y.wd ||
                   x.area - y.area ||
                   x.coord - y.coord ||
+                  x.qprimo - y.qprimo ||
                   x.classe - y.classe ||
                   // fra jolly: EQUITA, prima chi ha la quota piu bassa del proprio obiettivo
                   (x.j && y.j ? x.quota - y.quota : 0) ||
@@ -4214,7 +4241,7 @@ async function generaBozzaPiano(usaCoperture) {
       tolti.forEach(([n, g, cod]) => mettiB(n, g, cod));
       return false;
     };
-    for (let giro = 0; giro < 3; giro++) {
+    for (let giro = 0; giro < PIANO_BLOCCHI_BOZZA.giri; giro++) {
       let cambiati = 0;
       for (const a of nomi) {
         await pausaB();
@@ -4268,6 +4295,32 @@ async function generaBozzaPiano(usaCoperture) {
                   fatto = true;
                   break;
                 }
+              }
+            }
+          }
+          // CESSIONI VICINE AL BUCO (16/10/2026, bozza di novembre Slots con 111 buchi): un giorno
+          // di A passa a un collega libero quel giorno, oppure A prende il giorno di un collega
+          // in un suo giorno libero (allunga il blocco). Restano solo se i buchi di tutti e due
+          // scendono e le ore non si allontanano dall obiettivo (prova)
+          for (const d1 of fatto || !PIANO_BLOCCHI_BOZZA.cessioni ? [] : lavA) {
+            if (fatto) break;
+            const c1 = cella[a + '|' + d1];
+            for (const b of nomi) {
+              if (b === a || !liberaB(b, d1)) continue;
+              if (prova([[a, d1]], [[b, d1, c1]], [a, b])) {
+                fatto = true;
+                break;
+              }
+            }
+          }
+          for (const d2 of fatto || !PIANO_BLOCCHI_BOZZA.cessioni ? [] : libA) {
+            if (fatto) break;
+            for (const b of nomi) {
+              if (b === a || !mobileB(b, d2)) continue;
+              const c2 = cella[b + '|' + d2];
+              if (prova([[b, d2]], [[a, d2, c2]], [a, b])) {
+                fatto = true;
+                break;
               }
             }
           }

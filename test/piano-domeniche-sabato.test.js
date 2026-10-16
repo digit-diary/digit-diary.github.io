@@ -28,12 +28,25 @@ function estrai(file, nomi) {
     })
     .join('\n');
 }
-const ctx = { console, Date, Set, Map, JSON, Math, String, parseInt, parseFloat, Object };
+const ctx = {
+  console,
+  Date,
+  Set,
+  Map,
+  JSON,
+  Math,
+  String,
+  parseInt,
+  parseFloat,
+  Object,
+  PIANO_BLOCCHI_PESO_PREFERITO: 0.25,
+  PIANO_BLOCCHI_PESO_ISOLATO: 2.5,
+};
 ctx._pianoRegolaVal = (n) => (n === 'domeniche_libere_anno' ? '12' : null);
 ctx._pianoDomSabatoParam = () => ({ evita: true, copertura: true });
 vm.createContext(ctx);
 vm.runInContext(
-  estrai('piano-genera.js', ['_pianoTestoSabatoTardi', '_pianoDomAttese', '_pianoViolDiLegge']) +
+  estrai('piano-genera.js', ['_pianoTestoSabatoTardi', '_pianoDomAttese', '_pianoViolDiLegge', '_pianoPesoBuco']) +
     '\n' +
     estrai('piano-ricerca-ui.js', [
       '_ricercaPesoOrdine',
@@ -84,6 +97,17 @@ ok(
   ) === 'legge_dom',
   'domenica libera mancante: resta legge',
 );
+
+console.log('== peso dei buchi nei blocchi (16/10/2026) ==');
+const pb = ctx._pianoPesoBuco;
+ok(pb({ tipo: 'lavoro_isolato', lungo: 1 }) === 2.5, 'giorno isolato: 2,5 buchi (150)');
+ok(pb({ tipo: 'lavoro_isolato', lungo: 2 }) === 0.5, 'due giorni soli: mezzo buco');
+ok(
+  60 * (pb({ tipo: 'lavoro_isolato', lungo: 1 }) + pb({ tipo: 'riposo_singolo', prima: 3, dopo: 1 })) > 300,
+  '3-1-1 costa piu di un posto scoperto normale',
+);
+ok(pb({ tipo: 'riposo_singolo', prima: 4, dopo: 4 }) === 1, '4-1-4: un buco');
+ok(pb({ tipo: 'fuori_preferito', lungo: 5 }) === 0.25, '5 invece di 4: un quarto');
 
 console.log('\n=======================================');
 console.log('  ' + passati + ' passati, ' + falliti + ' falliti');

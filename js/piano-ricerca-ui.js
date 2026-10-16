@@ -46,7 +46,9 @@
 // ammesso: cosi la ricerca lavora fra i piani applicabili (prima finiva su un piano con 13
 // scoperti e una legge in piu, scartato tutto: restavano 41 scoperti).
 // SABATO OLTRE LE 23 A CHI E INDIETRO con le domeniche (decisione del titolare 15/10/2026):
-// 250 per ogni domenica persa. Meno di un posto scoperto (300, fino a 1.500 se raro, e i
+// 290 per ogni domenica persa (16/10/2026: era 250; online 11 -> 26 sabati per coprire posti
+// del sabato sera: ora quasi quanto un posto, si da il sabato tardi solo se il posto e raro o
+// se coprirlo porta anche altro guadagno). Meno di un posto scoperto (300, fino a 1.500 se raro, e i
 // riservati 30.000 in piu): un posto non resta mai scoperto per salvare la domenica, ma a
 // parita di posti coperti Migliora sposta il sabato tardi a un collega. Piu delle ore sotto il
 // minimo (200), della qualita (150), dei buchi nei blocchi (60) e delle ore verso l obiettivo
@@ -58,7 +60,9 @@ const RICERCA_PESI = {
   legge: 60000,
   regola: 20000,
   qualita: 150,
-  sabatoTardi: 250,
+  qualitaTurni: 250,
+  sabatoTardi: 290,
+  blocchiRicerca: 0,
   riservato: 30000,
   oreSotto: 200,
   scoperto: 300,
@@ -192,7 +196,11 @@ function _ricercaContiDi(viol) {
 function _ricercaPuntiDi(msg) {
   const k = _ricercaTipoViolazione(msg);
   if (k === 'oreSotto') return RICERCA_PESI.oreSotto;
-  if (k === 'qualita') return RICERCA_PESI.qualita;
+  // minimo con una competenza SU CERTI TURNI (es. accoglienza su S5): quasi un posto (16/10/2026)
+  if (k === 'qualita')
+    return / su [A-Z0-9*, ]+ \(trovati \d+\)$/.test(String(msg || ''))
+      ? RICERCA_PESI.qualitaTurni
+      : RICERCA_PESI.qualita;
   if (k === 'regola' || k === 'limite_gruppo') return RICERCA_PESI.regola;
   if (k === 'sabato_tardi') return _ricercaSabatoCopertura() ? RICERCA_PESI.sabatoTardi : RICERCA_PESI.regola;
   // le domeniche libere: per ogni domenica mancante
@@ -379,6 +387,26 @@ async function _ricercaPrepara(opz) {
   const turnoInfoDi = {};
   _pianoTurniReparto().forEach((t) => (turnoInfoDi[t.codice] = t));
   const _ammessiMemo = {};
+  // ultimo giorno di lavoro prima delle vacanze (regola diurno_prima_vacanza): niente notturni,
+  // come nella bozza (dopo d solo C e poi la V)
+  const diurnoPreV = _pianoRegolaVal('diurno_prima_vacanza') === 'TRUE';
+  // codice fisso della cella (le C attorno alle vacanze sono protette; le C di riempimento no)
+  const codFisso = (n, d) => {
+    const r = (righeDi[n + '|' + d] || [])[0];
+    if (!r) return '';
+    const c = String(r.codice || '').toUpperCase();
+    return c === 'C' && !r.protetto ? '' : c;
+  };
+  const primaDelleVacanze = (n, d) => {
+    const x = new Date(d + 'T12:00:00');
+    for (let k = 0; k < 8; k++) {
+      x.setDate(x.getDate() + 1);
+      const c = codFisso(n, dataLocaleISO(x));
+      if (c === 'V' || c === 'V1') return true;
+      if (c !== 'C') return false;
+    }
+    return false;
+  };
   const ammessi = (n, d) => {
     const km = n + '|' + d;
     if (_ammessiMemo[km]) return _ammessiMemo[km].slice();
@@ -389,6 +417,7 @@ async function _ricercaPrepara(opz) {
       const t = turnoInfoDi[c];
       if (!t) return false;
       if (isWd && t.tipo === 'NOTTURNO') return false; // WD = qui deve lavorare di giorno
+      if (diurnoPreV && t.tipo === 'NOTTURNO' && primaDelleVacanze(n, d)) return false;
       return _pianoIdoneoStatico(n, t, dow, idoneita);
     });
     out.push(isWd ? 'WD' : '');
@@ -453,17 +482,21 @@ async function _ricercaPrepara(opz) {
   // BLOCCHI COMPATTI (v453, qualita del piano, piano-genera.js): ogni buco costa il peso della
   // regola (60): meno di un posto coperto, nessun vincolo. Prima nessun costo: le mosse
   // "gratis" spostavano giorni a caso e Migliora spezzava i blocchi della bozza
-  // DUE TEMPI: durante la ricerca a caso i buchi non contano (la ricerca copre i posti come
-  // prima: col peso dentro la ricerca, anche solo un quinto e solo nell ultima parte, restavano
-  // 1-3 posti scoperti in piu, misura novembre e dicembre 2026 Slots e Tavoli, 3 semi); nella
-  // rifinitura finale (scambi di giorni e di turno, che non cambiano i posti coperti) contano
-  // col peso pieno. La compattezza non si paga mai con un posto scoperto.
-  // GIORNI ISOLATI (15/10/2026): provato anche il loro peso durante la ricerca a caso: dicembre
-  // Slots 3 semi, scoperti 5,0 senza, 7,7 con meta peso, 8,3 con il peso pieno (v456: 4,3); i
-  // 3-1-1 interni al mese erano 0 in tutti i casi. Si tengono solo nella rifinitura (pesi in
-  // _pianoPesoBuco: giorno isolato 150, 3-1-1 306, piu di un posto normale).
+  // STORIA: v453-v457 i buchi contano solo nella rifinitura finale (con il peso nella ricerca
+  // restavano posti scoperti in piu). Prova del titolare online 16/10/2026, novembre Slots: buchi
+  // 111 -> 153. Decisione del titolare: via di mezzo, al massimo +2 scoperti al mese sulla v457.
+  // Misura diario3, Migliora 1 minuto, 3 semi (scoperti / buchi; v457 nov 24,7 / 122, dic 5 / 111):
+  //   peso pieno nella ricerca, bozza nuova       nov 30,3 / 96   dic 9,3 / 74
+  //   un quarto, bozza nuova                      nov 27,3 / 111  dic 9,3 / 90
+  //   un quarto, bozza v457                       nov 30,7 / 121  dic 6 / 97
+  //   meta, bozza v457                            nov 32 / 112    dic 6,7 / 103
+  //   zero (solo rifinitura), bozza nuova SCELTO  nov 26,7 / 115  dic 7,7 / 105
+  //   zero, bozza v457                            nov 29 / 126    dic 7 / 119
+  // La regola "prima delle vacanze niente notte" costa da sola circa 3 posti a novembre (senza:
+  // 25,7). RICERCA_PESI.blocchiRicerca: frazione del peso durante la ricerca a caso.
   const parBl = typeof _pianoBlocchiParam === 'function' ? _pianoBlocchiParam() : { attivo: false };
-  let pesoBlOra = 0;
+  // peso dei buchi durante la ricerca a caso (pieno nella rifinitura: primaDellaRifinitura)
+  let pesoBlOra = parBl.attivo ? (parBl.peso || 0) * (RICERCA_PESI.blocchiRicerca || 0) : 0;
   const valutaPersona = (n, mappa) => {
     const mese = righePersona(n, mappa);
     const viol = _pianoViolazioniPersona(n, mese, mese.concat(bordoDi[n] || []), ctx);
@@ -804,6 +837,16 @@ async function pianoRicercaCalcola(secondi, onPasso, opz) {
   // punteggio (possono cedere a un posto coperto)
   const eccesso = { prima: ris.prima.eccesso || 0, dopo: ris.dopo.eccesso || 0 };
   const motivi = _ricercaVincoliRotti(prima, dopo, eccesso);
+  // A PARITA DI POSTI COPERTI buchi nei blocchi e sabati tardi non aumentano (16/10/2026): se il
+  // risultato non copre nessun posto in piu, non si scambia un piano piu spezzato
+  if (dopo.scoperti >= prima.scoperti) {
+    if ((dopo.blocchi || 0) > (prima.blocchi || 0))
+      motivi.push('buchi nei blocchi ' + prima.blocchi + ' → ' + dopo.blocchi + ' senza posti coperti in più');
+    if ((dopo.sabati || 0) > (prima.sabati || 0))
+      motivi.push(
+        'sabati oltre le 23 a chi è indietro ' + prima.sabati + ' → ' + dopo.sabati + ' senza posti coperti in più',
+      );
+  }
   const migliore =
     !motivi.length &&
     (dopo.regole < prima.regole ||

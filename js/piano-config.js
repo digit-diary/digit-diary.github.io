@@ -509,9 +509,10 @@ const PIANO_REGOLE_GUIDA = {
   },
   diurno_prima_vacanza: {
     g: 'Vacanze',
-    n: 'Turno diurno il giorno prima della vacanza',
+    n: 'Prima delle vacanze si finisce col presto: l ultimo giorno di lavoro prima delle C e delle V è un turno di giorno',
+    s: 'Sì: il giorno di lavoro prima delle C che precedono le vacanze (o prima della V, se non ci sono C) non è mai un turno notturno.',
     t: 'sino',
-    d: 'Controlla le regole',
+    d: 'Bozza, Migliora la bozza, Controlla le regole',
   },
   // valore predefinito (p): vale anche quando nel database la riga non c e (motore e
   // scheda lo leggono da qui, _pianoFunzioniFannoTutto in piano-core.js)
