@@ -2741,6 +2741,27 @@ function _pianoErroreScrittura(prefisso, e, avvisoPrima) {
   if (e && e.rete && !avvisoPrima && window._sessioneScadutaAvvisata) return;
   toastErrore(prefisso + ((e && e.message) || e), 9000);
 }
+// ERRORE DI UNA SCRITTURA GRANDE (Versioni del mese, Annulla tutto): una finestra che resta
+// finche non si preme OK, non un avviso di pochi secondi in fondo alla pagina. 16/10/2026:
+// "Rimetti tutto" delle Versioni non riuscito sembrava "non e successo niente" (l avviso
+// rosso spariva dopo 6 secondi). La scrittura del piano e tutto o niente: se il database
+// risponde con un errore non e stato scritto niente, e si dice. Senza rete non si sa se la
+// scrittura e arrivata: si dice di ricaricare e guardare prima di riprovare.
+function _pianoAvvisoErroreGrande(titolo, cosa, e) {
+  const msg = erroreInChiaro((e && e.message) || String(e || 'errore sconosciuto'));
+  const tempo = /statement timeout|57014|impiegato troppo/i.test(((e && e.message) || '') + ' ' + msg);
+  let t =
+    cosa +
+    ' NON riuscito.\n\n' +
+    (e && e.rete
+      ? msg
+      : 'Niente e stato scritto: il piano e rimasto com era prima.\n\nMotivo: ' +
+        msg +
+        (tempo
+          ? '\n\nIl server ha un limite di tempo per ogni scrittura e questa non e finita in tempo. Riprova fra un momento; se succede ancora avvisa l IT (aggiornamento del database: scritture grandi del piano).'
+          : ''));
+  return mostraAvviso(t, { titolo: titolo });
+}
 // esito dopo le scritture: le celle nuove in memoria (quelle del mese aperto)
 function _pianoMemoriaDopo(ops, righe) {
   (ops || []).forEach((o, i) => {

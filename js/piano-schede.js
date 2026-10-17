@@ -2089,6 +2089,9 @@ async function pianoStoricoRiporta(quando, esatto) {
   });
   const redoPrima = window._pianoRedo;
   window._pianoRedo = [];
+  // si vede che il programma sta lavorando (una scrittura grande sul cloud richiede qualche
+  // secondo): resta finche arriva l esito
+  toast('Rimetto ' + solo.size + (solo.size === 1 ? ' cella' : ' celle') + ' com erano il ' + quandoIt + '...', 120000);
   try {
     // UNA scrittura, tutto o niente, solo se le celle sono ancora come nell anteprima
     const esito = await _pianoRipristinaStato(
@@ -2115,11 +2118,14 @@ async function pianoStoricoRiporta(quando, esatto) {
         ' celle' +
         (passato ? ', giorni passati compresi' : nP ? ', giorni passati lasciati come oggi' : '') +
         ')',
+      6000,
     );
   } catch (e) {
     window._pianoUndo.pop();
     window._pianoRedo = redoPrima;
-    toastErrore('Ripristino non riuscito: ' + ((e && e.message) || e));
+    clearTimeout(window._toastTimer);
+    document.getElementById('toast').classList.remove('show'); // via "Rimetto N celle..."
+    await _pianoAvvisoErroreGrande('Versioni del mese', 'Ripristino del mese', e);
   }
   await renderPiano();
 }

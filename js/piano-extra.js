@@ -791,7 +791,7 @@ async function pianoAnnullaTutto() {
         { reparto: snap.rep, da: snap.ym + '-01', a: fineM, etichetta: 'Annulla tutto (' + snap.n + ' operazioni)' },
       );
     } catch (e) {
-      toastErrore('Annulla tutto non riuscito: ' + ((e && e.message) || e));
+      await _pianoAvvisoErroreGrande('Annulla tutto', 'Annulla tutto', e);
       await renderPiano();
       return false;
     }
@@ -822,7 +822,7 @@ async function pianoAnnullaTutto() {
     try {
       await _pianoRipristinaStato(snap, { memoria: memoria, riapri: true });
     } catch (e) {
-      toastErrore('Annulla tutto non riuscito: ' + ((e && e.message) || e));
+      await _pianoAvvisoErroreGrande('Annulla tutto', 'Annulla tutto', e);
       await renderPiano();
       return false;
     }
