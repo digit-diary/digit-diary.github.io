@@ -2955,6 +2955,13 @@ function _pianoCongediAttornoVacanze() {
   const v = _pianoRegolaVal('c_prima_dopo_vacanza');
   return v == null ? true : String(v).toUpperCase() !== 'FALSE';
 }
+// GIORNI WD DOPO LE C DEL RIENTRO (regola wd_dopo_vacanza): predefinito 0 (decisione del
+// titolare 21/10/2026, "WD dopo le vacanze: NO"); 0 anche con i congedi attorno spenti
+function _pianoWdDopoVacanza() {
+  if (!_pianoCongediAttornoVacanze()) return 0;
+  const n = parseInt(_pianoRegolaVal('wd_dopo_vacanza'));
+  return isNaN(n) || n < 0 ? 0 : n;
+}
 async function _applicaVacanzeMese(interattivo, opz) {
   if (!puoGestirePiano() && !window._pianoAutoInCorso) return null; // anche dentro la generazione automatica
   const ym = _pianoMeseSel;
@@ -2976,9 +2983,10 @@ async function _applicaVacanzeMese(interattivo, opz) {
   const cDopoJolly = cAttorno ? parseInt(_pianoRegolaVal('c_dopo_jolly')) || 1 : 0;
   const wdPrima = parseInt(_pianoRegolaVal('wd_prima_vacanza'));
   const nWd = !cAttorno ? 0 : isNaN(wdPrima) ? 4 : wdPrima;
-  // giorni di lavoro obbligatori anche DOPO le C del rientro (turni prima e dopo le C)
-  const wdDopoR = parseInt(_pianoRegolaVal('wd_dopo_vacanza'));
-  const nWdDopo = !cAttorno ? 0 : isNaN(wdDopoR) ? 1 : wdDopoR;
+  // giorni di lavoro obbligatori DOPO le C del rientro: predefinito nessuno (decisione del
+  // titolare 21/10/2026, "WD dopo le vacanze: NO": il primo turno dopo le C puo essere anche
+  // una notte). La regola wd_dopo_vacanza a 1 o piu rimette i WD come prima.
+  const nWdDopo = _pianoWdDopoVacanza();
   // SETTIMANE A CAVALLO D ANNO: la settimana 53 del 2026 (28.12-03.01) e la
   // settimana 1 del 2026 (dal 29.12.2025) portano giorni nel mese di un altro
   // anno. Si leggono anche le vacanze dell anno prima e dopo e ogni settimana

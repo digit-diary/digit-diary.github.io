@@ -1686,8 +1686,16 @@ async function cambiaImpiegoCollaboratore(id, imp, opz) {
   try {
     const c = collaboratoriCache.find((x) => x.id === id);
     const prima = c ? c.impiego : null;
-    await secPatch('collaboratori', 'id=eq.' + id, { impiego: imp || null });
-    if (c) c.impiego = imp || null;
+    // is_jolly segue l impiego (come in Cestino > Impiego): il piano, le ore dovute, le C attorno
+    // alle vacanze e i CGF leggono ancora is_jolly. Prima restava il valore vecchio: chi passava a
+    // Jolly da qui restava "CR 100%" con le ore dovute di un fisso
+    const patch = { impiego: imp || null };
+    if (imp === 'jolly' || imp === 'fisso') patch.is_jolly = imp === 'jolly';
+    await secPatch('collaboratori', 'id=eq.' + id, patch);
+    if (c) {
+      c.impiego = imp || null;
+      if ('is_jolly' in patch) c.is_jolly = patch.is_jolly;
+    }
     const lbl = (v) => (v === 'fisso' ? 'Fisso' : v === 'jolly' ? 'Jolly' : 'nessuno');
     logAzione('Impiego collaboratore', (c ? c.nome : 'ID ' + id) + ' → ' + lbl(imp));
     if (c && imp && imp !== prima && typeof _insertHrEvento === 'function')

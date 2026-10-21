@@ -1800,7 +1800,12 @@
           </button>
         </h4>
         <p style="color: var(--muted); font-size: var(--fs-md,.875rem); margin-bottom: 12px">
-          Gestisci categoria (Maison/Full Maison), budget, data nascita.
+          I clienti della Maison del settore con la loro categoria: Full Maison, Maison,
+          Direzione o un tipo di buono (BU, BL, CG...). Con una categoria di buono,
+          nell'inserimento dei costi il buono si propone da solo e il numero di buoni si
+          calcola dall'importo. Per aggiungere un cliente a mano: nome, categoria ed
+          eventuale budget qui sotto, poi <b>+ Aggiungi cliente</b>. <b>Modifica</b> cambia la
+          categoria, <b>Togli</b> lo mette nel Cestino.
         </p>
         <div
           style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap"
@@ -1949,13 +1954,8 @@
           </div>
           <div class="field">
             <label>Categoria</label
-            ><select id="maison-budget-cat" style="padding: 10px; width: 130px">
+            ><select id="maison-budget-cat" style="padding: 10px; width: 170px">
               <option value="">-</option>
-              <option value="maison">Maison</option>
-              <option value="full_maison">Full Maison</option>
-              <option value="direzione">Direzione</option>
-              <option value="bu">Buono Unico</option>
-              <option value="bl">Buono Lounge</option>
             </select>
           </div>
           <div class="field">
@@ -1968,7 +1968,7 @@
             />
           </div>
           <button class="btn-add-tipo" onclick="salvaMaisonBudget()">
-            + Salva
+            + Aggiungi cliente
           </button>
         </div>
       </div>
@@ -3594,7 +3594,7 @@
       </div>
       <div class="settings-section" data-gruppo="Dati" id="cestino-section" style="display: none">
         <div class="sez-head"><div><h4>Cestino</h4><p class="sez-desc" id="cestino-desc">Le registrazioni del Diario e i moduli eliminati del settore aperto: si ripristinano da qui. L’eliminazione definitiva è riservata all’amministratore e solo se il periodo di conservazione lo consente.</p></div></div>
-        <div class="add-tipo-row sez-form sez-filtri"><button class="btn-add-tipo" onclick="caricaCestino()">Carica cestino</button><div class="field"><label>Tipo</label><select id="cestino-filt-tipo" onchange="renderCestino()"><option value="">Tutti i tipi</option><option value="registrazioni">Registrazioni</option><option value="moduli">Moduli</option></select></div><div class="field"><label>Nome</label><input class="campo-cerca" type="text" id="cestino-filt-nome" placeholder="Cerca nome..." aria-label="Cerca nome" oninput="renderCestino()" /></div><div class="field"><label>Eliminato da</label><input type="text" id="cestino-filt-chi" placeholder="Operatore" oninput="renderCestino()" /></div><button class="btn-secondario" onclick="document.getElementById('cestino-filt-tipo').value='';document.getElementById('cestino-filt-nome').value='';document.getElementById('cestino-filt-chi').value='';renderCestino();">Azzera filtri</button></div>
+        <div class="add-tipo-row sez-form sez-filtri"><button class="btn-add-tipo" onclick="caricaCestino()">Carica cestino</button><div class="field"><label>Tipo</label><select id="cestino-filt-tipo" onchange="renderCestino()"><option value="">Tutti i tipi</option><option value="registrazioni">Registrazioni</option><option value="moduli">Moduli</option><option value="clienti_maison">Clienti Maison</option></select></div><div class="field"><label>Nome</label><input class="campo-cerca" type="text" id="cestino-filt-nome" placeholder="Cerca nome..." aria-label="Cerca nome" oninput="renderCestino()" /></div><div class="field"><label>Eliminato da</label><input type="text" id="cestino-filt-chi" placeholder="Operatore" oninput="renderCestino()" /></div><button class="btn-secondario" onclick="document.getElementById('cestino-filt-tipo').value='';document.getElementById('cestino-filt-nome').value='';document.getElementById('cestino-filt-chi').value='';renderCestino();">Azzera filtri</button></div>
         <div id="cestino-content"></div>
       </div>
     </div>

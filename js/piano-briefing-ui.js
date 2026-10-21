@@ -33,8 +33,20 @@ function _briefIsValet() {
 // nuovo, ordina solo per orario: prima solo Tavoli e Cleaning erano esclusi per nome e un
 // settore nuovo ereditava i gruppi C/S/R/Z delle Slots.
 const _BRIEF_SETTORI_ORDINE_LETTERE = ['slots', 'valet'];
+// JG (corso o giornata): sta nel gruppo dei turni di sala e, nell ordine, subito dopo
+// l ultimo di loro (decisione del titolare 21/10/2026). Slots e Valet: dopo le S (e le X),
+// prima di reception, L1/9 e Z; gli altri settori (un gruppo solo, per orario): dopo tutti
+// i turni. Prima la J finiva nel gruppo "altro", in fondo al foglio dopo Z e L1.
+function _briefEJg(cod) {
+  return (
+    String(cod || '')
+      .trim()
+      .toUpperCase() === 'JG'
+  );
+}
 function _briefGruppo(cod) {
   if (!cod) return 9;
+  if (_briefEJg(cod)) return 1;
   // le lettere (C cassa, S sala, R reception, Z, L1/9) sono delle sigle Slots (e del Valet,
   // che ne usa alcune): negli altri settori le sigle sono numeri o altro e si ordinano
   // solo per orario (prima il "9" dei Tavoli finiva in un gruppo a parte)
@@ -224,25 +236,45 @@ function _briefComponi(pianoRighe) {
       })(),
     });
   });
-  // cognomi uguali di persone diverse (es. BIANCHI Milena e BIANCHI Chiara):
-  // aggiungi l'iniziale del nome; se coincide anche quella, il nome intero
-  const perCognome = {};
-  righe.forEach((r) => {
-    (perCognome[r.nome] = perCognome[r.nome] || new Set()).add(r.nomeFull || r.nome);
-  });
-  righe.forEach((r) => {
-    if (perCognome[r.nome] && perCognome[r.nome].size > 1 && r.nomeFull) {
-      const parole = r.nomeFull.trim().split(/\s+/);
-      const proprio = parole[parole.length - 1];
-      const iniziali = [...perCognome[r.nome]].map((n) => {
-        const p = n.trim().split(/\s+/);
-        return p[p.length - 1].charAt(0).toUpperCase();
-      });
-      const doppiaIni = iniziali.filter((x) => x === proprio.charAt(0).toUpperCase()).length > 1;
-      r.nome = r.nome + ' ' + (doppiaIni ? proprio.toUpperCase() : proprio.charAt(0).toUpperCase() + '.');
-    }
-  });
+  _briefNomiDistinti(righe);
   _briefOrdina(righe);
+  return righe;
+}
+// COGNOMI UGUALI (richiesta del titolare 21/10/2026): sul foglio si scrive il cognome; se
+// quel giorno ci sono piu persone con lo stesso cognome si aggiunge l iniziale del nome
+// (BIANCHI C. e BIANCHI M.), se coincide anche l iniziale le prime due lettere (BIANCHI Ma.
+// e BIANCHI Mi.) e, se non basta nemmeno quello, il nome intero. Il nome corto cosi
+// distinto e lo stesso delle pause e dei bigliettini (leggono il nome della riga).
+// righe: [{ nome: cognome maiuscolo, nomeFull: 'Cognome Nome' }], cambiate sul posto
+function _briefNomiDistinti(righe) {
+  const proprioDi = (n) => {
+    const p = String(n || '')
+      .trim()
+      .split(/\s+/);
+    return p.length > 1 ? p[p.length - 1] : '';
+  };
+  const perCognome = {};
+  (righe || []).forEach((r) => {
+    if (!r || !r.nomeFull || !r.nome) return;
+    (perCognome[r.nome] = perCognome[r.nome] || new Set()).add(String(r.nomeFull).trim().toUpperCase());
+  });
+  (righe || []).forEach((r) => {
+    if (!r || !r.nomeFull || !perCognome[r.nome] || perCognome[r.nome].size < 2) return;
+    const proprio = proprioDi(r.nomeFull);
+    if (!proprio) return;
+    const altri = [...perCognome[r.nome]].filter((n) => n !== String(r.nomeFull).trim().toUpperCase()).map(proprioDi);
+    const pu = proprio.toUpperCase();
+    let suffisso = proprio.charAt(0).toUpperCase() + proprio.slice(1).toLowerCase();
+    for (const k of [1, 2]) {
+      if (pu.length <= k) break;
+      const pref = pu.slice(0, k);
+      if (!altri.some((a) => a.toUpperCase().slice(0, k) === pref)) {
+        suffisso = proprio.charAt(0).toUpperCase() + proprio.slice(1, k).toLowerCase() + '.';
+        break;
+      }
+    }
+    r.nome = r.nome + ' ' + suffisso;
+  });
   return righe;
 }
 // Ordine del foglio: gruppi, dentro il gruppo prima i presti poi le notti;
@@ -263,6 +295,8 @@ function _briefOrdina(righe) {
   righe.sort((a, b) => {
     const g = _briefGruppo(a.turno) - _briefGruppo(b.turno);
     if (g) return g;
+    // il JG chiude il gruppo dei turni di sala
+    if (_briefEJg(a.turno) !== _briefEJg(b.turno)) return _briefEJg(a.turno) ? 1 : -1;
     const ra = rangoCd(a.turno);
     const rb = rangoCd(b.turno);
     if (ra >= 0 || rb >= 0) {
@@ -636,7 +670,11 @@ async function _renderPianoBriefingTab() {
         : 'Nessun turno nel piano per questa data') +
     '</span></div>';
   // tabella briefing + tabella orari affiancate (stessa vista dell'Excel)
-  h += '<div style="display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap"><div style="overflow-x:auto">';
+  // Valet: il riquadro ORARI sta SOTTO la tabella (richiesta del titolare 21/10/2026), come nel PDF
+  h +=
+    '<div style="display:flex;gap:' +
+    (valet ? '14px;flex-direction:column' : '22px') +
+    ';align-items:flex-start;flex-wrap:wrap"><div style="overflow-x:auto">';
   h +=
     '<table id="brief-tabella" class="brief-table" style="border-collapse:collapse;font-size:var(--fs-md,.875rem)"><thead><tr>';
   // ogni reparto ha il SUO briefing: slots con CD (numeri cassa), valet con

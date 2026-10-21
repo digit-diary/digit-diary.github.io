@@ -4745,14 +4745,25 @@ async function pdfBriefingGiorno() {
     if (r.cs) righeCs[body.length] = r.cs;
     body.push(ids.map((id) => (id === 'e' || id === 'u' ? '' : id === 'nome' ? nomePdf : r[id] || '')));
   });
-  // sempre in UN SOLO foglio, con il carattere piu grande che ci sta (fino a 12)
-  // e colonne larghe quanto il testo piu lungo (cognomi lunghi, radio, badge)
+  // SEMPRE IN UN SOLO FOGLIO A4 con TUTTI i collaboratori del giorno (richiesta del titolare
+  // 21/10/2026): si cerca il carattere piu grande che ci sta, da 12 punti in giu fino al
+  // minimo di 7 punti (circa 2,5 mm di altezza delle maiuscole: si legge bene sul foglio
+  // stampato, sotto diventa faticoso). Prima si stringono i margini delle celle, poi il
+  // carattere; i nomi lunghi vanno a capo invece di rimpicciolire tutto; il riquadro ORARI
+  // sta di lato oppure sotto, dove lascia il carattere piu grande. Ogni prova si misura
+  // DISEGNANDO davvero la tabella su un foglio di prova (altezze vere di jsPDF, non stime).
+  // Se non ci sta neanche a 7 punti si stampa su piu pagine (intestazione ripetuta) e si
+  // avvisa: nessuna riga viene tolta in silenzio.
+  const FONT_MIN = 7;
   const nRighe = body.length || 1;
-  const largMax = valet ? PW - 20 : 142; // Slots/altri: a destra c e il riquadro ORARI
-  const altDisp = PH - 26 - 12;
-  const misura = (f) => {
+  const largMax = valet ? PW - 20 : 142; // Slots/altri: ORARI a destra (o sotto); Valet: ORARI sempre sotto
+  const fondoMax = PH - 9; // sopra la riga a pie di pagina
+  const misura = (f, compatto) => {
     doc.setFontSize(f);
-    const pad = Math.max(1, f * 0.17);
+    // margine interno: ai lati sempre lo stesso (decide la larghezza), sopra e sotto comodo
+    // (righe alte per spuntare e firmare a penna) oppure compatto (l altezza del testo)
+    const pad = Math.max(0.8, f * 0.12);
+    const padV = compatto ? Math.max(0.6, f * 0.085) : Math.max(1, f * 0.17);
     const larg = cols.map((h, c) => {
       doc.setFont('helvetica', 'bold');
       let w = doc.getTextWidth(String(h));
@@ -4765,8 +4776,9 @@ async function pdfBriefingGiorno() {
     });
     const minimi = ids.map((id) => (id === 'e' || id === 'u' ? 9 : id === 'firma' ? 30 : id === 'uscita' ? 18 : 12));
     const w = larg.map((x, c) => Math.max(x, minimi[c]));
-    const rowH = f * 0.3528 * 1.25 + 2 * pad;
-    return { f, pad, w, rowH, somma: w.reduce((a, b) => a + b, 0), naturale: w[iN] };
+    // riga normale: un po d aria per spuntare e firmare a penna; compatta: l altezza del testo
+    const rowH = compatto ? f * 0.3528 * 1.15 + 2 * padV : f * 0.3528 * 1.25 + 2 * padV;
+    return { f, pad, padV, compatto, w, rowH, somma: w.reduce((a, b) => a + b, 0) };
   };
   // il nome si allarga quanto serve; se non ci sta nella larghezza del foglio va a
   // capo su due righe (la riga si alza) invece di rimpicciolire tutto il testo
@@ -4788,147 +4800,244 @@ async function pdfBriefingGiorno() {
     x.doppie = doppie;
     return x;
   };
-  // Slots e altri: ORARI accanto (tabella fino a 142 mm) oppure sotto (tabella fino a
-  // 190 mm, se i nomi lunghi chiedono spazio): si sceglie la disposizione con il
-  // carattere piu grande che ci sta
-  const nOrari = valet
-    ? 0
-    : _pianoTurniReparto().filter((t) =>
-        (_briefState.righe || []).some(
-          (r) =>
-            String(r.turno || '')
-              .trim()
-              .toUpperCase() === String(t.codice).toUpperCase(),
-        ),
-      ).length;
-  const cerca = (larghMax, altMax) => {
-    // prima una misura grande (almeno 9) senza nomi a capo; se non c e, il nome
-    // lungo va a capo e il resto del foglio resta grande
-    for (const aCapo of [false, true]) {
-      for (let f = 12; f >= (aCapo ? 6.5 : 9); f -= 0.5) {
-        const x = adatta(misura(f), larghMax);
-        if (!x || (!aCapo && x.doppie)) continue;
-        if (x.somma <= larghMax && (nRighe + x.doppie) * x.rowH + 8 <= altMax) return x;
-      }
-    }
-    return null;
-  };
-  let m = cerca(largMax, altDisp);
-  let orariSotto = false;
-  if (!valet) {
-    // altezza del riquadro ORARI: righe da circa 6 mm, stacchi fra i gruppi, intestazione
-    const sotto = cerca(PW - 20, altDisp - (nOrari * 6.3 + 30));
-    if (sotto && (!m || sotto.f > m.f)) {
-      m = sotto;
-      orariSotto = true;
-    }
-  }
-  if (!m) m = misura(6.5);
-  const largUso = valet || orariSotto ? PW - 20 : largMax;
-  // lo spazio che avanza va soprattutto a FIRMA (per scrivere) e al nome
-  const avanza = Math.max(0, (valet || orariSotto ? largUso : Math.min(largUso, Math.max(m.somma, 138))) - m.somma);
-  const iF = ids.indexOf('firma');
-  if (iF >= 0) m.w[iF] += avanza * 0.6;
-  m.w[iN] += avanza * (iF >= 0 ? 0.4 : 1);
-  const larghezze = {};
-  m.w.forEach((x, c) => (larghezze[c] = { cellWidth: Math.round(x * 10) / 10 }));
-  // sigle del turno (e numero cassa) al centro della casella
-  larghezze[iT].halign = 'center';
-  if (iC >= 0) larghezze[iC].halign = 'center';
-  const tabW = m.w.reduce((a, b) => a + b, 0);
-  const rowH = m.rowH;
-  const fontR = m.f;
-  const padR = m.pad;
-  doc.autoTable({
-    startY: 26,
-    margin: { left: 10 },
-    tableWidth: tabW,
-    head: [cols],
-    body: body,
-    theme: 'grid',
-    styles: {
-      fontSize: fontR,
-      cellPadding: padR,
-      lineColor: [120, 120, 120],
-      lineWidth: 0.2,
-      textColor: [0, 0, 0],
-      minCellHeight: rowH,
-    },
-    headStyles: { fontStyle: 'bold', halign: 'center', minCellHeight: 6 },
-    columnStyles: larghezze,
-    didParseCell: (d) => {
-      if (d.section === 'head') {
-        const id = ids[d.column.index];
-        d.cell.styles.fillColor = id === 'e' ? [0, 176, 80] : id === 'u' ? [255, 0, 0] : [255, 255, 0];
-        if (id === 'u') d.cell.styles.textColor = [255, 255, 255]; // E nero sul verde, come a video
-        return;
-      }
-      // stile della cella singola + formato riga + regole fisse delle colonne
-      const fmtR = righeFmt[d.row.index] || {};
-      const campo = campiCol[d.column.index];
-      const stC = _stileCella(campo && righeCs[d.row.index] ? righeCs[d.row.index][campo] : '');
-      let bold = stC.b || fmtR.b;
-      let ital = stC.i || fmtR.i;
-      let fill = stC.c || '';
-      const tCol = stC.t || fmtR.t || '';
-      if (tCol && tCol[0] === '#') d.cell.styles.textColor = _peHexRgb(tCol);
-      if (d.column.index === iN && righeFm[d.row.index]) {
-        fill = fill || righeFm[d.row.index];
-        bold = true;
-      } else if (d.column.index === iT && d.cell.raw) {
-        const hex = _pianoColore(String(d.cell.raw).trim());
-        if (!fill && hex && hex[0] === '#') fill = hex;
-        bold = true;
-      } else if (d.column.index === iC && d.cell.raw) {
-        fill = fill || '#FFFF00';
-        bold = true;
-      }
-      if (fill) d.cell.styles.fillColor = _peHexRgb(fill);
-      if (bold || ital) d.cell.styles.fontStyle = bold && ital ? 'bolditalic' : bold ? 'bold' : 'italic';
-    },
-  });
-  if (!valet) {
+  // tabella ORARI (tutti i settori, anche il Valet: richiesta del titolare 21/10/2026, prima nel
+  // PDF del Valet mancava): solo i turni presenti nel foglio
+  const bodyT = [];
+  {
     const turniPresenti = {};
     (_briefState.righe || []).forEach((r) => {
       if (r.turno) turniPresenti[String(r.turno).trim().toUpperCase()] = true;
     });
-    const turni = _pianoTurniReparto()
+    let gT = null;
+    _pianoTurniReparto()
       .filter((t) => turniPresenti[t.codice.toUpperCase()])
+      // stesso ordine del riquadro a video: gruppo, poi orario di inizio
       .sort((a, b) => {
         const g = _briefGruppo(a.codice) - _briefGruppo(b.codice);
         if (g) return g;
+        const oa = _pianoOra((a.ora_inizio || '').substring(0, 5));
+        const ob = _pianoOra((b.ora_inizio || '').substring(0, 5));
+        const o = (oa == null ? 99 : oa) - (ob == null ? 99 : ob);
+        if (o) return o;
         return a.codice < b.codice ? -1 : 1;
+      })
+      .forEach((t) => {
+        const g = _briefGruppo(t.codice);
+        if (gT !== null && g !== gT) bodyT.push([{ content: '', colSpan: 3, styles: { minCellHeight: 2.5 } }]);
+        gT = g;
+        bodyT.push([t.codice, _briefOrarioHM(t.ora_inizio), _briefOrarioHM(t.ora_fine)]);
       });
-    const bodyT = [];
-    let gT = null;
-    turni.forEach((t) => {
-      const g = _briefGruppo(t.codice);
-      if (gT !== null && g !== gT) bodyT.push([{ content: '', colSpan: 3, styles: { minCellHeight: 2.5 } }]);
-      gT = g;
-      bodyT.push([t.codice, _briefOrarioHM(t.ora_inizio), _briefOrarioHM(t.ora_fine)]);
-    });
-    doc.autoTable({
-      startY: orariSotto ? doc.lastAutoTable.finalY + 6 : 26,
-      margin: { left: orariSotto ? 10 : Math.max(156, 10 + tabW + 4) },
-      tableWidth: 44,
-      head: [[{ content: 'ORARI', colSpan: 3, styles: { halign: 'center' } }]],
-      body: bodyT,
+  }
+  // disegna briefing e ORARI sul foglio d (vero o di prova); layout: 'lato' (ORARI a destra)
+  // o 'sotto' (ORARI sotto, tabella larga tutto il foglio; il Valet sempre cosi)
+  const disegna = (d, x, layout) => {
+    const sotto = layout === 'sotto';
+    const largUso = layout === 'lato' ? largMax : PW - 20;
+    const w = x.w.slice();
+    // lo spazio che avanza va soprattutto a FIRMA (per scrivere) e al nome
+    const somma = w.reduce((a, b) => a + b, 0);
+    const avanza = Math.max(0, (layout === 'lato' ? Math.min(largUso, Math.max(somma, 138)) : largUso) - somma);
+    const iF = ids.indexOf('firma');
+    if (iF >= 0) w[iF] += avanza * 0.6;
+    w[iN] += avanza * (iF >= 0 ? 0.4 : 1);
+    const larghezze = {};
+    w.forEach((v, c) => (larghezze[c] = { cellWidth: Math.round(v * 10) / 10 }));
+    // sigle del turno (e numero cassa) al centro della casella
+    larghezze[iT].halign = 'center';
+    if (iC >= 0) larghezze[iC].halign = 'center';
+    const tabW = w.reduce((a, b) => a + b, 0);
+    d.autoTable({
+      startY: 26,
+      margin: { left: 10, bottom: PH - fondoMax, top: 12 },
+      tableWidth: tabW,
+      head: [cols],
+      body: body,
       theme: 'grid',
-      styles: { fontSize: 10, cellPadding: 1.3, lineColor: [120, 120, 120], lineWidth: 0.2, textColor: [0, 0, 0] },
-      headStyles: { fillColor: [255, 255, 0], textColor: [0, 0, 0], fontStyle: 'bold' },
-      columnStyles: { 0: { cellWidth: 13, fontStyle: 'bold' }, 1: { cellWidth: 15.5 }, 2: { cellWidth: 15.5 } },
-      didParseCell: (d) => {
-        if (d.section === 'body' && d.column.index === 0 && d.cell.raw) {
-          const hex = _pianoColore(String(d.cell.raw).trim());
-          if (hex && hex[0] === '#') d.cell.styles.fillColor = _peHexRgb(hex);
+      styles: {
+        fontSize: x.f,
+        cellPadding: { left: x.pad, right: x.pad, top: x.padV, bottom: x.padV },
+        lineColor: [120, 120, 120],
+        lineWidth: 0.2,
+        textColor: [0, 0, 0],
+        minCellHeight: x.compatto ? 0 : x.rowH,
+      },
+      headStyles: { fontStyle: 'bold', halign: 'center', minCellHeight: x.compatto ? 0 : 6 },
+      columnStyles: larghezze,
+      didParseCell: (c) => {
+        // righe di stacco fra i gruppi: sottili, non alte quanto una riga di testo
+        if (c.section === 'body' && c.cell.colSpan === cols.length && !c.cell.raw.content) {
+          c.cell.styles.cellPadding = 0;
+          c.cell.styles.fontSize = 5;
+          c.cell.styles.minCellHeight = x.compatto ? 2.2 : 3.5;
+          return;
         }
+        stileCella(c);
       },
     });
+    const fineTab = d.lastAutoTable.finalY;
+    const pagTab = d.getNumberOfPages();
+    let fineOr = 0;
+    if (bodyT.length) {
+      // di lato: sulla prima pagina, accanto al briefing
+      if (!sotto) d.setPage(1);
+      const fO = sotto ? Math.min(10, Math.max(x.f, 8)) : 10;
+      d.autoTable({
+        startY: sotto ? fineTab + 5 : 26,
+        margin: { left: sotto ? 10 : Math.max(156, 10 + tabW + 4), bottom: PH - fondoMax, top: 12 },
+        tableWidth: 44,
+        head: [[{ content: 'ORARI', colSpan: 3, styles: { halign: 'center' } }]],
+        body: bodyT,
+        theme: 'grid',
+        styles: {
+          fontSize: fO,
+          cellPadding: x.compatto ? 0.9 : 1.3,
+          lineColor: [120, 120, 120],
+          lineWidth: 0.2,
+          textColor: [0, 0, 0],
+        },
+        headStyles: { fillColor: [255, 255, 0], textColor: [0, 0, 0], fontStyle: 'bold' },
+        columnStyles: { 0: { cellWidth: 13, fontStyle: 'bold' }, 1: { cellWidth: 15.5 }, 2: { cellWidth: 15.5 } },
+        didParseCell: (c) => {
+          if (c.section === 'body' && c.column.index === 0 && c.cell.raw) {
+            const hex = _pianoColore(String(c.cell.raw).trim());
+            if (hex && hex[0] === '#') c.cell.styles.fillColor = _peHexRgb(hex);
+          }
+        },
+      });
+      fineOr = d.lastAutoTable.finalY;
+      if (!sotto) d.setPage(pagTab);
+    }
+    return { pagine: d.getNumberOfPages(), fine: Math.max(fineTab, fineOr) };
+  };
+  // colori e formato delle celle del briefing (come a video)
+  const stileCella = (d) => {
+    if (d.section === 'head') {
+      const id = ids[d.column.index];
+      d.cell.styles.fillColor = id === 'e' ? [0, 176, 80] : id === 'u' ? [255, 0, 0] : [255, 255, 0];
+      if (id === 'u') d.cell.styles.textColor = [255, 255, 255]; // E nero sul verde, come a video
+      return;
+    }
+    // stile della cella singola + formato riga + regole fisse delle colonne
+    const fmtR = righeFmt[d.row.index] || {};
+    const campo = campiCol[d.column.index];
+    const stC = _stileCella(campo && righeCs[d.row.index] ? righeCs[d.row.index][campo] : '');
+    let bold = stC.b || fmtR.b;
+    let ital = stC.i || fmtR.i;
+    let fill = stC.c || '';
+    const tCol = stC.t || fmtR.t || '';
+    if (tCol && tCol[0] === '#') d.cell.styles.textColor = _peHexRgb(tCol);
+    if (d.column.index === iN && righeFm[d.row.index]) {
+      fill = fill || righeFm[d.row.index];
+      bold = true;
+    } else if (d.column.index === iT && d.cell.raw) {
+      const hex = _pianoColore(String(d.cell.raw).trim());
+      if (!fill && hex && hex[0] === '#') fill = hex;
+      bold = true;
+    } else if (d.column.index === iC && d.cell.raw) {
+      fill = fill || '#FFFF00';
+      bold = true;
+    }
+    if (fill) d.cell.styles.fillColor = _peHexRgb(fill);
+    if (bold || ital) d.cell.styles.fontStyle = bold && ital ? 'bolditalic' : bold ? 'bold' : 'italic';
+  };
+  // Valet: tabella larga (radio, badge) e ORARI sempre sotto, come a video
+  const layouts = valet ? ['sotto'] : ['lato', 'sotto'];
+  const larghDi = (layout) => (layout === 'lato' ? largMax : PW - 20);
+  const sta = (x, layout) => {
+    // scarto veloce dei casi lontani, poi la prova vera su un foglio a parte
+    const stima = 26 + (x.f * 0.3528 * 1.15 + 2 * x.padV) + (nRighe + x.doppie) * x.rowH * 0.8;
+    if (stima > fondoMax) return false;
+    const prova = disegna(new jsPDF('portrait', 'mm', 'a4'), x, layout);
+    return prova.pagine === 1 && prova.fine <= fondoMax + 0.01;
+  };
+  let scelta = null;
+  // prima senza nomi a capo e con il carattere ancora grande (almeno 9), poi con i nomi
+  // lunghi a capo fino al minimo; a parita di carattere prima le celle comode, poi compatte
+  for (const aCapo of [false, true]) {
+    for (let f = 12; f >= (aCapo ? FONT_MIN : 9) && !scelta; f -= 0.5) {
+      for (const compatto of [false, true]) {
+        for (const layout of layouts) {
+          const x = adatta(misura(f, compatto), larghDi(layout));
+          if (!x || (!aCapo && x.doppie) || x.somma > larghDi(layout) + 0.01) continue;
+          if (sta(x, layout)) {
+            scelta = { x, layout };
+            break;
+          }
+        }
+        if (scelta) break;
+      }
+    }
+    if (scelta) break;
   }
-  doc.setFontSize(6);
-  doc.setTextColor(120);
-  doc.text(identita().azienda + ' · Briefing · E/U da spuntare a penna', 10, PH - 5);
-  logAzione('Briefing stampato', _pianoReparto() + ' ' + dstr);
+  let piuPagine = false;
+  if (!scelta) {
+    // non ci sta neanche a 7 punti: si stampa tutto su piu pagine e si avvisa
+    piuPagine = true;
+    const lay = valet ? 'sotto' : adatta(misura(FONT_MIN, true), largMax) ? 'lato' : 'sotto';
+    scelta = { x: adatta(misura(FONT_MIN, true), larghDi(lay)) || misura(FONT_MIN, true), layout: lay };
+  }
+  const esito = disegna(doc, scelta.x, scelta.layout);
+  window._briefPdfMisure = {
+    righe: (_briefState.righe || []).filter((r) => r.nome || r.turno).length,
+    righeFoglio: nRighe,
+    carattere: scelta.x.f,
+    compatto: scelta.x.compatto,
+    orari: scelta.layout,
+    pagine: esito.pagine,
+  };
+  for (let pg = 1; pg <= esito.pagine; pg++) {
+    doc.setPage(pg);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6);
+    doc.setTextColor(120);
+    doc.text(
+      identita().azienda +
+        ' · Briefing · E/U da spuntare a penna' +
+        (esito.pagine > 1 ? ' · pagina ' + pg + ' di ' + esito.pagine : ''),
+      10,
+      PH - 5,
+    );
+  }
+  // CHI LAVORA E NON E SUL FOGLIO: un briefing salvato prima di un cambio nel piano puo non
+  // avere tutti; si avvisa (il foglio resta quello salvato, decide chi lo stampa)
+  let mancanti = [];
+  try {
+    const presenti = new Set();
+    (_briefState.righe || []).forEach((r) => {
+      if (r.nomeFull) presenti.add(String(r.nomeFull).trim().toUpperCase());
+      if (r.nome) presenti.add(String(r.nome).trim().toUpperCase());
+    });
+    mancanti = _briefComponi(_briefState.pianoRighe || [])
+      .filter(
+        (a) =>
+          a.nomeFull &&
+          !presenti.has(String(a.nomeFull).trim().toUpperCase()) &&
+          !presenti.has(String(a.nome).trim().toUpperCase()),
+      )
+      .map((a) => a.nomeFull + ' (' + a.turno + ')');
+  } catch (e) {}
+  const avvisi = [];
+  if (piuPagine)
+    avvisi.push(
+      'Il briefing ha ' +
+        window._briefPdfMisure.righe +
+        ' righe e non sta in un foglio A4 neanche con il carattere minimo (' +
+        FONT_MIN +
+        ' punti): è stampato su ' +
+        esito.pagine +
+        ' pagine, con l intestazione ripetuta. Nessuna riga è stata tolta.',
+    );
+  if (mancanti.length)
+    avvisi.push(
+      'Nel piano di questo giorno lavorano anche: ' +
+        mancanti.join(', ') +
+        '. Non sono nel briefing salvato: premi "Compila dal piano" o aggiungi le righe, poi ristampa.',
+    );
+  logAzione(
+    'Briefing stampato',
+    _pianoReparto() + ' ' + dstr + (esito.pagine > 1 ? ' (' + esito.pagine + ' pagine)' : ''),
+  );
+  if (avvisi.length) await mostraAvviso(avvisi.join('\n\n'), { titolo: 'Stampa briefing' });
   mostraPdfPreview(doc, 'briefing_' + dstr + '_' + _pianoReparto() + '.pdf', 'Briefing ' + lbl);
 }
 async function pdfPauseGiorno() {
@@ -5975,12 +6084,15 @@ async function importaBriefingExcel(input) {
       !(await chiediConferma('Trovate ' + righe.length + ' righe nel file. Sostituisco il briefing attuale?'))
     )
       return;
-    righe.sort((a, b) => {
-      const g = _briefGruppo(a.turno) - _briefGruppo(b.turno);
-      if (g) return g;
-      if (a.turno !== b.turno) return a.turno < b.turno ? -1 : 1;
-      return a.nome < b.nome ? -1 : 1;
-    });
+    // stesso ordine del foglio compilato dal piano (gruppi, JG dopo la sala, orario)
+    if (typeof _briefOrdina === 'function') _briefOrdina(righe);
+    else
+      righe.sort((a, b) => {
+        const g = _briefGruppo(a.turno) - _briefGruppo(b.turno);
+        if (g) return g;
+        if (a.turno !== b.turno) return a.turno < b.turno ? -1 : 1;
+        return a.nome < b.nome ? -1 : 1;
+      });
     _briefState.righe = righe;
     clearTimeout(_briefSaveTimer);
     await briefSalvaBriefing();

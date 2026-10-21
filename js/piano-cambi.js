@@ -3034,6 +3034,7 @@ function _pianoInitSelezione() {
   );
   if (!tabelle.length) return;
   tabelle.forEach((t, i) => (t.dataset.selInit = String(i + 1)));
+  if (typeof _pianoColDragBind === 'function') _pianoColDragBind();
   let selTipo = '';
   let selIdx = -1;
   let selTab = null;
@@ -3076,34 +3077,20 @@ function _pianoInitSelezione() {
     thead.querySelectorAll('tr th').forEach((th, colIdx) => {
       if (th.classList.contains('piano-nome') || th.classList.contains('piano-fun')) return;
       th.style.cursor = 'pointer';
+      const gTh = parseInt(th.dataset.g) || 0;
+      if (gTh) {
+        // GIORNI: selezione di colonne come Excel (clic, trascinamento, Maiusc, Cmd/Ctrl),
+        // gestita da _pianoColDragBind in piano-extra.js; qui il tasto destro
+        th.title =
+          th.title || 'Clic: tutta la colonna · trascina o Maiusc+clic: più giorni · Cmd/Ctrl+clic: giorni non vicini';
+        th.addEventListener('click', (e) => e.stopPropagation());
+        th.addEventListener('contextmenu', (e) => mostraPianoCtxGiorni(e, tab, gTh));
+        return;
+      }
       th.addEventListener('click', (e) => {
         e.stopPropagation();
-        const g = parseInt(th.dataset.g) || 0;
-        // Shift+click su un altro giorno = intervallo di colonne (come Excel), pronto da copiare
-        if (e.shiftKey && g && selTipo === 'col' && String(selIdx).charAt(0) === 'g') {
-          const g0 = parseInt(String(selIdx).substring(1)) || g;
-          const ga = Math.min(g0, g);
-          const gb = Math.max(g0, g);
-          clearAll();
-          _pianoBloccoPulisci();
-          selTipo = 'col';
-          selIdx = 'g' + g0;
-          for (let gi = ga; gi <= gb; gi++) {
-            tabelle.forEach((t) => {
-              const thx = t.querySelector('thead th[data-g="' + gi + '"]');
-              if (thx) thx.classList.add('col-selected-header');
-              t.querySelectorAll('tbody td[data-g="' + gi + '"]').forEach((c) => c.classList.add('col-selected'));
-            });
-          }
-          _pianoBloccoDaColonne(tab, ga, gb);
-          return;
-        }
-        // Ctrl/Cmd+click: selezione SPARSA di giorni con barra azioni
-        if ((e.ctrlKey || e.metaKey) && g) {
-          _pianoSparseToggleGiorno(g);
-          return;
-        }
-        const idSel = g ? 'g' + g : tab.dataset.selInit + ':' + colIdx;
+        // colonne dei totali (Ore, D, N, OD, OP, SM, YTD, Tot): clic = la colonna, ri-clic = via
+        const idSel = tab.dataset.selInit + ':' + colIdx;
         const era = selTipo === 'col' && idSel === selIdx;
         clearAll();
         _pianoBloccoPulisci();
@@ -3111,7 +3098,6 @@ function _pianoInitSelezione() {
         selTipo = 'col';
         selIdx = idSel;
         selezionaColonna(th, tab, colIdx);
-        if (g) _pianoBloccoDaColonne(tab, g, g);
       });
     });
     tbody.querySelectorAll('tr').forEach((riga, rowIdx) => {

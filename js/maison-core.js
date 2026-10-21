@@ -191,12 +191,11 @@ async function _salvaMaisonManualeEsegui() {
     // Tipo scelto a mano: il primo nome ha il buono con la quantita' scritta, gli altri il resto
     _voci = nomiFinali.map((n, i) => ({ nome: n, tipoBuono: i === 0 ? tipo : null, qty: i === 0 ? qty : 0 }));
   } else if (nNomi > 1) {
-    // Nessun tipo scelto + nomi multipli: il buono si riconosce dalla categoria budget (bu/bl),
-    // una quantita' per persona (px) di quel nome
-    const catToTipo = { bu: 'BU', bl: 'BL' };
+    // Nessun tipo scelto + nomi multipli: il buono si riconosce dalla categoria del cliente
+    // (BU, BL, CG... ogni tipo di buono configurato), una quantita' per persona (px) di quel nome
     _voci = nomiFinali.map((n, i) => {
       const b = getBudgetReparto().find((b) => b.nome.toLowerCase() === n.toLowerCase());
-      const tb = b && catToTipo[b.categoria] ? catToTipo[b.categoria] : null;
+      const tb = (b && maisonCatTipoBuono(b.categoria)) || null;
       return { nome: n, tipoBuono: tb, qty: tb ? _pxQuote[i] : 0 };
     });
   } else {
@@ -377,18 +376,7 @@ function renderRegali() {
           return b.nome.toLowerCase().split(/\s+/)[0] === _rc;
         });
     }
-    var _regCatBadge =
-      _regBudget && _regBudget.categoria === 'full_maison'
-        ? ' <span class="mini-badge" style="background:#b8860b;font-size:var(--fs-sm,.8125rem)">Full Maison</span>'
-        : _regBudget && _regBudget.categoria === 'maison'
-          ? ' <span class="mini-badge" style="background:#2980b9;font-size:var(--fs-sm,.8125rem)">Maison</span>'
-          : _regBudget && _regBudget.categoria === 'direzione'
-            ? ' <span class="mini-badge" style="background:#8e44ad;font-size:var(--fs-sm,.8125rem)">Direzione</span>'
-            : _regBudget && _regBudget.categoria === 'bu'
-              ? ' <span class="mini-badge" style="background:#c8671a;font-size:var(--fs-sm,.8125rem)">Buono Unico</span>'
-              : _regBudget && _regBudget.categoria === 'bl'
-                ? ' <span class="mini-badge" style="background:#2c6e49;font-size:var(--fs-sm,.8125rem)">Buono Lounge</span>'
-                : '';
+    var _regCatBadge = maisonCatBadgeHtml(_regBudget && _regBudget.categoria, 'font-size:var(--fs-sm,.8125rem)');
     html +=
       '<tr><td style="font-weight:600">' +
       d.toLocaleDateString('it-IT') +
@@ -639,19 +627,11 @@ function renderMaisonDashboard() {
     const overBudget = budget && budget.budget_chf && _spesoMese >= budget.budget_chf;
     const nearBudget = budget && budget.budget_chf && _spesoMese >= budget.budget_chf * 0.8 && !overBudget;
     const catBg =
-      budget && budget.categoria === 'full_maison'
-        ? 'background:rgba(184,134,11,0.12)'
-        : budget && budget.categoria === 'maison'
-          ? 'background:rgba(41,128,185,0.12)'
-          : budget && budget.categoria === 'direzione'
-            ? 'background:rgba(142,68,173,0.12)'
-            : budget && budget.categoria === 'bu'
-              ? 'background:rgba(230,126,34,0.12)'
-              : budget && budget.categoria === 'bl'
-                ? 'background:rgba(44,110,73,0.12)'
-                : _idx % 2
-                  ? 'background:rgba(0,0,0,0.04)'
-                  : 'background:var(--paper)';
+      budget && budget.categoria
+        ? 'background:' + maisonCatSfondo(budget.categoria)
+        : _idx % 2
+          ? 'background:rgba(0,0,0,0.04)'
+          : 'background:var(--paper)';
     const rowStyle = overBudget
       ? 'background:rgba(192,57,43,0.1)'
       : nearBudget
@@ -659,18 +639,7 @@ function renderMaisonDashboard() {
         : catBg;
     const ne = _jsArg(nome);
     const clientInfo = budget;
-    const catBadge =
-      clientInfo && clientInfo.categoria === 'full_maison'
-        ? '<span class="mini-badge" style="background:#b8860b;margin-left:6px">Full Maison</span>'
-        : clientInfo && clientInfo.categoria === 'maison'
-          ? '<span class="mini-badge" style="background:#2980b9;margin-left:6px">Maison</span>'
-          : clientInfo && clientInfo.categoria === 'direzione'
-            ? '<span class="mini-badge" style="background:#8e44ad;margin-left:6px">Direzione</span>'
-            : clientInfo && clientInfo.categoria === 'bu'
-              ? '<span class="mini-badge" style="background:#c8671a;margin-left:6px">Buono Unico</span>'
-              : clientInfo && clientInfo.categoria === 'bl'
-                ? '<span class="mini-badge" style="background:#2c6e49;margin-left:6px">Buono Lounge</span>'
-                : '';
+    const catBadge = maisonCatBadgeHtml(clientInfo && clientInfo.categoria, 'margin-left:6px');
     const condBadge = d.condivise
       ? ' <span title="' +
         d.condivise +
@@ -878,21 +847,9 @@ function renderMaisonGdOggi() {
       var catBadge =
         budget && budget.categoria
           ? '<span class="mini-badge" style="background:' +
-            ({
-              full_maison: '#b8860b',
-              maison: '#2980b9',
-              direzione: '#8e44ad',
-              bu: '#e67e22',
-              bl: '#2c6e49',
-            }[budget.categoria] || 'var(--muted)') +
+            (maisonCatMappa('colore')[budget.categoria] || 'var(--muted)') +
             ';margin-left:6px">' +
-            ({
-              full_maison: 'Full Maison',
-              maison: 'Maison',
-              direzione: 'Direzione',
-              bu: 'Buono Unico',
-              bl: 'Buono Lounge',
-            }[budget.categoria] || '') +
+            (maisonCatMappa('label')[budget.categoria] || '') +
             '</span>'
           : '';
       const altriNomi = gruppoRighe
@@ -906,21 +863,12 @@ function renderMaisonGdOggi() {
           const cBadge =
             bAltro && bAltro.categoria
               ? ' <span class="mini-badge" style="background:' +
-                ({
-                  full_maison: '#b8860b',
-                  maison: '#2980b9',
-                  direzione: '#8e44ad',
-                  bu: '#e67e22',
-                  bl: '#2c6e49',
-                }[bAltro.categoria] || 'var(--muted)') +
+                (maisonCatMappa('colore')[bAltro.categoria] || 'var(--muted)') +
                 ';font-size:var(--fs-sm,.8125rem)">' +
-                ({
-                  full_maison: 'FM',
-                  maison: 'M',
-                  direzione: 'D',
-                  bu: 'BU',
-                  bl: 'BL',
-                }[bAltro.categoria] || '') +
+                escP(
+                  { full_maison: 'FM', maison: 'M', direzione: 'D' }[bAltro.categoria] ||
+                    maisonCatBreve(bAltro.categoria),
+                ) +
                 '</span>'
               : '';
           return escP(x.nome) + cBadge;
@@ -974,21 +922,9 @@ function renderMaisonGdOggi() {
       var catBadge =
         budget && budget.categoria
           ? '<span class="mini-badge" style="background:' +
-            ({
-              full_maison: '#b8860b',
-              maison: '#2980b9',
-              direzione: '#8e44ad',
-              bu: '#e67e22',
-              bl: '#2c6e49',
-            }[budget.categoria] || 'var(--muted)') +
+            (maisonCatMappa('colore')[budget.categoria] || 'var(--muted)') +
             ';margin-left:6px">' +
-            ({
-              full_maison: 'Full Maison',
-              maison: 'Maison',
-              direzione: 'Direzione',
-              bu: 'Buono Unico',
-              bl: 'Buono Lounge',
-            }[budget.categoria] || '') +
+            (maisonCatMappa('label')[budget.categoria] || '') +
             '</span>'
           : '';
       var _qtyM = (r.note || '').match(buonoRegexQta());
@@ -1146,13 +1082,7 @@ function esportaGdOggiCSV() {
   }
   const grouped = _raggruppaGdRighe(righe);
   const dt = new Date(oggi + 'T12:00:00');
-  const _catL = {
-    full_maison: 'Full Maison',
-    maison: 'Maison',
-    direzione: 'Direzione',
-    bu: 'Buono Unico',
-    bl: 'Buono Lounge',
-  };
+  const _catL = maisonCatMappa('label');
   const rows = [
     ['GD ' + dt.toLocaleDateString('it-IT') + ' · ' + GIORNI[dt.getDay()]],
     ['Cliente', 'Categoria', 'Tipo', 'PX', 'Costo CHF'],
@@ -1206,20 +1136,8 @@ async function esportaGdOggiPDF() {
   const dt = new Date(oggi + 'T12:00:00');
   const tot = righe.reduce((s, r) => s + parseFloat(r.costo || 0), 0);
   const totPx = righe.reduce((s, r) => s + (r.px || 0), 0);
-  const _catL = {
-    full_maison: 'Full Maison',
-    maison: 'Maison',
-    direzione: 'Direzione',
-    bu: 'Buono Unico',
-    bl: 'Buono Lounge',
-  };
-  const _catC = {
-    full_maison: [184, 134, 11],
-    maison: [41, 128, 185],
-    direzione: [142, 68, 173],
-    bu: [230, 126, 34],
-    bl: [44, 110, 73],
-  };
+  const _catL = maisonCatMappa('label');
+  const _catC = maisonCatMappa('rgb');
   const _br = getBudgetReparto();
   try {
     const { jsPDF } = window.jspdf;
@@ -1529,18 +1447,7 @@ function apriDettaglioMaison(nome) {
         ),
       ].join(', ')
     : '';
-  const catBadgeD =
-    budget && budget.categoria === 'full_maison'
-      ? ' <span class="mini-badge" style="background:#b8860b;font-size:var(--fs-sm,.8125rem)">Full Maison</span>'
-      : budget && budget.categoria === 'maison'
-        ? ' <span class="mini-badge" style="background:#2980b9;font-size:var(--fs-sm,.8125rem)">Maison</span>'
-        : budget && budget.categoria === 'direzione'
-          ? ' <span class="mini-badge" style="background:#8e44ad;font-size:var(--fs-sm,.8125rem)">Direzione</span>'
-          : budget && budget.categoria === 'bu'
-            ? ' <span class="mini-badge" style="background:#c8671a;font-size:var(--fs-sm,.8125rem)">Buono Unico</span>'
-            : budget && budget.categoria === 'bl'
-              ? ' <span class="mini-badge" style="background:#2c6e49;font-size:var(--fs-sm,.8125rem)">Buono Lounge</span>'
-              : '';
+  const catBadgeD = maisonCatBadgeHtml(budget && budget.categoria, 'font-size:var(--fs-sm,.8125rem)');
   const nascitaStr =
     budget && budget.data_nascita ? new Date(budget.data_nascita + 'T12:00:00').toLocaleDateString('it-IT') : '';
   const ne = _jsArg(nome);
@@ -1552,17 +1459,9 @@ function apriDettaglioMaison(nome) {
     ne +
     '\')" style="font-size:var(--fs-sm,.8125rem);padding:3px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink);vertical-align:middle;cursor:pointer"><option value=""' +
     (!_curCat ? ' selected' : '') +
-    '>· Categoria ·</option><option value="full_maison"' +
-    (_curCat === 'full_maison' ? ' selected' : '') +
-    '>Full Maison</option><option value="maison"' +
-    (_curCat === 'maison' ? ' selected' : '') +
-    '>Maison</option><option value="direzione"' +
-    (_curCat === 'direzione' ? ' selected' : '') +
-    '>Direzione</option><option value="bu"' +
-    (_curCat === 'bu' ? ' selected' : '') +
-    '>Buono Unico</option><option value="bl"' +
-    (_curCat === 'bl' ? ' selected' : '') +
-    '>Buono Lounge</option></select>';
+    '>· Categoria ·</option>' +
+    maisonCatOpzioniHtml(_curCat).replace(/^<option value=""[^>]*>-<\/option>/, '') +
+    '</select>';
   let html =
     '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px"><div><h3 style="font-family:Playfair Display,serif;color:var(--ink);margin-bottom:4px">' +
     escP(nome) +
@@ -2017,21 +1916,7 @@ async function salvaDetailCat(nome) {
       renderMaisonBudgetUI();
       renderMaisonDashboard();
       logAzione('Categoria maison', nome + ' → ' + (cat || 'nessuna'));
-      toast(
-        nome +
-          ' → ' +
-          (cat === 'full_maison'
-            ? 'Full Maison'
-            : cat === 'maison'
-              ? 'Maison'
-              : cat === 'direzione'
-                ? 'Direzione'
-                : cat === 'bu'
-                  ? 'Buono Unico'
-                  : cat === 'bl'
-                    ? 'Buono Lounge'
-                    : 'Nessuna categoria'),
-      );
+      toast(nome + ' → ' + (maisonCatLabel(cat) || 'Nessuna categoria'));
     } catch (e) {
       toast('Errore salvataggio categoria');
     }
@@ -2048,21 +1933,7 @@ async function salvaDetailCat(nome) {
       renderMaisonBudgetUI();
       renderMaisonDashboard();
       logAzione('Categoria maison', nome + ' → ' + cat);
-      toast(
-        nome +
-          ' → ' +
-          (cat === 'full_maison'
-            ? 'Full Maison'
-            : cat === 'maison'
-              ? 'Maison'
-              : cat === 'direzione'
-                ? 'Direzione'
-                : cat === 'bu'
-                  ? 'Buono Unico'
-                  : cat === 'bl'
-                    ? 'Buono Lounge'
-                    : 'Nessuna categoria'),
-      );
+      toast(nome + ' → ' + (maisonCatLabel(cat) || 'Nessuna categoria'));
     } catch (e) {
       toast('Errore salvataggio categoria');
     }
@@ -2260,17 +2131,7 @@ function eseguiConfrontoMaison() {
       label: 'Categoria',
       fn: function (d) {
         var c = d.cat;
-        return c === 'full_maison'
-          ? 'Full Maison'
-          : c === 'maison'
-            ? 'Maison'
-            : c === 'direzione'
-              ? 'Direzione'
-              : c === 'bu'
-                ? 'Buono Unico'
-                : c === 'bl'
-                  ? 'Buono Lounge'
-                  : '-';
+        return maisonCatLabel(c) || '-';
       },
     },
     {
@@ -2421,13 +2282,7 @@ function esportaMaisonClienteCSV(nome) {
     toast('Nessun dato');
     return;
   }
-  const _csvCatLabels = {
-    full_maison: 'Full Maison',
-    maison: 'Maison',
-    direzione: 'Direzione',
-    bu: 'Buono Unico',
-    bl: 'Buono Lounge',
-  };
+  const _csvCatLabels = maisonCatMappa('label');
   let _csvBudget = getBudgetReparto().find((b) => b.nome.toLowerCase() === nome.toLowerCase());
   if (!_csvBudget) {
     const _cog = nome.toLowerCase().split(/\s+/)[0];
@@ -2564,20 +2419,8 @@ async function esportaMaisonClientePDF(nome) {
     y += 28;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
-    const _clCatLabels = {
-      full_maison: 'Full Maison',
-      maison: 'Maison',
-      direzione: 'Direzione',
-      bu: 'Buono Unico',
-      bl: 'Buono Lounge',
-    };
-    const _clCatColors = {
-      full_maison: [184, 134, 11],
-      maison: [41, 128, 185],
-      direzione: [142, 68, 173],
-      bu: [230, 126, 34],
-      bl: [44, 110, 73],
-    };
+    const _clCatLabels = maisonCatMappa('label');
+    const _clCatColors = maisonCatMappa('rgb');
     let _clBudget = budget;
     if (!_clBudget) {
       const _cog = nome.toLowerCase().split(/\s+/)[0];

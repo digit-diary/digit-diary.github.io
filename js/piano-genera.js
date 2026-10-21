@@ -773,18 +773,30 @@ async function _pianoDomenicheValideAnno(nome, anno) {
   righe.forEach((r) => (per[String(r.data).substring(0, 10)] = r));
   let n = 0;
   let daPianificare = 0; // domeniche dell anno ancora senza cella: possono diventare libere
+  const info = _pianoCollabInfo(nome) || {};
+  const ini = info.data_assunzione ? String(info.data_assunzione).substring(0, 10) : '';
+  const fin = info.data_fine_rapporto ? String(info.data_fine_rapporto).substring(0, 10) : '';
+  const mesi = new Set();
+  righe.forEach((r) => String(r.data).startsWith(anno + '-') && mesi.add(String(r.data).substring(5, 7)));
   for (let d = new Date(anno, 0, 1, 12); d.getFullYear() === anno; d.setDate(d.getDate() + 1)) {
     if (d.getDay() !== 0) continue;
     const ds = anno + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     if (!per[ds]) {
-      daPianificare++;
+      // fuori dal rapporto non si puo dare
+      if ((!ini || ds >= ini) && (!fin || ds <= fin)) daPianificare++;
       continue;
     }
     const sab = _pianoGiornoPrima(ds);
     const rs = per[sab];
     if (_pianoDomenicaValida(per[ds].codice, rs && rs.codice, sab, rs, undefined, nome)) n++;
   }
-  return { valide: n, daPianificare: daPianificare };
+  // diritto della persona (a mesi di contratto, _pianoDomContratto): contano i mesi con il piano
+  // e quelli da oggi in poi
+  const oggi = _pianoOggiStr();
+  const daMese = oggi.substring(0, 4) === String(anno) ? oggi.substring(5, 7) : oggi < anno + '' ? '00' : '13';
+  const contr = _pianoDomContratto(nome, anno, [...mesi], daMese);
+  const minimo = contr.inizioMancante ? parseInt(_pianoRegolaVal('domeniche_libere_anno')) || 12 : contr.diritto;
+  return { valide: n, daPianificare: daPianificare, minimo: minimo, inizioMancante: contr.inizioMancante };
 }
 // Un cambio toglie una domenica libera valida? Guarda la domenica della cella (se la
 // cella e domenica) o quella dopo (se la cella e sabato). righe = celle della persona
@@ -813,8 +825,8 @@ function _pianoDomenicaPersa(dstr, codiceNuovo, righe, nomeP) {
 // Testo dell avviso: quante domeniche valide resterebbero nell anno.
 async function _pianoTestoDomenicaPersa(nome, dom) {
   const anno = parseInt(dom.substring(0, 4));
-  const min = parseInt(_pianoRegolaVal('domeniche_libere_anno')) || 12;
   const conto = await _pianoDomenicheValideAnno(nome, anno);
+  const min = conto.minimo;
   const ora = conto.valide;
   const dopo = Math.max(0, ora - 1);
   // sotto il minimo solo se neanche le domeniche ancora da pianificare bastano
@@ -832,6 +844,7 @@ async function _pianoTestoDomenicaPersa(nome, dom) {
     dopo +
     ' (minimo ' +
     min +
+    (conto.inizioMancante ? ', data di inizio mancante' : ' secondo i mesi di contratto') +
     (conto.daPianificare ? ', ancora ' + conto.daPianificare + ' domeniche da pianificare' : '') +
     ')'
   );
@@ -935,38 +948,80 @@ async function _pianoCaricaDomAnno(ym, rep) {
 function _pianoDomAnnoDi(ym, rep) {
   return _pianoDomAnnoCache[ym.substring(0, 4) + '|' + (rep || _pianoReparto()) + '|' + ym] || null;
 }
-// domeniche libere ATTESE fino alla fine del mese ym (in proporzione alle domeniche dei
-// mesi in cui la persona ha un piano) e quelle gia avute nei mesi prima
+// DIRITTO ALLE DOMENICHE DI UNA PERSONA nell anno (decisione del titolare 21/10/2026): a mesi di
+// contratto, 1 domenica al mese (PianoRegole.domenicheContratto: un mese conta se il rapporto ne
+// copre almeno meta). Senza data di inizio (data_assunzione) resta il conto di prima (mesi con
+// un piano, in proporzione alle domeniche) con l avviso "data di inizio mancante"; la fine del
+// rapporto (data_fine_rapporto) vale in tutti e due i casi.
+// I mesi PASSATI senza nessun piano della persona restano fuori anche con la data (come prima:
+// "nei mesi senza piano non si conta nulla", es. un lungo congedo): conta(mm) dice se il mese
+// mm e da contare (ha un piano, oppure non e ancora passato: mm >= daMese).
+//   mesiPiano: mesi 'MM' in cui la persona ha celle; daMese: 'MM' da cui i mesi contano comunque
+function _pianoDomContratto(nome, anno, mesiPiano, daMese) {
+  const info = (nome && _pianoCollabInfo(nome)) || {};
+  const dir = parseInt(_pianoRegolaVal('domeniche_libere_anno')) || 12;
+  const c = PianoRegole.domenicheContratto(parseInt(anno), info.data_assunzione, info.data_fine_rapporto, dir);
+  if (c.inizioMancante || !mesiPiano) return c;
+  const conPiano = new Set(mesiPiano);
+  const mesi = c.mesi.filter((mm) => conPiano.has(mm) || mm >= (daMese || '00'));
+  const quota = (k) => Math.floor((dir * k) / 12);
+  return Object.assign({}, c, {
+    mesi: mesi,
+    diritto: quota(mesi.length),
+    attese: (mm) => quota(mesi.filter((x) => x <= mm).length),
+  });
+}
+// domeniche libere ATTESE fino alla fine del mese ym e quelle gia avute nei mesi prima. Con la
+// data di inizio: mesi di contratto (_pianoDomContratto); senza: in proporzione alle domeniche
+// dei mesi in cui la persona ha un piano (meno i mesi dopo la fine del rapporto).
 function _pianoDomAttese(nome, ym, dati) {
   if (!dati) return null;
-  const diritto = parseInt(_pianoRegolaVal('domeniche_libere_anno')) || 12;
+  const dirittoRegola = parseInt(_pianoRegolaVal('domeniche_libere_anno')) || 12;
   const p = dati.perNome[nome] || { libere: 0, mesi: [] };
-  const mesi = new Set(p.mesi);
-  mesi.add(ym.substring(5, 7));
   const mese = ym.substring(5, 7);
-  let dom = 0;
-  let domPrima = 0;
-  mesi.forEach((mm) => {
-    if (mm <= mese) dom += dati.domMese[mm] || 0;
-    if (mm < mese) domPrima += dati.domMese[mm] || 0;
-  });
-  const quota = (n) => Math.floor((diritto * n) / (dati.domAnno || 52));
-  const fineMese = quota(dom);
+  const contr = _pianoDomContratto(nome, ym.substring(0, 4), p.mesi, mese);
+  const inContratto = new Set(contr.mesi);
+  let diritto;
+  let fineMese;
+  let quotaPrima;
+  let restanti = 0;
+  if (!contr.inizioMancante) {
+    diritto = contr.diritto;
+    fineMese = contr.attese(mese);
+    const prec = String(parseInt(mese, 10) - 1).padStart(2, '0');
+    quotaPrima = contr.attese(prec);
+    contr.mesi.forEach((mm) => {
+      if (mm > mese) restanti += dati.domMese[mm] || 0;
+    });
+  } else {
+    diritto = dirittoRegola;
+    const mesi = new Set(p.mesi);
+    mesi.add(mese);
+    let dom = 0;
+    let domPrima = 0;
+    mesi.forEach((mm) => {
+      if (!inContratto.has(mm)) return; // dopo la fine del rapporto
+      if (mm <= mese) dom += dati.domMese[mm] || 0;
+      if (mm < mese) domPrima += dati.domMese[mm] || 0;
+    });
+    const quota = (n) => Math.floor((dirittoRegola * n) / (dati.domAnno || 52));
+    fineMese = quota(dom);
+    quotaPrima = quota(domPrima);
+    // domeniche dell anno nei mesi dopo questo: bastano ancora per arrivare al diritto?
+    Object.keys(dati.domMese || {}).forEach((mm) => {
+      if (mm > mese && inContratto.has(mm)) restanti += dati.domMese[mm] || 0;
+    });
+  }
   // RECUPERO SPALMATO (decisione del titolare 11/10/2026): chi e indietro con le domeniche
   // libere non le recupera tutte nel mese generato (ai Tavoli a novembre 34 persone su 53
   // ne avrebbero dovute avere da 2 a 7 su 5, con 89 posti scoperti), ma in parti uguali nei
   // mesi che restano fino a dicembre: ogni mese la sua quota piu una parte dell arretrato.
   // A dicembre la parte e tutto l arretrato: a fine anno il minimo resta rispettato.
-  const arretrato = Math.max(0, quota(domPrima) - p.libere);
+  const arretrato = Math.max(0, quotaPrima - p.libere);
   const mesiRestanti = 12 - parseInt(mese, 10) + 1;
   const attese = arretrato
-    ? Math.min(fineMese, p.libere + (fineMese - quota(domPrima)) + Math.ceil(arretrato / mesiRestanti))
+    ? Math.min(fineMese, p.libere + (fineMese - quotaPrima) + Math.ceil(arretrato / mesiRestanti))
     : fineMese;
-  // domeniche dell anno nei mesi dopo questo: bastano ancora per arrivare al diritto?
-  let restanti = 0;
-  Object.keys(dati.domMese || {}).forEach((mm) => {
-    if (mm > mese) restanti += dati.domMese[mm] || 0;
-  });
   return {
     diritto: diritto,
     prima: p.libere,
@@ -974,6 +1029,8 @@ function _pianoDomAttese(nome, ym, dati) {
     arretrato: arretrato,
     fineMese: fineMese,
     restanti: restanti,
+    mesiContratto: contr.inizioMancante ? null : contr.mesi.length,
+    inizioMancante: contr.inizioMancante,
   };
 }
 function _pianoCtxViolazioni(ym) {
@@ -1195,7 +1252,10 @@ function _pianoViolazioniPersona(nome, righeMese, righeSett, ctx) {
       aggiungi(parseInt(r.data.split('-')[2]), r.codice + ' su un giorno di NON disponibilità (dal Diario)');
   });
   // TURNO ATTORNO ALLE C DELLE VACANZE (decisione del titolare 08/10/2026, tassativa): il
-  // giorno prima delle C di partenza e il primo dopo le C del rientro devono avere un turno
+  // giorno prima delle C di partenza deve avere un turno. DOPO le C del rientro solo se la
+  // regola wd_dopo_vacanza chiede giorni di lavoro (predefinito 0 dal 21/10/2026: "WD dopo le
+  // vacanze: NO", il vincolo resta solo prima)
+  const wdDopo = _pianoWdDopoVacanza() > 0;
   if (typeof _pianoCongediAttornoVacanze !== 'function' || _pianoCongediAttornoVacanze()) {
     const codG = (g) => String((rigaDi(g) || {}).codice || '').toUpperCase();
     const protG = (g) => !!(rigaDi(g) || {}).protetto;
@@ -1211,7 +1271,7 @@ function _pianoViolazioniPersona(nome, righeMese, righeSett, ctx) {
     for (let g = 1 - 7; g <= nGiorni + 7; g++) {
       if (codG(g) !== 'V') continue;
       if (codG(g - 1) !== 'V') controlla(g, -1, 'prima delle C delle vacanze serve un turno');
-      if (codG(g + 1) !== 'V') controlla(g, 1, 'dopo le C del rientro dalle vacanze serve un turno');
+      if (wdDopo && codG(g + 1) !== 'V') controlla(g, 1, 'dopo le C del rientro dalle vacanze serve un turno');
     }
   }
   // WD rimasti: giorno di lavoro obbligatorio attorno alle vacanze senza un turno
@@ -1286,6 +1346,9 @@ function _pianoViolazioniPersona(nome, righeMese, righeSett, ctx) {
               ' attese fino a questo mese (minimo ' +
               conto.diritto +
               ' all anno' +
+              (conto.inizioMancante
+                ? ', data di inizio mancante: conto sui mesi con il piano'
+                : ', ' + conto.mesiContratto + ' mesi di contratto') +
               (conto.arretrato ? ', arretrato ' + conto.arretrato + ' da recuperare entro dicembre' : '') +
               '): da recuperare',
           );

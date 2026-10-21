@@ -425,7 +425,8 @@ async function loadAll() {
   moduliCache = (moduli || []).filter((m) => !m.eliminato);
   logCache = logs;
   maisonCache = maisonD || [];
-  maisonBudgetCache = maisonB || [];
+  // i clienti tolti (nel Cestino) non sono nella scheda ne fra i nomi della Maison
+  maisonBudgetCache = (maisonB || []).filter((b) => !b.eliminato);
   promemoriaCache = promemoriaD || [];
   consegneCache = consegneD || [];
   speseExtraCache = speseD || [];

@@ -501,11 +501,14 @@ const PIANO_REGOLE_GUIDA = {
     t: 'numero',
     d: 'Applica vacanze e bozza',
   },
+  // WD DOPO LE VACANZE: NO (decisione del titolare 21/10/2026). Dopo le C del rientro il primo
+  // turno puo essere anche una notte; il vincolo resta solo prima delle vacanze. Con 1 o piu
+  // torna il comportamento di prima (giorni di lavoro diurno obbligati dopo le C del rientro).
   wd_dopo_vacanza: {
     g: 'Vacanze',
-    n: 'Giorni di lavoro (WD) dopo i congedi del rientro',
+    n: 'Giorni di lavoro diurno obbligato (WD) dopo i congedi del rientro (0 = nessuno: dopo le vacanze va bene anche la notte)',
     t: 'numero',
-    d: 'Applica vacanze e bozza',
+    d: 'Applica vacanze, bozza, Controlla le regole',
   },
   diurno_prima_vacanza: {
     g: 'Vacanze',

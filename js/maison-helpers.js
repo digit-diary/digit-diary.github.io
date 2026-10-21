@@ -531,17 +531,7 @@ function _renderUnisciUI() {
   }
   const totOrig = st.coppie.length;
   const _catLabel = function (c) {
-    return c === 'full_maison'
-      ? 'Full Maison'
-      : c === 'maison'
-        ? 'Maison'
-        : c === 'direzione'
-          ? 'Direzione'
-          : c === 'bu'
-            ? 'Buono Unico'
-            : c === 'bl'
-              ? 'Buono Lounge'
-              : '';
+    return maisonCatLabel(c) || '';
   };
   const _fmtDn = function (d) {
     if (!d) return '';
@@ -730,18 +720,31 @@ function _checkUnisciDone() {
   }
   if (!rimaste.length) _renderUnisciUI();
 }
+// TOGLI UN CLIENTE DALLA SCHEDA (21/10/2026): va nel Cestino (Impostazioni > Cestino, voce
+// Clienti Maison) e si rimette da li; i costi gia registrati restano. Prima la scheda si
+// cancellava per sempre, con categoria, budget e compleanno.
 async function rimuoviMaisonBudget(id) {
-  if (!(await chiediConferma('Rimuovere questo budget?'))) return;
+  const b = maisonBudgetCache.find((x) => x.id === id);
+  if (!b) return;
+  if (
+    !(await chiediConferma(
+      'Togliere ' +
+        b.nome +
+        ' dalla scheda clienti?\n\nVa nel Cestino e si può ripristinare. I costi già registrati restano.',
+    ))
+  )
+    return;
   try {
-    await secDel('maison_budget', 'id=eq.' + id);
-    maisonBudgetCache = maisonBudgetCache.filter((b) => b.id !== id);
-    logAzione('Budget maison rimosso', 'ID ' + id);
+    const dati = { eliminato: true, eliminato_da: getOperatore(), eliminato_at: new Date().toISOString() };
+    await secPatch('maison_budget', 'id=eq.' + id, dati);
+    maisonBudgetCache = maisonBudgetCache.filter((x) => x.id !== id);
+    logAzione('Cliente Maison tolto (nel Cestino)', b.nome);
     renderMaisonBudgetUI();
     renderMaisonDashboard();
     renderMaisonBudgetAlerts();
-    toast('Budget rimosso');
+    toast(b.nome + ' tolto: è nel Cestino');
   } catch (e) {
-    toast('Errore rimozione budget');
+    toastErrore('Cliente non tolto: ' + ((e && e.message) || 'errore del database'));
   }
 }
 function renderMaisonBudgetAlerts() {
@@ -829,20 +832,8 @@ function acFiltraMaison(inputId, dropId) {
     drop = document.getElementById(dropId);
   if (!inp || !drop) return;
   const v = inp.value.toLowerCase();
-  const _catLabelsAc = {
-    full_maison: 'Full Maison',
-    maison: 'Maison',
-    direzione: 'Direzione',
-    bu: 'Buono Unico',
-    bl: 'Buono Lounge',
-  };
-  const _catColorsAc = {
-    full_maison: '#b8860b',
-    maison: '#2980b9',
-    direzione: '#8e44ad',
-    bu: '#e67e22',
-    bl: '#2c6e49',
-  };
+  const _catLabelsAc = maisonCatMappa('label');
+  const _catColorsAc = maisonCatMappa('colore');
   // Budget names con categoria (prioritari)
   const budgetNomi = getBudgetReparto().map((b) => ({
     nome: b.nome,
@@ -877,7 +868,7 @@ function acFiltraMaison(inputId, dropId) {
           escP(_catLabelsAc[item.cat] || '') +
           '</span>'
         : '';
-      const catTipo = item.cat === 'bu' ? 'BU' : item.cat === 'bl' ? 'BL' : '';
+      const catTipo = maisonCatTipoBuono(item.cat);
       return (
         '<div onmousedown="document.getElementById(\'' +
         inputId +
@@ -901,11 +892,12 @@ function acFiltraMaison(inputId, dropId) {
 // precedente e il nuovo cliente non ha buoni, si torna a Normale (prima restava il buono
 // dell altro cliente). Un tipo scelto a mano non si tocca.
 function _preimpostaTipoMaison(cat) {
-  const catToTipo = { bu: 'BU', bl: 'BL', cg: 'CG', wl: 'WL' };
+  // tipo di buono della categoria del cliente (BU, BL, CG... tutti i tipi configurati)
+  const tipoCat = maisonCatTipoBuono(cat);
   // Sezione Maison
   const tipoSel = document.getElementById('maison-man-tipo');
-  if (tipoSel && catToTipo[cat]) {
-    tipoSel.value = catToTipo[cat];
+  if (tipoSel && tipoCat) {
+    tipoSel.value = tipoCat;
     tipoSel.dispatchEvent(new Event('change'));
     tipoSel.dataset.auto = '1';
   } else if (tipoSel && tipoSel.dataset.auto === '1' && tipoSel.value) {
@@ -914,8 +906,8 @@ function _preimpostaTipoMaison(cat) {
   }
   // Sezione Inventario - Buono a Cliente
   const invTipoSel = document.getElementById('inv-usc-tipo');
-  if (invTipoSel && catToTipo[cat]) {
-    invTipoSel.value = catToTipo[cat];
+  if (invTipoSel && tipoCat) {
+    invTipoSel.value = tipoCat;
   }
   // Ricalcola qty se c'è già un importo
   _autoCalcolaBuoniManuale();
@@ -980,13 +972,7 @@ function esportaMaisonCSV() {
     return;
   }
   // Raggruppato per cliente con buoni e categoria
-  const _catLabels = {
-    full_maison: 'Full Maison',
-    maison: 'Maison',
-    direzione: 'Direzione',
-    bu: 'Buono Unico',
-    bl: 'Buono Lounge',
-  };
+  const _catLabels = maisonCatMappa('label');
   const byNome = {};
   data.forEach((r) => {
     if (!byNome[r.nome]) byNome[r.nome] = { tot: 0, px: 0, visite: 0, buoni: {} };
@@ -1047,20 +1033,8 @@ async function esportaMaisonPDF() {
       return;
     }
   }
-  const _catLabels = {
-    full_maison: 'Full Maison',
-    maison: 'Maison',
-    direzione: 'Direzione',
-    bu: 'Buono Unico',
-    bl: 'Buono Lounge',
-  };
-  const _catColors = {
-    full_maison: [184, 134, 11],
-    maison: [41, 128, 185],
-    direzione: [142, 68, 173],
-    bu: [230, 126, 34],
-    bl: [44, 110, 73],
-  };
+  const _catLabels = maisonCatMappa('label');
+  const _catColors = maisonCatMappa('rgb');
   const byNome = {};
   data.forEach((r) => {
     if (!byNome[r.nome]) byNome[r.nome] = { tot: 0, px: 0, visite: 0, buoni: {} };
@@ -1642,18 +1616,7 @@ function renderSpeseExtra() {
       const _cog = nome.toLowerCase().split(/\s+/)[0];
       if (_cog.length >= 3) _seBudget = getBudgetReparto().find((b) => b.nome.toLowerCase().split(/\s+/)[0] === _cog);
     }
-    const _seCatBadge =
-      _seBudget && _seBudget.categoria === 'full_maison'
-        ? ' <span class="mini-badge" style="background:#b8860b;font-size:var(--fs-sm,.8125rem)">Full Maison</span>'
-        : _seBudget && _seBudget.categoria === 'maison'
-          ? ' <span class="mini-badge" style="background:#2980b9;font-size:var(--fs-sm,.8125rem)">Maison</span>'
-          : _seBudget && _seBudget.categoria === 'direzione'
-            ? ' <span class="mini-badge" style="background:#8e44ad;font-size:var(--fs-sm,.8125rem)">Direzione</span>'
-            : _seBudget && _seBudget.categoria === 'bu'
-              ? ' <span class="mini-badge" style="background:#c8671a;font-size:var(--fs-sm,.8125rem)">Buono Unico</span>'
-              : _seBudget && _seBudget.categoria === 'bl'
-                ? ' <span class="mini-badge" style="background:#2c6e49;font-size:var(--fs-sm,.8125rem)">Buono Lounge</span>'
-                : '';
+    const _seCatBadge = maisonCatBadgeHtml(_seBudget && _seBudget.categoria, 'font-size:var(--fs-sm,.8125rem)');
     const tipiBadges = Object.entries(d.tipi)
       .map(
         ([t, n]) =>
@@ -2063,13 +2026,12 @@ function getMaisonReparto() {
 // corrispondente (bu/bl), altrimenti al primo. Prima veniva copiato su tutti e contato due volte.
 function _indiceNomeConBuono(nomi, r) {
   if (!r.tipo_buono) return -1;
-  var catToTipo = { bu: 'BU', bl: 'BL' };
   var _br = getBudgetReparto();
   for (var i = 0; i < nomi.length; i++) {
     var b = _br.find(function (x) {
       return x.nome.toLowerCase() === capitalizzaNome(nomi[i]).toLowerCase();
     });
-    if (b && catToTipo[b.categoria] === r.tipo_buono) return i;
+    if (b && maisonCatTipoBuono(b.categoria) && maisonCatTipoBuono(b.categoria) === r.tipo_buono) return i;
   }
   return 0;
 }
@@ -2777,6 +2739,14 @@ function renderInventario() {
   document.getElementById('inv-section-sigarette').style.display = _invTab === 'sigarette' ? '' : 'none';
   const customEl = document.getElementById('inv-section-custom');
   if (customEl) customEl.style.display = custom || !_invTab ? '' : 'none';
+  if (!_invTab) {
+    // settore senza categorie: via anche quello che il settore aperto prima aveva lasciato
+    // nelle sezioni nascoste (giacenze e movimenti di Buoni e Sigarette di un altro settore)
+    ['inv-buoni-kpi', 'inv-buoni-table', 'inv-sig-kpi', 'inv-sig-table'].forEach((id) => {
+      const x = document.getElementById(id);
+      if (x) x.innerHTML = '';
+    });
+  }
   if (!_invTab && customEl) {
     customEl.innerHTML =
       '<p style="color:var(--muted);padding:20px;text-align:center">Nessuna categoria inventario per il settore ' +
@@ -3789,8 +3759,12 @@ async function esportaInventarioPDF() {
   );
   if (isBuoni) {
     const giacenze = calcolaGiacenzaBuoni();
+    // i tipi del settore aperto (prima BU, BL, CG e WL fissi: "undefined" dove un tipo non c era)
     doc.text(
-      'Giacenze: BU=' + giacenze.BU + ' | BL=' + giacenze.BL + ' | CG=' + giacenze.CG + ' | WL=' + giacenze.WL,
+      'Giacenze: ' +
+        Object.keys(giacenze)
+          .map((t) => t + '=' + giacenze[t])
+          .join(' | '),
       14,
       28,
     );

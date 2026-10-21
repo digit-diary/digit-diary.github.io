@@ -193,6 +193,15 @@ const sj = O.suggerimenti(datiJ, { oggi: '2026-10-05', jollyPct: 0.5 }, AJ).find
 ok(!!sj, 'suggerimento: piu disponibilita agli ausiliari attuali');
 const BJ = O.analizza(datiJ, { oggi: '2026-10-05', jollyPct: 0.5 }, sj.scenario);
 ok(BJ.mesi[10].oreNette > AJ.mesi[10].oreNette, 'con piu disponibilita degli ausiliari aumentano le ore nette');
+// SOLO CHI C E (v461): un ausiliario uscito non da disponibilita in piu
+const datiJ3 = Object.assign({}, datiJ, {
+  persone: datiJ.persone.concat([{ nome: 'J3', jolly: true, pct: 1, fine: '2026-06-30' }]),
+});
+const sj3 = O.suggerimenti(datiJ3, { oggi: '2026-10-05', jollyPct: 0.5 }).find((s) => s.tipo === 'disponibilita');
+ok(
+  !!sj3 && /ai 2 ausiliari/.test(sj3.titolo) && JSON.stringify(sj3.scenario) === JSON.stringify(sj.scenario),
+  'ausiliario con il contratto finito a giugno: non conta fra gli ausiliari attuali (2, stessa proposta)',
+);
 
 console.log('== persone per le domeniche ==');
 // 3 posti la domenica, 3 persone: con 12 domeniche libere non bastano
@@ -325,6 +334,63 @@ ok(
     .every((g) => !g.effetto.costo),
   'senza costi: le proposte non mostrano costi',
 );
+
+console.log('== solo chi e in servizio (assunzione, fine del rapporto) ==');
+// celle rimaste nel piano prima dell assunzione o dopo la fine non sono assenze di nessuno
+const tFine = O.tassiStorici(righeStoria, [{ nome: 'Rossi', pct: 1, fine: '2026-04-20' }], {
+  oggi: '2026-10-01',
+  pesoStorico: 0,
+});
+ok(tFine.giorniOsservati === 20, 'storico: dopo la fine del rapporto le celle rimaste non contano (20 giorni)');
+const tEntra = O.tassiStorici(righeStoria, [{ nome: 'Rossi', pct: 1, assunzione: '2026-04-03' }], {
+  oggi: '2026-10-01',
+  pesoStorico: 0,
+});
+vicino(tEntra.media.malattia, 1 / 28, 0.0001, 'storico: prima dell assunzione non conta (1 malattia su 28 giorni)');
+const elenco = [
+  { nome: 'Esce', fine: '2026-08-15' },
+  { nome: 'Entra', assunzione: '2026-09-14' },
+  { nome: 'Sempre' },
+  { nome: 'Uscito', fine: '2025-12-31' },
+];
+ok(
+  O.personeInServizio(elenco, '2026-10-01', '2026-12-31')
+    .map((x) => x.nome)
+    .join() === 'Entra,Sempre',
+  'mesi rimasti: chi e uscito ad agosto non e in organico, chi entra a settembre si',
+);
+ok(
+  O.personeInServizio(elenco, '2026-08-01', '2026-08-31')
+    .map((x) => x.nome)
+    .join() === 'Esce,Sempre',
+  'agosto: chi esce il 15 c e, chi entra a settembre no',
+);
+// analisi dell anno: chi esce conta fino al suo ultimo giorno, chi entra dal primo
+const datiServ = {
+  anno: 2026,
+  fabbisogni: [],
+  turni: turni,
+  persone: [
+    { nome: 'Esce', pct: 1, vacanzeAnno: 0, fine: '2026-08-15' },
+    { nome: 'Entra', pct: 1, vacanzeAnno: 0, assunzione: '2026-09-14' },
+  ],
+  righe: [],
+  festiviAnno: 0,
+};
+const AServ = O.analizza(datiServ, { oggi: '2026-10-01' });
+ok(
+  AServ.mesi[6].teste === 1 && AServ.mesi[7].teste === 1 && AServ.mesi[8].teste === 1 && AServ.mesi[9].teste === 1,
+  'teste: luglio solo chi esce, agosto chi esce, settembre e ottobre chi entra',
+);
+vicino(AServ.mesi[7].offerta.contratto, 15 * ORE_GIORNO, 0.01, 'agosto: 15 giorni di chi esce');
+vicino(AServ.mesi[8].offerta.contratto, 17 * ORE_GIORNO, 0.01, 'settembre: 17 giorni di chi entra il 14');
+const cEsce = O.costoScenario(
+  AServ,
+  O.analizza(datiServ, { oggi: '2026-10-01' }, { percentuali: { Esce: 0.5 } }),
+  { fissoAnno: 100000 },
+  { oggi: '2026-10-01' },
+);
+ok(cEsce.chf === 0, 'costi: cambiare la percentuale di chi e gia uscito non costa nei mesi rimasti');
 
 console.log('\n=======================================');
 console.log('  ' + passati + ' passati, ' + falliti + ' falliti');

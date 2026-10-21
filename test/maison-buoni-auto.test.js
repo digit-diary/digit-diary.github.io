@@ -13,6 +13,7 @@ const pezzo = (src, inizio) => {
 };
 const prom = leggi('promemoria.js');
 const help = leggi('maison-helpers.js');
+const bud = leggi('maison-budget.js');
 
 let passati = 0;
 let falliti = 0;
@@ -54,6 +55,72 @@ eq(_buoniAutoQty(360, 40, 2, 1), 1, 'Aili BL / Bertaggia 360 CHF px 2: 1 BL (non
 eq(_buoniAutoQty(360, 40, 2, 3), 3, 'riga a due nomi, 3 persone del primo: 3 BL');
 eq(_buoniAutoQty(60, 40, 2, 3), 2, 'riga a due nomi: mai oltre importo/valore');
 
+// ---- CATEGORIE DEI CLIENTI (21/10/2026): fisse + una per ogni tipo di buono configurato
+// (js/maison-budget.js); la categoria di buono da il tipo che fa calcolare i buoni
+const BUONI_TIPI = [
+  { codice: 'BU', nome: 'Buono Unico', attivo: true },
+  { codice: 'BL', nome: 'Buono Lounge', attivo: true },
+  { codice: 'CG', nome: 'Coupon Gourmet', attivo: true },
+  { codice: 'WL', nome: 'Welcome Lounge', attivo: true, settori: ['tavoli'] },
+  { codice: 'XS', nome: 'Extra Spa', attivo: false },
+];
+let settoreAperto = 'slots';
+const CAT = new Function(
+  'BUONI_TIPI',
+  'buoniTipi',
+  'buonoColore',
+  'escP',
+  bud.slice(bud.indexOf('const MAISON_CAT_FISSE'), bud.indexOf('// mappa chiave -> etichetta')) +
+    '; return { maisonCatInfo, maisonCategorie, maisonCatLabel, maisonCatBreve, maisonCatTipoBuono, maisonCatColore, maisonCatRgb, maisonCatOpzioniHtml };',
+)(
+  BUONI_TIPI,
+  () => BUONI_TIPI.filter((t) => t.attivo && (!t.settori || t.settori.includes(settoreAperto))),
+  (c) => ({ BU: '#e67e22', BL: '#2c6e49', CG: '#8e44ad', WL: '#2980b9' })[c] || '#5a6b7a',
+  (s) => String(s),
+);
+const maisonCatTipoBuono = CAT.maisonCatTipoBuono;
+eq(CAT.maisonCatTipoBuono('bu'), 'BU', 'categoria bu = buono BU');
+eq(CAT.maisonCatTipoBuono('cg'), 'CG', 'categoria cg = buono CG (prima non assegnabile)');
+eq(CAT.maisonCatTipoBuono('xs'), 'XS', 'tipo disattivato: la categoria gia data vale ancora');
+eq(CAT.maisonCatTipoBuono('full_maison'), '', 'Full Maison: nessun buono');
+eq(CAT.maisonCatTipoBuono('zz'), '', 'sigla non configurata: nessun buono');
+eq(CAT.maisonCatTipoBuono(''), '', 'senza categoria: nessun buono');
+eq(CAT.maisonCatLabel('cg'), 'Coupon Gourmet', 'etichetta dal nome del tipo');
+eq(CAT.maisonCatBreve('cg'), 'CG', 'nome corto = sigla');
+eq(CAT.maisonCatLabel('maison'), 'Maison', 'fissa Maison');
+eq(
+  CAT.maisonCategorie()
+    .map((c) => c.key)
+    .join(','),
+  'full_maison,maison,direzione,bu,bl,cg',
+  'Slots: fisse + tipi attivi del settore (WL solo Tavoli, XS disattivato)',
+);
+settoreAperto = 'tavoli';
+eq(
+  CAT.maisonCategorie()
+    .map((c) => c.key)
+    .join(','),
+  'full_maison,maison,direzione,bu,bl,cg,wl',
+  'Tavoli: anche WL',
+);
+settoreAperto = 'slots';
+eq(
+  CAT.maisonCategorie([{ categoria: 'xs' }])
+    .map((c) => c.key)
+    .join(','),
+  'full_maison,maison,direzione,bu,bl,cg,xs',
+  'categoria gia assegnata con tipo disattivato resta nell elenco',
+);
+eq(CAT.maisonCatColore('cg') !== CAT.maisonCatColore('direzione'), true, 'CG non ha il colore di Direzione');
+eq(CAT.maisonCatRgb('bu').join(','), '230,126,34', 'colore per il PDF');
+eq(
+  /<option value="cg" selected>Coupon Gourmet \(CG\)<\/option>/.test(CAT.maisonCatOpzioniHtml('cg')),
+  true,
+  'menu: CG scelto',
+);
+eq(/<option value="" selected>-<\/option>/.test(CAT.maisonCatOpzioniHtml('')), true, 'menu: vuoto scelto');
+eq(/value="xs" selected/.test(CAT.maisonCatOpzioniHtml('xs')), true, 'menu: categoria disattivata resta scelta');
+
 // ---- modulo: documento finto con i campi del form
 const campi = {};
 const el = (id, value) => (campi[id] = { id, value, dataset: {}, dispatchEvent() {} });
@@ -67,6 +134,7 @@ const budget = [
   { nome: 'Aili Marco', categoria: 'bl' },
   { nome: 'Frigerio Anna', categoria: 'bu' },
   { nome: 'Rossi Luca', categoria: 'full_maison' },
+  { nome: 'Gallo Pia', categoria: 'cg' },
 ];
 const F = new Function(
   'document',
@@ -74,6 +142,7 @@ const F = new Function(
   'getBudgetReparto',
   '_buoniAutoQty',
   '_ripartisciPx',
+  'maisonCatTipoBuono',
   pezzo(help, 'function _preimpostaTipoMaison(') +
     pezzo(help, 'function _maisonManNomeCambiato(') +
     pezzo(help, 'function _maisonManFonte(') +
@@ -81,7 +150,7 @@ const F = new Function(
     pezzo(help, 'function _maisonManQtyAMano(') +
     pezzo(help, 'function _autoCalcolaBuoniManuale(') +
     '; return { _preimpostaTipoMaison, _maisonManNomeCambiato, _maisonManQtyAMano, _autoCalcolaBuoniManuale };',
-)(document, BUONO_VALORI, () => budget, _buoniAutoQty, _ripartisciPx);
+)(document, BUONO_VALORI, () => budget, _buoniAutoQty, _ripartisciPx, maisonCatTipoBuono);
 const v = (id) => String(campi[id].value);
 const scrivi = (id, x) => {
   campi[id].value = x;
@@ -129,6 +198,17 @@ F._maisonManNomeCambiato();
 eq(v('maison-man-qty'), '1', 'Aili / Rossi px 1: 1 BL');
 scrivi('maison-man-px', '4');
 eq(v('maison-man-qty'), '2', 'PX 4 su due nomi: 2 BL al primo');
+
+// cliente aggiunto a mano con categoria CG (Coupon Gourmet, 80 CHF): tipo e numero da soli
+campi['maison-man-tipo'].value = '';
+campi['maison-man-px'].value = '1';
+campi['maison-man-nome'].value = 'Gallo Pia';
+scrivi('maison-man-importo', '170');
+F._maisonManNomeCambiato();
+eq(v('maison-man-tipo'), 'CG', 'cliente con categoria CG: tipo CG');
+eq(v('maison-man-qty'), '3', '170 CHF CG da 80: 3 buoni');
+F._preimpostaTipoMaison('maison');
+eq(v('maison-man-tipo'), '', 'poi un cliente Maison: tipo torna Normale');
 
 // ---- import: numero scritto o no nel file
 const _parseMaisonNome = new Function(

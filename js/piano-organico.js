@@ -134,6 +134,12 @@ async function organicoSalvaCosti() {
 }
 
 // ---------------------------------------------------------------- dati
+// in servizio almeno un giorno fra da e a (data_assunzione, data_fine_rapporto)
+function _organicoInServizioTra(c, da, a) {
+  const i = _pianoInizioRapporto(c);
+  const f = _pianoFineRapporto(c);
+  return (!i || i <= a) && (!f || f >= da);
+}
 async function _organicoCaricaDati(anno) {
   const rep = _pianoReparto();
   const oggi = oggiLocale();
@@ -152,8 +158,15 @@ async function _organicoCaricaDati(anno) {
     );
   const sigle = Object.keys(turni);
   // ORGANICO del settore: i collaboratori di casa (chi copre da un altro settore
-  // resta nell organico del suo)
-  const membri = collaboratoriCache.filter((c) => c.attivo !== false && (c.reparto_dip || 'slots') === rep);
+  // resta nell organico del suo). SOLO CHI C E (v461, titolare 21/10/2026): attivi e in servizio
+  // in almeno un giorno dell anno (data_assunzione, data_fine_rapporto); mese per mese il
+  // modello conta solo i giorni in servizio (offerta, assenze dallo storico, consuntivo)
+  const membri = collaboratoriCache.filter(
+    (c) =>
+      c.attivo !== false &&
+      (c.reparto_dip || 'slots') === rep &&
+      _organicoInServizioTra(c, anno + '-01-01', anno + '-12-31'),
+  );
   const nomi = membri.map((c) => c.nome);
   const [fabbRighe, righe, copertura] = await Promise.all([
     secGet('piano_fabbisogni?data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31&reparto_dip=eq.' + rep),
@@ -248,9 +261,11 @@ async function _organicoCaricaDati(anno) {
     let sotto = 0; // ore di contratto non usate (fissi sotto le ore dovute)
     membri.forEach((c) => {
       if (c.is_jolly || c.impiego === 'jolly') return; // gli ausiliari non hanno ore dovute
+      if (!_pianoOperativoNelMese(c, ym)) return; // non in servizio nel mese
       const pct = parseFloat(c.percentuale) || 1;
+      // solo i giorni in servizio: celle rimaste prima dell assunzione o dopo la fine non sono ore fatte
       const ore = (righe || [])
-        .filter((r) => r.collaboratore === c.nome && String(r.data).startsWith(ym))
+        .filter((r) => r.collaboratore === c.nome && String(r.data).startsWith(ym) && _pianoOperativoIl(c, r.data))
         .reduce((s, r) => s + (_pianoOreDiRiga(r, pct) || 0), 0);
       const dovute = (_pianoGgDovuti(c.nome, ym) / 7) * _pianoOreSett * pct;
       if (ore > dovute) extra += ore - dovute;
@@ -296,6 +311,18 @@ function _organicoParametri() {
   };
 }
 
+// persone in servizio nei mesi rimasti dell anno (chi ha finito il contratto o non c e piu non
+// conta); anno gia passato: tutte quelle dell anno
+function _organicoPersoneRimaste(s) {
+  const primo = s.base.mesi.find((x) => !x.passato);
+  if (!primo) return s.dati.persone;
+  const anno = s.base.anno;
+  return OrganicoModello.personeInServizio(
+    s.dati.persone,
+    anno + '-' + String(primo.mese).padStart(2, '0') + '-01',
+    anno + '-12-31',
+  );
+}
 async function _organicoCalcola(forza) {
   const anno = window._organicoAnno || parseInt(_pianoMeseSel.split('-')[0]);
   const chiave = anno + '|' + _pianoReparto();
@@ -348,7 +375,7 @@ async function _renderPianoOrganicoTab() {
   const conteggio = { sotto: 0, 'in equilibrio': 0, margine: 0 };
   futuri.forEach((x) => (conteggio[OrganicoModello.statoMese(x)] = (conteggio[OrganicoModello.statoMese(x)] || 0) + 1));
   const media = (f) => (futuri.length ? futuri.reduce((t, x) => t + f(x), 0) / futuri.length : 0);
-  const persone = s.dati.persone;
+  const persone = _organicoPersoneRimaste(s);
   const fteContratto = persone.reduce((t, x) => t + (x.jolly ? s.par.jollyPct : x.pct), 0);
   const shrink = media((x) => 1 - x.quotaNetta);
 
@@ -464,7 +491,10 @@ function _organicoVistaSituazione(s, x) {
   h += tile(
     x.persone.length,
     'Persone in organico',
-    'di cui ' + x.persone.filter((p) => p.jolly).length + ' ausiliari',
+    'di cui ' +
+      x.persone.filter((p) => p.jolly).length +
+      ' ausiliari' +
+      (x.futuri.length ? ', in servizio nei mesi rimasti' : ''),
   );
   h += tile(_orgUno(serv), 'Ne servono', 'a tempo pieno');
   h += tile(
@@ -809,7 +839,7 @@ function _organicoSimulatoreHtml(s) {
   h += '<span style="width:16px"></span>';
   h +=
     '<label style="font-size:var(--fs-sm,.8125rem)">Percentuale di un collaboratore<br><select id="org-pers">' +
-    s.dati.persone
+    _organicoPersoneRimaste(s)
       .filter((p) => !p.jolly)
       .map(
         (p) => '<option value="' + escP(p.nome) + '">' + escP(p.nome) + ' (' + Math.round(p.pct * 100) + '%)</option>',

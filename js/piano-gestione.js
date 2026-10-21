@@ -73,12 +73,16 @@ function _renderPianoDomenicheBody() {
   );
   // domeniche future ancora disponibili (nei mesi con o senza piano): serve a
   // capire se le restanti si POSSONO ancora dare
-  let domFuture = 0;
-  Object.keys(domMese).forEach((mm) => domMese[mm].forEach((dstr) => dstr > oggiStr && domFuture++));
+  const domFutureDate = [];
+  Object.keys(domMese).forEach((mm) => domMese[mm].forEach((dstr) => dstr > oggiStr && domFutureDate.push(dstr)));
+  // mesi che contano comunque (anche senza piano): da questo mese in poi
+  const daMese =
+    oggiStr.substring(0, 4) === String(anno) ? oggiStr.substring(5, 7) : oggiStr < String(anno) ? '00' : '13';
+  let senzaInizio = 0;
   let h =
     '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Diritto: ' +
     diritto +
-    ' domeniche libere all anno (regola "Domeniche libere garantite in un anno"). Vacanza e malattia non contano né tra le libere né tra le lavorate (stesso criterio di Controlla le regole e di Benessere)' +
+    ' domeniche libere all anno (regola "Domeniche libere garantite in un anno"), in proporzione ai mesi di contratto: 1 al mese dalla data di inizio (o fino alla fine del rapporto); un mese conta se il contratto ne copre almeno metà (inizio il 16.8: agosto conta, il 20.8 no). Senza data di inizio si contano i mesi con il piano (segno *). Vacanza e malattia non contano né tra le libere né tra le lavorate (stesso criterio di Controlla le regole e di Benessere)' +
     (chkSab ? '; il sabato deve finire entro le 23, come in Controlla le regole' : '') +
     '. Nei mesi senza piano non si conta nulla. Rosso = le domeniche rimaste nell anno non bastano più per arrivare al diritto: da li in poi vanno restituite per prime.</p>';
   h +=
@@ -145,9 +149,22 @@ function _renderPianoDomenicheBody() {
     }
     if (!visto) return;
     scritte++;
-    const restano = Math.max(0, diritto - libere);
-    // le restanti si possono ancora dare? confronto con le domeniche future
-    const critico = restano > domFuture;
+    // DIRITTO DELLA PERSONA a mesi di contratto (_pianoDomContratto, stesso conto di Controlla
+    // le regole e della bozza); senza data di inizio il diritto dell anno come prima
+    const mesiP = [];
+    for (let m = 1; m <= 12; m++) {
+      const mm = String(m).padStart(2, '0');
+      if ((dati.mesiPersona || {})[nome + '|' + mm]) mesiP.push(mm);
+    }
+    const contr = _pianoDomContratto(nome, anno, mesiP, daMese);
+    const dirittoP = contr.inizioMancante ? diritto : contr.diritto;
+    if (contr.inizioMancante) senzaInizio++;
+    const fineR = info.data_fine_rapporto ? String(info.data_fine_rapporto).substring(0, 10) : '';
+    const iniR = info.data_assunzione ? String(info.data_assunzione).substring(0, 10) : '';
+    const futureP = domFutureDate.filter((x) => (!iniR || x >= iniR) && (!fineR || x <= fineR)).length;
+    const restano = Math.max(0, dirittoP - libere);
+    // le restanti si possono ancora dare? confronto con le domeniche future (nel contratto)
+    const critico = restano > futureP;
     h +=
       '<tr data-nome="' +
       escP(nome) +
@@ -160,20 +177,27 @@ function _renderPianoDomenicheBody() {
       '</td>' +
       cols +
       '<td style="font-weight:700;color:' +
-      (libere >= diritto ? 'var(--c-verde,#2c6e49)' : 'var(--c-oro,#8b6914)') +
+      (libere >= dirittoP ? 'var(--c-verde,#2c6e49)' : 'var(--c-oro,#8b6914)') +
       '">' +
       libere +
       '</td><td style="color:' +
       (lavorate ? 'var(--c-rosso,#c0392b)' : 'var(--muted)') +
       '">' +
       (lavorate || '') +
-      '</td><td>' +
-      diritto +
+      '</td><td title="' +
+      escP(
+        contr.inizioMancante
+          ? 'Data di inizio mancante nella scheda: diritto dell anno sui mesi con il piano'
+          : contr.mesi.length + ' mesi di contratto contati nel ' + anno,
+      ) +
+      '">' +
+      dirittoP +
+      (contr.inizioMancante ? '*' : '') +
       '</td><td style="font-weight:700;color:' +
       (restano === 0 ? 'var(--c-verde,#2c6e49)' : critico ? 'var(--c-rosso,#c0392b)' : 'var(--c-oro,#8b6914)') +
       '"' +
       (critico
-        ? ' title="Restano ' + restano + ' da dare ma nell anno ci sono solo ' + domFuture + ' domeniche future"'
+        ? ' title="Restano ' + restano + ' da dare ma nell anno ci sono solo ' + futureP + ' domeniche future"'
         : '') +
       '>' +
       restano +
@@ -181,6 +205,12 @@ function _renderPianoDomenicheBody() {
       '</td></tr>';
   });
   h += '</tbody></table></div>';
+  if (senzaInizio)
+    h +=
+      '<p style="font-size:var(--fs-sm,.8125rem);color:var(--c-oro,#8b6914);margin-top:6px">* Data di inizio mancante per ' +
+      senzaInizio +
+      (senzaInizio === 1 ? ' collaboratore' : ' collaboratori') +
+      ': il diritto resta quello dell anno sui mesi con il piano. Si completa nella scheda del collaboratore (Inizio attività).</p>';
   if (!scritte)
     h = '<p style="color:var(--muted);font-size:var(--fs-md,.875rem)">Nessun mese pianificato per il ' + anno + '.</p>';
   el.innerHTML = h;
@@ -456,10 +486,19 @@ function _benTabella(lista, titolo) {
   lista.forEach((x) => {
     const r = x.res;
     const m = x.m;
+    const sv = x.servizio || {};
+    const it = (d) => d.split('-').reverse().join('.');
+    const servizio = [
+      sv.da && sv.da > m.da ? 'in servizio dal ' + it(sv.da) : '',
+      sv.a && sv.a < m.a ? (sv.da && sv.da > m.da ? 'al ' : 'in servizio fino al ') + it(sv.a) : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
     const tip =
       x.nome +
       ': ' +
       r.etichetta +
+      (servizio ? '\n' + servizio[0].toUpperCase() + servizio.slice(1) + ': contano solo questi giorni' : '') +
       (x.p.percentuale < 1 ? '\nImpiego: ' + Math.round(x.p.percentuale * 100) + '%' : '') +
       (r.scelte.length ? '\nScelte: ' + r.scelte.join(', ') : '') +
       '\nConfronto con: ' +
@@ -473,11 +512,12 @@ function _benTabella(lista, titolo) {
       escP(x.nome) +
       '"><td style="text-align:left;font-weight:600">' +
       escP(x.nome) +
-      // la percentuale e la quantita di lavoro (non una scelta): si mostra accanto alle scelte
-      (r.scelte.length || x.p.percentuale < 1
+      // la percentuale e la quantita di lavoro (non una scelta): si mostra accanto alle scelte;
+      // chi entra o esce nel periodo: contato solo nei giorni in servizio (dal / fino al)
+      (r.scelte.length || x.p.percentuale < 1 || servizio
         ? '<div style="font-weight:400;font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
           escP(
-            [x.p.percentuale < 1 ? 'al ' + Math.round(x.p.percentuale * 100) + '%' : '']
+            [servizio, x.p.percentuale < 1 ? 'al ' + Math.round(x.p.percentuale * 100) + '%' : '']
               .concat(r.scelte.length ? ['scelte: ' + r.scelte.join(', ')] : [])
               .filter(Boolean)
               .join(' · '),
@@ -587,7 +627,7 @@ function _benesserePeriodoLbl(ris) {
     ris.a.substring(0, 4) +
     '</b> (' +
     giorni +
-    ' giorni con piano). I giorni senza piano restano fuori dai conti; le domeniche libere si contano da gennaio, perché il minimo è annuale.'
+    ' giorni con piano). I giorni senza piano restano fuori dai conti, e così i giorni prima dell assunzione e dopo la fine del rapporto (anche nelle medie dei colleghi); le domeniche libere si contano da gennaio, perché il minimo è annuale.'
   );
 }
 // Ordina senza ricalcolare: si riusa l ultimo risultato

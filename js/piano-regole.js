@@ -876,6 +876,40 @@
       raggiungibile: possibili >= serve,
     };
   }
+  // ===== DOMENICHE LIBERE IN BASE AL CONTRATTO (decisione del titolare 21/10/2026) =====
+  // Il diritto dell anno si conta a mesi di contratto: 1 domenica al mese (con la regola a 12;
+  // con un altro valore: valore x mesi / 12, per difetto). Un mese conta se il rapporto ne
+  // copre ALMENO META dei giorni (16 su 31, 15 su 30, 14 su 28): inizio il 1.8 o il 16.8 =
+  // agosto conta (5 domeniche nell anno), inizio il 20.8 = agosto no (4). Lo stesso alla fine
+  // del rapporto: fine il 15.3 = marzo no (2), fine il 16.3 = marzo si (3).
+  //   anno: 2026; inizio/fine: 'AAAA-MM-GG' o vuoto (senza inizio: dal 1 gennaio; senza fine:
+  //   fino al 31 dicembre); dirittoAnno: regola domeniche_libere_anno (predefinito 12)
+  // Ritorna { mesi: ['08', ...], diritto, inizioMancante, attese(mm): domeniche attese fino a
+  // fine del mese mm (compreso) }
+  function domenicheContratto(anno, inizio, fine, dirittoAnno) {
+    const dir = dirittoAnno == null || isNaN(dirittoAnno) ? 12 : Number(dirittoAnno);
+    const ini = inizio ? String(inizio).substring(0, 10) : '';
+    const fin = fine ? String(fine).substring(0, 10) : '';
+    const p2 = (n) => String(n).padStart(2, '0');
+    const mesi = [];
+    for (let m = 1; m <= 12; m++) {
+      const n = new Date(anno, m, 0).getDate();
+      const primo = anno + '-' + p2(m) + '-01';
+      const ultimo = anno + '-' + p2(m) + '-' + p2(n);
+      const da = ini && ini > primo ? ini : primo;
+      const a = fin && fin < ultimo ? fin : ultimo;
+      if (a < da) continue;
+      const giorni = parseInt(a.substring(8, 10), 10) - parseInt(da.substring(8, 10), 10) + 1;
+      if (giorni * 2 >= n) mesi.push(p2(m));
+    }
+    const quota = (k) => Math.floor((dir * k) / 12);
+    return {
+      mesi: mesi,
+      diritto: quota(mesi.length),
+      inizioMancante: !ini,
+      attese: (mm) => quota(mesi.filter((x) => x <= mm).length),
+    };
+  }
   // LA BOZZA PUO METTERE QUESTO TURNO? (vincolo, non preferenza) prima/dopo: gli stati delle
   // domeniche del mese senza e con il turno nuovo (una domenica lavorata, o un sabato che
   // finisce oltre le 23 prima di una domenica libera). Il turno si puo mettere se la persona
@@ -1071,6 +1105,7 @@
     domenicaTurnoAmmesso,
     domenicheIndietro,
     domenicheVerdetto,
+    domenicheContratto,
     livelloScala,
   };
 });

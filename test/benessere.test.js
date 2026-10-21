@@ -249,6 +249,59 @@ r = settore([
 ]);
 ok(r.length === 1 && r[0].nome === 'Uno', 'chi non ha piano nel periodo non compare');
 
+console.log('\n== solo i giorni in servizio (assunzione, fine del rapporto) ==');
+// 4 settimane dal 7.09: celle scritte in tutto il periodo, ma il rapporto finisce il 20.09 (Esce) o
+// comincia il 21.09 (Entra); gli altri tre sono colleghi sempre presenti
+const settoreS = (lista, da, a) =>
+  B.valutaSettore(
+    lista.map((x) => ({ nome: x.nome, info: x.info || {}, giorni: giorni(DA, x.sigle), servizio: x.servizio })),
+    { da: da || DA, a: a || A },
+  );
+const colleghi = [
+  { nome: 'C1', sigle: rip('G G G G G . .', 4) },
+  { nome: 'C2', sigle: rip('G G G G G . .', 4) },
+  { nome: 'C3', sigle: rip('G G G G . . G', 4) },
+];
+r = settoreS(
+  colleghi.concat([
+    { nome: 'Esce', sigle: rip('G G G G G G G', 4), servizio: { a: '2026-09-20' } },
+    { nome: 'Entra', sigle: rip('. . . . . . .', 2) + ' ' + rip('G G G G . . G', 2), servizio: { da: '2026-09-21' } },
+  ]),
+);
+const esce = r.find((x) => x.nome === 'Esce');
+const entra = r.find((x) => x.nome === 'Entra');
+ok(esce.m.giorni === 14 && esce.m.lavorati === 14, 'esce il 20.09: contano solo i 14 giorni fino alla fine');
+ok(entra.m.giorni === 14 && entra.m.lavorati === 10, 'entra il 21.09: contano solo i 14 giorni dal primo');
+ok(entra.m.weTot === 2 && entra.m.isolati === 0, 'entra: niente weekend o riposi prima di entrare');
+ok(esce.m.weTot === 2, 'chi esce: contano solo i 2 weekend in servizio');
+// chi esce lavora tutti i weekend: i 2 weekend dopo la fine alzerebbero la media dei colleghi.
+// Con il servizio la media e la stessa di un piano vuoto dopo la fine (e prima dell entrata)
+const senza = B.valutaSettore(
+  colleghi
+    .concat([
+      { nome: 'Esce', sigle: rip('G G G G G G G', 2) + ' ' + rip('_', 14) },
+      { nome: 'Entra', sigle: rip('_', 14) + ' ' + rip('G G G G . . G', 2) },
+    ])
+    .map((x) => ({ nome: x.nome, info: {}, giorni: giorni(DA, x.sigle) })),
+  { da: DA, a: A },
+);
+const mediaWe = (lista) => lista.find((x) => x.nome === 'C1').c.quotaWeekend;
+ok(Math.abs(mediaWe(senza) - mediaWe(r)) < 1e-9, 'media dei colleghi: i giorni fuori dal servizio non contano');
+// periodi interi fuori dal servizio: non compare (anche se nel piano ci sono celle)
+r = settoreS(colleghi.concat([{ nome: 'Esce', sigle: rip('G G G G G G G', 4), servizio: { a: '2026-09-06' } }]));
+ok(!r.some((x) => x.nome === 'Esce'), 'uscito prima del periodo: non compare');
+r = settoreS(colleghi.concat([{ nome: 'Entra', sigle: rip('G G G G G . .', 4), servizio: { da: '2026-10-05' } }]));
+ok(!r.some((x) => x.nome === 'Entra'), 'entra dopo il periodo: non compare');
+ok(
+  r.every((x) => x.c.persone === 3),
+  'e non conta nelle medie dei colleghi',
+);
+// domeniche: chi esce a meta anno non ha davanti le domeniche fino a dicembre
+ok(
+  B.domenicheRestanti('2026-08-31') === 17 && B.domenicheRestanti('2026-08-31', '2026-09-30') === 4,
+  'domeniche restanti fino alla fine del rapporto',
+);
+
 console.log('\n== soglie dalle regole ==');
 const s = B.soglieDa((n) => ({ min_riposo_ore: '12', benessere_notti_fila: '4' })[n]);
 ok(s.minRiposo === 12 && s.nottiFila === 4 && s.recuperoOre === 46, 'soglie lette, predefiniti per le altre');

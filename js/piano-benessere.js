@@ -183,7 +183,8 @@
         }
       }
       // domenica futura ancora senza piano: puo ancora diventare libera
-      if (d.dow === 0 && d.stato === 'ignoto' && o.oggi && d.data > o.oggi) m.domFuture++;
+      // (non dopo la fine del rapporto ne prima dell assunzione: in quei giorni la persona non c e)
+      if (d.dow === 0 && d.stato === 'ignoto' && !d.fuori && o.oggi && d.data > o.oggi) m.domFuture++;
       if (d.dow === 0 && d.stato !== 'ignoto') {
         if (d.domenica === 'esclusa' || d.stato === 'assenza') m.domAssenza++;
         else {
@@ -194,6 +195,7 @@
         }
       }
     }
+    m.fine = o.fine || null; // ultimo giorno del rapporto (domeniche che restano fino a lui)
     m.quotaNotti = m.lavorati ? m.notti / m.lavorati : 0;
     m.quotaWeekend = m.weTot ? m.weLav / m.weTot : 0;
     return m;
@@ -239,6 +241,9 @@
       aMano: !!c.turni_solo_a_mano,
       percentuale: num(c.percentuale, 1) || 1,
       jolly: !!(c.is_jolly || c.impiego === 'jolly'),
+      // domeniche libere a mesi di contratto (PianoRegole.domenicheContratto)
+      inizio: c.data_assunzione ? String(c.data_assunzione).substring(0, 10) : '',
+      fine: c.data_fine_rapporto ? String(c.data_fine_rapporto).substring(0, 10) : '',
       bloccatiDiurni: bloccati.filter((k) => {
         const t = typeof turnoDi === 'function' ? turnoDi(k) : null;
         return t && t.tipo !== 'NOTTURNO';
@@ -325,11 +330,12 @@
     return { di: diPct, gruppi: gruppi };
   }
 
-  // domeniche dal giorno dopo "a" a fine anno (per dire se l arretrato e ancora recuperabile)
-  function domenicheRestanti(a) {
+  // domeniche dal giorno dopo "a" a fine anno (per dire se l arretrato e ancora recuperabile);
+  // fino: ultimo giorno del rapporto, se finisce prima di dicembre
+  function domenicheRestanti(a, fino) {
     const anno = String(a).substring(0, 4);
     let n = 0;
-    for (let d = piu(a, 1); d.substring(0, 4) === anno; d = piu(d, 1))
+    for (let d = piu(a, 1); d.substring(0, 4) === anno && !(fino && d > fino); d = piu(d, 1))
       if (new Date(d + 'T12:00:00').getDay() === 0) n++;
     return n;
   }
@@ -431,12 +437,22 @@
     const ma = mAnno || m;
     const domConosciute = ma.domTot + ma.domAssenza;
     if (domConosciute > 0) {
-      const attese = Math.floor((so.domenicheAnno * domConosciute) / 52);
+      let attese = Math.floor((so.domenicheAnno * domConosciute) / 52);
+      // CON LA DATA DI INIZIO (titolare 21/10/2026): 1 domenica per mese di contratto, come
+      // Controlla le regole e la tabella Domeniche (PianoRegole.domenicheContratto)
+      const PR = root.PianoRegole;
+      const ctr =
+        p.inizio && PR && PR.domenicheContratto && ma.a
+          ? PR.domenicheContratto(parseInt(ma.a.substring(0, 4)), p.inizio, p.fine, so.domenicheAnno)
+          : null;
+      if (ctr) attese = ctr.attese(ma.a.substring(5, 7));
       const manca = attese - ma.domLib;
       // diritto dell anno in proporzione alle domeniche in cui la persona c e (chi entra a meta
       // anno ne ha meno): bastano le domeniche che restano fino a dicembre?
-      const restanti = domenicheRestanti(ma.a) + (ma.domFuture || 0);
-      const dirittoAnno = Math.floor((so.domenicheAnno * Math.min(52, domConosciute + restanti)) / 52);
+      const restanti = domenicheRestanti(ma.a, ma.fine) + (ma.domFuture || 0);
+      const dirittoAnno = ctr
+        ? ctr.diritto
+        : Math.floor((so.domenicheAnno * Math.min(52, domConosciute + restanti)) / 52);
       // quante delle domeniche che restano fino a dicembre devono essere libere per arrivare al
       // minimo? Fino a meta: si recupera senza sforzo (nota). Oltre meta: da tenere d occhio.
       // Piu di quelle che restano: il minimo dell anno non si raggiunge piu (critico).
@@ -445,6 +461,7 @@
         ma.domLib +
         ' domeniche libere da gennaio (attese ' +
         attese +
+        (ctr ? '' : ', data di inizio mancante') +
         (ma.domTardi ? ', ' + ma.domTardi + ' non valide per il sabato oltre le 23' : '') +
         ')';
       let liv = 'ok';
@@ -652,15 +669,37 @@
     };
   }
 
-  // tutto il settore in un colpo: persone [{ nome, giorni, info }] -> [{ ..., m, mAnno, p, c, res }]
+  // IN SERVIZIO (v461, titolare 21/10/2026): chi entra o esce conta solo nei giorni in cui c e.
+  // servizio: { da: assunzione, a: ultimo giorno del rapporto } (uno dei due o nessuno). I giorni
+  // fuori diventano "senza piano" (anche se nel piano restano celle scritte): non contano nei
+  // conteggi della persona ne nelle medie dei colleghi; chi non c e in tutto il periodo non compare.
+  function fuoriServizio(servizio, d) {
+    const s = servizio || {};
+    return !!((s.da && d < s.da) || (s.a && d > s.a));
+  }
+  function nelServizio(giorni, servizio) {
+    if (!servizio || (!servizio.da && !servizio.a)) return giorni || [];
+    return (giorni || []).map((g) =>
+      fuoriServizio(servizio, g.data) ? { data: g.data, dow: g.dow, stato: 'ignoto', fuori: true } : g,
+    );
+  }
+
+  // tutto il settore in un colpo: persone [{ nome, giorni, info, servizio }] -> [{ ..., m, mAnno, p, c, res }]
   // (la stessa strada per il browser e per i test)
   function valutaSettore(persone, opz) {
     const o = opz || {};
     const so = Object.assign({}, PREDEFINITI, o.soglie || {});
     const inizioAnno = String(o.a).substring(0, 4) + '-01-01';
-    const lista = (persone || []).map((x) => {
-      const m = misura(x.giorni, Object.assign({}, so, { da: o.da, a: o.a, oggi: o.oggi }));
-      const mAnno = misura(x.giorni, Object.assign({}, so, { da: inizioAnno, a: o.a, oggi: o.oggi }));
+    // fuori chi non e in servizio in nessun giorno del periodo (uscito prima, entrato dopo)
+    const inPeriodo = (persone || []).filter((x) => {
+      const s = x.servizio || {};
+      return !((s.a && o.da && s.a < o.da) || (s.da && o.a && s.da > o.a));
+    });
+    const lista = inPeriodo.map((y) => {
+      const x = y.servizio ? Object.assign({}, y, { giorni: nelServizio(y.giorni, y.servizio) }) : y;
+      const fine = (x.servizio && x.servizio.a) || null;
+      const m = misura(x.giorni, Object.assign({}, so, { da: o.da, a: o.a, oggi: o.oggi, fine: fine }));
+      const mAnno = misura(x.giorni, Object.assign({}, so, { da: inizioAnno, a: o.a, oggi: o.oggi, fine: fine }));
       // x.tratti (facoltativo): [{ da, a, info }] con le scelte valide in ogni parte del periodo
       // (PianoScelte.segmenti). Un tratto solo: le scelte di quel periodo, non quelle di oggi
       const tratti = Array.isArray(x.tratti) && x.tratti.length ? x.tratti : null;
@@ -691,6 +730,7 @@
     valutaSettore,
     soglieDa,
     domenicheRestanti,
+    fuoriServizio,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   root.PianoBenessere = API;
@@ -827,6 +867,11 @@ async function pianoBenessereCalcola(opz) {
           '&limit=80000&select=collaboratore,data,codice,ora_inizio,ora_fine,reparto_dip',
       )) || [];
     if (cambia) _pianoRepartoSel = rep; // durante l attesa qualcuno potrebbe aver cambiato settore
+    // CHI CONTA (v461, titolare 21/10/2026): ognuno solo nei giorni in cui e in servizio, dalla
+    // data di assunzione all ultimo giorno del rapporto (data_fine_rapporto, che e anche quello
+    // che scrive "Disattiva" in Gestione collaboratori). Dopo la fine non compare piu; nei periodi
+    // prima contano i giorni in cui c era. Chi e stato tolto del tutto (attivo = false) non e fra
+    // i collaboratori caricati e resta fuori come prima.
     const collab = collaboratoriCache.filter(
       (c) => c.attivo !== false && _pianoAppartieneAlReparto(c, rep) && c.funzione !== 'RESP',
     );
@@ -834,6 +879,10 @@ async function pianoBenessereCalcola(opz) {
     collab.forEach((c) => (perNome[c.nome] = {}));
     righe.forEach((r) => {
       if (perNome[r.collaboratore]) perNome[r.collaboratore][String(r.data).substring(0, 10)] = r;
+    });
+    const servizioDi = (c) => ({
+      da: c.data_assunzione ? String(c.data_assunzione).substring(0, 10) : null,
+      a: c.data_fine_rapporto ? String(c.data_fine_rapporto).substring(0, 10) : null,
     });
     const date = [];
     for (let d = prima; d <= dopo; d = _benPiu(d, 1)) date.push(d);
@@ -874,7 +923,7 @@ async function pianoBenessereCalcola(opz) {
       // scelte valide in ogni parte del periodo (solo notti, solo diurni, giorni... messe o
       // tolte nel tempo: js/piano-scelte.js), non quelle di oggi
       const tratti = typeof pianoScelteSegmenti === 'function' ? pianoScelteSegmenti(c, da, a) : null;
-      return { nome: c.nome, info: c, giorni: giorni, tratti: tratti };
+      return { nome: c.nome, info: c, giorni: giorni, tratti: tratti, servizio: servizioDi(c) };
     });
     const valutate = PianoBenessere.valutaSettore(persone, {
       da: da,

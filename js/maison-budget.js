@@ -6,105 +6,181 @@
  * Maison: budget, categorie, profilo
  */
 
-// Etichetta leggibile della categoria budget: unica mappa per lista, CSV e PDF
-// (il CSV conosceva solo Full Maison/Maison e lasciava vuote Direzione/BU/BL)
-const MAISON_CAT_LABEL = {
-  full_maison: 'Full Maison',
-  maison: 'Maison',
-  direzione: 'Direzione',
-  bu: 'Buono Unico',
-  bl: 'Buono Lounge',
-};
-function _maisonCatLabel(cat) {
-  return (cat && MAISON_CAT_LABEL[cat]) || '';
+// CATEGORIE DEI CLIENTI MAISON (21/10/2026): le tre fisse (Full Maison, Maison, Direzione)
+// e UNA PER OGNI TIPO DI BUONO configurato in Impostazioni > valori buoni Maison (BU, BL,
+// CG, WL e quelli aggiunti), con chiave = sigla in minuscolo (bu, bl, cg...). Una categoria
+// di buono, scegliendo il cliente nell inserimento dei costi, propone il tipo di buono e fa
+// calcolare il numero di buoni dall importo (_preimpostaTipoMaison, _autoCalcolaBuoniManuale).
+// Unica fonte per menu, gruppi, colori, CSV e PDF: prima ogni schermata aveva la sua mappa
+// con solo BU e BL (CG e WL non si potevano assegnare).
+const MAISON_CAT_FISSE = [
+  { key: 'full_maison', label: 'Full Maison', breve: 'Full Maison', colore: '#b8860b', buono: '' },
+  { key: 'maison', label: 'Maison', breve: 'Maison', colore: '#2980b9', buono: '' },
+  { key: 'direzione', label: 'Direzione', breve: 'Direzione', colore: '#8e44ad', buono: '' },
+];
+const _MAISON_CAT_COLORI_LIBERI = ['#c0392b', '#1a7a6d', '#5a6b7a', '#8b6914', '#7b2d8b', '#b5651d'];
+function _maisonCatDiBuono(t) {
+  // colore del buono; se coincide con una categoria fissa (CG viola come Direzione, WL blu
+  // come Maison) se ne prende uno libero, cosi i gruppi si distinguono
+  let colore = typeof buonoColore === 'function' ? buonoColore(t.codice) : 'var(--muted)';
+  if (MAISON_CAT_FISSE.some((c) => c.colore.toLowerCase() === String(colore).toLowerCase())) {
+    const i = Math.max(
+      0,
+      BUONI_TIPI.findIndex((x) => x.codice === t.codice),
+    );
+    colore = _MAISON_CAT_COLORI_LIBERI[i % _MAISON_CAT_COLORI_LIBERI.length];
+  }
+  return { key: t.codice.toLowerCase(), label: t.nome || t.codice, breve: t.codice, colore: colore, buono: t.codice };
 }
+// la categoria (oggetto) da una chiave salvata; null se vuota
+function maisonCatInfo(cat) {
+  if (!cat) return null;
+  const k = String(cat).toLowerCase();
+  const f = MAISON_CAT_FISSE.find((c) => c.key === k);
+  if (f) return f;
+  const t = (typeof BUONI_TIPI !== 'undefined' ? BUONI_TIPI : []).find((x) => x.codice.toLowerCase() === k);
+  if (t) return _maisonCatDiBuono(t);
+  // sigla non piu configurata: resta leggibile, ma non fa calcolare buoni
+  return { key: k, label: k.toUpperCase(), breve: k.toUpperCase(), colore: 'var(--muted)', buono: '' };
+}
+// elenco per menu e gruppi: le fisse, poi i tipi di buono attivi nel settore aperto; con
+// righe (clienti) anche le categorie gia assegnate che non sono piu fra queste
+function maisonCategorie(righe) {
+  const out = MAISON_CAT_FISSE.slice();
+  (typeof buoniTipi === 'function' ? buoniTipi(false) : []).forEach((t) => {
+    if (!out.some((c) => c.key === t.codice.toLowerCase())) out.push(_maisonCatDiBuono(t));
+  });
+  (righe || []).forEach((b) => {
+    const k = b && b.categoria ? String(b.categoria).toLowerCase() : '';
+    if (k && !out.some((c) => c.key === k)) out.push(maisonCatInfo(k));
+  });
+  return out;
+}
+function maisonCatLabel(cat) {
+  const c = maisonCatInfo(cat);
+  return c ? c.label : '';
+}
+function _maisonCatLabel(cat) {
+  return maisonCatLabel(cat);
+}
+// nome corto per i distintivi (Full Maison, Maison, Direzione, BU, BL, CG...)
+function maisonCatBreve(cat) {
+  const c = maisonCatInfo(cat);
+  return c ? c.breve : '';
+}
+function maisonCatColore(cat) {
+  const c = maisonCatInfo(cat);
+  return c ? c.colore : 'var(--muted)';
+}
+// tipo di buono della categoria ('BU', 'CG'...), '' per Full Maison, Maison, Direzione
+function maisonCatTipoBuono(cat) {
+  const c = maisonCatInfo(cat);
+  return (c && c.buono) || '';
+}
+// colore per jsPDF ([r, g, b]) e sfondo leggero per le righe
+function maisonCatRgb(cat) {
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(maisonCatColore(cat));
+  return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [100, 100, 100];
+}
+function maisonCatSfondo(cat) {
+  return 'rgba(' + maisonCatRgb(cat).join(',') + ',0.15)';
+}
+// <option> del menu Categoria: vuota (-), fisse, tipi di buono; la categoria gia salvata
+// resta scelta anche se il suo tipo di buono e stato disattivato
+function maisonCatOpzioniHtml(selezionata) {
+  const sel = selezionata ? String(selezionata).toLowerCase() : '';
+  return (
+    '<option value=""' +
+    (sel ? '' : ' selected') +
+    '>-</option>' +
+    maisonCategorie(sel ? [{ categoria: sel }] : [])
+      .map(
+        (c) =>
+          '<option value="' +
+          escP(c.key) +
+          '"' +
+          (c.key === sel ? ' selected' : '') +
+          '>' +
+          escP(c.label + (c.buono ? ' (' + c.buono + ')' : '')) +
+          '</option>',
+      )
+      .join('')
+  );
+}
+// mappa chiave -> etichetta / nome corto / colore / [r,g,b] di TUTTE le categorie conosciute
+// (fisse e ogni tipo di buono, anche disattivato): per le schermate che leggono b.categoria
+function maisonCatMappa(campo) {
+  const out = {};
+  MAISON_CAT_FISSE.concat((typeof BUONI_TIPI !== 'undefined' ? BUONI_TIPI : []).map(_maisonCatDiBuono)).forEach((c) => {
+    if (out[c.key] !== undefined) return;
+    out[c.key] = campo === 'rgb' ? maisonCatRgb(c.key) : c[campo];
+  });
+  return out;
+}
+// distintivo della categoria (vuoto senza categoria)
+function maisonCatBadgeHtml(cat, stile) {
+  if (!cat) return '';
+  return (
+    ' <span class="mini-badge" style="background:' +
+    maisonCatColore(cat) +
+    ';' +
+    (stile || 'font-size:var(--fs-sm,.8125rem)') +
+    '">' +
+    escP(maisonCatLabel(cat)) +
+    '</span>'
+  );
+}
+// riempie i menu Categoria della pagina (aggiunta cliente) al cambio di settore o di tipi
+function maisonCatRiempiSelect() {
+  if (typeof document === 'undefined') return;
+  const el = document.getElementById('maison-budget-cat');
+  if (el) el.innerHTML = maisonCatOpzioniHtml(el.value);
+}
+// SCHEDA CLIENTI MAISON: i clienti del settore aperto (i tolti sono nel Cestino), raggruppati
+// per categoria; filtro per categoria (anche "Senza categoria") e per nome
 function renderMaisonBudgetUI() {
+  maisonCatRiempiSelect();
   const el = document.getElementById('maison-budget-list');
   if (!el) return;
   const _br = getBudgetReparto(),
     _mr = getMaisonRepartoExpanded();
-  // Solo clienti con categoria assegnata (+ opzione per vedere tutti)
   const clientiCat = _br.filter((b) => b.categoria);
-  const tuttiNomi = [...new Set(clientiCat.map((b) => b.nome))].sort();
-  const nTotali = [...new Set([..._br.map((b) => b.nome), ..._mr.map((r) => r.nome)])].length;
-  if (!tuttiNomi.length && !_mr.length) {
+  const senzaCat = _br.filter((b) => !b.categoria);
+  if (!_br.length && !_mr.length) {
     el.innerHTML =
-      '<div class="empty-state"><p>Nessun cliente categorizzato</p><small>Clicca sul nome di un cliente nella tabella sopra per assegnare una categoria</small></div>';
+      '<div class="empty-state"><p>Nessun cliente nella scheda</p><small>Aggiungi un cliente qui sotto (nome e categoria) o clicca sul nome di un cliente nella tabella sopra per assegnare una categoria</small></div>';
     return;
   }
+  const categorie = maisonCategorie(_br);
   let filtCat = (document.getElementById('maison-filt-cat-lista') || {}).value || '';
-  const nFM = clientiCat.filter((b) => b.categoria === 'full_maison').length;
-  const nM = clientiCat.filter((b) => b.categoria === 'maison').length;
-  const nD = clientiCat.filter((b) => b.categoria === 'direzione').length;
-  const nBU = clientiCat.filter((b) => b.categoria === 'bu').length;
-  const nBL = clientiCat.filter((b) => b.categoria === 'bl').length;
+  if (filtCat && filtCat !== '_senza' && !categorie.some((c) => c.key === filtCat)) filtCat = '';
   const _filtNomeBudget = (document.getElementById('maison-filt-nome-budget') || {}).value || '';
+  const opz = (val, testo) =>
+    '<option value="' + escP(val) + '"' + (filtCat === val ? ' selected' : '') + '>' + escP(testo) + '</option>';
   let html =
-    '<div style="display:flex;gap:10px;margin-bottom:12px;align-items:center;flex-wrap:wrap"><select id="maison-filt-cat-lista" onchange="renderMaisonBudgetUI()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:var(--fs-md,.875rem);background:var(--paper);color:var(--ink)"><option value="">Tutti categorizzati (' +
-    tuttiNomi.length +
-    ')</option><option value="full_maison"' +
-    (filtCat === 'full_maison' ? ' selected' : '') +
-    '>Full Maison (' +
-    nFM +
-    ')</option><option value="maison"' +
-    (filtCat === 'maison' ? ' selected' : '') +
-    '>Maison (' +
-    nM +
-    ')</option><option value="direzione"' +
-    (filtCat === 'direzione' ? ' selected' : '') +
-    '>Direzione (' +
-    nD +
-    ')</option><option value="bu"' +
-    (filtCat === 'bu' ? ' selected' : '') +
-    '>Buono Unico (' +
-    nBU +
-    ')</option><option value="bl"' +
-    (filtCat === 'bl' ? ' selected' : '') +
-    '>Buono Lounge (' +
-    nBL +
-    ')</option></select><input type="text" id="maison-filt-nome-budget" placeholder="Cerca cliente..." value="' +
+    '<div style="display:flex;gap:10px;margin-bottom:12px;align-items:center;flex-wrap:wrap"><select id="maison-filt-cat-lista" aria-label="Categoria" onchange="renderMaisonBudgetUI()" style="padding:6px 10px;border:1px solid var(--line);border-radius:2px;font-size:var(--fs-md,.875rem);background:var(--paper);color:var(--ink)">' +
+    opz('', 'Tutti categorizzati (' + clientiCat.length + ')') +
+    categorie
+      .map((c) => opz(c.key, c.label + ' (' + clientiCat.filter((b) => b.categoria === c.key).length + ')'))
+      .join('') +
+    opz('_senza', 'Senza categoria (' + senzaCat.length + ')') +
+    '</select><input type="text" id="maison-filt-nome-budget" placeholder="Cerca cliente..." value="' +
     escP(_filtNomeBudget) +
     '" oninput="renderMaisonBudgetUI()" class="campo-cerca"></div>';
-  // Build client data
-  const clients = tuttiNomi.map((nome) => {
-    const b = _br.find((x) => x.nome.toLowerCase() === nome.toLowerCase());
-    // Budget mensile: la percentuale si calcola sullo speso di questo mese, non sullo storico
-    const spent = _spesoPerBudget(nome);
-    const cat = b ? b.categoria || '' : '';
-    return { nome, b, spent, cat };
-  });
-  // Filter
-  let filtered = clients;
-  if (filtCat) {
-    filtered = clients.filter((c) => c.cat === filtCat);
-  }
+  // Budget mensile: la percentuale si calcola sullo speso di questo mese, non sullo storico
+  const clients = (filtCat === '_senza' ? senzaCat : clientiCat)
+    .slice()
+    .sort((a, b) => a.nome.localeCompare(b.nome))
+    .map((b) => ({ nome: b.nome, b, spent: _spesoPerBudget(b.nome), cat: b.categoria || '' }));
+  let filtered = filtCat && filtCat !== '_senza' ? clients.filter((c) => c.cat === filtCat) : clients;
   if (_filtNomeBudget) {
     const _fnl = _filtNomeBudget.toLowerCase();
     filtered = filtered.filter((c) => c.nome.toLowerCase().includes(_fnl));
   }
-  // Group by category
-  const catDefs = [
-    { key: 'full_maison', label: 'Full Maison', color: '#b8860b' },
-    { key: 'maison', label: 'Maison', color: '#2980b9' },
-    { key: 'direzione', label: 'Direzione', color: '#8e44ad' },
-    { key: 'bu', label: 'Buono Unico', color: '#e67e22' },
-    { key: 'bl', label: 'Buono Lounge', color: '#2c6e49' },
-  ];
   function renderClientRow(c, idx) {
     const pct = c.b && c.b.budget_chf ? Math.round((c.spent / c.b.budget_chf) * 100) : 0;
     const pctColor = pct >= 100 ? 'var(--accent)' : pct >= 80 ? 'var(--c-arancio,#e67e22)' : 'var(--c-verde,#2c6e49)';
-    const borderColor =
-      c.cat === 'full_maison'
-        ? '#b8860b'
-        : c.cat === 'maison'
-          ? '#2980b9'
-          : c.cat === 'direzione'
-            ? '#8e44ad'
-            : c.cat === 'bu'
-              ? '#e67e22'
-              : c.cat === 'bl'
-                ? '#2c6e49'
-                : 'var(--muted)';
+    const borderColor = c.cat ? maisonCatColore(c.cat) : 'var(--muted)';
     const nascitaLabel =
       c.b && c.b.data_nascita
         ? new Date(c.b.data_nascita + 'T12:00:00').toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })
@@ -119,25 +195,12 @@ function renderMaisonBudgetUI() {
           pctColor +
           '"></div></div>'
         : '';
-    const bgColor =
-      c.cat === 'full_maison'
-        ? 'rgba(184,134,11,0.15)'
-        : c.cat === 'maison'
-          ? 'rgba(41,128,185,0.15)'
-          : c.cat === 'direzione'
-            ? 'rgba(142,68,173,0.15)'
-            : c.cat === 'bu'
-              ? 'rgba(230,126,34,0.15)'
-              : c.cat === 'bl'
-                ? 'rgba(44,110,73,0.15)'
-                : idx % 2
-                  ? 'rgba(0,0,0,0.03)'
-                  : 'var(--paper)';
+    const bgColor = c.cat ? maisonCatSfondo(c.cat) : idx % 2 ? 'rgba(0,0,0,0.03)' : 'var(--paper)';
     const _catBadgeRow = c.cat
       ? '<span class="mini-badge" style="background:' +
         borderColor +
         ';font-size:var(--fs-sm,.8125rem);margin-left:6px">' +
-        ({ full_maison: 'Full Maison', maison: 'Maison', direzione: 'Direzione', bu: 'BU', bl: 'BL' }[c.cat] || '') +
+        escP(maisonCatBreve(c.cat)) +
         '</span>'
       : '';
     return (
@@ -170,34 +233,30 @@ function renderMaisonBudgetUI() {
           nascitaLabel +
           '</span>'
         : '') +
-      (c.b
-        ? '<button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2);font-size:var(--fs-sm,.8125rem)" onclick="modificaMaisonInfo(' +
-          c.b.id +
-          ')">Modifica</button>'
-        : '<button class="btn-del-tipo" style="color:var(--c-azzurro,#1f6fa3);border-color:var(--c-azzurro,#1f6fa3);font-size:var(--fs-sm,.8125rem)" onclick="assegnaCatRapida(\'' +
-          ne +
-          '\')">Assegna</button>') +
-      (c.b
-        ? '<button class="btn-del-tipo pericolo" style="font-size:var(--fs-sm,.8125rem)" onclick="rimuoviMaisonBudget(' +
-          c.b.id +
-          ')">Rimuovi</button>'
-        : '') +
+      '<button class="btn-del-tipo" style="color:var(--accent2);border-color:var(--accent2);font-size:var(--fs-sm,.8125rem)" onclick="modificaMaisonInfo(' +
+      c.b.id +
+      ')">Modifica</button>' +
+      '<button class="btn-del-tipo pericolo" style="font-size:var(--fs-sm,.8125rem)" title="Toglie il cliente dalla scheda: va nel Cestino e si può ripristinare" onclick="rimuoviMaisonBudget(' +
+      c.b.id +
+      ')">Togli</button>' +
       '</div>'
     );
   }
   if (filtCat) {
-    html += filtered.map(renderClientRow).join('');
+    html += filtered.length
+      ? filtered.map(renderClientRow).join('')
+      : '<p style="color:var(--muted);padding:8px 0">Nessun cliente</p>';
   } else {
-    catDefs.forEach((cd) => {
+    categorie.forEach((cd) => {
       const group = filtered.filter((c) => c.cat === cd.key);
       if (!group.length) return;
       html +=
         '<div class="cat-group-header testo-cat" style="--cat:' +
-        cd.color +
+        cd.colore +
         '">' +
-        cd.label +
+        escP(cd.label) +
         ' <span class="cat-count" style="background:' +
-        cd.color +
+        cd.colore +
         '">' +
         group.length +
         '</span></div>';
@@ -214,129 +273,199 @@ function renderMaisonBudgetUI() {
     }
   }
 }
+// dopo un aggiunta o una modifica: scheda, alert del budget e cruscotto della Maison
+function _maisonClientiAggiornaViste() {
+  renderMaisonBudgetUI();
+  if (typeof renderMaisonDashboard === 'function') renderMaisonDashboard();
+  if (typeof renderMaisonBudgetAlerts === 'function') renderMaisonBudgetAlerts();
+}
+// NOME GIA USATO (il nome del cliente e unico in tutto il database): se e un cliente tolto
+// di questo settore si propone di rimetterlo, altrimenti si dice dove e. Ritorna la riga
+// rimessa nella scheda, o null.
+async function _maisonClienteNomeOccupato(nome) {
+  let righe = [];
+  try {
+    righe = (await secGet('maison_budget?nome=eq.' + encodeURIComponent(nome))) || [];
+  } catch (e) {}
+  const r = righe[0];
+  if (r && r.eliminato && (r.reparto_dip || 'slots') === currentReparto) {
+    if (
+      !(await chiediConferma(
+        nome +
+          ' era stato tolto dalla scheda clienti' +
+          (r.eliminato_da ? ' da ' + r.eliminato_da : '') +
+          ' ed è nel Cestino.\n\nRimetterlo nella scheda con i dati inseriti?',
+      ))
+    )
+      return null;
+    await secPatch('maison_budget', 'id=eq.' + r.id, { eliminato: false, eliminato_da: null, eliminato_at: null });
+    Object.assign(r, { eliminato: false, eliminato_da: null, eliminato_at: null });
+    if (!maisonBudgetCache.some((x) => x.id === r.id)) maisonBudgetCache.push(r);
+    return r;
+  }
+  toastErrore(
+    'Cliente non aggiunto: il nome "' +
+      nome +
+      '" è già usato' +
+      (r && (r.reparto_dip || 'slots') !== currentReparto
+        ? ' nel settore ' + repartoLabel(r.reparto_dip || 'slots')
+        : r && r.eliminato
+          ? ' da un cliente nel Cestino di un altro settore'
+          : '') +
+      '. Il nome deve essere unico: aggiungi il nome di battesimo o un’iniziale.',
+    9000,
+  );
+  return null;
+}
+// AGGIUNGI CLIENTE A MANO (scheda clienti): nome, categoria, budget e massimi del mese,
+// data di nascita. Un cliente gia nella scheda si aggiorna con i campi compilati.
+// Compare subito fra i nomi dell inserimento dei costi, con il calcolo dei buoni.
 // un salvataggio alla volta: il doppio click creava righe doppie (unaVoltaSola in utils.js)
 function salvaMaisonBudget() {
   return unaVoltaSola('maison-budget-salva', () => _salvaMaisonBudgetEsegui());
 }
 async function _salvaMaisonBudgetEsegui() {
-  const nome = capitalizzaNome(document.getElementById('maison-budget-nome').value.trim());
-  const chf = parseFloat(document.getElementById('maison-budget-chf').value) || null;
-  const bu = parseInt(document.getElementById('maison-budget-bu').value) || null;
-  const bl = parseInt(document.getElementById('maison-budget-bl').value) || null;
+  const val = (id) => (document.getElementById(id) || {}).value || '';
+  const nome = capitalizzaNome(val('maison-budget-nome').trim());
+  const chf = parseFloat(val('maison-budget-chf')) || null;
+  const bu = parseInt(val('maison-budget-bu')) || null;
+  const bl = parseInt(val('maison-budget-bl')) || null;
   const nascita = _getNascitaValue('maison-budget-nascita') || null;
-  const cat = document.getElementById('maison-budget-cat').value || '';
+  const cat = val('maison-budget-cat') || null;
   if (!nome) {
     toast('Inserisci il nome del cliente');
     return;
   }
   if (!chf && !bu && !bl && !nascita && !cat) {
-    toast('Imposta almeno un campo');
+    toast('Scegli la categoria (o un budget, un massimo o la data di nascita)');
     return;
   }
-  if (getBudgetReparto().find((b) => b.nome.toLowerCase() === nome.toLowerCase())) {
-    toast('Già esistente per ' + nome + '. Rimuovi prima il vecchio.');
-    return;
-  }
+  const dati = { aggiornato_da: getOperatore(), aggiornato_at: new Date().toISOString() };
+  if (cat) dati.categoria = cat;
+  if (chf) dati.budget_chf = chf;
+  if (bu) dati.budget_bu = bu;
+  if (bl) dati.budget_bl = bl;
+  if (nascita) dati.data_nascita = nascita;
+  const esiste = getBudgetReparto().find((b) => b.nome.toLowerCase() === nome.toLowerCase());
+  let riga = null;
+  let rimesso = false;
   try {
-    const r = await secPost('maison_budget', {
-      nome,
-      budget_chf: chf,
-      budget_bu: bu,
-      budget_bl: bl,
-      data_nascita: nascita,
-      categoria: cat,
-      reparto_dip: currentReparto,
-      aggiornato_da: getOperatore(),
-      aggiornato_at: new Date().toISOString(),
-    });
-    maisonBudgetCache.push(r[0]);
-    document.getElementById('maison-budget-nome').value = '';
-    document.getElementById('maison-budget-chf').value = '';
-    document.getElementById('maison-budget-bu').value = '';
-    document.getElementById('maison-budget-bl').value = '';
-    const nbFp = document.getElementById('maison-budget-nascita');
-    if (nbFp && nbFp._flatpickr) nbFp._flatpickr.clear();
-    else if (nbFp) nbFp.value = '';
-    renderMaisonBudgetUI();
-    renderMaisonDashboard();
-    renderMaisonBudgetAlerts();
-    toast('Budget impostato per ' + nome);
+    if (esiste) {
+      // prima: "Gia esistente, rimuovi prima il vecchio" (e si perdevano budget e compleanno)
+      if (
+        !(await chiediConferma(
+          esiste.nome +
+            ' è già nella scheda clienti' +
+            (esiste.categoria ? ' (' + maisonCatLabel(esiste.categoria) + ')' : '') +
+            '.\n\nAggiornarlo con i dati inseriti? I campi lasciati vuoti restano come sono.',
+        ))
+      )
+        return;
+      await secPatch('maison_budget', 'id=eq.' + esiste.id, dati);
+      Object.assign(esiste, dati);
+      riga = esiste;
+      logAzione('Cliente Maison aggiornato', esiste.nome + (cat ? ' · ' + maisonCatLabel(cat) : ''));
+    } else {
+      try {
+        const r = await secPost('maison_budget', Object.assign({ nome, reparto_dip: currentReparto }, dati));
+        riga = r && r[0];
+        if (riga) maisonBudgetCache.push(riga);
+      } catch (e) {
+        if (!/duplicate|unique|23505|esiste gia/i.test((e && e.message) || '')) throw e;
+        riga = await _maisonClienteNomeOccupato(nome);
+        if (!riga) return;
+        await secPatch('maison_budget', 'id=eq.' + riga.id, dati);
+        Object.assign(riga, dati);
+        rimesso = true;
+      }
+      logAzione(
+        rimesso ? 'Cliente Maison rimesso dal Cestino' : 'Cliente Maison aggiunto',
+        nome + (cat ? ' · ' + maisonCatLabel(cat) : ''),
+      );
+    }
   } catch (e) {
-    toast('Errore salvataggio budget');
+    toastErrore('Cliente non salvato: ' + ((e && e.message) || 'errore del database'));
+    return;
   }
+  ['maison-budget-nome', 'maison-budget-chf', 'maison-budget-bu', 'maison-budget-bl', 'maison-budget-cat'].forEach(
+    (id) => {
+      const x = document.getElementById(id);
+      if (x) x.value = '';
+    },
+  );
+  const nbFp = document.getElementById('maison-budget-nascita');
+  if (nbFp && nbFp._flatpickr) nbFp._flatpickr.clear();
+  else if (nbFp) nbFp.value = '';
+  _maisonClientiAggiornaViste();
+  toast(
+    (esiste ? 'Aggiornato ' : rimesso ? 'Rimesso nella scheda ' : 'Aggiunto ') +
+      nome +
+      (riga && riga.categoria ? ' · ' + maisonCatLabel(riga.categoria) : ''),
+  );
 }
+// categoria al volo per un nome che non e nella scheda (Assegna)
 function assegnaCatRapida(nome) {
   const mc = document.getElementById('pwd-modal-content');
   mc.innerHTML =
     '<h3>Assegna categoria</h3><p style="color:var(--muted);margin-bottom:16px">' +
     escP(nome) +
-    '</p><div style="display:flex;flex-direction:column;gap:10px"><button class="btn-salva" style="background:#b8860b" onclick="salvaAssegnaCat(\'' +
-    _jsArg(nome) +
-    '\',\'full_maison\')">Full Maison</button><button class="btn-salva" style="background:#2980b9" onclick="salvaAssegnaCat(\'' +
-    _jsArg(nome) +
-    '\',\'maison\')">Maison</button><button class="btn-salva" style="background:#8e44ad" onclick="salvaAssegnaCat(\'' +
-    _jsArg(nome) +
-    '\',\'direzione\')">Direzione</button><button class="btn-salva" style="background:#c8671a" onclick="salvaAssegnaCat(\'' +
-    _jsArg(nome) +
-    '\',\'bu\')">Buono Unico</button><button class="btn-salva" style="background:#2c6e49" onclick="salvaAssegnaCat(\'' +
-    _jsArg(nome) +
-    "','bl')\">Buono Lounge</button><button class=\"btn-modal-cancel\" onclick=\"document.getElementById('pwd-modal').classList.add('hidden')\">Annulla</button></div>";
+    '</p><div style="display:flex;flex-direction:column;gap:10px">' +
+    maisonCategorie()
+      .map(
+        (c) =>
+          '<button class="btn-salva" style="background:' +
+          c.colore +
+          '" onclick="salvaAssegnaCat(\'' +
+          _jsArg(nome) +
+          "','" +
+          _jsArg(c.key) +
+          '\')">' +
+          escP(c.label + (c.buono ? ' (' + c.buono + ')' : '')) +
+          '</button>',
+      )
+      .join('') +
+    '<button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
 }
 async function salvaAssegnaCat(nome, cat) {
+  const dati = { categoria: cat, aggiornato_da: getOperatore(), aggiornato_at: new Date().toISOString() };
   try {
-    const r = await secPost('maison_budget', {
-      nome,
-      categoria: cat,
-      reparto_dip: currentReparto,
-      aggiornato_da: getOperatore(),
-      aggiornato_at: new Date().toISOString(),
-    });
-    maisonBudgetCache.push(r[0]);
+    const esiste = getBudgetReparto().find((b) => b.nome.toLowerCase() === nome.toLowerCase());
+    if (esiste) {
+      await secPatch('maison_budget', 'id=eq.' + esiste.id, dati);
+      Object.assign(esiste, dati);
+    } else {
+      try {
+        const r = await secPost('maison_budget', Object.assign({ nome, reparto_dip: currentReparto }, dati));
+        if (r && r[0]) maisonBudgetCache.push(r[0]);
+      } catch (e) {
+        if (!/duplicate|unique|23505|esiste gia/i.test((e && e.message) || '')) throw e;
+        const riga = await _maisonClienteNomeOccupato(nome);
+        if (!riga) return;
+        await secPatch('maison_budget', 'id=eq.' + riga.id, dati);
+        Object.assign(riga, dati);
+      }
+    }
     document.getElementById('pwd-modal').classList.add('hidden');
-    renderMaisonBudgetUI();
-    renderMaisonDashboard();
-    logAzione('Categoria maison', nome + ' → ' + cat);
-    toast(
-      nome +
-        ' → ' +
-        (cat === 'full_maison'
-          ? 'Full Maison'
-          : cat === 'maison'
-            ? 'Maison'
-            : cat === 'direzione'
-              ? 'Direzione'
-              : cat === 'bu'
-                ? 'Buono Unico'
-                : cat === 'bl'
-                  ? 'Buono Lounge'
-                  : cat),
-    );
+    _maisonClientiAggiornaViste();
+    logAzione('Categoria maison', nome + ' → ' + maisonCatLabel(cat));
+    toast(nome + ' → ' + maisonCatLabel(cat));
   } catch (e) {
-    toast('Errore assegnazione categoria');
+    toastErrore('Categoria non assegnata: ' + ((e && e.message) || 'errore del database'));
   }
 }
+// MODIFICA CLIENTE: categoria (anche togliere la categoria), budget, massimi, nascita
 function modificaMaisonInfo(id) {
   const b = maisonBudgetCache.find((x) => x.id === id);
   if (!b) return;
   const mc = document.getElementById('pwd-modal-content');
   const nascitaDisplay = b.data_nascita ? new Date(b.data_nascita + 'T12:00:00').toLocaleDateString('it-IT') : '';
   mc.innerHTML =
-    '<h3>Modifica info cliente</h3><div class="pwd-field"><label>Cliente</label><input type="text" value="' +
+    '<h3>Modifica cliente</h3><div class="pwd-field"><label>Cliente</label><input type="text" value="' +
     escP(b.nome) +
-    '" readonly style="background:var(--paper2);color:var(--muted)"></div><div class="pwd-field"><label>Categoria</label><select id="edit-mb-cat" style="width:100%;padding:8px"><option value=""' +
-    (b.categoria === '' || !b.categoria ? ' selected' : '') +
-    '>-</option><option value="maison"' +
-    (b.categoria === 'maison' ? ' selected' : '') +
-    '>Maison</option><option value="full_maison"' +
-    (b.categoria === 'full_maison' ? ' selected' : '') +
-    '>Full Maison</option><option value="direzione"' +
-    (b.categoria === 'direzione' ? ' selected' : '') +
-    '>Direzione</option><option value="bu"' +
-    (b.categoria === 'bu' ? ' selected' : '') +
-    '>Buono Unico</option><option value="bl"' +
-    (b.categoria === 'bl' ? ' selected' : '') +
-    '>Buono Lounge</option></select></div><div style="display:flex;gap:10px"><div class="pwd-field" style="flex:1"><label>Budget CHF/mese</label><input type="number" id="edit-mb-chf" value="' +
+    '" readonly style="background:var(--paper2);color:var(--muted)"></div><div class="pwd-field"><label>Categoria</label><select id="edit-mb-cat" style="width:100%;padding:8px">' +
+    maisonCatOpzioniHtml(b.categoria) +
+    '</select><small style="color:var(--muted)">Con una categoria di buono (BU, BL, CG...) l’inserimento dei costi propone il buono e ne calcola il numero dall importo.</small></div><div style="display:flex;gap:10px"><div class="pwd-field" style="flex:1"><label>Budget CHF/mese</label><input type="number" id="edit-mb-chf" value="' +
     (b.budget_chf || '') +
     '" step="0.01"></div><div class="pwd-field" style="flex:1"><label>Max BU/mese</label><input type="number" id="edit-mb-bu" value="' +
     (b.budget_bu || '') +
@@ -355,13 +484,15 @@ function modificaMaisonInfo(id) {
   }
 }
 async function salvaModificaMaisonInfo(id) {
-  const cat = document.getElementById('edit-mb-cat').value || '';
+  const cat = document.getElementById('edit-mb-cat').value || null;
   const chf = parseFloat(document.getElementById('edit-mb-chf').value) || null;
   const bu = parseInt(document.getElementById('edit-mb-bu').value) || null;
   const bl = parseInt(document.getElementById('edit-mb-bl').value) || null;
   const nascita = _getNascitaValue('edit-mb-nascita') || null;
+  const b = maisonBudgetCache.find((x) => x.id === id);
+  const prima = b ? b.categoria : null;
   try {
-    await secPatch('maison_budget', 'id=eq.' + id, {
+    const dati = {
       categoria: cat,
       budget_chf: chf,
       budget_bu: bu,
@@ -369,46 +500,39 @@ async function salvaModificaMaisonInfo(id) {
       data_nascita: nascita,
       aggiornato_da: getOperatore(),
       aggiornato_at: new Date().toISOString(),
-    });
-    const b = maisonBudgetCache.find((x) => x.id === id);
-    if (b) {
-      b.categoria = cat;
-      b.budget_chf = chf;
-      b.budget_bu = bu;
-      b.budget_bl = bl;
-      b.data_nascita = nascita;
-    }
+    };
+    await secPatch('maison_budget', 'id=eq.' + id, dati);
+    if (b) Object.assign(b, dati);
     document.getElementById('pwd-modal').classList.add('hidden');
-    renderMaisonBudgetUI();
-    renderMaisonDashboard();
-    logAzione('Modifica info maison', 'ID ' + id);
-    toast('Info aggiornate');
+    _maisonClientiAggiornaViste();
+    logAzione(
+      'Modifica cliente maison',
+      (b ? b.nome : 'ID ' + id) +
+        ((prima || null) !== cat
+          ? ' · categoria ' + (maisonCatLabel(prima) || '-') + ' → ' + (maisonCatLabel(cat) || '-')
+          : ''),
+    );
+    toast('Cliente aggiornato');
   } catch (e) {
-    toast('Errore aggiornamento info');
+    toastErrore('Cliente non aggiornato: ' + ((e && e.message) || 'errore del database'));
   }
 }
 function apriListaClientiMaison() {
   const _br = getBudgetReparto();
-  const fullM = _br.filter((b) => b.categoria === 'full_maison').sort((a, b) => a.nome.localeCompare(b.nome));
-  const maison = _br.filter((b) => b.categoria === 'maison').sort((a, b) => a.nome.localeCompare(b.nome));
-  const direz = _br.filter((b) => b.categoria === 'direzione').sort((a, b) => a.nome.localeCompare(b.nome));
-  const buCat = _br.filter((b) => b.categoria === 'bu').sort((a, b) => a.nome.localeCompare(b.nome));
-  const blCat = _br.filter((b) => b.categoria === 'bl').sort((a, b) => a.nome.localeCompare(b.nome));
-  const tot = fullM.length + maison.length + direz.length + buCat.length + blCat.length;
+  const gruppi = maisonCategorie(_br).map((c) => ({
+    c,
+    items: _br.filter((b) => b.categoria === c.key).sort((a, b) => a.nome.localeCompare(b.nome)),
+  }));
+  const tot = gruppi.reduce((s, g) => s + g.items.length, 0);
   let html =
     '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px"><div><h3 style="font-family:Playfair Display,serif;color:var(--ink);margin-bottom:4px">Clienti Categorizzati</h3><p style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">' +
     tot +
-    ' clienti · ' +
-    fullM.length +
-    ' Full Maison · ' +
-    maison.length +
-    ' Maison · ' +
-    direz.length +
-    ' Direzione · ' +
-    buCat.length +
-    ' BU · ' +
-    blCat.length +
-    ' BL</p></div><button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\')" style="padding:6px 12px;font-size:var(--fs-sm,.8125rem)">Chiudi</button></div>';
+    ' clienti' +
+    gruppi
+      .filter((g) => g.items.length)
+      .map((g) => ' · ' + g.items.length + ' ' + escP(g.c.breve))
+      .join('') +
+    '</p></div><button class="btn-modal-cancel" onclick="document.getElementById(\'profilo-modal\').classList.add(\'hidden\')" style="padding:6px 12px;font-size:var(--fs-sm,.8125rem)">Chiudi</button></div>';
   html +=
     '<div style="display:flex;gap:10px;margin-bottom:16px"><button class="btn-export" onclick="esportaListaMaisonCSV()" style="font-size:var(--fs-sm,.8125rem);padding:5px 14px">CSV</button><button class="btn-export btn-export-pdf" onclick="esportaListaMaisonPDF()" style="font-size:var(--fs-sm,.8125rem);padding:5px 14px">PDF</button></div>';
   function renderCatBlock(items, label, color) {
@@ -441,11 +565,7 @@ function apriListaClientiMaison() {
     });
     return h + '</div>';
   }
-  html += renderCatBlock(fullM, 'Full Maison', '#b8860b');
-  html += renderCatBlock(maison, 'Maison', '#2980b9');
-  html += renderCatBlock(direz, 'Direzione', '#8e44ad');
-  html += renderCatBlock(buCat, 'Buono Unico', '#e67e22');
-  html += renderCatBlock(blCat, 'Buono Lounge', '#2c6e49');
+  gruppi.forEach((g) => (html += renderCatBlock(g.items, escP(g.c.label), g.c.colore)));
   if (!tot)
     html +=
       '<p style="color:var(--muted);text-align:center;padding:20px">Nessun cliente categorizzato. Assegna le categorie dalla scheda clienti.</p>';
@@ -509,7 +629,7 @@ async function esportaListaMaisonPDF() {
     doc.text(identita().azienda + ' · ' + _br.length + ' clienti', pw / 2, y, { align: 'center' });
     y += 10;
     doc.setTextColor(0);
-    const catOrder = ['full_maison', 'maison', 'direzione', 'bu', 'bl'];
+    const catOrder = maisonCategorie(_br).map((c) => c.key);
     const sorted = _br
       .filter((b) => b.categoria)
       .sort((a, b) => catOrder.indexOf(a.categoria) - catOrder.indexOf(b.categoria) || a.nome.localeCompare(b.nome));
@@ -528,23 +648,10 @@ async function esportaListaMaisonPDF() {
       headStyles: { fillColor: [26, 18, 8] },
       styles: { lineColor: [220, 215, 205], lineWidth: 0.15, fontSize: 10, cellPadding: 4 },
       didParseCell: function (d) {
-        if (d.section === 'body' && d.column.index === 1) {
-          if (d.cell.raw === 'Full Maison') {
-            d.cell.styles.textColor = [184, 134, 11];
-            d.cell.styles.fontStyle = 'bold';
-          } else if (d.cell.raw === 'Maison') {
-            d.cell.styles.textColor = [41, 128, 185];
-            d.cell.styles.fontStyle = 'bold';
-          } else if (d.cell.raw === 'Direzione') {
-            d.cell.styles.textColor = [142, 68, 173];
-            d.cell.styles.fontStyle = 'bold';
-          } else if (d.cell.raw === 'Buono Unico') {
-            d.cell.styles.textColor = [230, 126, 34];
-            d.cell.styles.fontStyle = 'bold';
-          } else if (d.cell.raw === 'Buono Lounge') {
-            d.cell.styles.textColor = [44, 110, 73];
-            d.cell.styles.fontStyle = 'bold';
-          }
+        // colore della categoria della riga (stesso della scheda clienti)
+        if (d.section === 'body' && d.column.index === 1 && sorted[d.row.index]) {
+          d.cell.styles.textColor = maisonCatRgb(sorted[d.row.index].categoria);
+          d.cell.styles.fontStyle = 'bold';
         }
       },
       alternateRowStyles: { fillColor: [250, 247, 242] },
@@ -564,6 +671,16 @@ async function esportaListaMaisonPDF() {
   } catch (e) {
     toast('Errore PDF');
   }
+}
+// Titolo di colonna (o di gruppo) con il nome di un tipo di buono configurato oltre a BU e BL,
+// gia riconosciuti sopra: "COUPON GOURMET" -> cg; con laSigla anche la sola sigla ("CG")
+function _maisonCatDaTitolo(vUp, laSigla) {
+  const t = (typeof BUONI_TIPI !== 'undefined' ? BUONI_TIPI : []).find(
+    (x) =>
+      !['BU', 'BL'].includes(x.codice) &&
+      ((laSigla && vUp === x.codice) || (x.nome && x.nome.length >= 4 && vUp.includes(x.nome.toUpperCase()))),
+  );
+  return t ? t.codice.toLowerCase() : '';
 }
 // IMPORTA CATEGORIE DA FILE EXCEL (Maison slots)
 async function importaCategorieMaison(input) {
@@ -596,6 +713,7 @@ async function importaCategorieMaison(input) {
           else if (v.includes('BUONI LOUNGE') || v.includes('BUONO LOUNGE') || v === 'BL') catCols[j] = 'bl';
           else if (v.includes('BUONO UNICO') || v.includes('BUONI UNICI') || v === 'BU') catCols[j] = 'bu';
           else if (v.includes('DIREZIONE')) catCols[j] = 'direzione';
+          else if (_maisonCatDaTitolo(v, true)) catCols[j] = _maisonCatDaTitolo(v, true);
         }
       }
       if (!Object.keys(catCols).length) continue;
@@ -640,6 +758,11 @@ async function importaCategorieMaison(input) {
           }
           if (vUp === 'DIREZIONE') {
             activeCat[cc] = 'direzione';
+            continue;
+          }
+          // altri tipi di buono configurati (Coupon Gourmet, Welcome Lounge...) per nome
+          if (_maisonCatDaTitolo(vUp, false)) {
+            activeCat[cc] = _maisonCatDaTitolo(vUp, false);
             continue;
           }
           // CONSUMAZIONI/MANGIA AL BAR = non è una categoria, disattiva
@@ -688,14 +811,12 @@ async function importaCategorieMaison(input) {
       if (!byCat[c]) byCat[c] = [];
       byCat[c].push(n.trim());
     });
-    const catLabels = {
-      full_maison: 'Full Maison',
-      maison: 'Maison',
-      bl: 'Buono Lounge',
-      bu: 'Buono Unico',
-      direzione: 'Direzione',
-    };
-    const catColors = { full_maison: '#b8860b', maison: '#2980b9', bl: '#2c6e49', bu: '#e67e22', direzione: '#8e44ad' };
+    const catLabels = {};
+    const catColors = {};
+    Object.keys(byCat).forEach((k) => {
+      catLabels[k] = maisonCatLabel(k);
+      catColors[k] = maisonCatColore(k);
+    });
     const esist = nomi.filter((n) =>
       maisonBudgetCache.find(
         (b) => b.nome.toLowerCase() === n.toLowerCase() && (b.reparto_dip || 'slots') === currentReparto,
@@ -768,8 +889,13 @@ async function importaCategorieMaison(input) {
       const status = document.getElementById('import-cat-status');
       // Refresh cache dal server per evitare duplicati
       status.textContent = 'Caricamento dati...';
+      // clienti tolti (nel Cestino): un nome del file che e fra questi torna nella scheda
+      // con la categoria del file (prima l inserimento falliva: il nome e unico)
+      let _tolti = [];
       try {
-        maisonBudgetCache = await secGet('maison_budget?order=nome.asc');
+        const _tutti = (await secGet('maison_budget?order=nome.asc')) || [];
+        maisonBudgetCache = _tutti.filter((b) => !b.eliminato);
+        _tolti = _tutti.filter((b) => b.eliminato);
       } catch (e) {}
       let nuovi = 0,
         aggiornati = 0,
@@ -780,7 +906,29 @@ async function importaCategorieMaison(input) {
         const existing = maisonBudgetCache.find(
           (b) => b.nome.toLowerCase() === nome.toLowerCase() && (b.reparto_dip || 'slots') === currentReparto,
         );
-        if (existing) {
+        const tolto =
+          !existing &&
+          _tolti.find(
+            (b) => b.nome.toLowerCase() === nome.toLowerCase() && (b.reparto_dip || 'slots') === currentReparto,
+          );
+        if (tolto) {
+          try {
+            const dati = {
+              categoria: cat,
+              eliminato: false,
+              eliminato_da: null,
+              eliminato_at: null,
+              aggiornato_da: getOperatore(),
+              aggiornato_at: new Date().toISOString(),
+            };
+            await secPatch('maison_budget', 'id=eq.' + tolto.id, dati);
+            Object.assign(tolto, dati);
+            maisonBudgetCache.push(tolto);
+            aggiornati++;
+          } catch (e) {
+            errori++;
+          }
+        } else if (existing) {
           if (existing.categoria !== cat) {
             try {
               await secPatch('maison_budget', 'id=eq.' + existing.id, {

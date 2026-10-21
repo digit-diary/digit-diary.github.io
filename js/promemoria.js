@@ -878,6 +878,8 @@ function buoniRiempiSelect() {
     sel.innerHTML = prime + buoniOpzioniHtml(val, sel.dataset.formato || 'codice');
     sel.value = val;
   });
+  // le categorie dei clienti Maison seguono i tipi di buono del settore (maison-budget.js)
+  if (typeof maisonCatRiempiSelect === 'function') maisonCatRiempiSelect();
 }
 buoniRiempiSelect();
 // Ripartisce il costo di una riga Maison fra piu' nomi. Regola unica per import Excel,
@@ -1197,20 +1199,8 @@ async function caricaMaisonFile(input, forzaSostituisci) {
       });
       if (Object.keys(_ambigui).length > 0) {
         // Mostra modal disambiguazione
-        const _catLabelsD = {
-          full_maison: 'Full Maison',
-          maison: 'Maison',
-          direzione: 'Direzione',
-          bu: 'Buono Unico',
-          bl: 'Buono Lounge',
-        };
-        const _catColorsD = {
-          full_maison: '#b8860b',
-          maison: '#2980b9',
-          direzione: '#8e44ad',
-          bu: '#e67e22',
-          bl: '#2c6e49',
-        };
+        const _catLabelsD = maisonCatMappa('label');
+        const _catColorsD = maisonCatMappa('colore');
         let mHtml = '<h3>Nomi ambigui trovati</h3><div style="max-height:60vh;overflow-y:auto;text-align:left">';
         Object.entries(_ambigui).forEach(([cog, info]) => {
           mHtml += '<div style="margin-bottom:16px;padding:10px;background:var(--paper2);border-radius:4px">';

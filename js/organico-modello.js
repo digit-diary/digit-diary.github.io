@@ -99,6 +99,19 @@
     if (persona.fine && d > persona.fine) return false;
     return true;
   }
+  // in servizio almeno un giorno fra da e a (compresi)?
+  function inServizioTra(persona, da, a) {
+    if (persona.assunzione && a && persona.assunzione > a) return false;
+    if (persona.fine && da && persona.fine < da) return false;
+    return true;
+  }
+  // SOLO CHI C E (v461, titolare 21/10/2026): le persone in servizio in almeno un giorno del
+  // periodo (assunzione e fine del rapporto); per i mesi: offertaMese conta i giorni uno a uno
+  function personeInServizio(persone, da, a) {
+    return (persone || []).filter((x) => inServizioTra(x, da, a));
+  }
+  // ausiliari (non ipotetici) che lavorano in quel mese dell analisi
+  const ausiliariDelMese = (x) => x.offerta.persone.filter((p) => p.jolly && !p.ipotetica).length;
 
   // TASSI STORICI dai giorni gia passati: malattia e altri impegni, per mese
   // dell anno, avvicinati alla media annua quando i giorni sono pochi.
@@ -107,13 +120,17 @@
     const mal = new Set(P.codiciMalattia);
     const imp = new Set(P.codiciImpegni);
     const cnp = new Set(P.codiciCongedoNp);
-    const inOrganico = new Set(persone.map((x) => x.nome));
+    // solo i giorni in cui la persona era in servizio (prima dell assunzione o dopo la fine
+    // le celle rimaste nel piano non sono assenze di nessuno)
+    const perNome = {};
+    persone.forEach((x) => (perNome[x.nome] = x));
     const perMese = {}; // MM -> {giorni, malattia, impegni}
     let tot = { giorni: 0, malattia: 0, impegni: 0 };
     (righe || []).forEach((r) => {
       const d = String(r.data).substring(0, 10);
       if (P.oggi && d > P.oggi) return; // solo il consuntivo
-      if (!inOrganico.has(r.collaboratore)) return;
+      const chi = perNome[r.collaboratore];
+      if (!chi || !inServizio(chi, d)) return;
       const cod = String(r.codice || '').toUpperCase();
       if (cnp.has(cod)) return; // congedo non pagato: non e servizio
       const mm = d.substring(5, 7);
@@ -584,13 +601,15 @@
         });
       }
     }
-    // B) PIU DISPONIBILITA DEGLI AUSILIARI ATTUALI nei mesi sotto
-    const jolly = (dati.persone || []).filter((x) => x.jolly).length;
-    if (sottoOre.length && jolly) {
+    // B) PIU DISPONIBILITA DEGLI AUSILIARI ATTUALI nei mesi sotto: solo quelli in servizio in
+    //    quel mese (chi e uscito o entra dopo non da ore in piu)
+    const conAus = sottoOre.filter((x) => ausiliariDelMese(x) > 0);
+    const jolly = conAus.reduce((t, x) => Math.max(t, ausiliariDelMese(x)), 0);
+    if (conAus.length) {
       const perMese = {};
       let massimo = 0;
-      sottoOre.forEach((x) => {
-        const pct = Math.min(1, Math.ceil((P.jollyPct + -x.differenzaFte / jolly) * 20) / 20);
+      conAus.forEach((x) => {
+        const pct = Math.min(1, Math.ceil((P.jollyPct + -x.differenzaFte / ausiliariDelMese(x)) * 20) / 20);
         perMese[x.mese] = pct;
         massimo = Math.max(massimo, pct);
       });
@@ -623,11 +642,14 @@
       if (dopo.length) {
         const sc = { vacanzeSposta: vacG.scenario.vacanzeSposta };
         let come;
-        if (jolly) {
+        if (dopo.every((x) => ausiliariDelMese(x) > 0)) {
           sc.jollyPctMesi = {};
           dopo.forEach(
             (x) =>
-              (sc.jollyPctMesi[x.mese] = Math.min(1, Math.ceil((P.jollyPct + -x.differenzaFte / jolly) * 20) / 20)),
+              (sc.jollyPctMesi[x.mese] = Math.min(
+                1,
+                Math.ceil((P.jollyPct + -x.differenzaFte / ausiliariDelMese(x)) * 20) / 20,
+              )),
           );
           come = 'più disponibilità degli ausiliari attuali ' + neiMesi(dopo.map((x) => x.mese));
         } else {
@@ -741,7 +763,8 @@
       null,
       futuri.map((x) => x.riservaMalattia),
     );
-    const jollyOggi = (dati.persone || []).filter((x) => x.jolly).length;
+    // ausiliari in servizio nel mese in corso (il primo dei mesi rimasti)
+    const jollyOggi = ausiliariDelMese(futuri[0]);
     if (riserva > 0)
       out.push({
         tipo: 'riserva',
@@ -931,5 +954,7 @@
     elencoMesi: elencoMesi,
     gruppi: gruppi,
     costoScenario: costoScenario,
+    inServizio: inServizio,
+    personeInServizio: personeInServizio,
   };
 });

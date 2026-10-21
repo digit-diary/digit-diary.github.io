@@ -17,7 +17,9 @@
  */
 
 let _cestinoModuli = [],
-  _cestinoReg = [];
+  _cestinoReg = [],
+  _cestinoClienti = [],
+  _cestinoClientiErrore = '';
 // CHI USA IL CESTINO (decisione del titolare 11/10: "uno deve poter cestinare quello che
 // vuole cestinare"): chi puo cestinare puo anche ripristinare. Registrazioni del Diario:
 // tutti (il database mostra le righe del proprio settore); moduli: chi scrive i moduli.
@@ -25,13 +27,21 @@ let _cestinoModuli = [],
 function _cestinoVedeModuli() {
   return isAdmin() || (typeof _puoScrivereModuli === 'function' && _puoScrivereModuli());
 }
-// filtro "Tipo": la voce Moduli solo a chi li vede
+// CLIENTI MAISON TOLTI (21/10/2026): li vede e li rimette chi ha la pagina Maison nel
+// settore aperto (gli stessi permessi della scheda clienti)
+function _cestinoVedeClienti() {
+  return typeof isVis === 'function' && isVis('maison');
+}
+// filtro "Tipo": le voci Moduli e Clienti Maison solo a chi li vede
 function cestinoPreparaFiltri() {
   const sel = document.getElementById('cestino-filt-tipo');
   if (!sel) return;
   const opMod = sel.querySelector('option[value="moduli"]');
   if (opMod) opMod.hidden = !_cestinoVedeModuli();
   if (sel.value === 'moduli' && !_cestinoVedeModuli()) sel.value = '';
+  const opCli = sel.querySelector('option[value="clienti_maison"]');
+  if (opCli) opCli.hidden = !_cestinoVedeClienti();
+  if (sel.value === 'clienti_maison' && !_cestinoVedeClienti()) sel.value = '';
 }
 async function caricaCestino() {
   const el = document.getElementById('cestino-content');
@@ -47,6 +57,20 @@ async function caricaCestino() {
     );
     _cestinoModuli = modDel || [];
     _cestinoReg = regDel || [];
+    // clienti Maison tolti: se la lettura non riesce il resto del Cestino si vede lo stesso,
+    // con l avviso (es. database non ancora aggiornato: colonna eliminato mancante)
+    _cestinoClienti = [];
+    _cestinoClientiErrore = '';
+    if (_cestinoVedeClienti()) {
+      try {
+        _cestinoClienti =
+          (await secGet(
+            'maison_budget?eliminato=eq.true&reparto_dip=eq.' + currentReparto + '&order=eliminato_at.desc',
+          )) || [];
+      } catch (e) {
+        _cestinoClientiErrore = (e && e.message) || 'errore del database';
+      }
+    }
     renderCestino();
   } catch (e) {
     el.innerHTML = '<p style="color:var(--accent)">Errore caricamento cestino</p>';
@@ -66,22 +90,34 @@ function renderCestino() {
     fcl = fc.toLowerCase();
   let filtReg = _cestinoReg;
   let filtMod = _cestinoModuli;
-  if (ft === 'registrazioni') filtMod = [];
-  if (ft === 'moduli') filtReg = [];
+  let filtCli = _cestinoVedeClienti() ? _cestinoClienti : [];
+  if (ft && ft !== 'registrazioni') filtReg = [];
+  if (ft && ft !== 'moduli') filtMod = [];
+  if (ft && ft !== 'clienti_maison') filtCli = [];
   if (fn) {
     filtReg = filtReg.filter(
       (r) => (r.nome || '').toLowerCase().includes(fnl) || (r.testo || '').toLowerCase().includes(fnl),
     );
     filtMod = filtMod.filter((m) => (m.collaboratore || '').toLowerCase().includes(fnl));
+    filtCli = filtCli.filter((c) => (c.nome || '').toLowerCase().includes(fnl));
   }
   if (fc) {
     filtReg = filtReg.filter((r) => (r.eliminato_da || '').toLowerCase().includes(fcl));
     filtMod = filtMod.filter((m) => (m.eliminato_da || '').toLowerCase().includes(fcl));
+    filtCli = filtCli.filter((c) => (c.eliminato_da || '').toLowerCase().includes(fcl));
   }
-  if (!filtMod.length && !filtReg.length) {
+  const avvisoCli = _cestinoClientiErrore
+    ? '<p style="color:var(--accent);font-size:var(--fs-sm,.8125rem)">Clienti Maison tolti non letti: ' +
+      escP(_cestinoClientiErrore) +
+      '</p>'
+    : '';
+  if (!filtMod.length && !filtReg.length && !filtCli.length) {
     el.innerHTML =
+      avvisoCli +
       '<p style="color:var(--c-verde,#2c6e49);font-weight:600">' +
-      (_cestinoModuli.length || _cestinoReg.length ? 'Nessun risultato con i filtri applicati' : 'Cestino vuoto') +
+      (_cestinoModuli.length || _cestinoReg.length || _cestinoClienti.length
+        ? 'Nessun risultato con i filtri applicati'
+        : 'Cestino vuoto') +
       '</p>';
     return;
   }
@@ -95,7 +131,7 @@ function renderCestino() {
         id +
         ')">Elimina</button>'
       : '';
-  let html = '';
+  let html = avvisoCli;
   if (filtReg.length) {
     html += '<h5 style="margin:12px 0 8px;color:var(--ink)">Registrazioni (' + filtReg.length + ')</h5>';
     html += '<div style="max-height:300px;overflow-y:auto">';
@@ -151,6 +187,32 @@ function renderCestino() {
     });
     html += '</div>';
   }
+  if (filtCli.length) {
+    html += '<h5 style="margin:12px 0 8px;color:var(--ink)">Clienti Maison (' + filtCli.length + ')</h5>';
+    html += '<div style="max-height:300px;overflow-y:auto">';
+    filtCli.forEach((c) => {
+      const delAt = c.eliminato_at
+        ? new Date(c.eliminato_at).toLocaleDateString('it-IT') +
+          ' ' +
+          new Date(c.eliminato_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+        : '';
+      const cat = typeof maisonCatLabel === 'function' ? maisonCatLabel(c.categoria) : c.categoria || '';
+      html +=
+        '<div style="padding:8px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:var(--fs-md,.875rem)"><div style="flex:1"><strong>' +
+        escP(c.nome || '') +
+        '</strong>' +
+        (cat ? ' · <span style="color:var(--muted)">' + escP(cat) + '</span>' : '') +
+        (c.budget_chf ? ' · ' + fmtCHF(c.budget_chf) + ' CHF/mese' : '') +
+        '<div style="font-size:var(--fs-sm,.8125rem);color:var(--accent)">' +
+        _cestinoChiQuando(c.eliminato_da, delAt) +
+        '</div></div><button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px" onclick="ripristinaCestino(\'maison_budget\',' +
+        c.id +
+        ')">Ripristina</button>' +
+        btnElimina('maison_budget', c.id) +
+        '</div>';
+    });
+    html += '</div>';
+  }
   html += adm
     ? '<div style="margin-top:16px;display:flex;gap:8px"><button class="btn-salva" style="background:var(--accent);font-size:var(--fs-sm,.8125rem);padding:8px 16px" onclick="svuotaCestino()">Svuota cestino</button></div>'
     : '<p style="margin-top:12px;font-size:var(--fs-sm,.8125rem);color:var(--muted)">L’eliminazione definitiva è riservata all’amministratore.</p>';
@@ -175,13 +237,30 @@ function ripristinaCestino(tabella, id) {
   return unaVoltaSola('cestino-ripristina|' + tabella + '|' + id, () => _ripristinaCestinoEsegui(tabella, id));
 }
 async function _ripristinaCestinoEsegui(tabella, id) {
-  if (tabella === 'moduli' && !_cestinoVedeModuli()) {
+  if ((tabella === 'moduli' && !_cestinoVedeModuli()) || (tabella === 'maison_budget' && !_cestinoVedeClienti())) {
     toast('Non hai il permesso');
     return;
   }
   if (!(await chiediConferma('Ripristinare questo elemento?'))) return;
   try {
     await secPatch(tabella, 'id=eq.' + id, { eliminato: false, eliminato_da: null, eliminato_at: null });
+    if (tabella === 'maison_budget') {
+      // il cliente torna nella scheda clienti e nell elenco dei nomi della Maison
+      const c = _cestinoClienti.find((x) => x.id === id);
+      if (c) {
+        c.eliminato = false;
+        c.eliminato_da = null;
+        c.eliminato_at = null;
+        if (!maisonBudgetCache.some((x) => x.id === id)) maisonBudgetCache.push(c);
+        _cestinoClienti = _cestinoClienti.filter((x) => x.id !== id);
+      }
+      logAzione('Cliente Maison ripristinato', (c && c.nome) || 'ID ' + id);
+      renderCestino();
+      if (typeof renderMaisonBudgetUI === 'function') renderMaisonBudgetUI();
+      if (typeof renderMaisonDashboard === 'function') renderMaisonDashboard();
+      toast('Ripristinato');
+      return;
+    }
     if (tabella === 'moduli') {
       const m = _cestinoModuli.find((x) => x.id === id);
       if (m) {
@@ -227,7 +306,12 @@ async function eliminaDefinitivo(tabella, id) {
   // CONSERVAZIONE (regolamento aziendale / RAP): un record dell'archivio degli
   // ultimi N anni non si cancella. Restano eliminabili le voci inserite da poco
   // (correzioni di battitura), che archivio non sono.
-  const rec = tabella === 'moduli' ? _cestinoModuli.find((x) => x.id === id) : _cestinoReg.find((x) => x.id === id);
+  const rec =
+    tabella === 'moduli'
+      ? _cestinoModuli.find((x) => x.id === id)
+      : tabella === 'maison_budget'
+        ? null // scheda di un cliente, non archivio: nessun vincolo di conservazione
+        : _cestinoReg.find((x) => x.id === id);
   const dataRec = rec ? rec.data || rec.data_modulo || rec.created_at : null;
   if (typeof inArchivioProtetto === 'function' && dataRec && inArchivioProtetto(dataRec)) {
     await mostraAvviso(
@@ -241,6 +325,7 @@ async function eliminaDefinitivo(tabella, id) {
   try {
     await secDel(tabella, 'id=eq.' + id);
     if (tabella === 'moduli') _cestinoModuli = _cestinoModuli.filter((x) => x.id !== id);
+    else if (tabella === 'maison_budget') _cestinoClienti = _cestinoClienti.filter((x) => x.id !== id);
     else _cestinoReg = _cestinoReg.filter((x) => x.id !== id);
     logAzione('Eliminato definitivamente', tabella + ' ID ' + id);
     renderCestino();
@@ -254,7 +339,7 @@ async function svuotaCestino() {
     toast("Riservato all'amministratore");
     return;
   }
-  const tot = _cestinoModuli.length + _cestinoReg.length;
+  const tot = _cestinoModuli.length + _cestinoReg.length + _cestinoClienti.length;
   if (!tot) {
     toast('Cestino già vuoto');
     return;
@@ -265,8 +350,10 @@ async function svuotaCestino() {
     typeof inArchivioProtetto === 'function' && inArchivioProtetto(r.data || r.data_modulo || r.created_at);
   const modOk = _cestinoModuli.filter((m) => !protetto(m));
   const regOk = _cestinoReg.filter((r) => !protetto(r));
-  const nProt = tot - modOk.length - regOk.length;
-  if (!modOk.length && !regOk.length) {
+  // clienti Maison tolti: schede, non archivio (nessuna conservazione)
+  const cliOk = _cestinoClienti.slice();
+  const nProt = tot - modOk.length - regOk.length - cliOk.length;
+  if (!modOk.length && !regOk.length && !cliOk.length) {
     await mostraAvviso(
       'Niente da svuotare.\n\nTutte le ' +
         tot +
@@ -279,11 +366,11 @@ async function svuotaCestino() {
   if (
     !(await chiediConferma(
       'Svuotare il cestino? ' +
-        (modOk.length + regOk.length) +
+        (modOk.length + regOk.length + cliOk.length) +
         ' element' +
-        (modOk.length + regOk.length === 1 ? 'o verrà' : 'i verranno') +
+        (modOk.length + regOk.length + cliOk.length === 1 ? 'o verrà' : 'i verranno') +
         ' eliminat' +
-        (modOk.length + regOk.length === 1 ? 'o' : 'i') +
+        (modOk.length + regOk.length + cliOk.length === 1 ? 'o' : 'i') +
         ' DEFINITIVAMENTE.' +
         (nProt
           ? '\n\n' +
@@ -302,10 +389,18 @@ async function svuotaCestino() {
     for (const r of regOk) {
       await secDel('registrazioni', 'id=eq.' + r.id);
     }
+    for (const c of cliOk) {
+      await secDel('maison_budget', 'id=eq.' + c.id);
+    }
     logAzione(
       'Cestino svuotato',
-      modOk.length + regOk.length + ' elementi eliminati definitivamente' + (nProt ? ', ' + nProt + ' protetti' : ''),
+      modOk.length +
+        regOk.length +
+        cliOk.length +
+        ' elementi eliminati definitivamente' +
+        (nProt ? ', ' + nProt + ' protetti' : ''),
     );
+    _cestinoClienti = [];
     const idsM = new Set(modOk.map((m) => m.id));
     const idsR = new Set(regOk.map((r) => r.id));
     _cestinoModuli = _cestinoModuli.filter((m) => !idsM.has(m.id));

@@ -548,11 +548,15 @@ async function pianoCtxAzione(azione) {
       if (nomi.length) pianoNascondiRighe(nomi);
       else toast('La selezione non è sulla griglia dei collaboratori');
     } else {
-      let g1 = parseInt(b.t1.dataset.g);
-      let g2 = parseInt(b.t2.dataset.g);
-      if (g1 > g2) [g1, g2] = [g2, g1];
-      const gg = [];
-      for (let g = g1; g <= g2; g++) gg.push(g);
+      // colonne non vicine (Cmd/Ctrl+clic sulle intestazioni): solo quei giorni
+      let gg = typeof _pianoGiorniSelezionati === 'function' ? _pianoGiorniSelezionati() : null;
+      if (!gg) {
+        let g1 = parseInt(b.t1.dataset.g);
+        let g2 = parseInt(b.t2.dataset.g);
+        if (g1 > g2) [g1, g2] = [g2, g1];
+        gg = [];
+        for (let g = g1; g <= g2; g++) gg.push(g);
+      }
       pianoNascondiGiorni(gg);
     }
   } else if (azione === 'stampa') stampaPianoCollaboratore(sel.nome);

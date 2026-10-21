@@ -1147,6 +1147,11 @@ async function _pianoIncollaSuSelezione(tab, testo) {
   if (!celle.length) return;
   const grid = _pianoParseTsv(testo).filter((r) => r.some((x) => x !== ''));
   const singolo = grid.length === 1 && grid[0].length === 1;
+  // colonne non vicine: un valore solo va su tutte le celle; un blocco no (come Excel)
+  if (!singolo && window._pianoBlocco && Array.isArray(window._pianoBlocco.giorni)) {
+    toast('Sulle colonne non vicine si incolla un valore solo (va su tutte le celle selezionate)');
+    return;
+  }
   const tutte = celle.flat();
   const primo = celle[0][0];
   const g0 = String(primo.dataset.g).padStart(2, '0');
@@ -1604,6 +1609,11 @@ function _pianoCellaDi(nome, g) {
   return tr ? tr.querySelector('td.piano-cella[data-g="' + g + '"]') : null;
 }
 function _pianoRipristinaCellaAttiva() {
+  // c era una selezione di colonne: torna quella (dopo Canc, colore, incolla... come Excel)
+  if (window._pianoColonneSel) {
+    _pianoRipristinaColonne();
+    return;
+  }
   const a = window._pianoCellaAttiva;
   if (!a || _pianoTab !== 'calendario' || a.ym !== _pianoMeseSel || a.rep !== _pianoReparto()) return;
   const el = _pianoCellaDi(a.nome, a.g);
@@ -1649,6 +1659,11 @@ function _pianoTastiCalendario(e) {
       ? window._pianoCellaAttivaEl
       : b.t1;
   const mosse = { ArrowRight: [1, 0], ArrowLeft: [-1, 0], ArrowDown: [0, 1], ArrowUp: [0, -1] };
+  if (mosse[e.key] && e.shiftKey && b.colonne) {
+    e.preventDefault();
+    _pianoAllargaColonne(b, mosse[e.key][0]);
+    return true;
+  }
   if (mosse[e.key]) {
     e.preventDefault();
     const base = e.shiftKey ? b.t2 || attiva : attiva;
@@ -1759,6 +1774,11 @@ function _fabbTasti(e) {
   const attiva =
     window._fabbCellaAttivaEl && document.body.contains(window._fabbCellaAttivaEl) ? window._fabbCellaAttivaEl : b.t1;
   const mosse = { ArrowRight: [1, 0], ArrowLeft: [-1, 0], ArrowDown: [0, 1], ArrowUp: [0, -1] };
+  if (mosse[e.key] && e.shiftKey && b.colonne) {
+    e.preventDefault();
+    _pianoAllargaColonne(b, mosse[e.key][0]);
+    return true;
+  }
   if (mosse[e.key]) {
     e.preventDefault();
     const base = e.shiftKey ? b.t2 || attiva : attiva;
@@ -1852,16 +1872,285 @@ function _pianoBloccoCelle() {
   let g1 = parseInt(b.t1.dataset.g);
   let g2 = parseInt(b.t2.dataset.g);
   if (g1 > g2) [g1, g2] = [g2, g1];
+  // colonne non vicine (Cmd/Ctrl+clic sulle intestazioni dei giorni): solo quei giorni
+  const soloGiorni = Array.isArray(b.giorni) ? new Set(b.giorni) : null;
   const out = [];
   for (let ri = r1; ri <= r2; ri++) {
+    // righe e giorni nascosti (o filtrati da Trova) non si toccano: come in Excel con il filtro
+    if (righe[ri].style.display === 'none') continue;
     const riga = [];
     for (let g = g1; g <= g2; g++) {
+      if (soloGiorni && !soloGiorni.has(g)) continue;
       const cel = righe[ri].querySelector('td[data-g="' + g + '"]');
-      if (cel) riga.push(cel);
+      if (cel && !cel.classList.contains('col-nascosta')) riga.push(cel);
     }
     if (riga.length) out.push(riga);
   }
   return out;
+}
+// ===== SELEZIONE DI COLONNE INTERE (giorni), come Excel (richiesta del titolare 21/10/2026) =====
+// Clic sull intestazione del giorno = tutta la colonna; trascinando sulle intestazioni (o
+// scendendo nella griglia mentre si trascina) o con Maiusc+clic = piu colonne vicine;
+// Cmd/Ctrl+clic = aggiunge o toglie una colonna anche non vicina, se la selezione attuale e
+// gia di colonne (altrimenti ne comincia una nuova). Maiusc+frecce destra/sinistra allargano.
+// La selezione e un BLOCCO come quello delle celle (window._pianoBlocco con l elenco dei
+// giorni): copia, incolla, Canc, colore, formato e sigla scritta passano dalle stesse
+// funzioni della selezione di celle, quindi dalle stesse protezioni (giorni chiusi con
+// sblocco e motivo, celle bloccate e protette contate nella conferma, regole del turno).
+// Le colonne sono collegate su tutte le tabelle del calendario (griglia, fabbisogno...).
+function _pianoEvidenziaGiorni(gg) {
+  document
+    .querySelectorAll('#piano-content .col-selected, #piano-content .col-selected-header')
+    .forEach((el) => el.classList.remove('col-selected', 'col-selected-header'));
+  document.querySelectorAll('#piano-content table[data-seltab]').forEach((t) =>
+    gg.forEach((g) => {
+      const th = t.querySelector('thead th[data-g="' + g + '"]');
+      if (th) th.classList.add('col-selected-header');
+      t.querySelectorAll('tbody td[data-g="' + g + '"]').forEach((c) => c.classList.add('col-selected'));
+    }),
+  );
+}
+function _pianoSelezionaGiorni(tabEl, giorni, ancora) {
+  if (!tabEl || !tabEl.dataset.seltab) return false;
+  const gg = [...new Set((giorni || []).map((g) => parseInt(g)).filter((g) => g > 0))].sort((a, b) => a - b);
+  _pianoBloccoPulisci();
+  _pianoPulisciSelezioneRighe();
+  if (!gg.length) return false;
+  const rows = [...tabEl.querySelectorAll('tbody tr')].filter((r) => r.querySelector('td[data-g]'));
+  const cella = (g, dalFondo) => {
+    const lista = dalFondo ? rows.slice().reverse() : rows;
+    for (const tr of lista) {
+      const c = tr.querySelector('td[data-g="' + g + '"]');
+      if (c) return c;
+    }
+    return null;
+  };
+  const t1 = cella(gg[0], false);
+  const t2 = cella(gg[gg.length - 1], true);
+  if (!t1 || !t2) return false;
+  const vicini = gg[gg.length - 1] - gg[0] + 1 === gg.length;
+  const tab = tabEl.dataset.seltab;
+  window._pianoBlocco = {
+    tab: tab,
+    t1: t1,
+    t2: t2,
+    completo: true,
+    colonne: true,
+    giorni: vicini ? null : gg,
+    ancora: parseInt(ancora) || gg[0],
+  };
+  // si ricorda per mese e settore: dopo un operazione (ridisegno) la selezione resta
+  window._pianoColonneSel = {
+    tab: tab,
+    giorni: gg,
+    ancora: parseInt(ancora) || gg[0],
+    ym: _pianoMeseSel,
+    rep: _pianoReparto(),
+  };
+  // cella attiva = la prima in alto della colonna (come Excel): Invio/una sigla partono da li
+  window._pianoCellaAttiva = null;
+  window._fabbCellaAttiva = null;
+  if (tab === 'piano') window._pianoCellaAttivaEl = t1;
+  if (tab === 'fabb') window._fabbCellaAttivaEl = t1;
+  _pianoEvidenziaGiorni(gg);
+  setTimeout(_pianoStatSelezione, 30);
+  return true;
+}
+// Maiusc + destra/sinistra su una selezione di colonne: allarga o stringe dall ancora
+// (su e giu non cambiano niente: le colonne sono gia intere)
+function _pianoAllargaColonne(b, dx) {
+  if (!dx) return;
+  const tabEl = b.t1.closest('table');
+  const gg = _pianoGiorniSelezionati(tabEl) || [];
+  if (!gg.length) return;
+  const ancora = b.ancora || gg[0];
+  // l estremo che si muove e quello lontano dall ancora
+  let fine = ancora === gg[0] ? gg[gg.length - 1] : gg[0];
+  const visibile = (g) => {
+    const th = tabEl.querySelector('thead th[data-g="' + g + '"]');
+    return th && !th.classList.contains('col-nascosta');
+  };
+  let g = fine + dx;
+  while (tabEl.querySelector('thead th[data-g="' + g + '"]') && !visibile(g)) g += dx;
+  if (!visibile(g)) return;
+  fine = g;
+  const out = [];
+  for (let x = Math.min(ancora, fine); x <= Math.max(ancora, fine); x++) out.push(x);
+  _pianoSelezionaGiorni(tabEl, out, ancora);
+  const th = tabEl.querySelector('thead th[data-g="' + fine + '"]');
+  if (th) th.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+// TRASCINAMENTO SULLE INTESTAZIONI DEI GIORNI (mouse): premi su un giorno e trascina
+// verso destra o sinistra (anche scendendo nella griglia); verso il bordo la griglia
+// scorre da sola. Con Cmd/Ctrl l intervallo trascinato si aggiunge alle colonne gia scelte.
+function _pianoColDragBind() {
+  if (window._pianoColDragBound) return;
+  window._pianoColDragBound = true;
+  let cd = null; // { table, base, ancora, ultimo, mosso, togliUnica, cx, cy }
+  let timer = null;
+  const intervallo = (a, b) => {
+    const out = [];
+    for (let g = Math.min(a, b); g <= Math.max(a, b); g++) out.push(g);
+    return out;
+  };
+  const applica = (g) => {
+    if (!cd || !g || g === cd.ultimo) return;
+    cd.ultimo = g;
+    _pianoSelezionaGiorni(cd.table, cd.base.concat(intervallo(cd.ancora, g)), cd.ancora);
+  };
+  const giornoSotto = (x, y) => {
+    const sotto = document.elementFromPoint(x, y);
+    const c = sotto && sotto.closest ? sotto.closest('th[data-g], td[data-g]') : null;
+    return c && cd && c.closest('table') === cd.table ? parseInt(c.dataset.g) || 0 : 0;
+  };
+  const fermaTimer = () => {
+    if (timer) clearInterval(timer);
+    timer = null;
+  };
+  document.addEventListener('mousedown', (e) => {
+    if (e.button !== 0 || !e.target.closest) return;
+    const th = e.target.closest('#piano-content table[data-seltab] thead th[data-g]');
+    if (!th || e.target.closest('input,button,a,select,.chip-giorni-nascosti')) return;
+    const table = th.closest('table');
+    const g = parseInt(th.dataset.g);
+    if (!g) return;
+    e.preventDefault(); // niente selezione del testo delle intestazioni
+    const att = document.activeElement;
+    if (att && att.tagName === 'INPUT' && att.closest('#piano-content')) att.blur(); // chiude una modifica in corso
+    nascondiPianoCtx();
+    const giaSel = _pianoGiorniSelezionati(table);
+    const b = window._pianoBlocco;
+    if (e.shiftKey) {
+      // Maiusc+clic: dall ancora (colonna di partenza o colonna della cella attiva) fino a qui
+      const ancora =
+        giaSel && b.ancora
+          ? b.ancora
+          : b && b.t1 && b.t1.closest('table') === table && parseInt(b.t1.dataset.g)
+            ? parseInt(b.t1.dataset.g)
+            : g;
+      cd = { table, base: [], ancora, ultimo: null, mosso: true };
+      applica(g);
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && giaSel) {
+      // Cmd/Ctrl+clic su una colonna gia scelta la toglie; su un altra la aggiunge
+      if (giaSel.includes(g)) {
+        const resto = giaSel.filter((x) => x !== g);
+        if (resto.length) _pianoSelezionaGiorni(table, resto, resto[0]);
+        else _pianoBloccoPulisci();
+        cd = null;
+        return;
+      }
+      cd = { table, base: giaSel, ancora: g, ultimo: null, mosso: false };
+      applica(g);
+      return;
+    }
+    // clic semplice (o Cmd/Ctrl con una selezione di celle o righe: non si mescolano)
+    const unica = !!(giaSel && giaSel.length === 1 && giaSel[0] === g && !(e.ctrlKey || e.metaKey));
+    cd = { table, base: [], ancora: g, ultimo: null, mosso: false, togliUnica: unica };
+    applica(g);
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (!cd) return;
+    cd.cx = e.clientX;
+    cd.cy = e.clientY;
+    const g = giornoSotto(e.clientX, e.clientY);
+    if (g && g !== cd.ultimo) {
+      cd.mosso = true;
+      cd.table.classList.add('sel-noselect');
+      applica(g);
+    }
+    if (!timer)
+      timer = setInterval(() => {
+        if (!cd) return fermaTimer();
+        const wrap = cd.table.closest('.piano-wrap');
+        const M = 60;
+        let dx = 0;
+        if (cd.cx > window.innerWidth - M) dx = 24;
+        else if (cd.cx < M) dx = -24;
+        if (wrap) {
+          const wr = wrap.getBoundingClientRect();
+          if (cd.cx > wr.right - 30) dx = 24;
+          else if (cd.cx < wr.left + 30 && wrap.scrollLeft > 0) dx = -24;
+        }
+        if (dx && wrap) {
+          wrap.scrollLeft += dx;
+          applica(giornoSotto(Math.max(1, Math.min(window.innerWidth - 1, cd.cx - Math.sign(dx) * 40)), cd.cy));
+        }
+      }, 60);
+  });
+  document.addEventListener('mouseup', () => {
+    fermaTimer();
+    if (!cd) return;
+    // ri-clic sulla sola colonna gia selezionata: la toglie (come prima)
+    if (cd.togliUnica && !cd.mosso) _pianoBloccoPulisci();
+    cd.table.classList.remove('sel-noselect');
+    cd = null;
+  });
+}
+// giorni della selezione di colonne attuale (null se la selezione non e di colonne)
+function _pianoGiorniSelezionati(tabEl) {
+  const b = window._pianoBlocco;
+  if (!b || !b.colonne || !b.t1 || (tabEl && b.t1.closest('table') !== tabEl)) return null;
+  if (Array.isArray(b.giorni)) return b.giorni.slice();
+  let g1 = parseInt(b.t1.dataset.g);
+  let g2 = parseInt(b.t2.dataset.g);
+  if (g1 > g2) [g1, g2] = [g2, g1];
+  const out = [];
+  for (let g = g1; g <= g2; g++) out.push(g);
+  return out;
+}
+function _pianoRipristinaColonne() {
+  const s = window._pianoColonneSel;
+  if (!s || _pianoTab !== 'calendario' || s.ym !== _pianoMeseSel || s.rep !== _pianoReparto()) return;
+  const t = document.querySelector('#piano-content table[data-seltab="' + s.tab + '"]');
+  if (t) _pianoSelezionaGiorni(t, s.giorni, s.ancora);
+}
+// tasto destro sull intestazione di un giorno: i comandi della selezione di colonne
+function mostraPianoCtxGiorni(e, tabEl, g) {
+  e.preventDefault();
+  const sel = _pianoGiorniSelezionati(tabEl);
+  if (!sel || !sel.includes(g)) _pianoSelezionaGiorni(tabEl, [g], g);
+  const gg = _pianoGiorniSelezionati(tabEl) || [g];
+  const menu = _pianoCtxElemento();
+  const tab = tabEl.dataset.seltab;
+  const puoMod = (tab === 'piano' || tab === 'fabb') && puoGestirePiano();
+  const voce = (label, icona, azione, attiva) =>
+    attiva
+      ? '<div class="piano-ctx-item" onclick="nascondiPianoCtx();' +
+        azione +
+        '"><i class="icx ' +
+        icona +
+        '"></i> ' +
+        label +
+        '</div>'
+      : '';
+  let h = '';
+  h += voce('Copia', 'icx-modifica', 'pianoCopiaBlocco()', true);
+  h += voce('Incolla (Excel/blocco)', 'icx-refresh', 'pianoIncollaSuColonne()', puoMod);
+  h += voce('Cancella contenuto', 'icx-cestino', 'pianoCancellaSelezione()', puoMod && tab === 'piano');
+  h += voce('Colore celle', 'icx-penna', 'pianoColoriToggle()', puoMod && tab === 'piano');
+  h += voce(
+    gg.length === 1 ? 'Nascondi giorno ' + gg[0] : 'Nascondi giorni selezionati',
+    'icx-settings',
+    'pianoNascondiGiorni(' + JSON.stringify(gg) + ')',
+    true,
+  );
+  menu.innerHTML =
+    '<div class="piano-ctx-head">' +
+    (gg.length === 1 ? 'Giorno ' + gg[0] : gg.length + ' giorni (' + gg.join(', ') + ')') +
+    '</div>' +
+    h;
+  menu.style.display = 'block';
+  menu.style.left = Math.min(e.clientX, window.innerWidth - 230) + 'px';
+  menu.style.top = Math.min(e.clientY, window.innerHeight - menu.offsetHeight - 10) + 'px';
+}
+// incolla dal menu: gli appunti del browser (o il riquadro per incollare a mano)
+async function pianoIncollaSuColonne() {
+  const b = window._pianoBlocco;
+  if (!b || !b.completo) return;
+  const testo = await _pianoTestoAppunti();
+  if (testo && testo.trim()) _pianoIncollaSuSelezione(b.tab, testo);
 }
 // Toglie le marcature di riga e colonna: quando parte una selezione a
 // trascinamento, quella precedente deve sparire (e viceversa).
@@ -1909,6 +2198,12 @@ function _pianoBloccoEvidenzia() {
 }
 function _pianoBloccoPulisci() {
   document.querySelectorAll('#piano-content .tot-sel').forEach((el) => el.classList.remove('tot-sel'));
+  // selezione di colonne: via anche il velo delle colonne (Esc, clic fuori)
+  if (window._pianoBlocco && window._pianoBlocco.colonne)
+    document
+      .querySelectorAll('#piano-content .col-selected, #piano-content .col-selected-header')
+      .forEach((el) => el.classList.remove('col-selected', 'col-selected-header'));
+  window._pianoColonneSel = null;
   document
     .querySelectorAll('.blocco-sel, .bs-t, .bs-b, .bs-l, .bs-r, .blocco-sel-head')
     .forEach((c) => c.classList.remove('blocco-sel', 'bs-t', 'bs-b', 'bs-l', 'bs-r', 'blocco-sel-head'));
@@ -2375,6 +2670,7 @@ function pianoNascondiRighe(nomi) {
   toast(nomi.length + (nomi.length === 1 ? ' riga nascosta' : ' righe nascoste'));
 }
 function pianoNascondiGiorni(gg) {
+  window._pianoColonneSel = null; // i giorni nascosti escono dalla selezione
   const o = _pianoNascosti();
   gg.forEach((g) => {
     if (!o.giorni.includes(g)) o.giorni.push(g);
@@ -2405,7 +2701,10 @@ function pianoMostraNascosti() {
 }
 function _pianoApplicaNascosti() {
   const o = _pianoNascosti();
+  // al ridisegno la selezione di colonne si rimette subito dopo (_pianoRipristinaCellaAttiva)
+  const colSel = window._pianoColonneSel;
   _pianoBloccoPulisci();
+  window._pianoColonneSel = colSel;
   // giorni: colonne collegate su TUTTE le tabelle (griglia, differenze, effettivi, pianificazione);
   // con table-layout:fixed va azzerata anche la <col> e ridotta la larghezza tabella
   document.querySelectorAll('#piano-content table[data-seltab]').forEach((t) => {
@@ -4307,15 +4606,26 @@ async function _pianoAvvisiLenti(forza) {
         if (!_pianoDomenicaValida(cod, perG[nome + '|' + sab], sab, perR[nome + '|' + sab], undefined, nome)) return;
         libere++;
       });
-      if (visto && libere < diritto) {
-        const restano = diritto - libere;
+      // diritto a mesi di contratto (_pianoDomContratto, come Controlla le regole e la tabella
+      // Domeniche); senza data di inizio quello dell anno
+      const mesiP = [];
+      for (let m = 1; m <= 12; m++)
+        if (mesiPersona[nome + '|' + String(m).padStart(2, '0')]) mesiP.push(String(m).padStart(2, '0'));
+      const oggiD = String(oggi).substring(0, 10);
+      const daMeseD =
+        oggiD.substring(0, 4) === String(anno) ? oggiD.substring(5, 7) : oggiD < String(anno) ? '00' : '13';
+      const contrD = _pianoDomContratto(nome, anno, mesiP, daMeseD);
+      const dirittoP = contrD.inizioMancante ? diritto : contrD.diritto;
+      if (visto && libere < dirittoP) {
+        const restano = dirittoP - libere;
         voci.push({
           grave: restano > future,
           testo:
             'domeniche libere ' +
             libere +
             ' su ' +
-            diritto +
+            dirittoP +
+            (contrD.inizioMancante ? ' (data di inizio mancante)' : '') +
             (restano > future ? ', non più raggiungibile' : ', ne mancano ' + restano),
         });
       }

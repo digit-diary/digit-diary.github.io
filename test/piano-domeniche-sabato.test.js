@@ -44,9 +44,18 @@ const ctx = {
 };
 ctx._pianoRegolaVal = (n) => (n === 'domeniche_libere_anno' ? '12' : null);
 ctx._pianoDomSabatoParam = () => ({ evita: true, copertura: true });
+ctx.PianoRegole = require('../js/piano-regole.js');
+const schede = {}; // nome -> { data_assunzione, data_fine_rapporto }
+ctx._pianoCollabInfo = (n) => schede[n] || null;
 vm.createContext(ctx);
 vm.runInContext(
-  estrai('piano-genera.js', ['_pianoTestoSabatoTardi', '_pianoDomAttese', '_pianoViolDiLegge', '_pianoPesoBuco']) +
+  estrai('piano-genera.js', [
+    '_pianoTestoSabatoTardi',
+    '_pianoDomContratto',
+    '_pianoDomAttese',
+    '_pianoViolDiLegge',
+    '_pianoPesoBuco',
+  ]) +
     '\n' +
     estrai('piano-ricerca-ui.js', [
       '_ricercaPesoOrdine',
@@ -76,6 +85,51 @@ const c = ctx._pianoDomAttese('A', '2026-11', dati);
 ok(c.restanti === 4, 'novembre: restano le 4 domeniche di dicembre (' + c.restanti + ')');
 ok(c.arretrato > 0, 'arretrato dei mesi passati (' + c.arretrato + ')');
 ok(ctx._pianoDomAttese('A', '2026-12', dati).restanti === 0, 'dicembre: nessuna domenica dopo');
+
+console.log('== domeniche in base al contratto (titolare 21/10/2026) ==');
+const PR = ctx.PianoRegole;
+const dc = (ini, fin) => PR.domenicheContratto(2026, ini, fin, 12);
+ok(dc('2026-08-01').diritto === 5, 'inizio 1.8: 5 domeniche (agosto-dicembre)');
+ok(dc('2026-08-16').diritto === 5, 'inizio 16.8: 16 giorni su 31, agosto conta: 5');
+ok(dc('2026-08-17').diritto === 4, 'inizio 17.8: 15 giorni su 31, meno di meta: 4');
+ok(dc('2026-08-20').diritto === 4, 'inizio 20.8: 4');
+ok(
+  dc(null, '2026-03-15').diritto === 2 && dc(null, '2026-03-15').inizioMancante,
+  'fine 15.3 senza inizio: 2, data mancante',
+);
+ok(dc('2020-01-01', '2026-03-16').diritto === 3, 'fine 16.3: marzo conta, 3');
+ok(dc('2026-02-15', null).mesi[0] === '02', 'febbraio: 14 giorni su 28 bastano');
+ok(dc('2026-08-16', '2026-11-10').diritto === 3, 'agosto-ottobre (novembre 10 giorni no): 3');
+ok(dc('2025-03-01').diritto === 12 && dc('2027-01-01').diritto === 0, 'anno intero 12, contratto dopo: 0');
+ok(dc('2026-08-16').attese('09') === 2 && dc('2026-08-16').attese('07') === 0, 'attese fino a settembre 2, luglio 0');
+ok(PR.domenicheContratto(2026, '2026-07-01', null, 10).diritto === 5, 'regola a 10: 10 x 6 / 12 = 5');
+// _pianoDomAttese con la data: assunto il 16.8, piano da agosto, 2 libere avute
+schede.B = { data_assunzione: '2026-08-16' };
+const datiB = { perNome: { B: { libere: 2, mesi: ['08', '09', '10'] } }, domMese: dati.domMese, domAnno: 52 };
+const cB = ctx._pianoDomAttese('B', '2026-11', datiB);
+ok(cB.diritto === 5 && cB.fineMese === 4 && cB.mesiContratto === 5, 'B: diritto 5, attese a fine novembre 4');
+ok(cB.arretrato === 1, 'B: fino a ottobre 3 attese, 2 avute: arretrato 1 (' + cB.arretrato + ')');
+ok(cB.restanti === 4, 'B: restano le domeniche di dicembre');
+// senza data di inizio: il conto di prima (proporzione sulle domeniche dei mesi con piano)
+const cA = ctx._pianoDomAttese('A', '2026-11', dati);
+ok(cA.inizioMancante && cA.diritto === 12 && cA.fineMese === Math.floor((12 * 48) / 52), 'A senza data: come prima');
+// fine del rapporto il 15.11 senza inizio: novembre non conta
+schede.C = { data_fine_rapporto: '2026-11-14' };
+const datiC = { perNome: { C: { libere: 10, mesi: dati.perNome.A.mesi } }, domMese: dati.domMese, domAnno: 52 };
+const cC = ctx._pianoDomAttese('C', '2026-11', datiC);
+ok(
+  cC.fineMese === Math.floor((12 * 43) / 52) && cC.restanti === 0,
+  'C: fine 14.11 (14 giorni su 30), novembre e dicembre fuori',
+);
+// un mese passato senza piano (es. lungo congedo) non conta anche con la data
+schede.D = { data_assunzione: '2020-01-01' };
+const datiD = {
+  perNome: { D: { libere: 8, mesi: ['01', '02', '03', '06', '07', '08', '09', '10'] } },
+  domMese: dati.domMese,
+  domAnno: 52,
+};
+const cD = ctx._pianoDomAttese('D', '2026-11', datiD);
+ok(cD.diritto === 10 && cD.fineMese === 9, 'D: aprile e maggio senza piano restano fuori (diritto 10)');
 
 console.log('== tipi per Migliora ==');
 ok(ctx._ricercaTipoViolazione(t) === 'sabato_tardi', 'avviso del sabato: tipo sabato_tardi');
