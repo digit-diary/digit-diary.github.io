@@ -17,15 +17,27 @@
  */
 
 let _cestinoModuli = [],
+  _cestinoValutazioni = [],
   _cestinoReg = [],
   _cestinoClienti = [],
-  _cestinoClientiErrore = '';
+  _cestinoClientiErrore = '',
+  _cestinoSchede = [];
+// SCHEDE COLLABORATORE TOLTE DA «UNISCI SCHEDE» (23/10/2026): le vede, le ripristina e le
+// elimina solo l amministratore (funzioni collaboratori_cestino_*, migrazione 20260930_c)
+function _cestinoVedeSchede() {
+  return typeof isAdmin === 'function' && isAdmin();
+}
 // CHI USA IL CESTINO (decisione del titolare 11/10: "uno deve poter cestinare quello che
 // vuole cestinare"): chi puo cestinare puo anche ripristinare. Registrazioni del Diario:
 // tutti (il database mostra le righe del proprio settore); moduli: chi scrive i moduli.
 // Elimina definitivamente e Svuota: solo l amministratore (il database lo impone).
 function _cestinoVedeModuli() {
   return isAdmin() || (typeof _puoScrivereModuli === 'function' && _puoScrivereModuli());
+}
+// VALUTAZIONI (23/10/2026, decisione del titolare): le vede e le rimette chi le gestisce
+// (Valutazioni · inserire e importare schede); il database fa lo stesso controllo
+function _cestinoVedeValutazioni() {
+  return isAdmin() || (typeof puoModificare === 'function' && puoModificare('gestione_valutazioni'));
 }
 // CLIENTI MAISON TOLTI (21/10/2026): li vede e li rimette chi ha la pagina Maison nel
 // settore aperto (gli stessi permessi della scheda clienti)
@@ -39,9 +51,15 @@ function cestinoPreparaFiltri() {
   const opMod = sel.querySelector('option[value="moduli"]');
   if (opMod) opMod.hidden = !_cestinoVedeModuli();
   if (sel.value === 'moduli' && !_cestinoVedeModuli()) sel.value = '';
+  const opVal = sel.querySelector('option[value="valutazioni"]');
+  if (opVal) opVal.hidden = !_cestinoVedeValutazioni();
+  if (sel.value === 'valutazioni' && !_cestinoVedeValutazioni()) sel.value = '';
   const opCli = sel.querySelector('option[value="clienti_maison"]');
   if (opCli) opCli.hidden = !_cestinoVedeClienti();
   if (sel.value === 'clienti_maison' && !_cestinoVedeClienti()) sel.value = '';
+  const opSch = sel.querySelector('option[value="schede_collaboratori"]');
+  if (opSch) opSch.hidden = !_cestinoVedeSchede();
+  if (sel.value === 'schede_collaboratori' && !_cestinoVedeSchede()) sel.value = '';
 }
 async function caricaCestino() {
   const el = document.getElementById('cestino-content');
@@ -57,6 +75,19 @@ async function caricaCestino() {
     );
     _cestinoModuli = modDel || [];
     _cestinoReg = regDel || [];
+    // valutazioni nel Cestino: come i clienti, se la lettura non riesce (database non ancora
+    // aggiornato) il resto del Cestino si vede lo stesso
+    _cestinoValutazioni = [];
+    if (_cestinoVedeValutazioni()) {
+      try {
+        _cestinoValutazioni =
+          (await secGet(
+            'valutazioni?eliminato=eq.true&reparto_dip=eq.' + currentReparto + '&order=eliminato_at.desc',
+          )) || [];
+      } catch (e) {
+        _cestinoValutazioni = [];
+      }
+    }
     // clienti Maison tolti: se la lettura non riesce il resto del Cestino si vede lo stesso,
     // con l avviso (es. database non ancora aggiornato: colonna eliminato mancante)
     _cestinoClienti = [];
@@ -69,6 +100,15 @@ async function caricaCestino() {
           )) || [];
       } catch (e) {
         _cestinoClientiErrore = (e && e.message) || 'errore del database';
+      }
+    }
+    // schede unite: database senza la migrazione = nessuna (il resto si vede lo stesso)
+    _cestinoSchede = [];
+    if (_cestinoVedeSchede()) {
+      try {
+        _cestinoSchede = (await _rpcSicura('collaboratori_cestino_leggi', { p_token: getOpToken() })) || [];
+      } catch (e) {
+        _cestinoSchede = [];
       }
     }
     renderCestino();
@@ -90,32 +130,46 @@ function renderCestino() {
     fcl = fc.toLowerCase();
   let filtReg = _cestinoReg;
   let filtMod = _cestinoModuli;
+  let filtVal = _cestinoVedeValutazioni() ? _cestinoValutazioni : [];
   let filtCli = _cestinoVedeClienti() ? _cestinoClienti : [];
+  let filtSch = _cestinoVedeSchede() ? _cestinoSchede : [];
+  if (ft && ft !== 'schede_collaboratori') filtSch = [];
   if (ft && ft !== 'registrazioni') filtReg = [];
   if (ft && ft !== 'moduli') filtMod = [];
+  if (ft && ft !== 'valutazioni') filtVal = [];
   if (ft && ft !== 'clienti_maison') filtCli = [];
   if (fn) {
     filtReg = filtReg.filter(
       (r) => (r.nome || '').toLowerCase().includes(fnl) || (r.testo || '').toLowerCase().includes(fnl),
     );
     filtMod = filtMod.filter((m) => (m.collaboratore || '').toLowerCase().includes(fnl));
+    filtVal = filtVal.filter((v) => (v.collaboratore || '').toLowerCase().includes(fnl));
     filtCli = filtCli.filter((c) => (c.nome || '').toLowerCase().includes(fnl));
+    filtSch = filtSch.filter(
+      (c) => (c.nome || '').toLowerCase().includes(fnl) || (c.unito_in || '').toLowerCase().includes(fnl),
+    );
   }
   if (fc) {
     filtReg = filtReg.filter((r) => (r.eliminato_da || '').toLowerCase().includes(fcl));
     filtMod = filtMod.filter((m) => (m.eliminato_da || '').toLowerCase().includes(fcl));
+    filtVal = filtVal.filter((v) => (v.eliminato_da || '').toLowerCase().includes(fcl));
     filtCli = filtCli.filter((c) => (c.eliminato_da || '').toLowerCase().includes(fcl));
+    filtSch = filtSch.filter((c) => (c.eliminato_da || '').toLowerCase().includes(fcl));
   }
   const avvisoCli = _cestinoClientiErrore
     ? '<p style="color:var(--accent);font-size:var(--fs-sm,.8125rem)">Clienti Maison tolti non letti: ' +
       escP(_cestinoClientiErrore) +
       '</p>'
     : '';
-  if (!filtMod.length && !filtReg.length && !filtCli.length) {
+  if (!filtMod.length && !filtReg.length && !filtCli.length && !filtVal.length && !filtSch.length) {
     el.innerHTML =
       avvisoCli +
       '<p style="color:var(--c-verde,#2c6e49);font-weight:600">' +
-      (_cestinoModuli.length || _cestinoReg.length || _cestinoClienti.length
+      (_cestinoModuli.length ||
+      _cestinoReg.length ||
+      _cestinoClienti.length ||
+      _cestinoValutazioni.length ||
+      _cestinoSchede.length
         ? 'Nessun risultato con i filtri applicati'
         : 'Cestino vuoto') +
       '</p>';
@@ -187,6 +241,34 @@ function renderCestino() {
     });
     html += '</div>';
   }
+  if (filtVal.length) {
+    html += '<h5 style="margin:12px 0 8px;color:var(--ink)">Valutazioni (' + filtVal.length + ')</h5>';
+    html += '<div style="max-height:300px;overflow-y:auto">';
+    filtVal.forEach((v) => {
+      const delAt = v.eliminato_at
+        ? new Date(v.eliminato_at).toLocaleDateString('it-IT') +
+          ' ' +
+          new Date(v.eliminato_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+        : '';
+      html +=
+        '<div style="padding:8px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:var(--fs-md,.875rem)"><div style="flex:1"><strong>' +
+        escP(v.collaboratore || '') +
+        '</strong> · <span style="color:var(--muted)">' +
+        escP(v.tipo || 'valutazione') +
+        ' ' +
+        escP(String(v.anno || '')) +
+        '</span>' +
+        (v.valutatore ? ' · ' + escP(v.valutatore) : '') +
+        '<div style="font-size:var(--fs-sm,.8125rem);color:var(--accent)">' +
+        _cestinoChiQuando(v.eliminato_da, delAt) +
+        '</div></div><button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px" onclick="ripristinaCestino(\'valutazioni\',' +
+        v.id +
+        ')">Ripristina</button>' +
+        btnElimina('valutazioni', v.id) +
+        '</div>';
+    });
+    html += '</div>';
+  }
   if (filtCli.length) {
     html += '<h5 style="margin:12px 0 8px;color:var(--ink)">Clienti Maison (' + filtCli.length + ')</h5>';
     html += '<div style="max-height:300px;overflow-y:auto">';
@@ -213,12 +295,41 @@ function renderCestino() {
     });
     html += '</div>';
   }
+  if (filtSch.length) {
+    html += '<h5 style="margin:12px 0 8px;color:var(--ink)">Schede collaboratore unite (' + filtSch.length + ')</h5>';
+    html += '<div style="max-height:300px;overflow-y:auto">';
+    filtSch.forEach((c) => {
+      const delAt = c.eliminato_at
+        ? new Date(c.eliminato_at).toLocaleDateString('it-IT') +
+          ' ' +
+          new Date(c.eliminato_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+        : '';
+      html +=
+        '<div style="padding:8px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;font-size:var(--fs-md,.875rem)"><div style="flex:1"><strong>' +
+        escP(c.nome || '') +
+        '</strong> · <span style="color:var(--muted)">unita in ' +
+        escP(c.unito_in || '') +
+        (c.righe_tolte ? ' · ' + c.righe_tolte + ' righe doppie' : '') +
+        '</span><div style="font-size:var(--fs-sm,.8125rem);color:var(--accent)">' +
+        _cestinoChiQuando(c.eliminato_da, delAt) +
+        '</div></div><button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px" onclick="ripristinaSchedaCestino(' +
+        c.id +
+        ')">Ripristina</button><button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:4px 10px;background:var(--accent)" onclick="eliminaSchedaCestino(' +
+        c.id +
+        ')">Elimina</button></div>';
+    });
+    html += '</div>';
+  }
   html += adm
     ? '<div style="margin-top:16px;display:flex;gap:8px"><button class="btn-salva" style="background:var(--accent);font-size:var(--fs-sm,.8125rem);padding:8px 16px" onclick="svuotaCestino()">Svuota cestino</button></div>'
     : '<p style="margin-top:12px;font-size:var(--fs-sm,.8125rem);color:var(--muted)">L’eliminazione definitiva è riservata all’amministratore.</p>';
   el.innerHTML = html;
 }
 async function _cestinoRiallineaRegistrazione(r) {
+  // registrata dal Diario: la voce torna nel Rapporto del primo giorno (A9), per prima e da sola
+  // (un errore del Piano non la blocca)
+  if (typeof _diarioOrigineRapporto === 'function' && _diarioOrigineRapporto(r))
+    await _diarioRapportoAllinea(r.origine, r.nome, r.tipo).catch((e) => console.error('rapporto: ripristino', e));
   try {
     if (r.tipo === nomeCorrente('Non Disponibilità') && typeof _diarioNdRiallinea === 'function')
       await _diarioNdRiallinea([r]);
@@ -237,13 +348,59 @@ function ripristinaCestino(tabella, id) {
   return unaVoltaSola('cestino-ripristina|' + tabella + '|' + id, () => _ripristinaCestinoEsegui(tabella, id));
 }
 async function _ripristinaCestinoEsegui(tabella, id) {
-  if ((tabella === 'moduli' && !_cestinoVedeModuli()) || (tabella === 'maison_budget' && !_cestinoVedeClienti())) {
-    toast('Non hai il permesso');
+  if (
+    (tabella === 'moduli' && !_cestinoVedeModuli()) ||
+    (tabella === 'maison_budget' && !_cestinoVedeClienti()) ||
+    (tabella === 'valutazioni' && !_cestinoVedeValutazioni())
+  ) {
+    toastErrore('Non hai il permesso di ripristinare questo elemento: chiedi all’amministratore');
+    return;
+  }
+  // una sola scheda viva per collaboratore, anno e tipo: se nel frattempo e' stata rifatta, il
+  // ripristino si ferma con il motivo (il database lo rifiuterebbe come doppione)
+  const valR = tabella === 'valutazioni' ? _cestinoValutazioni.find((x) => x.id === id) : null;
+  if (
+    valR &&
+    valutazioniCache.some(
+      (x) =>
+        x.id !== id &&
+        (x.collaboratore || '').toLowerCase() === (valR.collaboratore || '').toLowerCase() &&
+        x.anno === valR.anno &&
+        x.tipo === valR.tipo &&
+        (x.reparto_dip || 'slots') === (valR.reparto_dip || 'slots'),
+    )
+  ) {
+    toastErrore(
+      'Non ripristinata: ' +
+        valR.collaboratore +
+        ' ha già una ' +
+        valR.tipo +
+        ' ' +
+        valR.anno +
+        '. Elimina prima quella, poi ripristina questa.',
+      9000,
+    );
     return;
   }
   if (!(await chiediConferma('Ripristinare questo elemento?'))) return;
   try {
     await secPatch(tabella, 'id=eq.' + id, { eliminato: false, eliminato_da: null, eliminato_at: null });
+    if (tabella === 'valutazioni') {
+      if (valR) {
+        valR.eliminato = false;
+        valR.eliminato_da = null;
+        valR.eliminato_at = null;
+        if (!valutazioniCache.some((x) => x.id === id)) valutazioniCache.unshift(valR);
+        _cestinoValutazioni = _cestinoValutazioni.filter((x) => x.id !== id);
+      }
+      logAzione(
+        'Valutazione ripristinata',
+        valR ? valR.collaboratore + ' · ' + valR.tipo + ' ' + valR.anno : 'ID ' + id,
+      );
+      renderCestino();
+      toast('Ripristinata');
+      return;
+    }
     if (tabella === 'maison_budget') {
       // il cliente torna nella scheda clienti e nell elenco dei nomi della Maison
       const c = _cestinoClienti.find((x) => x.id === id);
@@ -297,6 +454,53 @@ async function _ripristinaCestinoEsegui(tabella, id) {
     toastErrore('Non ripristinato: ' + ((e && e.message) || 'errore del database'));
   }
 }
+// voce del Cestino nell archivio da conservare: archivio sulla data del fatto, correzione
+// ammessa per cio che e stato INSERITO da poco (created_at), non per i fatti recenti (C16)
+function _cestinoProtetto(r) {
+  if (typeof inArchivioProtetto !== 'function' || !r) return false;
+  const data = r.data || r.data_modulo || r.created_at;
+  return !!data && inArchivioProtetto(data, r.created_at);
+}
+// valutazione vista dalla conservazione: il fatto e' la data della scheda (data_valutazione)
+function _cestinoValProt(v) {
+  return v ? { data: v.data_valutazione || null, created_at: v.created_at } : null;
+}
+// voce del Cestino descritta per il Registro (riverifica C-N5): prima «registrazioni ID
+// 1792011407771», senza dire cosa fosse. Ora tipo, persona e data (il numero resta in fondo)
+function _cestinoDescriviVoce(tabella, id) {
+  const fmt = (d) =>
+    d
+      ? (String(d).length > 10 && typeof giornoDi === 'function' ? giornoDi(d) : String(d).substring(0, 10))
+          .split('-')
+          .reverse()
+          .join('.')
+      : '';
+  let parti = [];
+  if (tabella === 'moduli') {
+    const m = _cestinoModuli.find((x) => x.id === id) || {};
+    parti = ['Modulo ' + (m.tipo || ''), m.collaboratore, fmt(m.data_modulo)];
+  } else if (tabella === 'valutazioni') {
+    const v = _cestinoValutazioni.find((x) => x.id === id) || {};
+    parti = ['Valutazione' + (v.anno ? ' ' + v.anno : ''), v.collaboratore, fmt(v.data_valutazione)];
+  } else if (tabella === 'maison_budget') {
+    const c = _cestinoClienti.find((x) => x.id === id) || {};
+    parti = ['Cliente Maison', c.nome];
+  } else {
+    const r = _cestinoReg.find((x) => x.id === id) || {};
+    parti = ['Registrazione ' + (r.tipo || ''), r.nome, fmt(r.data)];
+  }
+  return (
+    parti
+      .map((x) => String(x || '').trim())
+      .filter(Boolean)
+      .join(' · ') +
+    ' (' +
+    tabella +
+    ' n. ' +
+    id +
+    ')'
+  );
+}
 async function eliminaDefinitivo(tabella, id) {
   // il controllo era solo nell'interfaccia: la funzione resta richiamabile dalla console
   if (!isAdmin()) {
@@ -311,9 +515,10 @@ async function eliminaDefinitivo(tabella, id) {
       ? _cestinoModuli.find((x) => x.id === id)
       : tabella === 'maison_budget'
         ? null // scheda di un cliente, non archivio: nessun vincolo di conservazione
-        : _cestinoReg.find((x) => x.id === id);
-  const dataRec = rec ? rec.data || rec.data_modulo || rec.created_at : null;
-  if (typeof inArchivioProtetto === 'function' && dataRec && inArchivioProtetto(dataRec)) {
+        : tabella === 'valutazioni'
+          ? _cestinoValProt(_cestinoValutazioni.find((x) => x.id === id))
+          : _cestinoReg.find((x) => x.id === id);
+  if (rec && _cestinoProtetto(rec)) {
     await mostraAvviso(
       "Non si può eliminare definitivamente.\n\nQuesta voce fa parte dell'archivio da conservare per " +
         conservazioneAnni() +
@@ -322,12 +527,15 @@ async function eliminaDefinitivo(tabella, id) {
     return;
   }
   if (!(await chiediConferma('Eliminare DEFINITIVAMENTE? Non potrà essere recuperato.'))) return;
+  const descr = _cestinoDescriviVoce(tabella, id);
   try {
     await secDel(tabella, 'id=eq.' + id);
     if (tabella === 'moduli') _cestinoModuli = _cestinoModuli.filter((x) => x.id !== id);
+    else if (tabella === 'valutazioni') _cestinoValutazioni = _cestinoValutazioni.filter((x) => x.id !== id);
     else if (tabella === 'maison_budget') _cestinoClienti = _cestinoClienti.filter((x) => x.id !== id);
     else _cestinoReg = _cestinoReg.filter((x) => x.id !== id);
-    logAzione('Eliminato definitivamente', tabella + ' ID ' + id);
+    // nel Registro cosa era (riverifica C-N5): nome, tipo e data, non solo il numero
+    logAzione('Eliminato definitivamente', descr);
     renderCestino();
     toast('Eliminato definitivamente');
   } catch (e) {
@@ -339,21 +547,21 @@ async function svuotaCestino() {
     toast("Riservato all'amministratore");
     return;
   }
-  const tot = _cestinoModuli.length + _cestinoReg.length + _cestinoClienti.length;
+  const tot = _cestinoModuli.length + _cestinoReg.length + _cestinoClienti.length + _cestinoValutazioni.length;
   if (!tot) {
     toast('Cestino già vuoto');
     return;
   }
   // CONSERVAZIONE: si svuota solo cio' che NON e' archivio protetto; le voci
   // degli ultimi N anni restano nel Cestino e si possono sempre ripristinare
-  const protetto = (r) =>
-    typeof inArchivioProtetto === 'function' && inArchivioProtetto(r.data || r.data_modulo || r.created_at);
-  const modOk = _cestinoModuli.filter((m) => !protetto(m));
-  const regOk = _cestinoReg.filter((r) => !protetto(r));
+  const modOk = _cestinoModuli.filter((m) => !_cestinoProtetto(m));
+  const regOk = _cestinoReg.filter((r) => !_cestinoProtetto(r));
+  const valOk = _cestinoValutazioni.filter((v) => !_cestinoProtetto(_cestinoValProt(v)));
   // clienti Maison tolti: schede, non archivio (nessuna conservazione)
   const cliOk = _cestinoClienti.slice();
-  const nProt = tot - modOk.length - regOk.length - cliOk.length;
-  if (!modOk.length && !regOk.length && !cliOk.length) {
+  const nProt = tot - modOk.length - regOk.length - cliOk.length - valOk.length;
+  const nVia = modOk.length + regOk.length + cliOk.length + valOk.length;
+  if (!nVia) {
     await mostraAvviso(
       'Niente da svuotare.\n\nTutte le ' +
         tot +
@@ -366,11 +574,11 @@ async function svuotaCestino() {
   if (
     !(await chiediConferma(
       'Svuotare il cestino? ' +
-        (modOk.length + regOk.length + cliOk.length) +
+        nVia +
         ' element' +
-        (modOk.length + regOk.length + cliOk.length === 1 ? 'o verrà' : 'i verranno') +
+        (nVia === 1 ? 'o verrà' : 'i verranno') +
         ' eliminat' +
-        (modOk.length + regOk.length + cliOk.length === 1 ? 'o' : 'i') +
+        (nVia === 1 ? 'o' : 'i') +
         ' DEFINITIVAMENTE.' +
         (nProt
           ? '\n\n' +
@@ -392,15 +600,16 @@ async function svuotaCestino() {
     for (const c of cliOk) {
       await secDel('maison_budget', 'id=eq.' + c.id);
     }
+    for (const v of valOk) {
+      await secDel('valutazioni', 'id=eq.' + v.id);
+    }
     logAzione(
       'Cestino svuotato',
-      modOk.length +
-        regOk.length +
-        cliOk.length +
-        ' elementi eliminati definitivamente' +
-        (nProt ? ', ' + nProt + ' protetti' : ''),
+      nVia + ' elementi eliminati definitivamente' + (nProt ? ', ' + nProt + ' protetti' : ''),
     );
     _cestinoClienti = [];
+    const idsV = new Set(valOk.map((v) => v.id));
+    _cestinoValutazioni = _cestinoValutazioni.filter((v) => !idsV.has(v.id));
     const idsM = new Set(modOk.map((m) => m.id));
     const idsR = new Set(regOk.map((r) => r.id));
     _cestinoModuli = _cestinoModuli.filter((m) => !idsM.has(m.id));
@@ -467,6 +676,113 @@ async function apriFixImpiego() {
       '<option value="">Non indicare</option></select></div>';
   });
   el.innerHTML = h;
+}
+// FISSO/JOLLY IN CONTRADDIZIONE (C14): impiego della scheda (elenco) e is_jolly (piano, ore
+// dovute, C attorno alle vacanze, CGF) diversi, oppure impiego da indicare con il piano che
+// lo tratta da Jolly. Dalla 20260929_c_jolly_fisso il database li tiene allineati a ogni
+// scrittura: qui si sistemano le schede di prima, mostrando prima cosa cambia.
+function _jollyDaAllineare(c) {
+  if (!c || c.attivo === false) return false;
+  if (c.impiego === 'jolly') return !c.is_jolly;
+  if (c.impiego === 'fisso') return !!c.is_jolly;
+  return !!c.is_jolly;
+}
+async function apriFixJolly() {
+  const el = document.getElementById('salute-content');
+  if (!el) return;
+  el.innerHTML = '<p style="color:var(--muted)">Caricamento...</p>';
+  const tutti =
+    (await secGet(
+      'collaboratori?select=id,nome,reparto_dip,is_jolly,percentuale,funzione,impiego,attivo&limit=2000',
+    )) || [];
+  const lista = tutti
+    .filter(_jollyDaAllineare)
+    .sort((a, b) => (a.reparto_dip || '').localeCompare(b.reparto_dip || '') || a.nome.localeCompare(b.nome));
+  if (!lista.length) {
+    el.innerHTML =
+      '<p style="color:var(--c-verde,#2c6e49);font-weight:700">Nessuna contraddizione: elenco e piano dicono la stessa cosa per tutti.</p>';
+    return;
+  }
+  const lbl = (v) => (v === 'jolly' ? 'Jolly' : v === 'fisso' ? 'Fisso' : 'da indicare');
+  let h =
+    '<p style="font-size:var(--fs-md,.875rem);margin-bottom:6px"><b>' +
+    lista.length +
+    (lista.length === 1 ? ' collaboratore' : ' collaboratori') +
+    ' con elenco e piano in contraddizione.</b> Nella colonna «Diventa» c&egrave; la proposta: dove la scheda indica gi&agrave; Fisso o Jolly vale la scheda (cambia il piano); dove l&#39;impiego &egrave; da indicare vale il piano (cambia l&#39;elenco). Correggi le righe sbagliate e salva.</p>' +
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:10px">Jolly: niente ore dovute, C e CGF dei fissi. Fisso: ore dovute secondo la percentuale. Ogni cambio va nello Storico HR e nel Registro.</p>' +
+    '<div style="margin-bottom:10px"><button class="btn-salva" style="font-size:var(--fs-sm,.8125rem);padding:6px 14px" onclick="salvaFixJolly()">Allinea</button> ' +
+    '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:6px 14px" onclick="controlloSalute()">Annulla</button></div>' +
+    '<div style="overflow-x:auto"><table class="collab-table" style="font-size:var(--fs-md,.875rem)"><thead><tr><th>Collaboratore</th><th>Settore</th><th>Elenco (scheda)</th><th>Piano oggi</th><th>Diventa</th></tr></thead><tbody>';
+  lista.forEach((c) => {
+    const proposta = c.impiego === 'jolly' || c.impiego === 'fisso' ? c.impiego : c.is_jolly ? 'jolly' : 'fisso';
+    const opt = (v, t) => '<option value="' + v + '"' + (v === proposta ? ' selected' : '') + '>' + t + '</option>';
+    h +=
+      '<tr><td><b>' +
+      escP(c.nome) +
+      '</b> <span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">' +
+      escP(c.funzione || '-') +
+      ' &middot; ' +
+      Math.round((parseFloat(c.percentuale) || 1) * 100) +
+      '%</span></td><td>' +
+      escP(repartoLabel(c.reparto_dip || 'slots')) +
+      '</td><td>' +
+      lbl(c.impiego) +
+      '</td><td>' +
+      (c.is_jolly ? 'Jolly' : 'Fisso') +
+      '</td><td><select data-fix-jolly="' +
+      c.id +
+      '" data-nome="' +
+      escP(c.nome) +
+      '" style="font-size:var(--fs-sm,.8125rem);padding:3px 8px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)">' +
+      opt('fisso', 'Fisso') +
+      opt('jolly', 'Jolly') +
+      '<option value="">Non toccare</option></select></td></tr>';
+  });
+  el.innerHTML = h + '</tbody></table></div>';
+}
+async function salvaFixJolly() {
+  // stesso permesso della scheda collaboratore (Impiego)
+  if (!puoModificare('gestione_impiego')) {
+    toastErrore('Non hai il permesso per questa azione');
+    return;
+  }
+  const sel = [...document.querySelectorAll('[data-fix-jolly]')].filter((s) => s.value);
+  if (!sel.length) return toast('Nessuna riga da allineare');
+  if (
+    !(await chiediConferma(
+      'Allineo elenco e piano di ' +
+        sel.length +
+        (sel.length === 1 ? ' collaboratore' : ' collaboratori') +
+        '?\n\n' +
+        sel.map((s) => '• ' + s.dataset.nome + ' → ' + (s.value === 'jolly' ? 'Jolly' : 'Fisso')).join('\n'),
+      { ok: 'Allinea' },
+    ))
+  )
+    return;
+  let n = 0;
+  const falliti = [];
+  for (const s of sel) {
+    const id = parseInt(s.dataset.fixJolly);
+    const opz = { scheda: true };
+    // la funzione della scheda: permesso, Storico HR (se l impiego cambia), Registro
+    const ok = typeof cambiaImpiegoCollaboratore === 'function' && (await cambiaImpiegoCollaboratore(id, s.value, opz));
+    // verifica nel database: i due campi devono dire la stessa cosa
+    let r = null;
+    try {
+      r = ((await secGet('collaboratori?id=eq.' + id + '&select=id,impiego,is_jolly&limit=1')) || [])[0] || null;
+    } catch (e) {}
+    if (ok && r && r.impiego === s.value && !!r.is_jolly === (s.value === 'jolly')) {
+      n++;
+      const c = collaboratoriCache.find((x) => x.id === id);
+      if (c) Object.assign(c, { impiego: r.impiego, is_jolly: r.is_jolly });
+    } else falliti.push(s.dataset.nome);
+  }
+  logAzione(
+    'Fisso/jolly allineati',
+    n + ' collaboratori' + (falliti.length ? ', NON allineati: ' + falliti.join(', ') : ''),
+  );
+  _esitoInBlocco('Elenco e piano allineati per ' + n + (n === 1 ? ' collaboratore' : ' collaboratori'), falliti);
+  controlloSalute();
 }
 // Esito di un salvataggio fatto collaboratore per collaboratore: se qualcuno non
 // e stato salvato lo si dice per nome (in rosso), mai un "salvato" che non e vero
@@ -929,17 +1245,18 @@ async function controlloSalute() {
       senzaImpiego.length ? "FIX:apriFixImpiego()|Assegna l'impiego adesso" : '',
     );
 
-    // 2) i due campi impiego/jolly in contraddizione
-    const contrad = attivi.filter(
-      (c) => (c.impiego === 'fisso' && c.is_jolly) || (c.impiego === 'jolly' && !c.is_jolly),
-    );
+    // 2) i due campi impiego/jolly in contraddizione (anche impiego da indicare con il piano
+    // che lo tratta da Jolly). Prima rimandava a Gestione Collaboratori, dove la scheda
+    // mostrava gia il valore giusto e Salva rispondeva "Nessuna modifica" (C14)
+    const contrad = attivi.filter(_jollyDaAllineare);
     add(
       contrad.length ? 'attenzione' : 'ok',
       'Coerenza fisso/jolly',
       contrad.length
-        ? contrad.map((c) => c.nome).join(', ') + ": la scheda dice una cosa e il piano un'altra."
-        : 'Nessuna contraddizione tra scheda e piano.',
-      contrad.length ? 'Gestione Collaboratori' : '',
+        ? contrad.map((c) => c.nome).join(', ') +
+            ": l'elenco dei collaboratori dice una cosa e il piano (ore dovute, C, CGF) un'altra."
+        : 'Nessuna contraddizione tra elenco e piano.',
+      contrad.length ? 'FIX:apriFixJolly()|Allinea (prima mostra cosa cambia)' : '',
     );
 
     // 3) turni di persone che non esistono in anagrafica
@@ -979,7 +1296,9 @@ async function controlloSalute() {
       'ok',
       'Congedo non pagato e giubilei',
       mesiFermi
-        ? 'Mesi senza turni rilevati: ' + mesiFermi + ' (da verificare nella sezione Congedi non pagati, in arrivo)'
+        ? 'Mesi senza turni rilevati: ' +
+            mesiFermi +
+            ' (da verificare in Piano › Impostazioni › Congedi non pagati: un congedo fino a 6 mesi non interrompe l anzianità)'
         : 'Nessun mese intero senza turni nel piano.',
       '',
     );
@@ -1001,6 +1320,31 @@ async function controlloSalute() {
         : 'Tutti hanno la data di nascita.',
       senzaNascita.length ? 'FIX:apriFixDateNascita()|Inserisci le date mancanti' : '',
     );
+
+    // 3-ter) COERENZA DIARIO/PIANO (controllo 23/10/2026, D27-D29): M nel piano senza
+    // registrazione, malattie del Diario non nel piano, cognomi del foglio, ex collaboratori
+    // senza fine rapporto. Qui solo il conto: la correzione si propone una per una
+    if (typeof coerenzaDiarioPianoConta === 'function') {
+      try {
+        const co = await coerenzaDiarioPianoConta();
+        const parti = [
+          [co.c.senzaDiario.length, 'M o ASS nel piano senza registrazione nel Diario'],
+          [co.c.senzaPiano.length, 'malattie o assenze del Diario non segnate nel piano'],
+          [co.c.cognomi.length, 'cognomi del foglio da controllare'],
+          [co.c.ex.length, 'ex collaboratori senza fine rapporto'],
+        ].filter((x) => x[0]);
+        add(
+          co.n ? 'attenzione' : 'ok',
+          'Coerenza Diario/Piano',
+          co.n
+            ? parti.map((x) => x[0] + ' ' + x[1]).join('; ') + '. Ogni correzione si conferma una per una.'
+            : 'Diario e Piano dicono la stessa cosa (malattie, assenze, cognomi, fine rapporto).',
+          co.n ? 'FIX:apriCoerenzaDiarioPiano()|Rivedi uno per uno' : '',
+        );
+      } catch (e) {
+        add('attenzione', 'Coerenza Diario/Piano', 'Controllo non riuscito: ' + ((e && e.message) || e), '');
+      }
+    }
 
     // 4) disattivati che hanno ancora turni
     const disattiviConTurni = [
@@ -1079,7 +1423,13 @@ async function controlloSalute() {
     );
 
     // 8) schede di prova rimaste
-    const prova = attivi.filter((c) => /^(sig\.|test|mario rossi|zztest)/i.test(nomeDi(c.nome)));
+    // nomi segnaposto e dati di prova: QA-..., QAFIX-..., TEST..., Xxxxx, "Cognome Nome",
+    // nomi di una sola parola tutta di lettere ripetute (C31: prima QA-... e Xxxxxxxxx passavano)
+    const _nomeDiProva = (n) =>
+      /^(sig\.|test\b|mario rossi|zztest|qa[a-z]*[-_ ]|prova\b|cognome\b|nome cognome)/i.test(n) ||
+      /^x{3,}$/i.test(n.replace(/\s+/g, '')) ||
+      /^(.)\1{3,}$/i.test(n.replace(/\s+/g, ''));
+    const prova = attivi.filter((c) => _nomeDiProva(nomeDi(c.nome)));
     add(
       prova.length ? 'attenzione' : 'ok',
       'Schede di prova',
@@ -1270,3 +1620,59 @@ async function _healthCheck() {
 }
 
 // PASSWORD
+
+// SCHEDA UNITA: torna con il suo numero e le righe doppie tolte; i dati spostati restano alla
+// scheda tenuta (si dice prima)
+function ripristinaSchedaCestino(id) {
+  return unaVoltaSola('cestino-scheda|' + id, async () => {
+    const c = _cestinoSchede.find((x) => x.id === id);
+    if (!c || !_cestinoVedeSchede()) return;
+    if (
+      !(await chiediConferma(
+        'Ripristinare la scheda «' +
+          c.nome +
+          '»?\n\nTorna con le ' +
+          (c.righe_tolte || 0) +
+          ' righe doppie che erano state tolte. I dati spostati in «' +
+          (c.unito_in || '') +
+          '» restano lì.',
+        { titolo: 'Cestino', ok: 'Ripristina' },
+      ))
+    )
+      return;
+    try {
+      await _rpcSicura('collaboratori_cestino_ripristina', { p_token: getOpToken(), p_id: id });
+      toast('Scheda «' + c.nome + '» ripristinata');
+      if (typeof loadAll === 'function') await loadAll();
+    } catch (e) {
+      toastNonRiuscito('Scheda NON ripristinata', e);
+    }
+    caricaCestino();
+  });
+}
+function eliminaSchedaCestino(id) {
+  return unaVoltaSola('cestino-scheda|' + id, async () => {
+    const c = _cestinoSchede.find((x) => x.id === id);
+    if (!c || !_cestinoVedeSchede()) return;
+    if (
+      !(await chiediConferma(
+        'Eliminare per sempre la scheda «' +
+          c.nome +
+          '» dal Cestino?\n\nLe ' +
+          (c.righe_tolte || 0) +
+          ' righe doppie si perdono; i dati spostati in «' +
+          (c.unito_in || '') +
+          '» restano.',
+        { titolo: 'Cestino', ok: 'Elimina per sempre' },
+      ))
+    )
+      return;
+    try {
+      await _rpcSicura('collaboratori_cestino_elimina', { p_token: getOpToken(), p_id: id });
+      toast('Scheda eliminata dal Cestino');
+    } catch (e) {
+      toastNonRiuscito('Scheda NON eliminata', e);
+    }
+    caricaCestino();
+  });
+}

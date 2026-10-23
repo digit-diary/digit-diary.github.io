@@ -21,7 +21,8 @@
  * Ogni mese e UN passo di Annulla del piano (i passi di bozza e Migliora si uniscono);
  * il fabbisogno copiato e un passo dell Annulla generale (come il pulsante). "Annulla
  * tutti i mesi" li mette tutti nella coda di Annulla (annulla.js), dal piu recente.
- * Ferma: la preparazione finisce il mese in corso e si ferma; i mesi fatti restano.
+ * Ferma: il mese in corso si interrompe (bozza: torna com era; Migliora: tiene il migliore
+ * trovato) e la preparazione si ferma; i mesi fatti restano.
  */
 
 const PIANO_MESI_MINUTI = [0, 1, 2, 3];
@@ -252,6 +253,17 @@ async function _pianoMesiUnMese(ym, rep, opz, ui, codaPrima) {
   try {
     return await _pianoMesiDopoFoto(ym, rep, opz, ui, codaPrima, { riga, auto, passo, segna, fine });
   } catch (e) {
+    // FERMA durante la bozza (riverifica D-N2): il mese si interrompe subito e torna com era,
+    // come Prepara il mese (prima si aspettava la fine del mese, anche 3 minuti)
+    if (e && e.pianoFermata) {
+      _pianoMesiUnisciPassi(passo, 'prepara più mesi: ' + _pianoMesiLabel(ym) + ' (fermato)');
+      await _pianoRipristinaUltimoSnapshot('Prepara più mesi fermato: ' + _pianoMesiLabel(ym) + " è tornato com'era");
+      return fine(
+        'fermato',
+        "fermato durante la bozza: il mese è tornato com'era" +
+          (riga.fabb && riga.fabb.copiato ? ' (il fabbisogno copiato resta: lo toglie Annulla)' : ''),
+      );
+    }
     // errore a meta mese: quello che e stato scritto resta UN passo di Annulla
     _pianoMesiUnisciPassi(passo, 'prepara più mesi: ' + _pianoMesiLabel(ym) + ' (interrotto)');
     throw e;
@@ -268,7 +280,7 @@ async function _pianoMesiDopoFoto(ym, rep, opz, ui, codaPrima, x) {
   }
   ui.fase('Bozza…', 0.06);
   auto.bozza = null;
-  await generaBozzaPiano(false);
+  await generaBozzaPiano(false, { blocchi: typeof _pianoBozzaABlocchi === 'function' && _pianoBozzaABlocchi() });
   const b = auto.bozza;
   segna('bozza');
   if (!b || b.saltata) {
@@ -289,12 +301,15 @@ async function _pianoMesiDopoFoto(ym, rep, opz, ui, codaPrima, x) {
   let res;
   if (minuti > 0 && (b.celle || 0) > 0) {
     const sec = minuti * 60;
-    res = await pianoRicercaCalcola(sec, (x) =>
+    res = await pianoRicercaCalcola(sec, (x) => {
+      // Ferma durante Migliora: si tiene il migliore trovato fin qui (come Ferma di Migliora)
+      if (_pianoMesiStato && _pianoMesiStato.ferma) window._ricercaFerma = true;
       ui.fase(
         'Migliora… ' + Math.round(x.frazione * 100) + '% · posti scoperti ' + x.scoperti,
         0.4 + 0.55 * x.frazione,
-      ),
-    );
+      );
+    });
+    if (_pianoMesiStato && _pianoMesiStato.ferma) riga.note.push('Migliora fermato: tenuto il migliore trovato');
     riga.migliora = { minuti: minuti, prima: _pianoMesiNumeri(res.prima), applicata: false, cambi: 0 };
     if (res.migliore && res.cambi.length) {
       ui.fase('Scrivo i miglioramenti…', 0.97);
@@ -505,6 +520,7 @@ async function _pianoMesiAvvia(opz) {
   if (typeof _pianoUndoChiudiAperto === 'function') _pianoUndoChiudiAperto();
   const t0 = Date.now();
   _pianoMesiStato = { inCorso: true, ferma: false, fase: 'Preparo i dati…', frazione: 0, i: 0, n: opz.mesi.length };
+  window._pianoBozzaFerma = false;
   _pianoMesiPannello();
   logAzione(
     'Piano: prepara più mesi',
@@ -532,6 +548,7 @@ async function _pianoMesiAvvia(opz) {
   } finally {
     if (typeof _pianoUndoChiudiAperto === 'function') _pianoUndoChiudiAperto();
     window._pianoAutoInCorso = null;
+    window._pianoBozzaFerma = false;
     _pianoMeseSel = prima.mese;
     _pianoRepartoSel = prima.rep;
     _pianoMesiAzzeraCache();
@@ -606,7 +623,7 @@ function _pianoMesiPannello() {
     (s.ym ? ' (' + _pianoMesiLabel(s.ym) + ')' : '') +
     ' · ' +
     (s.fase || '') +
-    (s.ferma ? '\nMi fermo alla fine di questo mese: i mesi fatti restano.' : '');
+    (s.ferma ? '\nMi fermo: questo mese si interrompe, i mesi fatti restano.' : '');
   const t = document.getElementById('pm-testo');
   if (t) {
     t.textContent = testo;
@@ -626,6 +643,10 @@ function _pianoMesiPannello() {
 function pianoMesiFerma() {
   if (!_pianoMesiStato) return;
   _pianoMesiStato.ferma = true;
+  // la bozza del mese in corso si ferma alla pausa successiva (generaBozzaPiano), Migliora alla
+  // fetta successiva (D-N2)
+  window._pianoBozzaFerma = true;
+  window._ricercaFerma = true;
   _pianoMesiPannello();
 }
 // avviso al posto della griglia (renderPiano, tramite _pianoAutoBanner di piano-auto.js)
@@ -633,7 +654,7 @@ function _pianoMesiBanner(el) {
   el.style.opacity = '';
   el.innerHTML =
     '<div class="main-card" style="margin-top:12px"><div class="card-header">Prepara più mesi in corso</div>' +
-    '<div style="padding:14px;line-height:1.6">Il programma sta preparando il piano di più mesi su questo PC. Il resto del programma si usa normalmente; il Piano torna appena finito (o dopo Ferma, alla fine del mese in corso).' +
+    '<div style="padding:14px;line-height:1.6">Il programma sta preparando il piano di più mesi su questo PC. Il resto del programma si usa normalmente; il Piano torna appena finito (Ferma interrompe subito il mese in corso, che torna com\'era; i mesi fatti restano).' +
     '<div id="pm-avviso" style="margin-top:8px;color:var(--muted);white-space:pre-line"></div></div></div>';
   _pianoMesiPannello();
 }
@@ -662,7 +683,11 @@ function _pianoMesiRiepilogo() {
         ? 'Migliora applicata (' + r.migliora.cambi + ' celle)'
         : 'Migliora: nessun miglioramento sicuro, bozza lasciata com era'
       : '';
-    const sotto = [r.stato !== 'fatto' ? (r.stato === 'errore' ? 'Errore: ' : 'Saltato: ') + (r.motivo || '') : '']
+    const sotto = [
+      r.stato !== 'fatto'
+        ? (r.stato === 'errore' ? 'Errore: ' : r.stato === 'fermato' ? 'Fermato: ' : 'Saltato: ') + (r.motivo || '')
+        : '',
+    ]
       .concat(r.rigenerato ? ['tolte ' + r.rigenerato + ' celle generate prima'] : [])
       .concat(mig ? [mig] : [])
       .concat(r.note || [])

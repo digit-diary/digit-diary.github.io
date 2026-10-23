@@ -90,7 +90,7 @@ function apriModulo(tipo) {
       '<div class="modulo-field"><label>Livello RDI</label><select id="mod-livello"><option value="I">I° livello</option><option value="II">II° livello (grave)</option></select></div>';
   }
   html +=
-    '<div class="modulo-field" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)"><label>Modalit\u00E0 firma</label><div style="display:flex;gap:18px;margin-bottom:8px"><label style="display:flex;align-items:center;gap:5px;font-size:var(--fs-md,.875rem);cursor:pointer"><input type="radio" name="firma-tipo" value="cartacea" checked onchange="toggleFirmaDigitale()"> <i class="icx icx-penna"></i> Cartacea (stampa e firma a mano)</label><label style="display:flex;align-items:center;gap:5px;font-size:var(--fs-md,.875rem);cursor:pointer"><input type="radio" name="firma-tipo" value="digitale" onchange="toggleFirmaDigitale()"> <i class="icx icx-modifica"></i> Digitale (firma sullo schermo)</label></div><div id="firma-digitale-box" style="display:none"><div class="firma-canvas-wrap"><div class="firma-canvas-box"><small>Firma Resp. Settore</small><canvas id="firma-resp-canvas" class="firma-canvas" width="560" height="200"></canvas><button onclick="clearFirma(\'firma-resp-canvas\')">Cancella</button></div><div class="firma-canvas-box"><small>Firma Collaboratore</small><canvas id="firma-collab-canvas" class="firma-canvas" width="560" height="200"></canvas><button onclick="clearFirma(\'firma-collab-canvas\')">Cancella</button></div></div></div></div>';
+    '<div class="modulo-field" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)"><label>Modalit\u00E0 firma</label><div style="display:flex;flex-wrap:wrap;gap:8px 18px;margin-bottom:8px"><label style="display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-md,.875rem);font-weight:400;cursor:pointer;width:auto;margin:0"><input type="radio" name="firma-tipo" value="cartacea" checked onchange="toggleFirmaDigitale()" style="width:auto;flex:0 0 auto;margin:0;padding:0"> <i class="icx icx-penna"></i> Cartacea (stampa e firma a mano)</label><label style="display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-md,.875rem);font-weight:400;cursor:pointer;width:auto;margin:0"><input type="radio" name="firma-tipo" value="digitale" onchange="toggleFirmaDigitale()" style="width:auto;flex:0 0 auto;margin:0;padding:0"> <i class="icx icx-modifica"></i> Digitale (firma sullo schermo)</label></div><div id="firma-digitale-box" style="display:none"><div class="firma-canvas-wrap"><div class="firma-canvas-box"><small>Firma Resp. Settore</small><canvas id="firma-resp-canvas" class="firma-canvas" width="560" height="200"></canvas><button onclick="clearFirma(\'firma-resp-canvas\')">Cancella</button></div><div class="firma-canvas-box"><small>Firma Collaboratore</small><canvas id="firma-collab-canvas" class="firma-canvas" width="560" height="200"></canvas><button onclick="clearFirma(\'firma-collab-canvas\')">Cancella</button></div></div></div></div>';
   html +=
     '<div style="display:flex;gap:12px;margin-top:18px"><button class="btn-salva" onclick="generaModuloPDF(\'' +
     tipo +
@@ -155,6 +155,7 @@ function initFirmaCanvas(canvasId) {
   }
   c.addEventListener('mousedown', (e) => {
     drawing = true;
+    c._firmaToccata = true;
     [lx, ly] = gp(e);
   });
   c.addEventListener('mousemove', (e) => {
@@ -173,6 +174,7 @@ function initFirmaCanvas(canvasId) {
     (e) => {
       e.preventDefault();
       drawing = true;
+      c._firmaToccata = true;
       [lx, ly] = gp(e);
     },
     { passive: false },
@@ -204,6 +206,7 @@ function clearFirma(canvasId) {
   const c = document.getElementById(canvasId);
   if (!c) return;
   c.getContext('2d').clearRect(0, 0, c.width, c.height);
+  c._firmaToccata = true;
 }
 function getFirmaB64(canvasId) {
   const c = document.getElementById(canvasId);
@@ -225,6 +228,8 @@ function loadFirmaToCanvas(canvasId, b64) {
     img.onload = () => {
       ctx.clearRect(0, 0, c.width, c.height);
       ctx.drawImage(img, 0, 0, c.width, c.height);
+      // firma caricata dal modulo salvato: finche' non si ridisegna resta l'immagine originale
+      c._firmaToccata = false;
       res(true);
     };
     img.onerror = () => res(false);
@@ -316,7 +321,9 @@ async function generaModuloPDF(tipo) {
   }
   // la ristampa non scrive nulla; creare o modificare si'
   if (!_isRistampaSnap && !_puoScrivereModuli()) {
-    toast('Non hai il permesso');
+    toastErrore(
+      'Non puoi creare o modificare moduli in questo settore (pagina Moduli non tua o settore in sola lettura): chiedi all’amministratore',
+    );
     return;
   }
   let collab = capitalizzaNome((document.getElementById('mod-collaboratore') || {}).value || '');
@@ -358,10 +365,18 @@ async function generaModuloPDF(tipo) {
   }
   // Firma digitale
   const isDigFirma = document.querySelector('input[name="firma-tipo"][value="digitale"]');
-  const _fResp = isDigFirma && isDigFirma.checked ? getFirmaB64('firma-resp-canvas') : null;
-  const _fCollab = isDigFirma && isDigFirma.checked ? getFirmaB64('firma-collab-canvas') : null;
   // QR code ID
   const existingQr = window._editModuloId && moduliCache.find((x) => x.id === window._editModuloId);
+  const _datiOrig = (existingQr && existingQr.dati) || {};
+  // una firma ricaricata dal modulo salvato e non ridisegnata resta l'immagine originale: rileggerla
+  // dal canvas la ricodificava e il modulo risultava "modificato" senza che nessuno l'avesse toccato
+  const _firmaDi = (canvasId, orig) => {
+    const el = document.getElementById(canvasId);
+    if (orig && el && el._firmaToccata === false) return orig;
+    return getFirmaB64(canvasId);
+  };
+  const _fResp = isDigFirma && isDigFirma.checked ? _firmaDi('firma-resp-canvas', _datiOrig.firma_resp) : null;
+  const _fCollab = isDigFirma && isDigFirma.checked ? _firmaDi('firma-collab-canvas', _datiOrig.firma_collab) : null;
   const moduloQrId =
     existingQr && existingQr.dati && existingQr.dati.qr_code
       ? existingQr.dati.qr_code
@@ -371,8 +386,12 @@ async function generaModuloPDF(tipo) {
   // senza modello_testi il modulo e stato fatto con i testi ORIGINALI ({}), non con quelli
   // cambiati dopo
   if (typeof modelliCarica === 'function') await modelliCarica();
+  // 23/10/2026: anche la MODIFICA di un modulo salvato tiene i testi di allora (correggere un refuso
+  // non deve cambiare titolo, frasi e distribuzione con quelli del modello di oggi)
   const testiSalvati =
-    _isRistampaSnap && existingQr ? (existingQr.dati && existingQr.dati.modello_testi) || {} : undefined;
+    (_isRistampaSnap || _isEditSnap) && existingQr
+      ? (existingQr.dati && existingQr.dati.modello_testi) || {}
+      : undefined;
   const doc = _pdfModuloDisciplinare(
     tipo,
     {
@@ -404,8 +423,12 @@ async function generaModuloPDF(tipo) {
       '.pdf',
     'Modulo ' + tipo.charAt(0).toUpperCase() + tipo.slice(1) + ' · ' + collab,
   );
-  // Salva/aggiorna nel database
-  const dati = { qr_code: moduloQrId };
+  // Salva/aggiorna nel database. In modifica si parte dai dati salvati: le voci che il modulo non
+  // mostra (testi di allora, campi di versioni vecchie) restano come sono
+  const dati = _isEditSnap ? JSON.parse(JSON.stringify(_datiOrig)) : {};
+  dati.qr_code = moduloQrId;
+  delete dati.firma_resp;
+  delete dati.firma_collab;
   if (_fResp) dati.firma_resp = _fResp;
   if (_fCollab) dati.firma_collab = _fCollab;
   dati.firma_digitale = !!(isDigFirma && isDigFirma.checked);
@@ -418,9 +441,12 @@ async function generaModuloPDF(tipo) {
     dati.descrizione = (document.getElementById('mod-descrizione') || {}).value || '';
     dati.osservazioni = (document.getElementById('mod-osservazioni') || {}).value || '';
   }
-  // testi del modello cambiati rispetto agli originali (con i testi originali non si salva niente)
-  const testiUsati = typeof modelloTestiCambiati === 'function' ? modelloTestiCambiati(tipo) : {};
-  if (Object.keys(testiUsati).length) dati.modello_testi = testiUsati;
+  // testi del modello cambiati rispetto agli originali (con i testi originali non si salva niente);
+  // un modulo modificato tiene quelli con cui e' stato fatto (gia' in dati)
+  if (!_isEditSnap) {
+    const testiUsati = typeof modelloTestiCambiati === 'function' ? modelloTestiCambiati(tipo) : {};
+    if (Object.keys(testiUsati).length) dati.modello_testi = testiUsati;
+  }
   const isEdit = _isEditSnap;
   const isRistampa = _isRistampaSnap;
   let _ultimoEditCambiato = false;
@@ -435,19 +461,10 @@ async function generaModuloPDF(tipo) {
     if (isEdit) {
       const origMod = moduliCache.find((x) => x.id === window._editModuloId);
       const origOp = origMod ? origMod.operatore : getOperatore();
-      // Confronta con originale per capire se c'è stata una modifica reale
+      // Confronta con originale per capire se c'è stata una modifica reale (campo per campo,
+      // indipendente dall'ordine delle chiavi che il database restituisce)
       const orig = window._editModuloOrig || {};
-      const curSnap = {
-        collaboratore: collab,
-        resp_settore: resp,
-        data_modulo: data,
-        dati: JSON.stringify(dati),
-      };
-      const hasChanged =
-        curSnap.collaboratore !== orig.collaboratore ||
-        curSnap.resp_settore !== orig.resp_settore ||
-        curSnap.data_modulo !== orig.data_modulo ||
-        curSnap.dati !== orig.dati;
+      const hasChanged = _moduloCambiato(orig, { collaboratore: collab, resp_settore: resp, data_modulo: data, dati });
       const modBy = hasChanged && origOp !== getOperatore() ? getOperatore() : origMod ? origMod.modificato_da : null;
       if (hasChanged) {
         await secPatch('moduli', 'id=eq.' + window._editModuloId, {
@@ -506,6 +523,11 @@ async function generaModuloPDF(tipo) {
       10000,
     );
   }
+}
+// indirizzo del codice QR di un modulo: il sito del programma (Identita, js/identita.js)
+function _moduloQrUrl(qrId) {
+  const base = typeof identitaIndirizzo === 'function' ? identitaIndirizzo() : 'https://digit-diary.github.io';
+  return base + '/#modulo/' + qrId;
 }
 // PDF DI ALLINEAMENTO, APPREZZAMENTO E RDI (impaginazione di sempre, "come Word").
 // c = campi del modulo { collab, resp, data, settore, nonConf, obiettivo, scadenza, livello,
@@ -768,7 +790,7 @@ function _pdfModuloDisciplinare(tipo, c, testiSovra) {
   try {
     if (!c.senzaQr && isVis('qr_code') && typeof qrcode === 'function') {
       const qr = qrcode(0, 'M');
-      qr.addData('https://digit-diary.github.io/#modulo/' + c.qrId);
+      qr.addData(_moduloQrUrl(c.qrId));
       qr.make();
       const qrImg = qr.createDataURL(4, 0);
       const qrSz = 22;
@@ -779,7 +801,9 @@ function _pdfModuloDisciplinare(tipo, c, testiSovra) {
       doc.setTextColor(130);
       doc.setFont('helvetica', 'normal');
       doc.text('Scansiona per verificare', pw - mx - qrSz, ph - 11);
-      doc.text('digit-diary.github.io/#modulo/' + c.qrId, pw - mx - qrSz, ph - 8);
+      // indirizzo lungo (server interno con cartella): va a capo invece di uscire dal foglio
+      const qrRighe = doc.splitTextToSize(_moduloQrUrl(c.qrId).replace(/^https?:\/\//, ''), qrSz + mx - 4).slice(0, 2);
+      doc.text(qrRighe, pw - mx - qrSz, ph - 8);
     }
   } catch (e) {}
   return doc;
@@ -899,6 +923,49 @@ function resetModuliFiltri() {
   });
   aggiornaModuliLista();
 }
+// NOMI DEI TIPI DI MODULO, uguali in lista, riepilogo mensile e scheda
+const MODULI_TIPO_ETICHETTE = {
+  allineamento: 'Allineamento',
+  apprezzamento: 'Apprezzamento',
+  rdi: 'RDI',
+  cambio_turno: 'Cambio turno',
+  non_disponibilita: 'Non disponibilità',
+};
+function moduloTipoEtichetta(tipo) {
+  return MODULI_TIPO_ETICHETTE[tipo] || (tipo ? tipo.charAt(0).toUpperCase() + tipo.slice(1) : 'Modulo');
+}
+// righe del riepilogo mensile (Statistiche): [tipo, collaboratore, quantita'] per tipo
+// (allineamento, RDI, apprezzamento, poi gli altri) e collaboratore, i piu' frequenti prima
+function moduliRiepilogoRighe(lista) {
+  const ordine = ['allineamento', 'rdi', 'apprezzamento'];
+  const tipi = [...new Set((lista || []).map((m) => m.tipo).filter(Boolean))].sort(
+    (a, b) => (ordine.indexOf(a) + 1 || 99) - (ordine.indexOf(b) + 1 || 99) || a.localeCompare(b),
+  );
+  const out = [];
+  tipi.forEach((tipo) => {
+    const conta = {};
+    lista
+      .filter((m) => m.tipo === tipo)
+      .forEach((m) => {
+        const n = String(m.collaboratore || '').trim() || '(senza nome)';
+        conta[n] = (conta[n] || 0) + 1;
+      });
+    Object.entries(conta)
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'it'))
+      .forEach(([n, c]) => out.push([moduloTipoEtichetta(tipo), n, String(c)]));
+  });
+  return out;
+}
+// giorno locale (aaaa-mm-gg) di un istante salvato in UTC: un modulo creato fra mezzanotte e le 2
+// e' del giorno in cui e' stato fatto, non di quello prima
+function _moduloGiorno(m) {
+  const v = m.created_at || m.data_modulo || '';
+  if (typeof giornoDi === 'function') return giornoDi(v);
+  const d = new Date(v);
+  if (isNaN(d)) return String(v).substring(0, 10);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+const MODULI_LISTA_MAX = 50;
 function aggiornaModuliLista() {
   const fn = (document.getElementById('mod-filt-nome') || {}).value || '';
   const ft = (document.getElementById('mod-filt-tipo') || {}).value || '';
@@ -907,17 +974,11 @@ function aggiornaModuliLista() {
   let filtered = getModuliReparto().filter((m) => {
     if (fn && !m.collaboratore.toLowerCase().includes(fn.toLowerCase())) return false;
     if (ft && m.tipo !== ft) return false;
-    if (fd && m.created_at < fd) return false;
-    if (fa && m.created_at > fa + 'T23:59:59') return false;
+    if (fd && _moduloGiorno(m) < fd) return false;
+    if (fa && _moduloGiorno(m) > fa) return false;
     return true;
   });
-  const tl = {
-    allineamento: 'Allineamento',
-    apprezzamento: 'Apprezzamento',
-    rdi: 'RDI',
-    cambio_turno: 'Cambio turno',
-    non_disponibilita: 'Non disponibilità',
-  };
+  const tl = MODULI_TIPO_ETICHETTE;
   const tc = {
     allineamento: '#1a4a7a',
     apprezzamento: '#b8860b',
@@ -931,48 +992,89 @@ function aggiornaModuliLista() {
     box.innerHTML = '<div style="padding:14px;text-align:center;color:var(--muted)">Nessun modulo trovato</div>';
     return;
   }
-  box.innerHTML = filtered
-    .slice(0, 50)
-    .map((m) => {
-      const d = new Date(m.created_at);
-      const me = _jsArg(m.collaboratore);
-      return (
-        '<div class="scad-item" style="flex-wrap:wrap;padding:12px 0"><div style="display:flex;align-items:center;gap:10px;width:100%;flex-wrap:wrap"><span class="scad-date">' +
-        d.toLocaleDateString('it-IT') +
-        '</span><span class="entry-name" onclick="apriSchedaCollaboratore(\'' +
-        me +
-        '\')"><strong>' +
-        escP(m.collaboratore) +
-        '</strong></span><span class="badge" style="background:' +
-        (tc[m.tipo] || '#888') +
-        ';color:white;padding:2px 10px;border-radius:2px;font-size:var(--fs-sm,.8125rem)">' +
-        (tl[m.tipo] || escP(m.tipo || 'Modulo')) +
-        '</span><span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
-        (m.tipo === 'cambio_turno'
-          ? 'Cambio del ' +
-            escP(
-              String(m.data_modulo || '')
-                .split('-')
-                .reverse()
-                .join('.'),
-            )
-          : 'Resp: ' + escP(m.resp_settore || '-')) +
-        (m.operatore ? ' · Creato da ' + escP(m.operatore) : '') +
-        (m.modificato_da ? ' · Modificato da ' + escP(m.modificato_da) : '') +
-        '</span><div style="margin-left:auto;display:flex;gap:6px">' +
-        (m.tipo === 'cambio_turno'
-          ? '<button class="btn-act tipo" onclick="ristampaModuloPDF(' + m.id + ')">Apri PDF</button>'
-          : '<button class="btn-act edit" onclick="apriModuloSalvato(' +
-            m.id +
-            ')">Apri</button><button class="btn-act tipo" onclick="ristampaModuloPDF(' +
-            m.id +
-            ')">PDF</button>') +
-        '<button class="btn-act del" onclick="eliminaModulo(' +
-        m.id +
-        ')">Elimina</button></div></div></div>'
-      );
-    })
-    .join('');
+  // oltre il limite si dice quanti sono e come restringere (prima il resto spariva in silenzio)
+  const oltre =
+    filtered.length > MODULI_LISTA_MAX
+      ? '<div style="padding:10px 0;color:var(--muted);font-size:var(--fs-sm,.8125rem)">Mostrati i ' +
+        MODULI_LISTA_MAX +
+        ' più recenti di ' +
+        filtered.length +
+        ': usa i filtri per nome, tipo o date per vedere gli altri.</div>'
+      : '';
+  box.innerHTML =
+    oltre +
+    filtered
+      .slice(0, MODULI_LISTA_MAX)
+      .map((m) => {
+        const d = new Date(m.created_at);
+        const me = _jsArg(m.collaboratore);
+        return (
+          '<div class="scad-item" style="flex-wrap:wrap;padding:12px 0"><div style="display:flex;align-items:center;gap:10px;width:100%;flex-wrap:wrap"><span class="scad-date">' +
+          d.toLocaleDateString('it-IT') +
+          '</span><span class="entry-name" onclick="apriSchedaCollaboratore(\'' +
+          me +
+          '\')"><strong>' +
+          escP(m.collaboratore) +
+          '</strong></span><span class="badge" style="background:' +
+          (tc[m.tipo] || '#888') +
+          ';color:white;padding:2px 10px;border-radius:2px;font-size:var(--fs-sm,.8125rem)">' +
+          (tl[m.tipo] || escP(m.tipo || 'Modulo')) +
+          '</span><span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
+          (m.tipo === 'cambio_turno'
+            ? 'Cambio del ' +
+              escP(
+                String(m.data_modulo || '')
+                  .split('-')
+                  .reverse()
+                  .join('.'),
+              )
+            : 'Resp: ' + escP(m.resp_settore || '-')) +
+          (m.operatore ? ' · Creato da ' + escP(m.operatore) : '') +
+          (m.modificato_da ? ' · Modificato da ' + escP(m.modificato_da) : '') +
+          '</span><div style="margin-left:auto;display:flex;gap:6px">' +
+          (m.tipo === 'cambio_turno'
+            ? '<button class="btn-act tipo" onclick="ristampaModuloPDF(' + m.id + ')">Apri PDF</button>'
+            : '<button class="btn-act edit" onclick="apriModuloSalvato(' +
+              m.id +
+              ')">Apri</button><button class="btn-act tipo" onclick="ristampaModuloPDF(' +
+              m.id +
+              ')">PDF</button>') +
+          '<button class="btn-act del" onclick="eliminaModulo(' +
+          m.id +
+          ')">Elimina</button></div></div></div>'
+        );
+      })
+      .join('');
+}
+// Forma canonica dei dati di un modulo per il confronto: chiavi in ordine (il jsonb del database
+// le restituisce in un altro ordine) e voci vuote tolte ('' / null / false valgono come assenti,
+// cosi' un modulo vecchio senza "scadenza" non risulta cambiato perche' ora la casella e vuota)
+function _moduloDatiNorm(v) {
+  if (Array.isArray(v)) return v.map(_moduloDatiNorm);
+  if (v && typeof v === 'object') {
+    const o = {};
+    Object.keys(v)
+      .sort()
+      .forEach((k) => {
+        const x = v[k];
+        if (x === null || x === undefined || x === false || (typeof x === 'string' && x.trim() === '')) return;
+        o[k] = _moduloDatiNorm(x);
+      });
+    return o;
+  }
+  // uno spazio in fondo a un campo non e una modifica (riverifica B-N2)
+  return typeof v === 'string' ? v.trim() : v;
+}
+// true se il modulo riaperto e' davvero cambiato (23/10/2026: prima JSON.stringify(dati) contro
+// i dati del database dava sempre "cambiato" e ogni ristampa scriveva "Modificato da")
+function _moduloCambiato(orig, cur) {
+  orig = orig || {};
+  const s = (x) => String(x == null ? '' : x).trim();
+  if (s(orig.collaboratore) !== s(cur.collaboratore)) return true;
+  if (s(orig.resp_settore) !== s(cur.resp_settore)) return true;
+  if (s(orig.data_modulo) !== s(cur.data_modulo)) return true;
+  const od = typeof orig.dati === 'string' ? JSON.parse(orig.dati || '{}') : orig.dati || {};
+  return JSON.stringify(_moduloDatiNorm(od)) !== JSON.stringify(_moduloDatiNorm(cur.dati || {}));
 }
 function apriModuloSalvato(id) {
   const m = moduliCache.find((x) => x.id === id);
@@ -986,7 +1088,7 @@ function apriModuloSalvato(id) {
     collaboratore: m.collaboratore,
     resp_settore: m.resp_settore,
     data_modulo: m.data_modulo,
-    dati: JSON.stringify(m.dati || {}),
+    dati: JSON.parse(JSON.stringify(m.dati || {})),
   };
   // Il form e' gia' nel DOM (apriModulo lo scrive in modo sincrono): si
   // compila subito, senza timer a occhio. Le firme arrivano da immagini
@@ -1056,7 +1158,8 @@ async function ristampaModuloPDF(id) {
     try {
       if (!window.jspdf) await caricaJsPDF();
       if (typeof modelliCarica === 'function') await modelliCarica();
-      const doc = _pdfCambioTurno(m.dati || {});
+      // la data di quando il foglio e stato fatto, non quella di oggi (B16)
+      const doc = _pdfCambioTurno(Object.assign({ generato_il: m.created_at }, m.dati || {}));
       mostraPdfPreview(doc, 'cambio_turno_' + (m.data_modulo || '') + '.pdf', 'Cambio turno ' + (m.data_modulo || ''));
       logAzione('Ristampato foglio cambio turno', m.collaboratore + ' - ' + (m.data_modulo || ''));
     } catch (e) {
@@ -1084,7 +1187,9 @@ function _puoScrivereModuli() {
 }
 async function eliminaModulo(id) {
   if (!_puoScrivereModuli()) {
-    toast('Non hai il permesso');
+    toastErrore(
+      'Non puoi eliminare moduli in questo settore (pagina Moduli non tua o settore in sola lettura): chiedi all’amministratore',
+    );
     return;
   }
   if (!(await chiediConferma('Eliminare questo modulo? Sarà spostato nel cestino.'))) return;
@@ -1112,7 +1217,7 @@ async function eliminaModulo(id) {
     renderAmmonimentiAlerts();
     toast('Modulo spostato nel cestino');
   } catch (e) {
-    toast('Errore eliminazione');
+    toastNonRiuscito('Modulo NON eliminato', e);
   }
 }
 
@@ -1254,7 +1359,7 @@ function filtraCollaboratoriUI(testo) {
 // ripete qui perche' le funzioni sono globali e richiamabili anche da console.
 function _soloAdminAnagrafica() {
   if (isAdmin()) return true;
-  toast('Non hai il permesso');
+  toastErrore("Anagrafica dei collaboratori: la modifica solo l'amministratore");
   return false;
 }
 // un salvataggio alla volta: il doppio click creava il collaboratore e poi dava
@@ -1288,7 +1393,7 @@ async function _aggiungiCollaboratoreEsegui() {
     toast('Collaboratore aggiunto');
   } catch (e) {
     if (e.message && e.message.includes('duplicate')) toast('Nome già esistente');
-    else toast('Errore aggiunta collaboratore');
+    else toastNonRiuscito('Collaboratore NON aggiunto', e);
   }
 }
 function rinominaCollaboratore(nome) {
@@ -1651,7 +1756,7 @@ async function salvaCoperturaCollab(id) {
     toast(scelti.length ? 'Copertura aggiornata' : 'Copertura rimossa');
     renderCollaboratoriUI();
   } catch (e) {
-    toast('Errore salvataggio copertura');
+    toastNonRiuscito('Copertura NON salvata', e);
   }
 }
 async function cambiaRepartoCollaboratore(id, rep, opz) {
@@ -1848,7 +1953,7 @@ async function disattivaCollaboratore(nome) {
     aggiornaNomi();
     toast('Collaboratore disattivato');
   } catch (e) {
-    toast('Errore disattivazione');
+    toastNonRiuscito('Collaboratore NON disattivato', e);
   }
 }
 async function riattivaCollaboratore(nome) {
@@ -1870,16 +1975,28 @@ async function riattivaCollaboratore(nome) {
     aggiornaNomi();
     toast('Collaboratore riattivato');
   } catch (e) {
-    toast('Errore riattivazione');
+    toastNonRiuscito('Collaboratore NON riattivato', e);
   }
 }
 
+// testo accorciato a parola intera con «…» (prima tagliato a 80 caratteri a meta parola:
+// «(2 giorni) ricev», controllo 23/10 D13)
+function _etichettaCorta(t, max) {
+  t = String(t || '');
+  if (t.length <= max) return t;
+  const c = t.substring(0, max);
+  const sp = c.lastIndexOf(' ');
+  return (sp > max * 0.6 ? c.substring(0, sp) : c).replace(/[\s,;:·-]+$/, '') + '\u2026';
+}
 // LOG ATTIVITA
 async function logAzione(azione, dettaglio) {
   // il registro segna la fine di un azione: le scritture fatte finora
   // diventano UN gruppo di Annulla con questa etichetta
   if (window.Annulla && !/^(Annullata|Ripristinata) azione/.test(azione))
-    window.Annulla.chiudiGruppo(azione + (dettaglio ? ' \u00b7 ' + String(dettaglio).substring(0, 80) : ''));
+    window.Annulla.chiudiGruppo(
+      azione + (dettaglio ? ' \u00b7 ' + _etichettaCorta(String(dettaglio), 110) : ''),
+      azione + (dettaglio ? ' \u00b7 ' + String(dettaglio) : ''),
+    );
   try {
     const rec = {
       operatore: getOperatore() || 'Admin',
@@ -1896,120 +2013,204 @@ async function logAzione(azione, dettaglio) {
     logCache.unshift(Object.assign(rec, { created_at: new Date().toISOString() }));
   } catch (e) {}
 }
-function renderRegistro() {
-  const el = document.getElementById('registro-list');
-  if (!el) return;
+// REGISTRO ATTIVITA (controllo C, C11): periodo, operatore, categoria e ricerca si leggono
+// dal database (registro_leggi, migrazione 20260929_c_registro_attivita), a pagine, con il
+// totale. Prima si filtravano le ultime 500 righe caricate all avvio (logCache) e se ne
+// mostravano 200: settembre risultava vuoto con 599 righe nel database, il filtro Operatore
+// aveva solo i nomi di quelle righe e "Collaboratori" riconosceva 4 azioni. Le categorie
+// arrivano dal database insieme ai dati (una sola definizione).
+const _REG_PAGINA = 200;
+let _regStato = { righe: [], totale: 0, seq: 0, timer: null };
+function _registroFiltri() {
+  const v = (id) => ((document.getElementById(id) || {}).value || '').trim();
+  return {
+    p_dal: v('log-filt-dal') || null,
+    p_al: v('log-filt-al') || null,
+    p_operatore: v('log-filt-op'),
+    p_categoria: v('log-filt-cat'),
+    p_cerca: v('log-filt-cerca'),
+  };
+}
+async function _registroLeggi(filtri, limit, offset) {
+  const tk = typeof getOpToken === 'function' ? getOpToken() : null;
+  if (!tk) throw new Error('sessione scaduta: accedi di nuovo');
+  return _conSessione(
+    (t) => _rpcSicura('registro_leggi', Object.assign({ p_token: t, p_limit: limit, p_offset: offset }, filtri)),
+    tk,
+  );
+}
+// menu Operatore e Categoria dai dati del database, tenendo la scelta fatta
+function _registroMenu(r) {
   const selOp = document.getElementById('log-filt-op');
-  if (selOp) {
+  if (selOp && Array.isArray(r.operatori)) {
     const cv = selOp.value;
-    const ops = [...new Set(logCache.map((l) => l.operatore))].sort();
+    const ops = r.operatori.slice();
+    if (cv && !ops.includes(cv)) ops.push(cv);
     selOp.innerHTML =
       '<option value="">Tutti</option>' +
-      ops.map((n) => '<option' + (n === cv ? ' selected' : '') + '>' + escP(n) + '</option>').join('');
+      ops
+        .map(
+          (n) =>
+            '<option value="' +
+            escP(n) +
+            '"' +
+            (n === cv ? ' selected' : '') +
+            '>' +
+            escP(n || '(senza nome)') +
+            '</option>',
+        )
+        .join('');
   }
-  const fo = (document.getElementById('log-filt-op') || {}).value || '';
-  const fcat = (document.getElementById('log-filt-cat') || {}).value || '';
-  const fc = (document.getElementById('log-filt-cerca') || {}).value || '';
-  const fd = (document.getElementById('log-filt-dal') || {}).value || '';
-  const fa = (document.getElementById('log-filt-al') || {}).value || '';
-  const catMap = {
-    registrazione: ['Nuova registrazione', 'Modifica registrazione', 'Eliminata registrazione'],
-    modulo: ['Modulo allineamento', 'Modulo apprezzamento', 'Modulo rdi', 'Eliminato modulo'],
-    collaboratore: [
-      'Rinomina collaboratore',
-      'Importa collaboratori',
-      'Collaboratore aggiunto',
-      'Collaboratore disattivato',
-    ],
-    rapporto: ['Rapporto salvato'],
-    scadenza: ['Scadenza creata', 'Scadenza completata'],
-    operatore: ['Operatore creato', 'Operatore rimosso'],
-    tipo: ['Tipo aggiunto'],
-  };
-  let filtered = logCache.filter((l) => {
-    if (fo && l.operatore !== fo) return false;
-    if (fcat && catMap[fcat] && !catMap[fcat].some((a) => l.azione.startsWith(a))) return false;
-    if (
-      fc &&
-      !l.azione.toLowerCase().includes(fc.toLowerCase()) &&
-      !(l.dettaglio || '').toLowerCase().includes(fc.toLowerCase())
-    )
-      return false;
-    if (fd && l.created_at < fd) return false;
-    if (fa && l.created_at > fa + 'T23:59:59') return false;
-    return true;
-  });
-  if (!filtered.length) {
-    el.innerHTML = '<p style="color:var(--muted);padding:10px">Nessuna attività registrata</p>';
+  const selCat = document.getElementById('log-filt-cat');
+  if (selCat && Array.isArray(r.categorie) && !selCat.dataset.dalDb) {
+    const cv = selCat.value;
+    selCat.innerHTML =
+      '<option value="">Tutte</option>' +
+      r.categorie
+        .concat([{ chiave: 'altro', etichetta: 'Altro' }])
+        .map(
+          (c) =>
+            '<option value="' +
+            escP(c.chiave) +
+            '"' +
+            (c.chiave === cv ? ' selected' : '') +
+            '>' +
+            escP(
+              typeof incentiviVisibili === 'function' && !incentiviVisibili() && c.chiave === 'formazione'
+                ? 'Formazione'
+                : c.etichetta,
+            ) +
+            '</option>',
+        )
+        .join('');
+    selCat.dataset.dalDb = '1';
+  }
+}
+function _registroRigaHtml(l) {
+  const d = new Date(l.created_at);
+  return (
+    '<tr' +
+    (typeof _attrCellaDaTesto === 'function' ? _attrCellaDaTesto(l.dettaglio) : '') +
+    '><td class="reg-quando">' +
+    d.toLocaleDateString('it-IT') +
+    ' ' +
+    d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) +
+    '</td><td class="reg-chi">' +
+    escP(l.operatore) +
+    '</td><td>' +
+    escP(l.azione) +
+    '</td><td class="reg-dettaglio">' +
+    escP(l.dettaglio) +
+    '</td></tr>'
+  );
+}
+// INCENTIVI SPENTI (incentiviVisibili, formazione.js): le righe di punti e premi non si
+// mostrano (restano nel database e tornano quando gli incentivi si riaccendono)
+const _REG_INCENTIVI_RE = /^(punti|premio|azione punti|notifiche incentivi|report incentivi|copertura rimossa)/i;
+function _registroSenzaIncentivi(righe) {
+  if (typeof incentiviVisibili !== 'function' || incentiviVisibili()) return righe;
+  return righe.filter((l) => !_REG_INCENTIVI_RE.test(String(l.azione || '')));
+}
+function _registroDisegna() {
+  const el = document.getElementById('registro-list');
+  if (!el) return;
+  const st = _regStato;
+  const vis = _registroSenzaIncentivi(st.righe);
+  const nascoste = st.righe.length - vis.length;
+  if (!st.righe.length) {
+    el.innerHTML = '<p style="color:var(--muted);padding:10px">Nessuna attività registrata con questi filtri</p>';
     return;
   }
   el.innerHTML =
-    '<table style="width:100%;border-collapse:collapse;font-size:var(--fs-md,.875rem)"><thead><tr style="border-bottom:2px solid var(--line);text-align:left"><th style="padding:8px">Data/Ora</th><th style="padding:8px">Operatore</th><th style="padding:8px">Azione</th><th style="padding:8px">Dettaglio</th></tr></thead><tbody>' +
-    filtered
-      .slice(0, 200)
-      .map((l) => {
-        const d = new Date(l.created_at);
-        return (
-          '<tr style="border-bottom:1px solid var(--line)"' +
-          (typeof _attrCellaDaTesto === 'function' ? _attrCellaDaTesto(l.dettaglio) : '') +
-          '><td style="padding:6px 8px;white-space:nowrap;color:var(--muted);font-size:var(--fs-sm,.8125rem)">' +
-          d.toLocaleDateString('it-IT') +
-          ' ' +
-          d.toLocaleTimeString('it-IT', {
-            hour: '2-digit',
-            minute: '2-digit',
-          }) +
-          '</td><td style="padding:6px 8px;font-weight:600">' +
-          escP(l.operatore) +
-          '</td><td style="padding:6px 8px">' +
-          escP(l.azione) +
-          '</td><td style="padding:6px 8px;color:var(--muted);font-size:var(--fs-md,.875rem)">' +
-          escP(l.dettaglio) +
-          '</td></tr>'
-        );
-      })
-      .join('') +
-    '</tbody></table>';
+    '<p class="reg-conta">Mostrate <b>' +
+    vis.length +
+    '</b> di <b>' +
+    (st.totale - nascoste) +
+    '</b>' +
+    (st.totale > st.righe.length ? ' (le più recenti prima)' : '') +
+    '</p><div class="reg-scorre"><table class="reg-tab"><thead><tr><th>Data/Ora</th><th>Operatore</th><th>Azione</th><th>Dettaglio</th></tr></thead><tbody>' +
+    vis.map(_registroRigaHtml).join('') +
+    '</tbody></table></div>' +
+    (st.totale > st.righe.length
+      ? '<p style="text-align:center;margin-top:10px"><button type="button" class="btn-export" onclick="registroAltre()">Mostra altre ' +
+        Math.min(_REG_PAGINA, st.totale - st.righe.length) +
+        '</button></p>'
+      : '');
 }
-function esportaRegistroCSV() {
-  const fo = (document.getElementById('log-filt-op') || {}).value || '';
-  const fcat = (document.getElementById('log-filt-cat') || {}).value || '';
-  const fc = (document.getElementById('log-filt-cerca') || {}).value || '';
-  const fd = (document.getElementById('log-filt-dal') || {}).value || '';
-  const fa = (document.getElementById('log-filt-al') || {}).value || '';
-  const catMap = {
-    registrazione: ['Nuova registrazione', 'Modifica registrazione', 'Eliminata registrazione'],
-    modulo: ['Modulo allineamento', 'Modulo apprezzamento', 'Modulo rdi', 'Eliminato modulo'],
-    collaboratore: [
-      'Rinomina collaboratore',
-      'Importa collaboratori',
-      'Collaboratore aggiunto',
-      'Collaboratore disattivato',
-    ],
-    rapporto: ['Rapporto salvato'],
-    scadenza: ['Scadenza creata', 'Scadenza completata'],
-    operatore: ['Operatore creato', 'Operatore rimosso'],
-    tipo: ['Tipo aggiunto'],
-  };
-  const filtered = logCache.filter((l) => {
-    if (fo && l.operatore !== fo) return false;
-    if (fcat && catMap[fcat] && !catMap[fcat].some((a) => l.azione.startsWith(a))) return false;
-    if (
-      fc &&
-      !l.azione.toLowerCase().includes(fc.toLowerCase()) &&
-      !(l.dettaglio || '').toLowerCase().includes(fc.toLowerCase())
-    )
-      return false;
-    if (fd && l.created_at < fd) return false;
-    if (fa && l.created_at > fa + 'T23:59:59') return false;
-    return true;
-  });
-  if (!filtered.length) {
+// rilegge dalla prima pagina (filtri cambiati); la ricerca aspetta che si smetta di scrivere
+function renderRegistro(subito) {
+  clearTimeout(_regStato.timer);
+  const attiva = document.activeElement && document.activeElement.id === 'log-filt-cerca';
+  if (!subito && attiva) {
+    _regStato.timer = setTimeout(() => renderRegistro(true), 300);
+    return;
+  }
+  return _registroCarica();
+}
+async function _registroCarica() {
+  const el = document.getElementById('registro-list');
+  if (!el) return;
+  const seq = ++_regStato.seq;
+  el.innerHTML = '<p style="color:var(--muted);padding:10px">Caricamento...</p>';
+  try {
+    const r = await _registroLeggi(_registroFiltri(), _REG_PAGINA, 0);
+    if (seq !== _regStato.seq) return; // nel frattempo sono cambiati i filtri
+    _registroMenu(r || {});
+    _regStato.righe = (r && r.righe) || [];
+    _regStato.totale = (r && r.totale) || 0;
+    _registroDisegna();
+  } catch (e) {
+    if (seq !== _regStato.seq) return;
+    el.innerHTML =
+      '<p style="color:var(--accent);padding:10px">Registro non letto: ' + escP((e && e.message) || String(e)) + '</p>';
+  }
+}
+// una lettura alla volta (riverifica C-N2): il doppio clic leggeva due volte la stessa pagina
+// e la lista mostrava 600 righe di cui 400 diverse
+let _regAltreInCorso = false;
+async function registroAltre() {
+  if (_regAltreInCorso) return;
+  _regAltreInCorso = true;
+  const seq = _regStato.seq;
+  const btn =
+    typeof event !== 'undefined' && event && event.target && event.target.closest
+      ? event.target.closest('button')
+      : null;
+  if (btn) btn.disabled = true;
+  try {
+    const r = await _registroLeggi(_registroFiltri(), _REG_PAGINA, _regStato.righe.length);
+    if (seq !== _regStato.seq) return;
+    _regStato.righe = _regStato.righe.concat((r && r.righe) || []);
+    _regStato.totale = (r && r.totale) || _regStato.totale;
+    _registroDisegna();
+  } catch (e) {
+    toastErrore('Altre righe non lette: ' + ((e && e.message) || e));
+    if (btn) btn.disabled = false;
+  } finally {
+    _regAltreInCorso = false;
+  }
+}
+// CSV: TUTTE le righe dei filtri scelti (a pagine dal database), non solo quelle a schermo
+async function esportaRegistroCSV() {
+  const filtri = _registroFiltri();
+  let righe = [];
+  try {
+    for (let pag = 0; pag < 200; pag++) {
+      const r = await _registroLeggi(filtri, 5000, righe.length);
+      const nuove = (r && r.righe) || [];
+      righe = righe.concat(nuove);
+      if (nuove.length < 5000 || righe.length >= ((r && r.totale) || 0)) break;
+    }
+  } catch (e) {
+    toastErrore('CSV non creato: ' + ((e && e.message) || e));
+    return;
+  }
+  if (!righe.length) {
     toast('Nessun dato da esportare');
     return;
   }
   const rows = [['Data', 'Ora', 'Operatore', 'Azione', 'Dettaglio']];
-  filtered.forEach((l) => {
+  _registroSenzaIncentivi(righe).forEach((l) => {
     const d = new Date(l.created_at);
     rows.push([
       d.toLocaleDateString('it-IT'),
@@ -2019,14 +2220,14 @@ function esportaRegistroCSV() {
       '"' + (l.dettaglio || '').replace(/"/g, '""').replace(/\n/g, ' ') + '"',
     ]);
   });
-  const blob = new Blob(['\uFEFF' + rows.map((r) => r.join(';')).join('\n')], {
+  const blob = new Blob(['﻿' + rows.map((r) => r.join(';')).join('\n')], {
     type: 'text/csv;charset=utf-8',
   });
   Object.assign(document.createElement('a'), {
     href: URL.createObjectURL(blob),
     download: 'registro_' + new Date().toLocaleDateString('it-IT').replace(/\//g, '-') + '.csv',
   }).click();
-  toast('CSV registro esportato!');
+  toast('CSV registro esportato: ' + righe.length + ' righe');
 }
 
 // IMPORTA COLLABORATORI DA FILE
@@ -2531,7 +2732,7 @@ async function importaModuloFile(input) {
     }
   } catch (e) {
     console.error(e);
-    toast('Errore lettura file');
+    toastNonRiuscito('File non letto', e);
     input.value = '';
     return;
   }
@@ -2660,6 +2861,15 @@ function apriProfilo(nome) {
 }
 
 // FILTER & RENDER
+// Dal/Al del Diario sul giorno LOCALE della registrazione (23/10/2026, controllo A23): prima
+// new Date('aaaa-mm-gg') era la mezzanotte UTC, e una voce delle 00:30 di quel giorno restava
+// fuori con Dal = Al = quel giorno
+function _diarioNelPeriodo(data, dal, al) {
+  const g = giornoDi(data);
+  if (dal && g < dal) return false;
+  if (al && g > al) return false;
+  return true;
+}
 function getFiltrati() {
   const p = document.getElementById('filt-persona').value,
     t = document.getElementById('filt-tipo').value,
@@ -2667,11 +2877,9 @@ function getFiltrati() {
     al = document.getElementById('filt-al').value,
     c = document.getElementById('filt-cerca').value.toLowerCase();
   let list = getDatiReparto().filter((e) => {
-    const d = new Date(e.data);
     if (p && e.nome !== p) return false;
     if (t && e.tipo !== t) return false;
-    if (dal && d < new Date(dal)) return false;
-    if (al && d > new Date(al + 'T23:59:59')) return false;
+    if (!_diarioNelPeriodo(e.data, dal, al)) return false;
     if (c && !e.nome.toLowerCase().includes(c) && !e.testo.toLowerCase().includes(c)) return false;
     return true;
   });

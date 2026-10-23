@@ -605,6 +605,7 @@ async function modelliApriEditor(tipoIniziale) {
     box.querySelector('.mdl-avviso').textContent = msg.join(' ');
     box.classList.toggle('mdl-cambiato', ta.value !== c.t);
     box.querySelector('.mdl-orig').hidden = ta.value === c.t;
+    _mdlAltezza(ta);
   };
   const disegnaCampi = () => {
     const m = MODELLI_DOC[tipo];
@@ -892,4 +893,18 @@ function modelliPulsanteModuli() {
   el.innerHTML = modelliPuoModificare()
     ? '<button type="button" class="btn-secondario" onclick="modelliApriEditor(\'allineamento\')" title="Cambia i testi fissi dei moduli e dei formulari stampati"><i class="icx icx-modifica"></i> Modelli dei documenti</button>'
     : '';
+}
+
+// casella di testo dei Modelli alta quanto il suo contenuto (23/10/2026: con rows fisso i testi
+// lunghi, per esempio il titolo della sezione obiettivo, restavano tagliati). Finche' la finestra
+// non e' visibile scrollHeight vale 0: si riprova al disegno successivo.
+function _mdlAltezza(ta) {
+  if (!ta) return;
+  const fai = () => {
+    if (!ta.scrollHeight) return false;
+    ta.style.height = 'auto';
+    ta.style.height = ta.scrollHeight + 2 + 'px';
+    return true;
+  };
+  if (!fai() && typeof requestAnimationFrame === 'function') requestAnimationFrame(fai);
 }

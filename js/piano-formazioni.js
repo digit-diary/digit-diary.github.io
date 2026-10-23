@@ -670,7 +670,7 @@ async function formazioneNuova(pre) {
       '<label style="display:inline-flex;gap:6px;align-items:center;margin-bottom:6px;font-size:var(--fs-sm,.8125rem)"><input type="checkbox" id="fz-nuovo" onchange="document.getElementById(\'fz-box-nuovo\').hidden=!this.checked;document.getElementById(\'fz-box-esistente\').hidden=this.checked"> Nuovo allievo, non ancora nel programma</label>' +
         '<div id="fz-box-esistente"><input id="fz-allievo" list="fz-nomi" value="' +
         escP(pre.allievo || '') +
-        '" placeholder="Cerca collaboratore..." autocomplete="off" style="width:100%;padding:6px 8px"><datalist id="fz-nomi">' +
+        '" placeholder="Cerca collaboratore..." autocomplete="off" onchange="formazioneAggiornaFormatori()" style="width:100%;padding:6px 8px"><datalist id="fz-nomi">' +
         membri.map((n) => '<option value="' + escP(n) + '">').join('') +
         '</datalist></div>' +
         '<div id="fz-box-nuovo" hidden><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="fz-cognome" placeholder="Cognome" autocomplete="off" style="flex:1;min-width:140px;padding:6px 8px"><input id="fz-nome" placeholder="Nome" autocomplete="off" style="flex:1;min-width:140px;padding:6px 8px"></div>' +
@@ -692,9 +692,10 @@ async function formazioneNuova(pre) {
               (compPre && compPre.key === c.key ? ' selected' : '') +
               '>' +
               escP(c.label) +
-              ' (' +
-              escP(c.gruppo) +
-              ')</option>',
+              // il gruppo tra parentesi solo se l etichetta non lo dice gia («Back Office
+              // (BO)» restava «Back Office (BO) (BO)», controllo 23/10 D22)
+              (String(c.label || '').includes('(' + c.gruppo + ')') ? '' : ' (' + escP(c.gruppo) + ')') +
+              '</option>',
           )
           .join('') +
         '</select>',
@@ -882,11 +883,22 @@ function formazioneAggiornaFormatori(preferito) {
   if (!sel) return;
   const comp = _formCompetenze().find((c) => c.key === sel.value);
   if (!comp) return;
-  const fm = _formFormatori(comp.key);
+  // l allievo non e mai fra i suoi formatori (prima compariva e si poteva spuntare: lo
+  // fermava solo il controllo alla conferma, controllo 23/10 D22)
+  const allEl = document.getElementById('fz-allievo');
+  const nuovoEl = document.getElementById('fz-nuovo');
+  const allievo =
+    allEl && !(nuovoEl && nuovoEl.checked)
+      ? String(allEl.value || '')
+          .trim()
+          .toLowerCase()
+      : '';
+  const nonAllievo = (n) => !allievo || String(n).toLowerCase() !== allievo;
+  const fm = _formFormatori(comp.key).filter(nonAllievo);
   const t = _pianoTurniReparto().find((x) => String(x.gruppo || '').toUpperCase() === comp.gruppo);
   const storia = _formIdoneitaStoria();
   const membri = collaboratoriCache
-    .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && !fm.includes(c.nome))
+    .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && !fm.includes(c.nome) && nonAllievo(c.nome))
     .sort((a, b) => a.nome.localeCompare(b.nome));
   const abil = membri.filter((c) => !t || _pianoIdoneoStatico(c.nome, t, null, storia)).map((c) => c.nome);
   // anche chi non risulta abilitato si puo scegliere (in fondo): decide chi pianifica
@@ -902,7 +914,7 @@ function formazioneAggiornaFormatori(preferito) {
   ].forEach(([box, id]) => {
     const el = document.getElementById(box);
     if (!el) return;
-    const prima = selPersValori(id);
+    const prima = selPersValori(id).filter(nonAllievo);
     // di partenza: il formatore indicato (da Organico) o tutti i formatori della competenza
     const scelti = prima.length ? prima : preferito ? [preferito] : fm.slice();
     el.innerHTML = _selPersHtml(id, gruppi, scelti, { numeri: true, segnaposto: 'Cerca formatore...' });
@@ -969,8 +981,19 @@ async function _formCercaProposte(r, seq) {
   const velo = document.createElement('div');
   velo.className = 'finestra-velo';
   velo.innerHTML =
-    '<div class="finestra-box" role="dialog" aria-modal="true" style="max-width:480px"><h3>Cerco le proposte</h3><div class="finestra-testo" id="fz-prog">Preparo il mese...</div><div style="height:8px;background:var(--line,#ddd);border-radius:4px;overflow:hidden;margin:10px 0"><div id="fz-barra" style="height:100%;width:0;background:var(--accent2,#1a4a7a)"></div></div></div>';
+    '<div class="finestra-box" role="dialog" aria-modal="true" style="max-width:480px"><h3>Cerco le proposte</h3><div class="finestra-testo" id="fz-prog">Preparo il mese...</div><div style="height:8px;background:var(--line,#ddd);border-radius:4px;overflow:hidden;margin:10px 0"><div id="fz-barra" style="height:100%;width:0;background:var(--accent2,#1a4a7a)"></div></div>' +
+    '<div class="finestra-pulsanti"><button type="button" id="fz-ferma" class="btn-act">Ferma</button></div></div>';
   document.body.appendChild(velo);
+  // FERMA (come Prepara più mesi, controllo 23/10 D6): la ricerca finisce la proposta in
+  // corso e mostra quelle gia trovate; senza proposte si chiude senza scrivere niente
+  let fermato = false;
+  const bFerma = velo.querySelector('#fz-ferma');
+  if (bFerma)
+    bFerma.onclick = () => {
+      fermato = true;
+      bFerma.disabled = true;
+      bFerma.textContent = 'Mi fermo…';
+    };
   const prog = (t, f) => {
     const a = document.getElementById('fz-prog');
     const b = document.getElementById('fz-barra');
@@ -997,12 +1020,19 @@ async function _formCercaProposte(r, seq) {
   try {
     // il periodo puo toccare piu mesi: si cercano i giorni in ognuno
     let tutti = [];
-    for (let ym = r.dal.substring(0, 7); ym <= r.al.substring(0, 7); ym = _formMeseDopo(ym)) {
+    for (let ym = r.dal.substring(0, 7); ym <= r.al.substring(0, 7) && !fermato; ym = _formMeseDopo(ym)) {
       prog('Cerco i giorni possibili in ' + _formMeseNome(ym) + '...', 0);
       const m = await caricaMese(ym);
       tutti = tutti.concat(await _formCandidati(r, seq, ym, m.righe));
     }
-    const cand = _formOrdinaCandidati(r, tutti).slice(0, 5);
+    const cand = fermato ? [] : _formOrdinaCandidati(r, tutti).slice(0, 5);
+    if (fermato) {
+      _pianoMeseSel = meseAperto;
+      _formTogliAllievoProvvisorio();
+      velo.remove();
+      toast('Ricerca fermata: niente è stato scritto');
+      return;
+    }
     if (!cand.length) {
       _pianoMeseSel = meseAperto;
       _formTogliAllievoProvvisorio();
@@ -1013,7 +1043,7 @@ async function _formCercaProposte(r, seq) {
       return;
     }
     const ms = (r.secondi * 1000) / cand.length;
-    for (let i = 0; i < cand.length; i++) {
+    for (let i = 0; i < cand.length && !(fermato && proposte.length); i++) {
       const c = cand[i];
       const m = await caricaMese(c.ym);
       if (!m.fabb) {
@@ -1049,7 +1079,7 @@ async function _formCercaProposte(r, seq) {
       // una regola violata pesa sempre di piu
       const motore = PianoRicerca.crea(prep.problema, { pesoScoperto: 1000, pesoCambio: 400, seme: 7 + i });
       const t0 = Date.now();
-      while (Date.now() - t0 < ms) {
+      while (Date.now() - t0 < ms && !fermato) {
         motore.passo(40, (Date.now() - t0) / ms);
         prog(
           'Proposta ' + (i + 1) + ' di ' + cand.length + ': dal ' + _formGg(c.inizio),
@@ -1528,21 +1558,95 @@ async function formazioneAnnulla(id) {
     ))
   )
     return;
-  _pianoUndoSnap('annulla formazione ' + d.allievo);
-  let tornate = 0;
-  for (const x of d.ripristino || []) {
-    const righe = (await secGet('piano?collaboratore=eq.' + encodeURIComponent(x.nome) + '&data=eq.' + x.data)) || [];
-    const cella = righe.find((y) => /^FORMAZIONE /.test(String(y.commento || '')));
-    if (!cella) continue;
-    if (x.codice) await secPatch('piano', 'id=eq.' + cella.id, { codice: x.codice, commento: x.commento || null });
-    else await secDel('piano', 'id=eq.' + cella.id);
-    tornate++;
+  // IN UNA SCRITTURA SOLA e solo se le celle sono ancora quelle della formazione (atteso);
+  // i giorni chiusi non si toccano e si elencano. Prima si rimettevano una a una, senza
+  // controllo dei giorni chiusi ne dei conflitti: un errore a meta lasciava mezza
+  // formazione (controllo 23/10 D22)
+  const avvisoRete = !!window._sessioneScadutaAvvisata;
+  const rip = d.ripristino || [];
+  const nomiR = [...new Set(rip.map((x) => x.nome))];
+  const dateR = [...new Set(rip.map((x) => String(x.data).substring(0, 10)))];
+  let attuali = [];
+  try {
+    attuali =
+      nomiR.length && dateR.length
+        ? (await secGet(
+            'piano?collaboratore=in.(' +
+              nomiR.map((n) => encodeURIComponent(n)).join(',') +
+              ')&data=in.(' +
+              dateR.join(',') +
+              ')&limit=5000',
+          )) || []
+        : [];
+  } catch (e) {
+    _pianoErroreScrittura('Formazione NON annullata: ', e, avvisoRete);
+    return;
   }
+  const ops = [];
+  const chiusi = [];
+  const cambiate = [];
+  const gg = (x) => String(x).substring(8, 10) + '.' + String(x).substring(5, 7);
+  for (const x of rip) {
+    const dx = String(x.data).substring(0, 10);
+    const cella = attuali.find((y) => y.collaboratore === x.nome && String(y.data).substring(0, 10) === dx);
+    if (!cella || !/^FORMAZIONE /.test(String(cella.commento || ''))) {
+      cambiate.push(x.nome + ' ' + gg(dx));
+      continue;
+    }
+    if (_pianoGiornoBloccato(dx) && !_pianoGiornoSbloccato(dx)) {
+      chiusi.push(x.nome + ' ' + gg(dx));
+      continue;
+    }
+    ops.push({
+      collaboratore: x.nome,
+      data: dx,
+      atteso: _pianoAttesoDi(cella),
+      dati: x.codice
+        ? {
+            codice: x.codice,
+            commento: x.commento || null,
+            operatore: getOperatore(),
+            updated_at: new Date().toISOString(),
+          }
+        : null,
+    });
+  }
+  const passo = _pianoUndoSnap('annulla formazione ' + _cognomeDi(d.allievo));
+  let es = { ok: true, ops: [], righe: [] };
+  if (ops.length) {
+    try {
+      es = await _pianoScriviCelle(ops);
+    } catch (e) {
+      _pianoUndoScarta(passo);
+      _pianoErroreScrittura('Formazione NON annullata: ', e, avvisoRete);
+      return;
+    }
+    if (!es.ok) {
+      _pianoUndoScarta(passo);
+      await _pianoAvvisaConflitti(es.conflitti, 'Formazione non annullata');
+      return;
+    }
+    _pianoMemoriaDopo(es.ops, es.righe);
+  } else _pianoUndoScarta(passo);
+  const tornate = ops.length;
   const nuovi = Object.assign({}, d, { stato: 'annullata', annullata: new Date().toISOString() });
   await secPatch('moduli', 'id=eq.' + id, { dati: nuovi });
   f.dati = nuovi;
   logAzione('Formazione annullata', d.allievo + ' · ' + _formPeriodo(f) + ' · celle rimesse ' + tornate);
-  toast('Formazione annullata');
+  toast('Formazione annullata: ' + tornate + (tornate === 1 ? ' cella rimessa' : ' celle rimesse'));
+  if (chiusi.length || cambiate.length)
+    await mostraAvviso(
+      (chiusi.length
+        ? 'Giorni chiusi, non toccati (per rimetterli: sblocca il giorno e correggi a mano):\n' +
+          chiusi.map((x) => '\u2022 ' + x).join('\n') +
+          '\n\n'
+        : '') +
+        (cambiate.length
+          ? 'Celle cambiate a mano dopo la formazione, lasciate come sono:\n' +
+            cambiate.map((x) => '\u2022 ' + x).join('\n')
+          : ''),
+      { titolo: 'Formazione annullata' },
+    );
   renderPiano();
 }
 // FINE FORMAZIONE: svolta nello storico HR, competenza certificata (livelli inferiori

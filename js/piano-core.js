@@ -202,7 +202,7 @@ async function _pianoConsentiScrittura(dstr, silenzioso) {
   const motivo = await chiediTesto(
     'GIORNATA CHIUSA \u00b7 ' +
       dataIt +
-      "\n\nIl piano dei giorni passati non si modifica più per distrazione: è un documento.\n\nScrivi il MOTIVO della correzione (obbligatorio, resta nel registro).\nIl giorno restera' sbloccato per dieci minuti:",
+      '\n\nIl piano dei giorni passati non si modifica più per distrazione: è un documento.\n\nScrivi il MOTIVO della correzione (obbligatorio, resta nel registro).\nIl giorno resterà sbloccato per dieci minuti:',
   );
   if (motivo === null || !String(motivo).trim()) {
     toast('Correzione annullata: senza motivo il giorno resta chiuso');
@@ -436,9 +436,51 @@ function _pianoStoriaGruppiDi(nome, dstr, rep) {
 }
 // IDONEITA: contesto comune del motore unico (PianoRegole.idoneita) per bozza, proposte,
 // scrittura a mano e "Chi puo fare cosa". extra: dow, storiaDi, modo, coperturaDi...
+// SIGLE DEL TURNO PREFERITO del settore aperto (impostazione turno_preferito_sigle, senza: L1),
+// solo quelle che esistono fra i turni del settore. Con la spunta Preferisce valgono come
+// preferenza esplicita della persona: prima delle regole generiche di funzione e di gruppo
+// (PianoRegole.turniPersonali, decisione del titolare 23/10/2026). Si chiama in ogni controllo di
+// idoneita: risultato tenuto finche non cambiano regola, settore o turni.
+let _pianoPrefSigleCache = null;
+function _pianoTurniPreferitiSigle() {
+  const v = typeof _pianoRegolaVal === 'function' ? _pianoRegolaVal('turno_preferito_sigle') : null;
+  const rep = _pianoReparto();
+  const n = (pianoTurniCache || []).length;
+  const c = _pianoPrefSigleCache;
+  if (c && c.v === v && c.rep === rep && c.n === n) return c.sigle;
+  const sigle = new Set(_pianoTurniReparto().map((t) => String(t.codice).toUpperCase()));
+  const lista = [
+    ...new Set(
+      String(v == null ? 'L1' : v)
+        .split(',')
+        .map((x) => x.trim().toUpperCase())
+        .filter((x) => x && sigle.has(x)),
+    ),
+  ];
+  _pianoPrefSigleCache = { v: v, rep: rep, n: n, sigle: lista };
+  return lista;
+}
+// TURNO "SOLO SE SERVE" PER LA PERSONA (Turni consentiti, titolare 23/10/2026): bozza, Copri i
+// buchi, Migliora e coperture lo danno a lei solo se nessun altro idoneo puo coprire il posto
+function _pianoSoloSeServe(nome, cod) {
+  const v = PianoRegole.turnoConsentitoDi(_pianoCollabInfo(nome) || {}, cod);
+  return !!(v && v.seServe);
+}
+// testo leggibile dei turni consentiti (mai i segni): "L1 solo se serve, senza formazione dell area; 10"
+function _pianoTurniConsentitiTesto(c) {
+  return PianoRegole.turniConsentitiVoci(c || {})
+    .map(
+      (v) =>
+        v.sigla +
+        (v.seServe ? ' solo se serve' : '') +
+        (v.senzaArea ? (v.seServe ? ',' : '') + ' anche senza la formazione dell area' : ''),
+    )
+    .join('; ');
+}
 function _pianoCtxIdoneita(extra) {
   return Object.assign(
     {
+      turniPreferiti: () => _pianoTurniPreferitiSigle(),
       settoriDi: (i) => _pianoSettoriEffettivi(i),
       regoleGruppoDi: (gr) => _pianoRegoleGruppoDi(gr),
       campoOk: (i, v) => _pianoCampoOk(i, v),
@@ -481,6 +523,7 @@ function _pianoViolazioneFunzioneTurno(nome, t, dow, automatica) {
   const infoS = Object.assign({}, info, {
     _settori: _pianoSettoriEffettivi(info) || [],
     _livello: _pianoLivelloNelSettore(info),
+    _preferiti: _pianoTurniPreferitiSigle(),
   });
   return PianoRegole.violazioneFunzioneTurno(infoS, t, dow, _pianoRegoleTurnoFunzione());
 }
@@ -684,6 +727,7 @@ async function _pianoCaricaCfg() {
     evidCfg,
     solverUrl,
     fonteCfg,
+    cognomiFoglio,
   ] = await Promise.all([
     secGet('piano_turni?order=ordine.asc&limit=500'),
     secGet('piano_codici?order=codice.asc&limit=200'),
@@ -704,7 +748,14 @@ async function _pianoCaricaCfg() {
     getImp('brief_evidenziazioni'),
     getImp('piano_solver_url'),
     getImp('piano_regole_fonte'),
+    getImp('cognomi_foglio'),
   ]);
+  // cognomi da stampare sul foglio decisi in Coerenza Diario/Piano (piano-coerenza.js, D29)
+  try {
+    window._cognomiFoglio = cognomiFoglio ? JSON.parse(cognomiFoglio) || {} : {};
+  } catch (e) {
+    window._cognomiFoglio = {};
+  }
   // riferimenti normativi delle regole cambiati dall amministratore (piano-config.js)
   try {
     window._pianoRegoleFonteCfg = fonteCfg ? JSON.parse(fonteCfg) || {} : {};
@@ -961,14 +1012,18 @@ function _pianoTurniReparto() {
 // esiste nel settore della riga vale quello (es. "9" in Slots e in Tavoli),
 // altrimenti il settore aperto se la conosce, altrimenti l unico che la conosce.
 // Celle senza turno (C, V, M...) restano al settore della riga.
+// TURNO DISATTIVATO (controllo 23/10/2026, D5): una sigla del settore della riga resta di
+// quel settore anche dopo che il turno e stato disattivato. Prima si cercavano solo i turni
+// attivi: disattivato il «9» delle Slots (06-14), le celle «9» gia scritte diventavano il 9
+// dei Tavoli (21-05), con ore, riposi e settore sbagliati (Brandolisio novembre 92,5 -> 96,7 h)
 function _pianoSettoreTurno(r, repAperto) {
   const qui = repAperto || _pianoReparto();
   const repRiga = (r && r.reparto_dip) || 'slots';
   const cod = r && r.codice;
-  const settori = new Set(
-    (pianoTurniCache || []).filter((t) => t.attivo !== false && t.codice === cod).map((t) => _repartoDi(t)),
-  );
-  if (!settori.size || settori.has(repRiga)) return repRiga;
+  const conSigla = (pianoTurniCache || []).filter((t) => t.codice === cod);
+  if (conSigla.some((t) => _repartoDi(t) === repRiga)) return repRiga; // anche disattivato
+  const settori = new Set(conSigla.filter((t) => t.attivo !== false).map((t) => _repartoDi(t)));
+  if (!settori.size) return repRiga;
   if (settori.has(qui)) return qui;
   return settori.size === 1 ? [...settori][0] : repRiga;
 }
@@ -983,13 +1038,20 @@ function _pianoCopreQui(r, repAperto) {
 function _pianoTurnoInfoRiga(r) {
   if (!r || !r.codice) return null;
   const s = _pianoSettoreTurno(r);
-  return (
-    (pianoTurniCache || []).find((t) => t.attivo !== false && t.codice === r.codice && _repartoDi(t) === s) ||
-    _pianoTurnoInfo(r.codice)
-  );
+  const delSettore = (pianoTurniCache || []).filter((t) => t.codice === r.codice && _repartoDi(t) === s);
+  // il turno attivo del settore; se e stato disattivato, la sua definizione (D5): le celle
+  // gia scritte tengono orario e ore di quando sono state scritte
+  return delSettore.find((t) => t.attivo !== false) || delSettore[0] || _pianoTurnoInfo(r.codice);
 }
 function _pianoTurnoInfo(codice) {
-  return _pianoTurniReparto().find((t) => t.codice === codice) || pianoTurniCache.find((t) => t.codice === codice);
+  // il turno attivo del settore aperto; poi lo stesso turno disattivato (le celle gia scritte
+  // con una sigla disattivata restano del settore, D5); poi un turno attivo di un altro settore
+  return (
+    _pianoTurniReparto().find((t) => t.codice === codice) ||
+    pianoTurniCache.find((t) => t.codice === codice && _repartoDi(t) === _pianoReparto()) ||
+    pianoTurniCache.find((t) => t.codice === codice && t.attivo !== false) ||
+    pianoTurniCache.find((t) => t.codice === codice)
+  );
 }
 function _pianoCodiceInfo(codice) {
   return pianoCodiciCache.find((c) => c.codice === codice);
@@ -1375,6 +1437,19 @@ function _pianoDateMalattia(testo, dataReg) {
   }
   return out;
 }
+// GIORNI DI UNA REGISTRAZIONE di malattia o assenza. Il Diario e il Piano scrivono UNA RIGA
+// PER GIORNO con il periodo come etichetta finale «(dal 03/02/2027 al 05/02/2027)»: quella
+// riga vale solo per il suo giorno. Prima valeva tutto il periodo, e cancellando la riga del
+// 05 la M del 05 restava nel Piano perche le righe del 03 e del 04 «coprivano» ancora il 05
+// (A4 del 23.10). Le altre (Rapporto «dal .. al .. (3 giorni, ...)», righe vecchie) il periodo.
+function _pianoGiorniRegistrazione(testo, dataReg) {
+  const tutti = _pianoDateMalattia(testo, dataReg);
+  if (/\(dal \d{1,2}[./]\d{1,2}[./]\d{4} al \d{1,2}[./]\d{1,2}[./]\d{4}\)\s*$/.test(String(testo || ''))) {
+    const g = typeof giornoDi === 'function' ? giornoDi(dataReg) : String(dataReg || '').substring(0, 10);
+    if (g && tutti.includes(g)) return [g];
+  }
+  return tutti;
+}
 // SINCRONIZZAZIONE PIANO dopo la correzione di una malattia nel Diario:
 // le M salvate nei giorni non piu' coperti vengono tolte, i giorni nuovi
 // ricevono la M protetta. Chiamata da salvaModificaRegistrazione
@@ -1388,13 +1463,16 @@ function _pianoDateMalattia(testo, dataReg) {
 // che coprono lo stesso giorno lo tengono; senza, vale la data come prima).
 async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNuovo, opz) {
   opz = opz || {};
+  // le celle preparate per il Rapporto: mai una finestra (si salva mentre si scrive)
+  if (opz.soloPrepara) opz = Object.assign({}, opz, { senzaDomande: true });
   const modoAss = opz.codice === 'ASS';
+  let p = null; // le celle preparate (prepara), lette anche da _dopo
   try {
     // testo vuoto = nessun giorno (malattia nuova o cancellata). Prima un testo vuoto
     // valeva come "il giorno della registrazione": una malattia di un giorno appena
     // creata non riceveva la M e una cancellata non restituiva il turno
-    const vecchie = String(testoVecchio || '').trim() ? _pianoDateMalattia(testoVecchio, dataVecchia) : [];
-    const nuove = String(testoNuovo || '').trim() ? _pianoDateMalattia(testoNuovo, dataVecchia) : [];
+    const vecchie = String(testoVecchio || '').trim() ? _pianoGiorniRegistrazione(testoVecchio, dataVecchia) : [];
+    const nuove = String(testoNuovo || '').trim() ? _pianoGiorniRegistrazione(testoNuovo, dataVecchia) : [];
     if (!vecchie.length && !nuove.length) return null;
     const daTogliere = vecchie.filter((d) => !nuove.includes(d));
     const daMettere = nuove.filter((d) => !vecchie.includes(d));
@@ -1417,7 +1495,7 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
           String(e.nome || '').toLowerCase() === String(nome).toLowerCase() &&
           (!escludi ||
             (opz.idReg != null ? e.id !== opz.idReg : String(e.data || '').substring(0, 10) !== dataVecchiaStr)) &&
-          _pianoDateMalattia(e.testo || '', e.data).includes(d),
+          _pianoGiorniRegistrazione(e.testo || '', e.data).includes(d),
       );
     const copertoAltrove = (d) => copertoDa(tipoReg, d, true);
     // M tolta in un giorno dove resta un Assenza: torna ASS (il turno resta scoperto)
@@ -1448,7 +1526,7 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
         });
         // con Annulla: diventa un passo del Piano (malato e sostituti insieme)
         if (togliCop)
-          passoCop = _pianoUndoSnap('tolta copertura ' + (modoAss ? 'assenza ' : 'malattia ') + nome.split(' ')[0]);
+          passoCop = _pianoUndoSnap('tolta copertura ' + (modoAss ? 'assenza ' : 'malattia ') + _cognomeDi(nome));
       }
     }
     const festCgf = typeof _pianoFestiviCgfSet === 'function' ? _pianoFestiviCgfSet() : new Set();
@@ -1576,9 +1654,21 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
       if (togliCop) cop0.ops.forEach((o) => ops.push(o));
       return { ops, festiviPersi, cgfPersi, tolte, messe, assFerme };
     };
-    let p = await prepara();
+    p = await prepara();
     for (const d of [...new Set(nuoveSenzaCella)])
       if (!(await _pianoConsentiScrittura(d))) throw new Error('giorno chiuso: ' + d);
+    // SOLO PREPARA (Rapporto, controllo 23/10 D12): le celle tornano a chi chiama, che le scrive
+    // insieme alle registrazioni del Diario in UNA transazione (rapporto_assenze_scrivi). Poi
+    // chiama dopo(es) con l esito del piano, oppure riprepara() se una cella e cambiata.
+    if (opz.soloPrepara)
+      return {
+        ops: p.ops,
+        riprepara: async () => {
+          p = await prepara();
+          return p.ops;
+        },
+        dopo: (es) => _dopo(es),
+      };
     let es;
     try {
       es = await _pianoScriviCelle(p.ops);
@@ -1604,6 +1694,15 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
       es = await _pianoScriviCelle(p.ops);
       if (!es.ok) throw _pianoErroreConflitto(es.conflitti);
     }
+    return await _dopo(es);
+  } catch (e) {
+    // l errore arriva a chi chiama, che lo mostra ("Piano non allineato alla malattia"):
+    // prima si scriveva solo in console e l utente leggeva "salvato" con le M sbagliate
+    console.error('sync malattia piano', e);
+    throw e;
+  }
+  // DOPO LA SCRITTURA: memoria, recuperi, avvisi e registro (anche per il Rapporto)
+  async function _dopo(es) {
     const { festiviPersi, cgfPersi, tolte, messe, assFerme } = p;
     if (typeof _pianoRighe !== 'undefined') _pianoMemoriaDopo(es.ops, es.righe);
     // festivo saltato per malattia: i recuperi automatici in piu' tornano C
@@ -1616,9 +1715,17 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
     if (typeof _pianoAvvisoCoperturaAggiorna === 'function' && window._copAvvisi && window._copAvvisi[nome])
       _pianoAvvisoCoperturaAggiorna(nome);
     if (tolte || messe) {
+      // UN SOLO PASSO DI ANNULLA (controllo 23/10 D27): l allineamento e una conseguenza
+      // della registrazione. La sua riga di registro non chiude il gruppo di Annulla: prima
+      // il passo della registrazione prendeva il nome «Malattia: piano allineato» e chi
+      // annullava «l allineamento» toglieva in realta la registrazione (o viceversa)
+      const logAll = (az, det) =>
+        window.Annulla && typeof window.Annulla.senzaTraccia === 'function'
+          ? window.Annulla.senzaTraccia(() => logAzione(az, det))
+          : logAzione(az, det);
       if (modoAss)
-        logAzione('Assenza: piano allineato', nome + ' · ' + tolte + ' ASS tolte, ' + messe + ' turni diventati ASS');
-      else logAzione('Malattia: piano allineato', nome + ' · ' + tolte + ' M tolte, ' + messe + ' celle diventate M');
+        logAll('Assenza: piano allineato', nome + ' · ' + tolte + ' ASS tolte, ' + messe + ' turni diventati ASS');
+      else logAll('Malattia: piano allineato', nome + ' · ' + tolte + ' M tolte, ' + messe + ' celle diventate M');
       if (typeof _pianoRighe !== 'undefined' && _pianoRighe.length && typeof renderPiano === 'function') renderPiano();
     }
     // ASS rimaste: la malattia sopra un assenza la registra l HR con Certificato ricevuto
@@ -1631,11 +1738,6 @@ async function sincronizzaMalattiaPiano(nome, testoVecchio, dataVecchia, testoNu
         9000,
       );
     return { tolte: tolte, messe: messe, assFerme: assFerme || [] };
-  } catch (e) {
-    // l errore arriva a chi chiama, che lo mostra ("Piano non allineato alla malattia"):
-    // prima si scriveva solo in console e l utente leggeva "salvato" con le M sbagliate
-    console.error('sync malattia piano', e);
-    throw e;
   }
 }
 // ND DAL DIARIO NEL PIANO (05.10, segnalazione del titolare): un giorno di non
@@ -2103,16 +2205,18 @@ function _pianoAvvisiMeseAvvia() {
       clearTimeout(t2);
       t2 = setTimeout(_pianoAvvisiMeseSommario, 120);
     });
-    ['compleanni-banner', 'cassa-alerts-container', 'rischio-alerts-container'].forEach((id) => {
-      const x = document.getElementById(id);
-      if (x)
-        window._pianoAvvisiMeseOss.observe(x, {
-          childList: true,
-          subtree: true,
-          attributes: id === 'compleanni-banner',
-          attributeFilter: id === 'compleanni-banner' ? ['class', 'style'] : undefined,
-        });
-    });
+    ['compleanni-banner', 'cassa-alerts-container', 'rischio-alerts-container', 'punti-alerts-container'].forEach(
+      (id) => {
+        const x = document.getElementById(id);
+        if (x)
+          window._pianoAvvisiMeseOss.observe(x, {
+            childList: true,
+            subtree: true,
+            attributes: id === 'compleanni-banner',
+            attributeFilter: id === 'compleanni-banner' ? ['class', 'style'] : undefined,
+          });
+      },
+    );
   }
   if (window.MutationObserver) {
     let t = null;
@@ -2387,7 +2491,7 @@ async function _pianoAggiornaYtd(nomi) {
       if (!effettive) continue;
       const dim = _pianoGgDovuti(n, anno + '-' + String(m).padStart(2, '0')); // meno i giorni di congedo non pagato
       const dovute = Math.round((dim / 7) * _pianoOreSett * pct * 10) / 10;
-      cum += Math.round((Math.round(effettive * 100) / 100 - dovute) * 10) / 10;
+      cum += Math.round((Math.round(effettive * 10000) / 10000 - dovute) * 10) / 10; // un solo arrotondamento (D30)
     }
     _pianoYtdMap[n] = Math.round(cum * 100) / 100;
   });
@@ -3046,10 +3150,13 @@ async function _pianoCaricaMeseSettore(da, a, rep) {
   // lettura aspettava il giro su internet della precedente). Il risultato e lo stesso.
   // Giorni delle settimane a cavallo del mese (lunedi-domenica, una settimana in
   // piu: riposi a cavallo): servono per le ore lavorate nella settimana.
+  // DUE SETTIMANE IN PIU (controllo del 23/10/2026): con una sola, chi rientrava dalle vacanze a
+  // inizio mese non aveva nessun turno nel bordo e il riposo di 47 ore attorno alla prima
+  // domenica non si giudicava; lo stesso per i giorni di fila con il mese dopo
   const l = new Date(da + 'T12:00:00');
-  l.setDate(l.getDate() - ((l.getDay() + 6) % 7) - 7);
+  l.setDate(l.getDate() - ((l.getDay() + 6) % 7) - 14);
   const dm = new Date(a + 'T12:00:00');
-  dm.setDate(dm.getDate() + ((7 - dm.getDay()) % 7) + 7);
+  dm.setDate(dm.getDate() + ((7 - dm.getDay()) % 7) + 14);
   const dalB = dataLocaleISO(l) < da ? dataLocaleISO(l) : da;
   const alB = dataLocaleISO(dm) > a ? dataLocaleISO(dm) : a;
   // CELLE DEGLI ALTRI SETTORI di chi lavora anche altrove: sia chi viene a coprire
@@ -3078,10 +3185,10 @@ async function _pianoCaricaMeseSettore(da, a, rep) {
     // malattie dell anno: servono per le ore di malattia (giorno 1-14 o dal 15.)
     _pianoCaricaMalattieAnno(parseInt(String(da).substring(0, 4)), rep),
     dalB < da
-      ? bordoNulla(secGet('piano?data=gte.' + dalB + '&data=lt.' + da + '&reparto_dip=eq.' + rep + '&limit=2000'))
+      ? bordoNulla(secGet('piano?data=gte.' + dalB + '&data=lt.' + da + '&reparto_dip=eq.' + rep + '&limit=5000'))
       : [],
     alB > a
-      ? bordoNulla(secGet('piano?data=gt.' + a + '&data=lte.' + alB + '&reparto_dip=eq.' + rep + '&limit=2000'))
+      ? bordoNulla(secGet('piano?data=gt.' + a + '&data=lte.' + alB + '&reparto_dip=eq.' + rep + '&limit=5000'))
       : [],
     altrove.length
       ? secGet('piano?collaboratore=in.(' + altrove.map((n) => encodeURIComponent(n)).join(',') + ')' + periodo)
@@ -3285,7 +3392,7 @@ async function _renderPianoCore() {
       if (puoMod) {
         if (puoAuto)
           h +=
-            '<button type="button" class="btn-export pbar-btn pbar-principale" onclick="pianoPreparaMese()" title="Il programma riempie i posti del mese con i collaboratori di questo settore, rispettando regole, vacanze e preferenze. Le celle già scritte non vengono toccate. Alla fine propone di migliorare la bozza.">' +
+            '<button type="button" class="btn-export pbar-btn pbar-principale pbar-lunga" onclick="pianoPreparaMese()" title="Il programma riempie i posti del mese con i collaboratori di questo settore, rispettando regole, vacanze e preferenze. Le celle già scritte non vengono toccate. Alla fine propone di migliorare la bozza.">' +
             '<i class="icx icx-calendario"></i>Prepara il mese</button>';
         // Controlla
         h += menu(
@@ -3311,19 +3418,19 @@ async function _renderPianoCore() {
         if (puoAuto && typeof pianoPreparaMesi === 'function')
           sis += voce(
             'Prepara più mesi',
-            'pianoPreparaMesi()',
+            "pianoLunga('Prepara più mesi',pianoPreparaMesi)",
             'Prepara 3, 6 o fino a 12 mesi uno dopo l altro: copia il fabbisogno se manca, fa la bozza e la migliora, poi passa al mese dopo',
           );
         if (puoAuto)
           sis += voce(
             'Migliora la bozza',
-            'pianoMigliora()',
+            "pianoLunga('Migliora la bozza',pianoMigliora)",
             'Prova scambi e spostamenti fra i turni preparati dal programma e tiene solo quelli che rispettano meglio regole, posti e ore. Ti mostra prima e dopo',
           );
         if (puoAuto)
           sis += voce(
             'Sistema le ore',
-            'miglioraOrePiano()',
+            "pianoLunga('Sistema le ore',miglioraOrePiano)",
             'Sposta turni preparati dal programma da chi lavora troppe ore a chi ne ha poche, nello stesso giorno e senza rompere regole',
           );
         if (
@@ -3332,13 +3439,13 @@ async function _renderPianoCore() {
         )
           sis += voce(
             'Copri i buchi con altri settori',
-            'completaConCoperture()',
+            "pianoLunga('Copri i buchi con altri settori',completaConCoperture)",
             'Riempie i posti rimasti vuoti con chi può coprire da altri settori. Da fare dopo aver preparato i piani dei loro settori',
           );
         if (puoAuto && window._pianoSolverUrl)
           sis += voce(
             'Prepara con il motore avanzato',
-            'generaConSolver()',
+            "pianoLunga('Prepara con il motore avanzato',generaConSolver)",
             'Il server interno cerca il piano migliore del mese, con il lavoro diviso in modo equo. Stesse regole, non tocca le celle esistenti',
           );
         sis += voce(
@@ -3360,7 +3467,7 @@ async function _renderPianoCore() {
         );
         if (puoAuto || (puoMod && puoAzioniAutoPiano('cancella')))
           pericolo +=
-            '<button type="button" class="btn-export pbar-btn pbar-pericolo" onclick="cancellaBozzaPiano()" title="Toglie i turni del mese di questo settore. Chiede prima conferma e si può annullare">' +
+            '<button type="button" class="btn-export pbar-btn pbar-pericolo pbar-lunga" onclick="cancellaBozzaPiano()" title="Toglie i turni del mese di questo settore. Chiede prima conferma e si può annullare">' +
             '<i class="icx icx-cestino"></i>Svuota il mese</button>';
         const ssnap = (window._pianoSessSnap || {})[_pianoMeseSel + '|' + _pianoReparto()];
         if (ssnap)
@@ -3377,12 +3484,12 @@ async function _renderPianoCore() {
       if (puoMod && puoAzioniAutoPiano('import')) {
         ge += voce(
           'Importa da Excel',
-          'pianoImportaConColonne(false)',
+          "pianoLunga('Importa da Excel',()=>pianoImportaConColonne(false))",
           'Legge un piano da un file Excel o CSV e lo controlla prima di scriverlo',
         );
         ge += voce(
           'Importa da Excel scegliendo le colonne',
-          'pianoImportaConColonne(true)',
+          "pianoLunga('Importa da Excel',()=>pianoImportaConColonne(true))",
           'Per un file di un altro formato: scegli foglio, colonna dei nomi e colonne dei giorni, con anteprima',
         );
       }
@@ -3521,7 +3628,7 @@ async function _renderPianoCore() {
           g +
           '</div>' +
           (_pianoGiornoBloccato(dstr)
-            ? '<div style="font-size:var(--fs-xs,.75rem);line-height:1;opacity:.55" title="Giornata chiusa">&#128274;</div>'
+            ? '<div style="font-size:var(--fs-xs,.75rem);line-height:1;opacity:.55" title="Giornata chiusa"><i class="icx icx-lucchetto" aria-label="Giornata chiusa"></i></div>'
             : '') +
           '</th>';
       }
@@ -3710,7 +3817,9 @@ async function _renderPianoCore() {
         // scostamenti giornaliati (scheda Recupero ore): sommati alle ore del
         // piano, cosi' il saldo e' aggiornato giorno per giorno
         const _rec = _pianoRecuperoTotale(nome, ym);
-        const orePianificate = Math.round((ore + oreSpec + _rec) * 100) / 100;
+        // UN solo arrotondamento, a una cifra, come la scheda Saldo (D30: 184.548 diventava 184.55 e poi
+        // 184.6 qui, 184.5 nel Saldo): qui si toglie solo il rumore dei decimali
+        const orePianificate = Math.round((ore + oreSpec + _rec) * 10000) / 10000;
         // dove c'e' una rettifica scritta a mano, vale quella: e' il totale
         // reale del mese, quello che finisce in busta paga
         const orePiano = _rett ? Math.round(parseFloat(_rett.ore_reali) * 100) / 100 : orePianificate;
@@ -3846,13 +3955,18 @@ async function _renderPianoCore() {
           '" style="color:' +
           (saldo > 0 ? 'var(--c-verde,#2c6e49)' : saldo < 0 ? 'var(--c-rosso,#c0392b)' : 'var(--muted)') +
           '">' +
-          (orePiano || dovute ? (saldo > 0 ? '+' : '') + saldo.toFixed(1) : '') +
+          // ausiliari: niente ore dovute, quindi niente saldo (come la scheda Saldo, D30)
+          (infoC && infoC.is_jolly ? '\u2013' : orePiano || dovute ? (saldo > 0 ? '+' : '') + saldo.toFixed(1) : '') +
           '</td><td class="piano-tot" data-tot="6" title="' +
           escP(_pianoTestoYtd(nome, saldo, ytd, orePiano)) +
           '" style="font-weight:700;color:' +
           (ytd > 0 ? 'var(--c-verde,#2c6e49)' : ytd < 0 ? 'var(--c-rosso,#c0392b)' : 'var(--muted)') +
           '">' +
-          (orePiano || _pianoYtdMap[nome] ? (ytd > 0 ? '+' : '') + ytd.toFixed(1) : '') +
+          (infoC && infoC.is_jolly
+            ? '\u2013'
+            : orePiano || _pianoYtdMap[nome]
+              ? (ytd > 0 ? '+' : '') + ytd.toFixed(1)
+              : '') +
           '</td></tr>';
       });
       h += '</tbody></table></div>';
@@ -4296,7 +4410,9 @@ async function _rimuoviPianoCellaEsegui(giaChiuso) {
         r.codice +
         (r.motivo_blocco
           ? '\n\nE BLOCCATA per: ' + r.motivo_blocco
-          : '\n\nE una cella protetta (piano consolidato, vacanza o assenza confermata).') +
+          : typeof _pianoDescriviProtetta === 'function'
+            ? '\n\nE protetta: ' + _pianoDescriviProtetta(r) + '.'
+            : '\n\nE una cella protetta (piano consolidato, vacanza o assenza confermata).') +
         '\nCancellarla comunque?',
     ))
   )
@@ -4371,13 +4487,110 @@ document.addEventListener('keydown', (e) => {
 // PREPARA IL MESE: la bozza (generaBozzaPiano, invariata) e poi, se e stata scritta,
 // la proposta del passo dopo: Migliora la bozza. I posti scoperti si spiegano con
 // "Perché manca qualcuno" (menu Controlla), proposto se non si migliora.
-async function pianoPreparaMese() {
+// OPERAZIONI LUNGHE DEL PIANO UNA ALLA VOLTA (controllo 23/10/2026, D2): Prepara il mese,
+// Migliora, Prepara più mesi, Svuota, Applica vacanze, Sistema le ore, Copri i buchi,
+// Importa, Annulla tutto. Prima un doppio clic su Prepara il mese (150 ms) avviava due
+// bozze insieme: due conferme, la seconda finiva in errore e restavano due passi di
+// Annulla. Il blocco si prende SUBITO (prima di ogni attesa), i pulsanti delle operazioni
+// lunghe restano spenti anche se la griglia si ridisegna (classe sul body, css) e un
+// secondo comando dice cosa e in corso. Le operazioni annidate (Migliora dentro Prepara il
+// mese) passano dalla funzione interna, non da qui.
+let _pianoLungaInCorso = null; // etichetta dell operazione lunga in corso su questo PC
+function pianoLungaOccupato() {
+  if (_pianoLungaInCorso) return _pianoLungaInCorso;
+  if (window._pianoAutoInCorso)
+    return window._pianoAutoInCorso.mesi ? 'Prepara più mesi' : 'Generazione automatica del piano';
+  return '';
+}
+async function pianoLunga(etichetta, fn) {
+  const occ = pianoLungaOccupato();
+  if (occ) {
+    toastErrore(occ + ' è ancora in corso su questo PC: aspetta che finisca.');
+    return undefined;
+  }
+  _pianoLungaInCorso = etichetta;
+  document.body.classList.add('piano-lunga');
+  try {
+    return await fn();
+  } finally {
+    _pianoLungaInCorso = null;
+    document.body.classList.remove('piano-lunga');
+  }
+}
+// RIQUADRO DI PREPARA IL MESE (D6): fase, tempo passato e Ferma, come Prepara più mesi.
+// Ferma vale fino alla conferma della bozza: la bozza si interrompe alla pausa successiva
+// (window._pianoBozzaFerma, letto in generaBozzaPiano) e il mese torna com era
+let _pianoPrepStato = null; // { t0, fase, ferma, timer }
+function _pianoPrepPannello() {
+  let el = document.getElementById('pp-pannello');
+  const s = _pianoPrepStato;
+  if (!s) {
+    if (el) el.remove();
+    return;
+  }
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'pp-pannello';
+    el.setAttribute('role', 'status');
+    el.style.cssText =
+      'position:fixed;right:16px;bottom:16px;z-index:900;width:min(340px,calc(100vw - 32px));background:var(--paper,#fff);color:var(--ink,#222);border:1px solid var(--line,#ccc);border-left:4px solid var(--accent2,#1a4a7a);border-radius:4px;box-shadow:0 4px 16px rgba(0,0,0,.18);padding:10px 12px;font-size:var(--fs-sm,.8125rem)';
+    el.innerHTML =
+      '<div style="font-weight:700;margin-bottom:4px">Prepara il mese</div><div id="pp-testo" style="white-space:pre-line"></div>' +
+      '<div style="height:8px;background:var(--line,#ddd);border-radius:4px;overflow:hidden;margin:8px 0"><div id="pp-barra" class="pp-barra-scorre" style="height:100%;width:35%;background:var(--accent2,#1a4a7a)"></div></div>' +
+      '<button type="button" id="pp-ferma" class="btn-act" onclick="pianoPreparaFerma()">Ferma</button>';
+    document.body.appendChild(el);
+  }
+  const sec = Math.round((Date.now() - s.t0) / 1000);
+  const t = document.getElementById('pp-testo');
+  if (t)
+    t.textContent =
+      (window._pianoBozzaFase || s.fase || 'Preparo la bozza…') +
+      ' · ' +
+      (sec < 60 ? sec + ' s' : Math.floor(sec / 60) + ' min ' + (sec % 60) + ' s') +
+      (s.ferma ? '\nMi fermo: il mese torna com era.' : '');
+  const f = document.getElementById('pp-ferma');
+  if (f) {
+    // dopo la conferma la bozza si scrive: non si ferma piu a meta
+    const fermabile = !s.ferma && !window._pianoBozzaScrive;
+    f.disabled = !fermabile;
+    f.textContent = s.ferma ? 'Mi fermo…' : 'Ferma';
+  }
+}
+function pianoPreparaFerma() {
+  if (!_pianoPrepStato || window._pianoBozzaScrive) return;
+  _pianoPrepStato.ferma = true;
+  window._pianoBozzaFerma = true;
+  _pianoPrepPannello();
+}
+function pianoPreparaMese() {
+  return pianoLunga('Prepara il mese', _pianoPreparaMeseEsegui);
+}
+async function _pianoPreparaMeseEsegui() {
   window._pianoUltimaBozza = null;
   window._pianoPreparaInCorso = true;
+  window._pianoBozzaFerma = false;
+  window._pianoBozzaScrive = false;
+  window._pianoBozzaFase = '';
+  _pianoPrepStato = { t0: Date.now(), fase: 'Preparo la bozza…', ferma: false };
+  _pianoPrepStato.timer = setInterval(_pianoPrepPannello, 1000);
+  _pianoPrepPannello();
   try {
-    await generaBozzaPiano();
+    // BOZZA A BLOCCHI (regola bozza_a_blocchi, predefinita Si: js/piano-blocchi.js); senza, quella di prima
+    await generaBozzaPiano(undefined, { blocchi: typeof _pianoBozzaABlocchi === 'function' && _pianoBozzaABlocchi() });
+  } catch (e) {
+    if (e && e.pianoFermata) {
+      // fermata con Ferma: le C di riempimento e le vacanze erano gia riscritte per il calcolo
+      await _pianoRipristinaUltimoSnapshot("Prepara il mese fermato: il mese è tornato com'era");
+      window._pianoUltimaBozza = null;
+    } else throw e;
   } finally {
     window._pianoPreparaInCorso = false;
+    window._pianoBozzaFerma = false;
+    window._pianoBozzaScrive = false;
+    window._pianoBozzaFase = '';
+    if (_pianoPrepStato) clearInterval(_pianoPrepStato.timer);
+    _pianoPrepStato = null;
+    _pianoPrepPannello();
   }
   const b = window._pianoUltimaBozza;
   if (!b) return; // annullata, niente da fare o errore (i messaggi li ha gia dati la bozza)

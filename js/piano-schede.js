@@ -1392,7 +1392,7 @@ function _pianoSaldoDelMese(dati, nome, mm, info) {
   if (!op) return null;
   const gg = _pianoGgDovuti(nome, dati.anno + '-' + mm); // meno i giorni di congedo non pagato
   const od = info.is_jolly ? 0 : Math.round((gg / 7) * _pianoOreSett * pct * 10) / 10;
-  return Math.round((Math.round(op * 100) / 100 - od) * 10) / 10;
+  return Math.round((Math.round(op * 10000) / 10000 - od) * 10) / 10; // un solo arrotondamento (D30)
 }
 async function pianoCaricaSaldoAnno() {
   const anno = parseInt(_pianoMeseSel.split('-')[0]);
@@ -1603,7 +1603,8 @@ async function _renderPianoSaldoTab() {
     // dovute), altrimenti la stessa persona mostra due saldi diversi nelle due
     // schede per un centesimo di differenza
     const od = info.is_jolly ? 0 : Math.round((_pianoGgDovuti(nome, ym) / 7) * _pianoOreSett * pct * 10) / 10;
-    const sm = Math.round((Math.round(op * 100) / 100 - od) * 10) / 10;
+    op = Math.round(op * 10000) / 10000; // solo il rumore dei decimali, come il calendario (D30)
+    const sm = Math.round((op - od) * 10) / 10;
     const ytd = _pianoYtdConMese(nome, sm, op);
     totD += od;
     totP += op;
@@ -1789,12 +1790,31 @@ function pianoStoricoRiportaA() {
 // opz.ndSvuota = Set di 'nome|dstr': ND cancellate da uno Svuota il mese (_pianoNdDaSvuota),
 // che si rimettono come le altre celle (con il passato, il modulo 1187 si riallinea da solo).
 // Ritorna { rimetti, passate, giorniPassati, malattia, nd, altroSettore, ndSvuota } (chiavi 'nome|dstr').
+// sigle che vengono da una registrazione del Diario (Malattia, Assenza): nelle Versioni
+// restano come le dice il Diario. Prima solo M e M1: una ASS diventava il turno di allora
+// (S3) mentre Diario e Rapporto dicevano ancora assente
+const PIANO_VERSIONE_DIARIO = ['M', 'M1', 'ASS'];
+// giorni di malattia E di assenza registrati nel Diario nel mese: { 'nome|dstr': true }
+function _pianoAssenzeDiarioMese(ym) {
+  const out = Object.assign({}, _pianoMalattieMese(ym));
+  const tipoAss = typeof nomeCorrente === 'function' ? nomeCorrente('Assenza') : 'Assenza';
+  const inizio = ym + '-01';
+  const fine = ym + '-' + String(_pianoUltimoGiorno(ym)).padStart(2, '0');
+  (typeof datiCache !== 'undefined' ? datiCache : []).forEach((e) => {
+    if (e.tipo !== tipoAss || e.eliminato) return;
+    _pianoDateMalattia(e.testo || '', e.data).forEach((d) => {
+      if (d >= inizio && d <= fine) out[e.nome + '|' + d] = true;
+    });
+  });
+  return out;
+}
 function _pianoVersioneCalcola(versione, oggi, opz) {
   opz = opz || {};
   const k = (r) => r.collaboratore + '|' + String(r.data).substring(0, 10);
   const A = new Map((versione || []).map((r) => [k(r), r]));
   const B = new Map((oggi || []).map((r) => [k(r), r]));
-  const mal = (r) => !!r && ['M', 'M1'].includes(String(r.codice || '').toUpperCase());
+  // M, M1 e ASS (assenza in attesa di certificato, D4 23/10/2026): vale il Diario
+  const mal = (r) => !!r && PIANO_VERSIONE_DIARIO.includes(String(r.codice || '').toUpperCase());
   const malDiario = opz.malattie || {};
   const altro = opz.altroSettore || new Set();
   const nd = (r) => !!r && String(r.codice || '').toUpperCase() === 'ND';
@@ -1885,7 +1905,10 @@ function _pianoVersioneCella(r) {
   else if (r.protetto === false) t.push('non protetta');
   return r.codice + (t.length ? ' (' + t.join(', ') + ')' : '');
 }
-async function pianoStoricoRiporta(quando, esatto) {
+function pianoStoricoRiporta(quando, esatto) {
+  return pianoLunga('Riporta a prima', () => _pianoStoricoRiportaEsegui(quando, esatto));
+}
+async function _pianoStoricoRiportaEsegui(quando, esatto) {
   // senza il permesso: le differenze si vedono, il mese non si riporta
   const puoRip = puoRipristinareVersioni();
   const ym = _pianoMeseSel;
@@ -1939,7 +1962,7 @@ async function pianoStoricoRiporta(quando, esatto) {
   }
   const calc = _pianoVersioneCalcola(stato, cur, {
     bloccato: _pianoGiornoBloccato,
-    malattie: _pianoMalattieMese(ym),
+    malattie: _pianoAssenzeDiarioMese(ym),
     altroSettore: altroSettore,
     ndSvuota: ndSvuota,
   });
@@ -2013,7 +2036,7 @@ async function pianoStoricoRiporta(quando, esatto) {
       '\n\nRestano come oggi ' +
       calc.malattia.length +
       (calc.malattia.length === 1 ? ' cella' : ' celle') +
-      ' di malattia (vale il Diario: la malattia si toglie o si rimette dalla sua registrazione):\n' +
+      ' di malattia o assenza (vale il Diario: si toglie o si rimette dalla sua registrazione):\n' +
       elenco(calc.malattia, 6);
   if (calc.nd.length)
     testo +=
@@ -2488,7 +2511,8 @@ async function confermaScambioSettimane() {
             // solo i giorni aperti: _applicaVacanzeMese non riscrive i giorni chiusi,
             // quindi cancellarli li lascerebbe vuoti (prima si toglieva tutto il mese)
             _pianoGiornoScrivibile(String(x.data).substring(0, 10)) &&
-            (x.codice === 'V' || ((x.codice === 'C' || x.codice === 'WD') && x.generato)),
+            // le C e i WD di Applica, mai le C di riempimento della bozza (D1 23/10/2026)
+            (x.codice === 'V' || _vacCellaDiApplica(x)),
         )) {
           await secDel('piano', 'id=eq.' + r.id);
         }
@@ -2529,6 +2553,38 @@ async function confermaScambioSettimane() {
   }
 }
 
+// TIPO DI UNA NUOVA VACANZA (controllo 23/10/2026, D19): solo le assenze che si pianificano
+// nel file delle vacanze (matrimonio, trasloco, protezione civile, militare...). Prima il
+// campo proponeva anche malattie e infortuni (si registrano nel Diario), ASS, ND (modulo
+// 1187), JG, WD, CGF, i riposi, i corsi e le sigle «Da definire» dell import
+const VAC_TIPI_ESCLUSI = [
+  'V',
+  'C',
+  'M',
+  'M1',
+  'I',
+  'I1',
+  'ASS',
+  'ND',
+  'JG',
+  'WD',
+  'CGF',
+  'D',
+  'U',
+  'US',
+  'F',
+  '1F',
+  'CO',
+  'RC',
+];
+function _vacTipoScegliibile(c) {
+  if (!c || c.attivo === false) return false;
+  const cod = String(c.codice || '').toUpperCase();
+  if (VAC_TIPI_ESCLUSI.includes(cod)) return false;
+  if (c.richiede_orario) return false; // corsi e turni con orario
+  if (/^da definire/i.test(String(c.descrizione || ''))) return false;
+  return true;
+}
 function apriNuovaVacanza() {
   if (!puoGestirePiano()) return;
   const nomiRep = collaboratoriCache
@@ -2542,7 +2598,7 @@ function apriNuovaVacanza() {
     nomiRep.map((n) => '<option value="' + escP(n) + '">' + escP(n) + '</option>').join('') +
     '</select></div><div class="field" style="text-align:left;margin-top:8px"><label>Settimana (1-53)</label><input type="number" id="nv-sett" min="1" max="53" style="width:110px;padding:8px"></div><div class="field" style="text-align:left;margin-top:8px"><label>Tipo</label><select id="nv-tipo" style="width:100%;padding:8px"><option value="V">V · Vacanza (conta nei giorni di vacanza)</option>' +
     (typeof pianoCodiciCache !== 'undefined' ? pianoCodiciCache : [])
-      .filter((c) => c.attivo !== false && !['V', 'C'].includes(String(c.codice).toUpperCase()))
+      .filter(_vacTipoScegliibile)
       .map(
         (c) =>
           '<option value="' +
@@ -3251,6 +3307,10 @@ async function _applicaVacanzeMese(interattivo, opz) {
   // 14 V protette tolte a Valet novembre e sostituite con turni)
   let nOrfane = 0;
   const vSenzaFile = []; // { nome, data }
+  // celle scritte da un Applica precedente e tolte qui (V orfane, C e WD): alla fine, se il
+  // mese ha il riempimento della bozza e restano vuote, tornano C di riempimento (D1)
+  const tolteApplica = new Set(); // nome|g
+  let meseConRiempimento = false;
   {
     const righeV =
       (await secGet(
@@ -3283,31 +3343,65 @@ async function _applicaVacanzeMese(interattivo, opz) {
     for (let i = 0; i < orfane.length; i += 10) {
       await Promise.all(orfane.slice(i, i + 10).map((r) => secDel('piano', 'id=eq.' + r.id)));
     }
+    orfane.forEach((r) => tolteApplica.add(r.collaboratore + '|' + parseInt(r.data.split('-')[2])));
     nOrfane = orfane.length;
     if (nOrfane) logAzione('Vacanze: V rimosse', ym + ' · ' + nOrfane + ' giorni non più in vacanza');
   }
-  // via le V/C/WD dei giri precedenti: i WD (non protetti) e i C scritti da
-  // "Applica" (protetti ma generati); gli inserimenti a mano restano
-  await secDel(
-    'piano',
-    'data=gte.' +
-      da +
-      '&data=lte.' +
-      a +
-      '&reparto_dip=eq.' +
-      _pianoReparto() +
-      '&protetto=eq.false&generato=eq.true&codice=in.(V,C,WD)',
-  );
-  await secDel(
-    'piano',
-    'data=gte.' +
-      da +
-      '&data=lte.' +
-      a +
-      '&reparto_dip=eq.' +
-      _pianoReparto() +
-      '&protetto=eq.true&generato=eq.true&codice=eq.C',
-  );
+  // via SOLO le C e i WD dei giri precedenti di "Applica" (_vacCellaDiApplica): i WD
+  // generati e le C protette e generate senza nota. Le C DI RIEMPIMENTO della bozza
+  // (generate, non protette) e le celle scritte a mano restano (controllo 23/10/2026:
+  // prima si cancellavano tutte le C generate non protette, Applica dopo Prepara il mese
+  // toglieva 667 C di riempimento e il mese passava da 1350 a 701 celle). I giorni
+  // liberati restano vuoti o, se il mese ha il riempimento, tornano C di riempimento
+  // alla fine (come fa la bozza)
+  {
+    const righePrima =
+      (await secGet(
+        'piano?data=gte.' + da + '&data=lte.' + a + '&reparto_dip=eq.' + _pianoReparto() + '&limit=5000',
+      )) || [];
+    meseConRiempimento = righePrima.some(_vacCRiempimento);
+    const proprie = righePrima.filter(_vacCellaDiApplica);
+    for (let i = 0; i < proprie.length; i += 100) {
+      await secDel(
+        'piano',
+        'id=in.(' +
+          proprie
+            .slice(i, i + 100)
+            .map((r) => r.id)
+            .join(',') +
+          ')',
+      );
+    }
+    proprie.forEach((r) => tolteApplica.add(r.collaboratore + '|' + parseInt(r.data.split('-')[2])));
+  }
+  // alla fine: i giorni tolti a Applica rimasti vuoti tornano C di riempimento (solo se il
+  // mese ha il riempimento della bozza; mai in malattia, fuori rapporto o in un altro settore)
+  const rimettiRiempimento = async () => {
+    if (!meseConRiempimento || !tolteApplica.size) return 0;
+    const ora =
+      (await secGet('piano?data=gte.' + da + '&data=lte.' + a + '&select=collaboratore,data&limit=20000')) || [];
+    const occupate = new Set(ora.map((r) => r.collaboratore + '|' + parseInt(String(r.data).split('-')[2])));
+    let n = 0;
+    for (const k of tolteApplica) {
+      if (occupate.has(k)) continue;
+      const i = k.lastIndexOf('|');
+      const nome = k.substring(0, i);
+      const g = parseInt(k.substring(i + 1));
+      const dstr = ym + '-' + String(g).padStart(2, '0');
+      if (g < primoAperto || eMalato(nome, g) || !_pianoOperativoIl(nome, dstr)) continue;
+      const nuovo = await _pianoInserisciCella({
+        collaboratore: nome,
+        data: dstr,
+        codice: 'C',
+        protetto: false,
+        generato: true,
+        reparto_dip: _pianoReparto(),
+        operatore: getOperatore(),
+      });
+      if (nuovo) n++;
+    }
+    return n;
+  };
   // VACANZA IN MALATTIA: M protetta con la nota "Ex V" (stessa forma della malattia
   // registrata sopra una V: ore della vacanza nei primi 14 giorni, V di ritorno se la
   // malattia si toglie). Le M/I gia presenti restano; nella generazione automatica le
@@ -3412,6 +3506,7 @@ async function _applicaVacanzeMese(interattivo, opz) {
   }
   const nomiBlocchi = [...new Set(Object.keys(vacGiorni).concat(Object.keys(altreGiorni), Object.keys(codaPrec)))];
   if (!nomiBlocchi.length) {
+    await rimettiRiempimento();
     if (interattivo)
       toast(
         nOrfane
@@ -3454,7 +3549,30 @@ async function _applicaVacanzeMese(interattivo, opz) {
     }
     if (r) {
       if (r.protetto) return false; // mai toccare le protette
-      if (r.codice === codice) return false;
+      // stessa sigla gia nella cella: una C di riempimento sul giorno di una C della
+      // vacanza diventa la C della vacanza (protetta, Migliora non la sposta)
+      if (r.codice === codice) {
+        if (!protetto || !_vacCRiempimento(r)) return false;
+        await secPatch('piano', 'id=eq.' + r.id, {
+          protetto: true,
+          generato: true,
+          operatore: op,
+          updated_at: new Date().toISOString(),
+        });
+        r.protetto = true;
+        r.generato = true;
+        return true;
+      }
+      // una C scritta a mano resta C (riposo voluto): non diventa WD
+      if (String(r.codice || '').toUpperCase() === 'C' && !r.generato) return false;
+      // WD gia risolto dalla bozza (controllo 23/10/2026): sul giorno del WD la bozza ha messo
+      // un turno diurno, o una C quando non c era posto. Applica dopo Prepara il mese non lo
+      // rimette WD (prima il turno presto spariva e tornava il segnaposto)
+      if (codice === 'WD' && r.generato) {
+        const ti = typeof _pianoTurnoInfoRiga === 'function' ? _pianoTurnoInfoRiga(r) : null;
+        const diurno = _pianoIsLavoro(r.codice) && !(ti && String(ti.tipo || '').toUpperCase() === 'NOTTURNO');
+        if (diurno || _vacCRiempimento(r)) return false;
+      }
       // GENERAZIONE AUTOMATICA: le celle scritte a mano non si toccano mai, nemmeno
       // per una vacanza; il conflitto va nel resoconto da controllare
       const auto = window._pianoAutoInCorso;
@@ -3646,6 +3764,7 @@ async function _applicaVacanzeMese(interattivo, opz) {
       }
     }
   }
+  const nRiemp = await rimettiRiempimento();
   logAzione(
     'Piano: vacanze applicate',
     ym +
@@ -3656,7 +3775,8 @@ async function _applicaVacanzeMese(interattivo, opz) {
       ' C, ' +
       nWdP +
       ' WD' +
-      (nAltre ? ', ' + nAltre + ' altre assenze (PC, MT...)' : ''),
+      (nAltre ? ', ' + nAltre + ' altre assenze (PC, MT...)' : '') +
+      (nRiemp ? ', ' + nRiemp + ' giorni tornati C di riempimento' : ''),
   );
   if (nonToccati.length)
     logAzione(
@@ -3682,6 +3802,30 @@ async function _applicaVacanzeMese(interattivo, opz) {
     restituiti: nRestituiti,
   };
 }
+// C DI RIEMPIMENTO della bozza: C generata, non protetta, senza nota (il compleanno ha la
+// nota) e senza motivo di blocco. Applica vacanze non la cancella mai
+function _vacCRiempimento(r) {
+  return (
+    !!r &&
+    String(r.codice || '').toUpperCase() === 'C' &&
+    !!r.generato &&
+    !r.protetto &&
+    !String(r.commento || '').trim() &&
+    !String(r.motivo_blocco || '').trim()
+  );
+}
+// cella scritta da un giro precedente di "Applica al piano" (le sole che Applica toglie per
+// riscriverle): i WD generati non protetti (diurno forzato) e le C protette e generate senza
+// nota. Le V hanno il loro giro (orfane); le C della bozza, del compleanno, dei cambi (con la
+// nota "Ex ...") e quelle scritte a mano (generato=false) restano
+function _vacCellaDiApplica(r) {
+  if (!r) return false;
+  const c = String(r.codice || '').toUpperCase();
+  if (String(r.motivo_blocco || '').trim()) return false;
+  if (c === 'WD') return !!r.generato && !r.protetto;
+  if (c === 'C') return !!r.generato && !!r.protetto && !String(r.commento || '').trim();
+  return false;
+}
 // "Rossi Mario 03.11-09.11, Bianchi Anna 21.11": giorni di fila raccolti per persona
 function _vacElencoGiorni(l) {
   const per = {};
@@ -3703,7 +3847,11 @@ function _vacElencoGiorni(l) {
     })
     .join('\n');
 }
-async function applicaVacanzePiano() {
+// una alla volta con le altre operazioni lunghe del Piano (pianoLunga, D2 23/10/2026)
+function applicaVacanzePiano() {
+  return pianoLunga('Applica vacanze', _applicaVacanzePianoEsegui);
+}
+async function _applicaVacanzePianoEsegui() {
   if (!_pianoAzioneAutoConsentita('vacanze')) return; // azione automatica: permesso apposito
   const MESI_L = MESI_FULL || [];
   const lbl = (MESI_L[parseInt(_pianoMeseSel.split('-')[1]) - 1] || '') + ' ' + _pianoMeseSel.split('-')[0];
@@ -3713,7 +3861,7 @@ async function applicaVacanzePiano() {
         lbl +
         ' (' +
         repartoLabel(_pianoReparto()) +
-        ')?\n\nScrive le V (protette) sui giorni di vacanza, i congedi C prima/dopo i blocchi e i WD (diurno forzato) secondo le regole. Le celle protette esistenti non vengono toccate.',
+        ')?\n\nScrive le V (protette) sui giorni di vacanza, i congedi C prima/dopo i blocchi e i WD (diurno forzato) secondo le regole.\n\nToglie solo le C e i WD scritti da un Applica precedente (se una vacanza si è spostata). Le C di riempimento della bozza, le celle scritte a mano e le celle protette non vengono toccate.',
     ))
   )
     return;

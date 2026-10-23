@@ -257,33 +257,24 @@ async function _completaPromemoriaEsegui(id) {
     if (p.ripetizione) {
       const nuovaData = _pmProssimaData(p, oggiLocale());
       try {
-        const rep = p.reparto_dip || currentReparto;
-        const gia =
-          (await secGet(
-            'promemoria?titolo=eq.' +
-              encodeURIComponent(p.titolo) +
-              '&ripetizione=eq.' +
-              encodeURIComponent(p.ripetizione) +
-              '&completata=eq.false&data_scadenza=gte.' +
-              nuovaData +
-              '&reparto_dip=eq.' +
-              encodeURIComponent(rep) +
-              // stesso titolo ma per un altro collega non e un doppione
-              (p.assegnato_a ? '&assegnato_a=eq.' + encodeURIComponent(p.assegnato_a) : '&assegnato_a=is.null'),
-          )) || [];
-        if (gia.length) {
-          toast("Fatto. Il prossimo c'è già: " + gia[0].data_scadenza.split('-').reverse().join('.'));
-        } else {
-          const nr = await secPost('promemoria', {
-            titolo: p.titolo,
-            descrizione: p.descrizione,
-            data_scadenza: nuovaData,
-            assegnato_a: p.assegnato_a,
-            creato_da: p.creato_da,
-            ripetizione: p.ripetizione,
-            reparto_dip: rep,
-          });
-          if (nr && nr[0]) promemoriaCache.push(nr[0]);
+        // LA RIPETIZIONE LA CREA IL DATABASE (riverifica 4 N1): con l autore della volta prima
+        // (prima nasceva a nome di chi lo segnava fatto); se il prossimo c e gia, non lo rifa
+        const x = await _conSessione(
+          (t) => _rpcSicura('promemoria_ripeti', { p_token: t, p_id: p.id, p_data: nuovaData, p_azione: 'crea' }),
+          getOpToken(),
+          true,
+        );
+        if (x && x.gia) {
+          toast("Fatto. Il prossimo c'è già: " + String(x.gia.data_scadenza).split('-').reverse().join('.'));
+        } else if (x && x.nuovo) {
+          promemoriaCache.push(x.nuovo);
+          // nello stesso passo di Annulla del Fatto: Annulla toglie anche il prossimo
+          if (typeof _annullaPronto === 'function' && _annullaPronto() && window.Annulla.dopoRpc)
+            window.Annulla.dopoRpc({
+              tipo: 'rpc',
+              annulla: { fn: 'promemoria_ripeti', params: { p_id: p.id, p_data: nuovaData, p_azione: 'togli' } },
+              ripristina: { fn: 'promemoria_ripeti', params: { p_id: p.id, p_data: nuovaData, p_azione: 'crea' } },
+            });
           toast('Fatto. Prossimo: ' + nuovaData.split('-').reverse().join('.'));
         }
       } catch (e) {
@@ -736,21 +727,53 @@ function _trovaNomeSimileMaison(nome) {
     )
       return { nome: n, tipo: 'simile' };
   }
-  // Match cognome (primo token): "Leccese" → "Leccese Pietro"
-  const _cognome = nl.split(/\s+/)[0];
-  if (_cognome.length >= 3) {
-    for (const n of nomi) {
-      if (n.toLowerCase().split(/\s+/)[0] === _cognome) return { nome: n, tipo: 'simile' };
-    }
+  // Match cognome (primo token): "Leccese" → "Leccese Pietro". Solo se e' stata scritta UNA
+  // parola (23/10/2026): con piu parole il primo cognome uguale non basta ("Qa-B D'Angelo Spesa"
+  // proponeva "Qa-B Tre", "Porcello Bruno" proponeva "Porcello Angelo")
+  // Si propone solo un cliente UNICO (riverifica B-N1): «Porcello» con Porcello Angelo e
+  // Porcello Bruno proponeva il primo trovato; ora risponde 'ambiguo' con l elenco
+  const _cognome = nl.trim().split(/\s+/)[0];
+  const _unaParola = nl.trim().split(/\s+/).length === 1;
+  const _unico = (trovati) =>
+    trovati.length === 1
+      ? { nome: trovati[0], tipo: 'simile' }
+      : trovati.length
+        ? { nome: null, tipo: 'ambiguo', nomi: trovati }
+        : null;
+  if (_unaParola && _cognome.length >= 3) {
+    const r = _unico(nomi.filter((n) => n.toLowerCase().split(/\s+/)[0] === _cognome));
+    if (r) return r;
   }
   // Match su qualsiasi token: "Baroni" → "Micheli Baroni Cristina"
-  if (_cognome.length >= 3) {
-    for (const n of nomi) {
-      const tokens = n.toLowerCase().split(/\s+/);
-      if (tokens.some((t) => t === _cognome)) return { nome: n, tipo: 'simile' };
-    }
+  if (_unaParola && _cognome.length >= 3) {
+    const r = _unico(nomi.filter((n) => n.toLowerCase().split(/\s+/).includes(_cognome)));
+    if (r) return r;
   }
   return null;
+}
+// nome scritto che corrisponde a piu clienti: si sceglie dall elenco o si lascia com e scritto
+// (null = annullato)
+async function _maisonScegliTraSimili(scritto, nomi) {
+  const r = await chiediModulo(
+    '"' + scritto + '" corrisponde a più clienti. Quale?',
+    [
+      {
+        titolo: 'Cliente',
+        campi: [
+          {
+            id: 'n',
+            tipo: 'scelta',
+            opzioni: nomi
+              .map((n) => ({ valore: n, etichetta: n }))
+              .concat([{ valore: '__come_scritto__', etichetta: 'Nessuno: lascia "' + scritto + '" come scritto' }]),
+          },
+        ],
+      },
+    ],
+    { titolo: 'Nome da chiarire', ok: 'Conferma' },
+  );
+  if (!r || !r.n) return null;
+  return r.n === '__come_scritto__' ? scritto : r.n;
 }
 // Valori CHF dei buoni Maison · personalizzabili da admin in Impostazioni (chiave 'buono_valori')
 let BUONO_VALORI = { BU: 15, BL: 40, CG: 80, WL: 40 };

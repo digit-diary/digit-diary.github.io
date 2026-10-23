@@ -169,6 +169,16 @@ const PIANO_REGOLE_GUIDA = {
     p: 'TRUE',
     d: 'Bozza, Migliora la bozza, Controlla le regole (qualità del piano)',
   },
+  // BOZZA A BLOCCHI (23/10/2026, js/piano-blocchi.js): prima lo schema lavoro/riposo di ognuno,
+  // poi i turni dentro lo schema; Migliora conta i buchi anche durante la ricerca
+  bozza_a_blocchi: {
+    g: 'Riposo e giorni di lavoro',
+    n: 'Prepara il mese a blocchi (prima i giorni di lavoro e riposo di ognuno, poi i turni)',
+    s: 'Sì: come chi pianifica a mano, il programma decide prima per ognuno i blocchi di lavoro e i riposi (4+2, 5+2, più corti per chi ha poche ore, mai riposi troppo lunghi), che coprono il fabbisogno giorno per giorno, poi mette i turni dentro i blocchi con tutte le regole; i posti che restano scoperti si provano con tutti. Migliora la bozza tiene conto dei buchi anche mentre cerca. No: la bozza giorno per giorno di prima.',
+    t: 'sino',
+    p: 'TRUE',
+    d: 'Prepara il mese, Prepara più mesi, Migliora la bozza',
+  },
   blocco_lavoro_minimo: {
     g: 'Riposo e giorni di lavoro',
     n: 'Blocco di lavoro minimo fra due liberi (giorni)',
@@ -693,6 +703,8 @@ const PIANO_REGOLE_LIMITI = {
   blocco_ora_limite: [0, 23],
   congedo_np_giorni_vacanze: [0, 365],
   congedo_np_mesi_anzianita: [0, 24],
+  // giorni prima che un ASS compaia negli Avvisi: almeno 1 (controllo QA 23/10/2026, D18: -2 passava)
+  ass_giorni_regolarizzare: [1, 60],
 };
 // COSA ESISTE IN UN SETTORE: sigle dei turni, gruppi e funzioni presenti.
 // Serve a dire "questa regola qui non ha senso" (L1 e 9 ai Tavoli non esistono).
@@ -743,10 +755,18 @@ function _pianoValidaRegola(nome, valore, settore) {
   if (g.t === 'numero') {
     const num = parseFloat(v.replace(',', '.'));
     if (v === '' || isNaN(num)) return 'Serve un numero (per esempio 11 oppure 0.8), non "' + v + '"';
-    const lim = PIANO_REGOLE_LIMITI[nome];
-    if (lim && (num < lim[0] || num > lim[1]))
+    if (!/^[+-]?\d+(?:[.,]\d+)?$/.test(v)) return 'Serve un numero (per esempio 11 oppure 0.8), non "' + v + '"';
+    // senza limiti propri: mai negativo (un numero di giorni, ore o persone)
+    const lim = PIANO_REGOLE_LIMITI[nome] || [0, Infinity];
+    if (num < lim[0] || num > lim[1])
       return (
-        'Valore fuori scala: per "' + g.n + '" e ammesso da ' + lim[0] + ' a ' + lim[1] + ' (hai scritto ' + v + ')'
+        'Valore fuori scala: per "' +
+        g.n +
+        '" è ammesso ' +
+        (lim[1] === Infinity ? 'da ' + lim[0] + ' in su' : 'da ' + lim[0] + ' a ' + lim[1]) +
+        ' (hai scritto ' +
+        v +
+        ')'
       );
     return null;
   }
@@ -1073,6 +1093,10 @@ async function salvaPianoRegolaNuova(nome, valore) {
     return;
   }
   const nuovo = String(valore == null ? '' : valore).trim();
+  if (g.t === 'sino' && /^false$/i.test(nuovo) && !(await _pianoConfermaSpegniLegge(nome))) {
+    renderPiano();
+    return;
+  }
   try {
     const righe = await secPost('piano_regole', {
       nome: nome,
@@ -1105,7 +1129,7 @@ async function eliminaPianoRegolaSettore(id) {
         r.nome +
         '" per ' +
         _pianoRegolaSettori(r).map(repartoLabel).join(', ') +
-        "?\n\nTornera' a valere il valore generale.",
+        '?\n\nTornerà a valere il valore generale.',
     ))
   )
     return;
@@ -1149,9 +1173,32 @@ async function eliminaPianoRegola(id) {
     toastErrore('Errore: ' + (e.message || ''));
   }
 }
+// REGOLA DI LEGGE SPENTA (controllo QA 23/10/2026, D24): prima bastava togliere la spunta.
+// Ora serve una conferma esplicita che dice che e una norma di legge; con Annulla resta accesa.
+async function _pianoConfermaSpegniLegge(nome) {
+  if (!PIANO_REGOLE_LEGGE.has(nome)) return true;
+  const g = PIANO_REGOLE_GUIDA[nome] || {};
+  const fonte = pianoRegolaFonte(nome);
+  return chiediConferma(
+    '«' +
+      (g.n || nome) +
+      '» è una norma di legge' +
+      (fonte ? ' (' + fonte + ')' : '') +
+      '.\n\nSpegnendola il programma non la controlla più in nessun settore: bozza, cambi, scambi e Controlla le regole non segnalano le violazioni. La responsabilità del rispetto della legge resta.\n\nSpegnerla davvero?',
+    { titolo: 'Regola di legge', ok: 'Sì, spegni la regola di legge', pericolo: true },
+  );
+}
 async function salvaPianoRegola(id, campo, valore) {
   if (!isAdmin()) return;
   const rV = pianoRegoleCache.find((x) => x.id === id);
+  const spegne =
+    campo === 'attivo'
+      ? !valore
+      : rV && (PIANO_REGOLE_GUIDA[rV.nome] || {}).t === 'sino' && /^false$/i.test(String(valore).trim());
+  if (spegne && rV && rV.attivo !== false && !(await _pianoConfermaSpegniLegge(rV.nome))) {
+    renderPiano(); // la spunta torna come prima
+    return;
+  }
   if (campo === 'valore' && rV) {
     const settR = _pianoRegolaSettori(rV);
     const errore = _pianoValidaRegola(rV.nome, valore, settR.length === 1 ? settR[0] : '');
@@ -2845,6 +2892,62 @@ async function _importaPianoDaWb(wb, ym, opz) {
             .map((c) => secPatch('piano', 'id=eq.' + c.riga.id, { colore: c.colore, operatore: op, updated_at: ora })),
         );
     }
+    // M E ASS DEL FILE ANCHE NEL DIARIO (controllo 23/10 D28): come una M scritta a mano nel
+    // calendario, la malattia (o l assenza in attesa di certificato) arrivata con l import
+    // si registra nel Rapporto e nel Diario, un periodo di giorni di fila per persona. Prima
+    // restava solo nel piano (Troncao 2-4.10 e altri: M senza registrazione)
+    if (typeof _pianoMalattiaNelDiario === 'function') {
+      const MD = { M: 'M', M1: 'M', ASS: 'ASS' };
+      const nuoveM = nuoveCelle
+        .filter((x) => MD[String(x.codice).toUpperCase()])
+        .map((x) => ({ nome: x.collaboratore, data: x.data, tipo: MD[String(x.codice).toUpperCase()], era: '' }))
+        .concat(
+          (aggiorna ? cambiate : [])
+            .filter((c) => MD[String(c.nuovo.codice).toUpperCase()])
+            .map((c) => ({
+              nome: c.riga.collaboratore,
+              data: c.nuovo.data,
+              tipo: MD[String(c.nuovo.codice).toUpperCase()],
+              era: c.riga.codice,
+            })),
+        )
+        .sort((a, b) => a.nome.localeCompare(b.nome) || a.tipo.localeCompare(b.tipo) || a.data.localeCompare(b.data));
+      const giornoDopo = (d) => {
+        const x = new Date(d + 'T12:00:00');
+        x.setDate(x.getDate() + 1);
+        return dataLocaleISO(x);
+      };
+      let nReg = 0;
+      for (let i = 0; i < nuoveM.length;) {
+        let j = i;
+        while (
+          j + 1 < nuoveM.length &&
+          nuoveM[j + 1].nome === nuoveM[i].nome &&
+          nuoveM[j + 1].tipo === nuoveM[i].tipo &&
+          nuoveM[j + 1].data === giornoDopo(nuoveM[j].data)
+        )
+          j++;
+        try {
+          nReg += await _pianoMalattiaNelDiario(
+            nuoveM[i].nome,
+            nuoveM[i].data,
+            nuoveM[j].data,
+            false,
+            nuoveM[i].era,
+            nuoveM[i].tipo === 'ASS' ? 'ASS' : undefined,
+          );
+        } catch (e) {
+          toastErrore(
+            nuoveM[i].nome + ': malattia del file NON registrata nel Diario (' + ((e && e.message) || e) + ')',
+          );
+        }
+        i = j + 1;
+      }
+      if (nReg)
+        toast(
+          'Malattie e assenze del file registrate anche nel Diario: ' + nReg + (nReg === 1 ? ' giorno' : ' giorni'),
+        );
+    }
     const inserite = (r && r.inserite) || 0;
     logAzione(
       'Piano importato da Excel',
@@ -3036,10 +3139,94 @@ async function _pianoFabbisognoCopiaCalcola(ym, rep, presenti) {
   return esito;
 }
 // scrive le celle calcolate da _pianoFabbisognoCopiaCalcola (un passo di Annulla, chiuso dal registro)
+// TUTTO O NIENTE (controllo QA 23/10/2026, D23): prima a gruppi di 10, e un errore a meta (rete,
+// permesso, cella gia scritta da un altro PC) lasciava una copia parziale. Ora UNA scrittura nel
+// database (piano_fabbisogno_copia, migrazione 20260930_b): permesso del fabbisogno, settore
+// dell operatore, celle del mese e del settore, tutto o niente; una cella gia impostata nel
+// frattempo = niente scritto. Le righe scritte entrano nell Annulla (un passo). Database senza
+// la migrazione: la strada di prima (righe tolte di nuovo se qualcosa non riesce).
+// L errore arriva a chi chiama, che ridisegna.
 async function _pianoFabbisognoCopiaScrivi(calc, ym) {
   const nuovi = calc.nuovi;
-  for (let i = 0; i < nuovi.length; i += 10) {
-    await Promise.all(nuovi.slice(i, i + 10).map((f) => secPost('piano_fabbisogni', f)));
+  if (!nuovi.length) return 0;
+  const rep = nuovi[0].reparto_dip;
+  let es = null;
+  try {
+    es = await _conSessione(
+      (t) => _rpcSicura('piano_fabbisogno_copia', { p_token: t, p_ym: ym, p_rep: rep, p_righe: nuovi }),
+      getOpToken(),
+      true, // rete caduta: niente secondo tentativo alla cieca
+    );
+  } catch (e) {
+    if (!(typeof _pianoErroreFunzioneAssente === 'function' && _pianoErroreFunzioneAssente(e))) {
+      const err = new Error(
+        'copia del fabbisogno non riuscita (' +
+          ((e && e.message) || e) +
+          '). Nessuna cella scritta: il mese è come prima.',
+      );
+      err.copiaParziale = 0;
+      throw err;
+    }
+    console.warn('[piano] piano_fabbisogno_copia assente (migrazione 20260930_b): copia a gruppi');
+    return _pianoFabbisognoCopiaScriviVecchio(calc, ym);
+  }
+  if (!es || typeof es.ok !== 'boolean') throw new Error('il database non ha confermato la copia del fabbisogno');
+  if (!es.ok) {
+    const c = es.conflitti || [];
+    const err = new Error(
+      'nel frattempo ' +
+        (c.length === 1
+          ? '1 cella del fabbisogno è stata impostata'
+          : c.length + ' celle del fabbisogno sono state impostate') +
+        ' da un altro PC (' +
+        c
+          .slice(0, 5)
+          .map((x) => String(x.data).substring(8, 10) + '.' + String(x.data).substring(5, 7) + ' ' + x.turno_codice)
+          .join(', ') +
+        (c.length > 5 ? '…' : '') +
+        '). Nessuna cella scritta: ricarica il mese e riprova.',
+    );
+    err.copiaParziale = 0;
+    throw err;
+  }
+  if (window.Annulla && typeof window.Annulla.dopoPost === 'function' && (es.righe || []).length)
+    window.Annulla.dopoPost('piano_fabbisogni', es.righe);
+  logAzione(
+    'Piano: fabbisogno copiato per tipo di giornata',
+    calc.ymPrec + ' → ' + ym + ' (' + nuovi.length + ' celle)',
+  );
+  return nuovi.length;
+}
+async function _pianoFabbisognoCopiaScriviVecchio(calc, ym) {
+  const nuovi = calc.nuovi;
+  const scritte = []; // id delle righe nuove
+  let errore = null;
+  for (let i = 0; i < nuovi.length && !errore; i += 10) {
+    const esiti = await Promise.allSettled(nuovi.slice(i, i + 10).map((f) => secPost('piano_fabbisogni', f)));
+    esiti.forEach((e) => {
+      if (e.status === 'fulfilled') [].concat(e.value || []).forEach((r) => r && r.id != null && scritte.push(r.id));
+      else if (!errore) errore = e.reason || new Error('scrittura non riuscita');
+    });
+  }
+  if (errore) {
+    let rimaste = 0;
+    for (let i = 0; i < scritte.length; i += 100) {
+      try {
+        await secDel('piano_fabbisogni', 'id=in.(' + scritte.slice(i, i + 100).join(',') + ')');
+      } catch (e) {
+        rimaste += scritte.slice(i, i + 100).length;
+      }
+    }
+    const err = new Error(
+      'copia del fabbisogno non riuscita (' +
+        ((errore && errore.message) || errore) +
+        '). ' +
+        (rimaste
+          ? rimaste + ' celle già scritte non si sono potute togliere: controlla il mese.'
+          : 'Nessuna cella scritta: il mese è come prima.'),
+    );
+    err.copiaParziale = rimaste;
+    throw err;
   }
   logAzione(
     'Piano: fabbisogno copiato per tipo di giornata',
@@ -3090,10 +3277,10 @@ async function copiaFabbisognoMese() {
   try {
     await _pianoFabbisognoCopiaScrivi(calc, _pianoMeseSel);
     toast('Fabbisogno copiato per tipo di giornata (' + nuovi.length + ' celle)');
-    renderPiano();
   } catch (e) {
-    toast('Errore copia fabbisogno');
+    toastErrore('Errore: ' + ((e && e.message) || e), 9000);
   }
+  renderPiano(); // anche dopo un errore: la griglia mostra lo stato vero
 }
 
 // ---- Card TURNI (admin) ----

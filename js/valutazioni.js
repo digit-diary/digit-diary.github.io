@@ -407,6 +407,9 @@ function apriValutazioneEditor(nome, anno, tipo) {
     '<span class="filter-label">Valutatore</span><input type="text" id="val-valutatore" value="' +
     _escAttr((esistente && esistente.valutatore) || getOperatore() || '') +
     '" style="width:200px;padding:8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)">' +
+    '<span class="filter-label">Data</span><input type="date" id="val-data" value="' +
+    _escAttr((esistente && esistente.data_valutazione) || oggiLocale()) +
+    '" style="padding:8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)">' +
     '<span class="filter-label">Settore</span><input type="text" id="val-settore" value="' +
     _escAttr(((esistente && esistente.dati_personali) || {}).settore || '') +
     '" placeholder="Es: Foboslot" style="width:130px;padding:8px;border:1px solid var(--line);border-radius:2px;background:var(--paper2);color:var(--ink)">' +
@@ -557,7 +560,8 @@ async function _salvaValutazioneEsegui(nome) {
     proposta_sviluppo: ((document.getElementById('val-proposta') || {}).value || '').trim(),
     osservazioni: ((document.getElementById('val-osservazioni') || {}).value || '').trim(),
     valutatore: ((document.getElementById('val-valutatore') || {}).value || '').trim(),
-    data_valutazione: oggiLocale(),
+    // la data e' quella della scheda (campo Data): salvare di nuovo non la rimette a oggi
+    data_valutazione: _valDataScelta(esistPre),
     reparto_dip: currentReparto,
   };
   try {
@@ -579,23 +583,51 @@ async function _salvaValutazioneEsegui(nome) {
     apriSchedaCollaboratore(nome);
   } catch (e) {
     console.error(e);
-    toast('Errore salvataggio valutazione');
+    toastNonRiuscito('Valutazione NON salvata', e);
   }
+}
+// Data della valutazione dal campo dell'editor; senza campo resta quella gia' salvata, oggi solo
+// per una scheda nuova (23/10/2026: prima ogni Salva rimetteva la data di oggi)
+function _valDataScelta(esistente) {
+  const v = ((document.getElementById('val-data') || {}).value || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+  return (esistente && esistente.data_valutazione) || oggiLocale();
 }
 async function eliminaValutazione(id, nome) {
   if (typeof puoModificare === 'function' && !puoModificare('gestione_valutazioni')) {
-    toast('Non hai il permesso');
+    toastErrore(
+      'Non puoi eliminare le valutazioni: serve il permesso «Valutazioni · inserire e importare schede» (chiedi all’amministratore)',
+    );
     return;
   }
-  if (!(await chiediConferma('Eliminare questa valutazione?'))) return;
+  // VALUTAZIONI NEL CESTINO (decisione del titolare 23/10/2026): come moduli e Diario, si
+  // ripristinano dal Cestino; l'eliminazione definitiva e' solo dell'amministratore (anche nel
+  // database, _controlla_permessi_scrittura)
+  const v = valutazioniCache.find((x) => x.id === id) || {};
+  if (
+    !(await chiediConferma(
+      'Eliminare la ' +
+        (v.tipo || 'valutazione') +
+        (v.anno ? ' ' + v.anno : '') +
+        ' di ' +
+        nome +
+        '? Sarà spostata nel Cestino, da dove si può ripristinare.',
+    ))
+  )
+    return;
+  const op = getOperatore();
+  const now = new Date().toISOString();
   try {
-    await secDel('valutazioni', 'id=eq.' + id);
-    valutazioniCache = valutazioniCache.filter((v) => v.id !== id);
-    logAzione('Valutazione eliminata', nome + ' ID ' + id);
-    toast('Valutazione eliminata');
+    await secPatch('valutazioni', 'id=eq.' + id, { eliminato: true, eliminato_da: op, eliminato_at: now });
+    valutazioniCache = valutazioniCache.filter((x) => x.id !== id);
+    logAzione(
+      'Valutazione nel cestino',
+      nome + ' · ' + (v.tipo || 'valutazione') + ' ' + (v.anno || '') + ' (da ' + op + ')',
+    );
+    toast('Valutazione spostata nel cestino');
     apriSchedaCollaboratore(nome);
   } catch (e) {
-    toast('Errore eliminazione');
+    toastNonRiuscito('Valutazione NON eliminata', e);
   }
 }
 
@@ -887,6 +919,16 @@ async function importaValutazioneExcel(input, nome) {
     toast('Errore lettura file: ' + e.message);
   }
 }
+// Riga nuova di una valutazione importata (23/10/2026): valutatore e data sono quelli scritti nel
+// file (decisione v288); chi importa e la data di oggi valgono solo se il file non li ha.
+// Prima i valori predefiniti venivano DOPO ...testi e sovrascrivevano quelli del file.
+function _valImportNuovaRiga(p, testi, operatore, oggi, reparto) {
+  return Object.assign(
+    { collaboratore: p.nome, anno: p.anno, tipo: 'valutazione', valutatore: operatore, data_valutazione: oggi },
+    testi,
+    { aree: p.aree, reparto_dip: reparto },
+  );
+}
 // un salvataggio alla volta: il doppio click creava righe doppie (unaVoltaSola in utils.js)
 function _confermaImportValutazione() {
   return unaVoltaSola('valutazione-import', () => _confermaImportValutazioneEsegui());
@@ -921,16 +963,10 @@ async function _confermaImportValutazioneEsegui() {
       await secPatch('valutazioni', 'id=eq.' + esistente.id, patch);
       Object.assign(esistente, patch);
     } else {
-      const r = await secPost('valutazioni', {
-        collaboratore: p.nome,
-        anno: p.anno,
-        tipo: 'valutazione',
-        ...testi,
-        aree: p.aree,
-        valutatore: getOperatore(),
-        data_valutazione: oggiLocale(),
-        reparto_dip: currentReparto,
-      });
+      const r = await secPost(
+        'valutazioni',
+        _valImportNuovaRiga(p, testi, getOperatore(), oggiLocale(), currentReparto),
+      );
       if (r && r[0]) valutazioniCache.unshift(r[0]);
     }
     logAzione('Valutazione importata da Excel', p.nome + ' · anno ' + p.anno);
@@ -944,7 +980,7 @@ async function _confermaImportValutazioneEsegui() {
     window._valImportPending = null;
     apriSchedaCollaboratore(p.nome);
   } catch (e) {
-    toast('Errore importazione');
+    toastNonRiuscito('Valutazione NON importata', e);
   }
 }
 

@@ -897,18 +897,47 @@ async function cambiaVisibilita(key, val) {
     toast("Riservato all'amministratore");
     return;
   }
+  const prima = visibilitaConfig[key];
+  const box = document.getElementById('vis-ops-' + key);
   if (val === 'selezionati') {
-    visibilitaConfig[key] = { tipo: 'selezionati', operatori: [] };
-    const box = document.getElementById('vis-ops-' + key);
-    if (box) box.style.display = 'flex';
+    // C19 (controllo C): "Operatori selezionati" NON salva subito un elenco vuoto (tutti
+    // perdevano l accesso finche non si spuntavano i nomi). Si parte da chi ha l accesso oggi:
+    // l elenco di prima se si torna a "selezionati", tutti gli operatori se era "Tutti",
+    // nessuno se era "Solo admin" o "Nascosto" (e allora si salva alla prima spunta).
+    const ops = box ? [...box.querySelectorAll('input[type=checkbox]')].map((cb) => cb.value) : [];
+    const ricordati = (window._visOpsPrecedenti || {})[key];
+    // senza voce: Piano e permessi di modifica = solo admin, il resto = tutti
+    const senzaVoce = key === 'piano' || (VIS_ITEMS.permessi && VIS_ITEMS.permessi[key]) ? 'admin' : 'tutti';
+    const tipoPrima = prima && typeof prima === 'object' ? 'selezionati' : prima || senzaVoce;
+    let lista = [];
+    if (Array.isArray(ricordati)) lista = ricordati.filter((n) => ops.includes(n));
+    else if (tipoPrima === 'tutti') lista = ops.slice();
+    if (box) {
+      box.style.display = 'flex';
+      box.querySelectorAll('input[type=checkbox]').forEach((cb) => (cb.checked = lista.includes(cb.value)));
+    }
+    if (!lista.length) {
+      toast('Spunta gli operatori: la scelta si salva alla prima spunta (fino ad allora resta com era)', 6000);
+      return;
+    }
+    visibilitaConfig[key] = { tipo: 'selezionati', operatori: lista };
   } else {
-    // per i permessi di modifica il default (chiave assente) è 'admin', quindi 'tutti' va salvato esplicitamente
-    if (val === 'tutti' && !(VIS_ITEMS.permessi && VIS_ITEMS.permessi[key])) delete visibilitaConfig[key];
-    else visibilitaConfig[key] = val;
-    const box = document.getElementById('vis-ops-' + key);
+    // l elenco dei selezionati si ricorda (tornando a "selezionati" non si perde)
+    if (prima && typeof prima === 'object' && Array.isArray(prima.operatori)) {
+      window._visOpsPrecedenti = window._visOpsPrecedenti || {};
+      window._visOpsPrecedenti[key] = prima.operatori.slice();
+    }
+    // C10 (controllo C): "Tutti" si salva sempre esplicito. Prima la chiave si cancellava e,
+    // senza chiave, il Piano di lavoro restava al solo amministratore (programma e database)
+    // e i permessi tornavano "solo admin", mentre il menu mostrava "Tutti".
+    visibilitaConfig[key] = val;
     if (box) box.style.display = 'none';
   }
-  if (!(await salvaImp('visibilita', JSON.stringify(visibilitaConfig)))) return;
+  if (!(await salvaImp('visibilita', JSON.stringify(visibilitaConfig)))) {
+    if (prima === undefined) delete visibilitaConfig[key];
+    else visibilitaConfig[key] = prima;
+    return;
+  }
   applicaVisibilita();
   toast('Visibilità aggiornata');
 }
@@ -920,8 +949,14 @@ async function aggiornaVisOps(key) {
   const box = document.getElementById('vis-ops-' + key);
   if (!box) return;
   const checked = [...box.querySelectorAll('input[type=checkbox]:checked')].map((cb) => cb.value);
+  const prima = visibilitaConfig[key];
   visibilitaConfig[key] = { tipo: 'selezionati', operatori: checked };
-  if (!(await salvaImp('visibilita', JSON.stringify(visibilitaConfig)))) return;
+  if (!(await salvaImp('visibilita', JSON.stringify(visibilitaConfig)))) {
+    if (prima === undefined) delete visibilitaConfig[key];
+    else visibilitaConfig[key] = prima;
+    return;
+  }
+  if (!checked.length) toast('Nessun operatore selezionato: la voce resta al solo amministratore', 5000);
   applicaVisibilita();
 }
 async function aggiungiOperatoreConPwd() {
@@ -940,8 +975,8 @@ async function aggiungiOperatoreConPwd() {
     if (el) el.focus();
     return;
   }
-  if (p.length < 4) {
-    toast('La password deve avere almeno 4 caratteri (ne hai scritti ' + p.length + ')');
+  if (regolaPassword(p)) {
+    toast(regolaPassword(p), 6000);
     return;
   }
   if (!p2) {
@@ -956,6 +991,18 @@ async function aggiungiOperatoreConPwd() {
   }
   if (operatoriAuthCache.find((o) => o.nome.toLowerCase() === n.toLowerCase())) {
     toast('Operatore già esistente');
+    return;
+  }
+  // SETTORE da indicare per forza (C25): prima il predefinito era "Tutti i settori" e un
+  // operatore nuovo vedeva tutto se non lo si cambiava. Con "stessi accessi di" vale il
+  // settore del collega.
+  const repScelto = (document.getElementById('new-operatore-rep') || {}).value || '';
+  const sceltaProf = (document.getElementById('new-operatore-prof') || {}).value || '';
+  const srcCopia = sceltaProf.indexOf('copia:') === 0 ? sceltaProf.substring(6) : '';
+  if (!repScelto && !(srcCopia && operatoriRepartoMap[srcCopia])) {
+    toast('Scegli il settore del nuovo operatore');
+    const elR = document.getElementById('new-operatore-rep');
+    if (elR) elR.focus();
     return;
   }
   const h = await secureHash(p, n);
@@ -977,13 +1024,13 @@ async function aggiungiOperatoreConPwd() {
       operatoriSalvati.sort();
       await saveOperatori();
     }
-    let rep = document.getElementById('new-operatore-rep').value || 'entrambi';
-    const scelta = (document.getElementById('new-operatore-prof') || {}).value || '';
+    let rep = repScelto;
+    const scelta = sceltaProf;
     let esito = '';
     if (scelta.indexOf('copia:') === 0) {
       // stessi accessi di un collega: settore (se non scelto), profilo, accessi extra, voci selezionate
       const src = scelta.substring(6);
-      if (rep === 'entrambi' && operatoriRepartoMap[src]) rep = operatoriRepartoMap[src];
+      if (!rep && operatoriRepartoMap[src]) rep = operatoriRepartoMap[src];
       esito = ' · accessi copiati da ' + src;
     }
     operatoriRepartoMap[n] = rep;
@@ -998,14 +1045,14 @@ async function aggiungiOperatoreConPwd() {
         esito = ' · profilo ' + _profiloNome(pid) + ' applicato';
       }
     }
-    logAzione('Operatore creato', n + ' (' + rep + ')' + esito);
+    logAzione('Operatore creato', n + ' (' + repartoLabel(rep) + ')' + esito);
     document.getElementById('new-operatore-nome').value = '';
     document.getElementById('new-operatore-pwd').value = '';
     document.getElementById('new-operatore-pwd2').value = '';
     const selP = document.getElementById('new-operatore-prof');
     if (selP) selP.value = '';
     renderOperatoriUI();
-    toast('Operatore "' + n + '" creato (' + rep + ')' + esito);
+    toast('Operatore "' + n + '" creato (' + repartoLabel(rep) + ')' + esito);
     if (scelta === 'nuovo') {
       // apre subito la tabella del nuovo profilo: al salvataggio viene assegnato a questo operatore
       window._profCustomEdit = { id: '', nome: '', voci: _profCustomVociDa('') };
@@ -1223,6 +1270,20 @@ async function rimuoviOperatore(n) {
   }
   delete operatoriRepartoMap[n];
   if (!(await salvaImp('operatori_reparto', JSON.stringify(operatoriRepartoMap)))) return;
+  // C8 (controllo C): il database (remove_operator) ha gia tolto il nome da Visibilita, profilo,
+  // accessi extra e settore; qui la memoria della pagina, altrimenti il prossimo salvataggio
+  // di Visibilita rimetteva il nome e un nuovo operatore omonimo ereditava i permessi
+  Object.keys(visibilitaConfig).forEach((k) => {
+    const v = visibilitaConfig[k];
+    if (v && typeof v === 'object' && Array.isArray(v.operatori)) v.operatori = v.operatori.filter((o) => o !== n);
+  });
+  if (typeof profiliOperatori !== 'undefined' && profiliOperatori) delete profiliOperatori[n];
+  if (window._operatoriAccessiExtra && window._operatoriAccessiExtra[n]) {
+    delete window._operatoriAccessiExtra[n];
+    try {
+      localStorage.setItem('_cache_operatori_accessi_extra', JSON.stringify(window._operatoriAccessiExtra));
+    } catch (e) {}
+  }
   logAzione('Operatore rimosso', n);
   renderOperatoriUI();
   toast('Rimosso');
@@ -1237,7 +1298,9 @@ async function cambiaPasswordOperatore() {
   b.innerHTML =
     '<h3>Cambia password operatore</h3><p>Operatore: <strong>' +
     escP(op) +
-    '</strong></p><div class="pwd-field"><label>Password attuale</label><input type="password" id="op-old-pwd"></div><div class="pwd-field"><label>Nuova password (min 4)</label><input type="password" id="op-new-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="op-new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiCambioPwdOp()">Conferma</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';
+    '</strong></p><div class="pwd-field"><label>Password attuale</label><input type="password" id="op-old-pwd"></div><div class="pwd-field"><label>Nuova password (' +
+    PASSWORD_REGOLA +
+    ')</label><input type="password" id="op-new-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="op-new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiCambioPwdOp()">Conferma</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
 }
 async function eseguiCambioPwdOp() {
@@ -1248,8 +1311,8 @@ async function eseguiCambioPwdOp() {
     err = document.getElementById('pwd-modal-error');
   // la vecchia impronta SHA-256 non serve piu: il primo accesso la converte (migrazione 20260911)
   const oh = await secureHash(o, op);
-  if (p1.length < 4) {
-    err.textContent = 'Troppo corta';
+  if (regolaPassword(p1)) {
+    err.textContent = regolaPassword(p1);
     return;
   }
   if (p1 !== p2) {
@@ -1973,6 +2036,9 @@ const _TABELLE_BACKUP = [
   // chi esporta; i messaggi chat restano cifrati anche nel backup
   'note_colleghi',
 ];
+// versioni del piano nel backup del browser: ultimi mesi, al massimo tot righe (le piu recenti)
+const BACKUP_STORICO_MESI = 3;
+const BACKUP_STORICO_MAX = 100000;
 // operatori_auth NON passa dall'app per sicurezza (contiene le password):
 // per la migrazione completa c'e' il backup server nel pacchetto IT
 async function esportaBackupCompleto() {
@@ -2015,21 +2081,78 @@ async function esportaBackupCompleto() {
         totale += sc.length;
       }
     } catch (e) {}
+    // C18 (controllo C): versioni del piano (piano_storico) degli ultimi BACKUP_STORICO_MESI mesi,
+    // al massimo BACKUP_STORICO_MAX righe (le piu recenti), e registro delle preparazioni
+    // automatiche (senza il lasciapassare), a pagine da 5000. Lo storico cresce di decine di
+    // migliaia di righe per ogni mese generato (ogni cella scritta, con prima e dopo; nella copia
+    // di prova 2,5 milioni di righe in 3 mesi = 1,5 GB): nel file del browser solo le versioni
+    // recenti che servono a "Riporta a prima"; lo storico completo resta nel database e nel
+    // backup del server (pacchetto IT).
+    const extraDal = new Date();
+    extraDal.setMonth(extraDal.getMonth() - BACKUP_STORICO_MESI);
+    const extraNote = {};
+    for (const tab of ['piano_storico', 'piano_auto_esecuzioni']) {
+      try {
+        const righe = [];
+        for (let off = 0; off < BACKUP_STORICO_MAX; off += 5000) {
+          const pag = await _conSessione(
+            (t) =>
+              _rpcSicura('leggi_backup_extra', {
+                p_token: t,
+                p_tabella: tab,
+                p_dal: extraDal.toISOString(),
+                p_limit: 5000,
+                p_offset: off,
+              }),
+            getOpToken(),
+          );
+          if (!Array.isArray(pag) || !pag.length) break;
+          for (const x of pag) righe.push(x);
+          if (pag.length < 5000) break;
+          if (righe.length >= BACKUP_STORICO_MAX) {
+            extraNote[tab] =
+              'solo le ultime ' +
+              righe.length +
+              ' righe (dal ' +
+              String(righe[righe.length - 1].quando || '').substring(0, 10) +
+              ')';
+            break;
+          }
+        }
+        dati[tab] = righe;
+        totale += righe.length;
+      } catch (e) {
+        extraNote[tab] = 'non esportata: ' + ((e && e.message) || e);
+      }
+    }
     const backup = {
       app: identita().programma + ' · ' + identita().azienda,
       esportato_il: new Date().toISOString(),
       esportato_da: getOperatore(),
+      // piano_storico e piano_auto_esecuzioni dal giorno indicato (non tutta la storia)
+      storico_dal: extraDal.toISOString(),
+      note: Object.keys(extraNote).length ? extraNote : undefined,
       tabelle: dati,
     };
-    const blob = new Blob([JSON.stringify(backup, null, 1)], { type: 'application/json' });
+    // il file si scrive a pezzi (una tabella alla volta): con un unico JSON.stringify un
+    // backup grande superava la lunghezza massima di un testo ("Invalid string length") e
+    // l esportazione falliva senza aggiornare "Ultimo backup"
+    const testa = Object.assign({}, backup);
+    delete testa.tabelle;
+    const pezzi = [JSON.stringify(testa).replace(/}$/, '') + (Object.keys(testa).length ? ',' : '') + '"tabelle":{'];
+    Object.keys(dati).forEach((t, i) =>
+      pezzi.push((i ? ',\n' : '\n') + JSON.stringify(t) + ':' + JSON.stringify(dati[t] || [])),
+    );
+    pezzi.push('\n}}');
+    const blob = new Blob(pezzi, { type: 'application/json' });
     Object.assign(document.createElement('a'), {
       href: URL.createObjectURL(blob),
       download: 'diario_backup_' + oggiLocale() + '.json',
     }).click();
-    logAzione('Backup completo esportato', totale + ' record, ' + _TABELLE_BACKUP.length + ' tabelle');
+    logAzione('Backup completo esportato', totale + ' record, ' + Object.keys(dati).length + ' tabelle');
     await setImp('backup_ultimo', new Date().toISOString());
     _aggiornaBackupInfo();
-    if (st) st.textContent = 'Backup scaricato: ' + totale + ' record da ' + _TABELLE_BACKUP.length + ' tabelle.';
+    if (st) st.textContent = 'Backup scaricato: ' + totale + ' record da ' + Object.keys(dati).length + ' tabelle.';
     toast('Backup completo scaricato');
   } catch (e) {
     console.error(e);
@@ -2639,6 +2762,14 @@ function _schedaPermessiOperatori() {
 }
 // SCHEDA DA COMPILARE: file HTML gia spuntato con i permessi di adesso (caselle Si/no
 // modificabili, note, firme, Salva copia compilata), dal modello unico js/scheda-permessi.js
+// settore di ogni operatore come lo legge chi controlla: "Tutti i settori" (che comprende anche
+// Valet e Cleaning), non la chiave interna "entrambi" (C23)
+function _schedaPermessiSettori() {
+  const rep = typeof operatoriRepartoMap !== 'undefined' && operatoriRepartoMap ? operatoriRepartoMap : {};
+  const out = {};
+  Object.keys(rep).forEach((o) => (out[o] = rep[o] ? repartoLabel(rep[o]) : ''));
+  return out;
+}
 function scaricaSchedaPermessiCompilabile() {
   if (!isAdmin()) {
     toast("Riservato all'amministratore");
@@ -2654,7 +2785,7 @@ function scaricaSchedaPermessiCompilabile() {
     ops: ops,
     nomiProfili: nomiProf,
     profili: typeof profiliOperatori !== 'undefined' && profiliOperatori ? profiliOperatori : {},
-    settori: typeof operatoriRepartoMap !== 'undefined' && operatoriRepartoMap ? operatoriRepartoMap : {},
+    settori: _schedaPermessiSettori(),
     extra: window._operatoriAccessiExtra || {},
     vis: visibilitaConfig,
     voci: VIS_ITEMS,
@@ -2722,7 +2853,7 @@ function stampaSchedaPermessi() {
       '</b></td><td>' +
       escP(nomiProf[prof[o]] || 'nessuno') +
       '</td><td>' +
-      escP(rep[o] || '?') +
+      escP(rep[o] ? repartoLabel(rep[o]) : '?') +
       '</td><td class="l">' +
       (escP(ext) || '-') +
       '</td></tr>';
@@ -2839,6 +2970,11 @@ function _gcElencoHtml(attivi, inattivi, p) {
       (cop.length
         ? '<span class="gc-sotto">Copre anche: ' + cop.map((k) => escP(repartoLabel(k))).join(', ') + '</span>'
         : '') +
+      (_gcJollyIncoerente(c)
+        ? '<span class="gc-etichetta gc-fine" title="Elenco e piano non sono d accordo: Controlla il sistema › Coerenza fisso/jolly › Allinea">piano: ' +
+          (c.is_jolly ? 'Jolly' : 'Fisso') +
+          '</span>'
+        : '') +
       '</td><td data-et="Funzione nel piano">' +
       (c.funzione ? escP(_gcFunzioneTesto(c.funzione)) : '<span class="gc-manca">da indicare</span>') +
       '</td>' +
@@ -2915,6 +3051,18 @@ async function gcRiattiva(nome) {
     return;
   if (typeof riattivaCollaboratore === 'function') await riattivaCollaboratore(nome);
 }
+// FISSO/JOLLY (controllo C, C14): l impiego della scheda e il vecchio campo is_jolly che
+// leggono piano, ore dovute, C attorno alle vacanze e CGF devono dire la stessa cosa. Dalla
+// 20260929_c_jolly_fisso il database li tiene allineati a ogni scrittura; le schede di prima
+// in contraddizione si vedono qui e si sistemano con Controlla il sistema > Allinea.
+// true = l elenco (impiego) e il piano (is_jolly) non sono d accordo
+function _gcJollyIncoerente(c) {
+  if (!c) return false;
+  const imp = c.impiego || '';
+  if (imp === 'jolly') return !c.is_jolly;
+  if (imp === 'fisso') return !!c.is_jolly;
+  return !!c.is_jolly; // impiego da indicare, ma il piano lo tratta da Jolly
+}
 // ---- scheda (finestra) ----
 function _gcCerca(id) {
   return (window._gcRecords || []).find((x) => x.id === id) || (collaboratoriCache || []).find((x) => x.id === id);
@@ -2978,6 +3126,17 @@ function gcApriScheda(id) {
       opt('', 'Da indicare', imp) + opt('fisso', 'Fisso', imp) + opt('jolly', 'Jolly (chiamato quando serve)', imp),
       p.puoImp,
     ),
+    _gcJollyIncoerente(c)
+      ? imp
+        ? '<b>Il piano oggi lo tratta da ' +
+          (c.is_jolly ? 'Jolly' : 'Fisso') +
+          '</b>: con Salva il piano segue questa scheda (' +
+          (imp === 'jolly' ? 'Jolly' : 'Fisso') +
+          ')'
+        : '<b>Il piano oggi lo tratta da Jolly</b>: scegli Fisso o Jolly'
+      : imp
+        ? ''
+        : 'Finché non è indicato il piano lo tratta da fisso',
   );
   if (vedeCat)
     h += campo(
@@ -3129,7 +3288,9 @@ async function gcSalvaScheda(id) {
     return el && !el.disabled ? el.value : undefined;
   };
   const prima = {
-    impiego: c.impiego || '',
+    // impiego in contraddizione con il piano (is_jolly): Salva lo riscrive anche se il menu non
+    // e stato toccato. Prima rispondeva "Nessuna modifica" e la contraddizione restava (C14)
+    impiego: c.impiego && _gcJollyIncoerente(c) ? '(da allineare)' : c.impiego || '',
     categoria: c.categoria ? String(c.categoria) : '',
     funzione: c.funzione || '',
     percentuale: String(parseFloat(c.percentuale) || 1),

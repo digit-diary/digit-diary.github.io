@@ -63,6 +63,11 @@ const RICERCA_PESI = {
   qualitaTurni: 250,
   sabatoTardi: 290,
   blocchiRicerca: 0,
+  turnoPreferito: 40,
+  riposoLungo: 40,
+  // turno "solo se serve" per la persona (Turni consentiti, 23/10/2026): alto ma sotto il posto
+  // scoperto (300): Migliora lo tiene solo se senza di lei il posto resta scoperto
+  soloSeServe: 250,
   riservato: 30000,
   oreSotto: 200,
   scoperto: 300,
@@ -125,6 +130,10 @@ function _ricercaRegolaDiLegge(msg) {
 function _ricercaTipoViolazione(msg) {
   const m = String(msg || '');
   if (/ SOTTO il minimo /.test(m)) return 'oreSotto';
+  // ORE DEL MESE OLTRE IL MASSIMO (23/10/2026): un vincolo a parte, come nella bozza (candidatoOk
+  // non supera mai il massimo). Prima contava fra le altre regole e Migliora portava 3 persone
+  // oltre il massimo di novembre Slots mentre altre regole scendevano
+  if (/ SOPRA il massimo /.test(m)) return 'oreSopra';
   if (_ricercaSabatoTardi(m)) return 'sabato_tardi';
   if (_ricercaLimiteGruppo(m)) return 'limite_gruppo';
   if (_ricercaRegolaDiQualita(m)) return 'qualita';
@@ -164,7 +173,8 @@ const RICERCA_TIPI_LEGGE = ['legge_dom', 'legge_riposo', 'legge_sett', 'legge_al
 const RICERCA_VINCOLI = RICERCA_TIPI_LEGGE.map((k) => [k]).concat([
   ['legge_dom_mancanti'],
   ['limite_gruppo'],
-  RICERCA_TIPI_LEGGE.concat(['regola', 'limite_gruppo']),
+  ['oreSopra'],
+  RICERCA_TIPI_LEGGE.concat(['regola', 'limite_gruppo', 'oreSopra']),
 ]);
 // i vincoli di adesso: con "consenti in caso di copertura" = No anche i sabati oltre le 23 a
 // chi e indietro non possono aumentare
@@ -201,7 +211,7 @@ function _ricercaPuntiDi(msg) {
     return / su [A-Z0-9*, ]+ \(trovati \d+\)$/.test(String(msg || ''))
       ? RICERCA_PESI.qualitaTurni
       : RICERCA_PESI.qualita;
-  if (k === 'regola' || k === 'limite_gruppo') return RICERCA_PESI.regola;
+  if (k === 'regola' || k === 'limite_gruppo' || k === 'oreSopra') return RICERCA_PESI.regola;
   if (k === 'sabato_tardi') return _ricercaSabatoCopertura() ? RICERCA_PESI.sabatoTardi : RICERCA_PESI.regola;
   // le domeniche libere: per ogni domenica mancante
   return RICERCA_PESI.legge * _ricercaPesoOrdine(msg) * Math.max(1, _ricercaDomMancanti(msg));
@@ -220,6 +230,7 @@ function _ricercaVincoliRotti(prima, dopo, eccesso) {
     legge_altre: 'altre regole di legge',
     sabato_tardi: 'sabati oltre le 23 a chi è indietro con le domeniche',
     limite_gruppo: 'limiti di una funzione in un area (al giorno, al mese a testa)',
+    oreSopra: 'persone oltre il massimo di ore del mese',
   };
   _ricercaVincoli().forEach((g) => {
     const a = somma(prima.conti, g);
@@ -452,6 +463,11 @@ async function _ricercaPrepara(opz) {
     if (!giorniAperti.some((d) => ammessi(n, d).some((c) => tipoNotte(c) === 1))) return null;
     return String(info.funzione || '-').toUpperCase();
   };
+  // TURNO PREFERITO ("Preferisce", sigle turno_preferito_sigle, 23/10/2026): chi lo preferisce non
+  // lo perde per un cambio senza motivo, ma nemmeno lo fa tutto il mese. Quanti al mese: come nei
+  // mesi passati (media e scarto della storia, es. 3-13 L1 al mese -> da 4 a 10); fuori costa
+  // RICERCA_PESI.turnoPreferito per turno (sotto un buco nei blocchi, un posto e ogni regola)
+  const prefRange = _ricercaPreferitoRange(nomi, storia || [], ym);
   // REGOLE della persona, con lo stesso controllo di "Valida regole"
   const ctx = _pianoCtxViolazioni(ym);
   const obiettivo = {};
@@ -496,7 +512,36 @@ async function _ricercaPrepara(opz) {
   // 25,7). RICERCA_PESI.blocchiRicerca: frazione del peso durante la ricerca a caso.
   const parBl = typeof _pianoBlocchiParam === 'function' ? _pianoBlocchiParam() : { attivo: false };
   // peso dei buchi durante la ricerca a caso (pieno nella rifinitura: primaDellaRifinitura)
-  let pesoBlOra = parBl.attivo ? (parBl.peso || 0) * (RICERCA_PESI.blocchiRicerca || 0) : 0;
+  let pesoBlOra = parBl.attivo ? (parBl.peso || 0) * _ricercaFattoreBlocchi() : 0;
+  // sigle "solo se serve" di ogni persona (Turni consentiti)
+  const soloSeServeDi = {};
+  nomi.forEach((n) => {
+    const ss = PianoRegole.turniConsentitiVoci(_pianoCollabInfo(n) || {}).filter((v) => v.seServe);
+    if (ss.length) soloSeServeDi[n] = new Set(ss.map((v) => v.sigla));
+  });
+  // riposi lunghi: massimo per persona e giorni (da -13 a fine mese + 14) come per i buchi
+  const riposoMaxDi = {};
+  const giorniFin = [];
+  for (let g = -13; g <= nGiorni + 14; g++) {
+    const x = new Date(ym + '-01T12:00:00');
+    x.setDate(x.getDate() + g - 1);
+    giorniFin.push(dataLocaleISO(x));
+  }
+  if (parBl.attivo && typeof _pianoRiposiLunghi === 'function')
+    nomi.forEach((n) => (riposoMaxDi[n] = _pianoRiposoMassimo(n, nGiorni)));
+  const tipiRiposi = (n, mese) => {
+    const cod = {};
+    (bordoDi[n] || []).forEach((r) => (cod[String(r.data).substring(0, 10)] = r.codice));
+    mese.forEach((r) => (cod[String(r.data).substring(0, 10)] = r.codice));
+    return giorniFin.map((d, k) => {
+      const dentro = k >= 14 && k <= 13 + nGiorni;
+      if (!(d in cod))
+        return dentro ? (mobile[n + '|' + d] && !ammessi(n, d).some((c) => c && c !== 'WD') ? 'Z' : 'R') : 'U';
+      const t = _pianoTipoGiornoBlocchi(cod[d]);
+      if (t === 'R' && dentro && mobile[n + '|' + d] && !ammessi(n, d).some((c) => c && c !== 'WD')) return 'Z';
+      return t;
+    });
+  };
   const valutaPersona = (n, mappa) => {
     const mese = righePersona(n, mappa);
     const viol = _pianoViolazioniPersona(n, mese, mese.concat(bordoDi[n] || []), ctx);
@@ -507,6 +552,10 @@ async function _ricercaPrepara(opz) {
       _pianoBlocchiPersona(n, mese, bordoDi[n] || [], ym, parBl, true).forEach(
         (b) => (costo += pesoBlOra * _pianoPesoBuco(b)),
       );
+    // RIPOSI TROPPO LUNGHI (decisione del titolare 23/10/2026, js/piano-blocchi.js): i giorni liberi di
+    // fila oltre il massimo della persona costano, vacanze e assenze escluse
+    if (riposoMaxDi[n])
+      costo += RICERCA_PESI.riposoLungo * _pianoRiposiLunghi(tipiRiposi(n, mese), 14, 13 + nGiorni, riposoMaxDi[n]);
     if (obiettivo[n] != null) {
       const infoO = _pianoCollabInfo(n) || {};
       const pct = parseFloat(infoO.percentuale) || 1;
@@ -515,6 +564,16 @@ async function _ricercaPrepara(opz) {
       // i fissi devono raggiungere le ore (sotto pesa il doppio); i jolly coprono i
       // buchi: costa solo andare oltre l 80% (decisione del titolare 08/10/2026)
       costo += RICERCA_PESI.oraObiettivo * (infoO.is_jolly ? Math.max(0, scarto) : scarto < 0 ? -2 * scarto : scarto);
+    }
+    if (soloSeServeDi[n])
+      mese.forEach((r) => {
+        if (soloSeServeDi[n].has(String(r.codice || '').toUpperCase())) costo += RICERCA_PESI.soloSeServe;
+      });
+    const pr = prefRange[n];
+    if (pr) {
+      const k = mese.filter((r) => pr.sigle.has(String(r.codice || '').toUpperCase())).length;
+      if (k < pr.min) costo += RICERCA_PESI.turnoPreferito * (pr.min - k);
+      else if (k > pr.max) costo += RICERCA_PESI.turnoPreferito * 0.5 * (k - pr.max);
     }
     return { costo: costo, conti: _ricercaContiDi(viol) };
   };
@@ -632,10 +691,63 @@ async function _ricercaPrepara(opz) {
       },
       // rifinitura finale: i buchi nei blocchi col peso pieno (vedi parBl)
       primaDellaRifinitura: () => {
-        pesoBlOra = parBl.attivo ? parBl.peso || 0 : 0;
+        pesoBlOra = parBl.attivo ? (parBl.peso || 0) * Math.max(1, _ricercaFattoreBlocchi()) : 0;
       },
     },
   };
+}
+
+// TURNI PREFERITI AL MESE per chi ha la spunta "Preferisce" (scheda del collaboratore): sigle
+// della regola turno_preferito_sigle (senza: L1) e quanti al mese, dalle abitudini dei mesi passati
+// (righe della storia del settore): da media - scarto a media + scarto (almeno 1). Senza storia:
+// almeno 1, nessun massimo. Ritorna { nome: { sigle: Set, min, max } }
+function _ricercaPreferitoRange(nomi, storia, ym) {
+  const v = typeof _pianoRegolaVal === 'function' ? _pianoRegolaVal('turno_preferito_sigle') : null;
+  const sigle = new Set(
+    String(v == null ? 'L1' : v)
+      .split(',')
+      .map((x) => x.trim().toUpperCase())
+      .filter(Boolean),
+  );
+  const out = {};
+  nomi.forEach((n) => {
+    const info = (typeof _pianoCollabInfo === 'function' && _pianoCollabInfo(n)) || {};
+    if (!info.prefers_l1 || !sigle.size) return;
+    const perMese = {};
+    const giorniMese = {};
+    (storia || []).forEach((r) => {
+      if (r.collaboratore !== n) return;
+      const m = String(r.data).substring(0, 7);
+      if (m >= ym) return;
+      giorniMese[m] = (giorniMese[m] || 0) + 1;
+      if (sigle.has(String(r.codice || '').toUpperCase())) perMese[m] = (perMese[m] || 0) + 1;
+    });
+    const mesi = Object.keys(giorniMese).filter((m) => giorniMese[m] >= 15);
+    if (!mesi.length) {
+      out[n] = { sigle: sigle, min: 1, max: 99 };
+      return;
+    }
+    const x = mesi.map((m) => perMese[m] || 0);
+    const media = x.reduce((a, b) => a + b, 0) / x.length;
+    const scarto = Math.sqrt(x.reduce((a, b) => a + (b - media) * (b - media), 0) / x.length);
+    out[n] = {
+      sigle: sigle,
+      min: Math.max(1, Math.round(media - scarto)),
+      max: Math.max(1, Math.round(media + scarto)),
+    };
+  });
+  return out;
+}
+
+// PESO DEI BUCHI DURANTE LA RICERCA (frazione del peso dei blocchi compatti): con la bozza a blocchi
+// (regola bozza_a_blocchi) i buchi contano anche mentre Migliora cerca (RICERCA_BLOCCHI_A_BLOCCHI),
+// altrimenti come prima solo nella rifinitura (RICERCA_PESI.blocchiRicerca)
+const RICERCA_BLOCCHI_A_BLOCCHI = 1;
+function _ricercaFattoreBlocchi() {
+  if (RICERCA_PESI.blocchiRicercaForzato != null) return RICERCA_PESI.blocchiRicercaForzato;
+  return typeof _pianoBozzaABlocchi === 'function' && _pianoBozzaABlocchi()
+    ? RICERCA_BLOCCHI_A_BLOCCHI
+    : RICERCA_PESI.blocchiRicerca || 0;
 }
 
 // posti del fabbisogno scoperti con le righe date (stesso conteggio del calendario)

@@ -382,7 +382,7 @@ function _renderPianoImpostazioniCard() {
     '<div class="field"><label title="0 = illimitati">Max cambi turno al mese</label><input type="number" min="0" max="99" value="' +
     _pianoMaxCambi() +
     '" style="width:80px" onchange="salvaMaxCambi(this.value)"></div>' +
-    '<div class="field" style="flex:1;min-width:260px"><label title="Indirizzo del servizio solver sul server interno (es. http://diario.casinolg.local:8765). Vuoto = pulsante nascosto, resta la bozza integrata">Solver esterno (server interno), indirizzo</label><input type="text" id="pi-solver-url" placeholder="http://server:8765" value="' +
+    '<div class="field" style="flex:1;min-width:260px"><label title="Indirizzo del motore avanzato sul server interno, dietro IIS (es. https://diario.casino.local/solver). Vuoto = voce nascosta, resta Prepara il mese">Motore avanzato (server interno), indirizzo</label><input type="text" id="pi-solver-url" placeholder="https://server/solver" value="' +
     escP(window._pianoSolverUrl || '') +
     '" onchange="salvaSolverUrl(this.value)"></div>' +
     '<div class="field"><label title="Giorni di affiancamento (dai commenti con formazione) prima della proposta di certificazione">Giorni formazione per certificare</label><input type="number" min="1" max="30" id="imp-gg-formazione" value="' +
@@ -486,10 +486,10 @@ function _pianoMaxCambi() {
   const v = parseInt(window._pianoMaxCambiCfg);
   return isNaN(v) ? 0 : v;
 }
-// ===== SOLVER ESTERNO (server interno, OR-Tools) =====
-// Il programma resta indipendente: con l'indirizzo vuoto la bozza integrata
-// fa tutto. Se l'IT attiva il servizio (cartella IT/solver), basta scrivere
-// qui l'indirizzo: compare il pulsante "Genera con il solver".
+// ===== MOTORE AVANZATO (server interno, CP-SAT di OR-Tools: cartella IT/solver) =====
+// Il programma resta indipendente: con l'indirizzo vuoto la bozza integrata fa tutto. Se l'IT
+// attiva il servizio, basta scrivere qui l'indirizzo (es. https://diario.casino.local/solver):
+// nel menu compare «Prepara con il motore avanzato».
 async function salvaSolverUrl(v) {
   if (!isAdmin()) return;
   const url = String(v || '')
@@ -505,68 +505,525 @@ async function salvaSolverUrl(v) {
   window._pianoSolverUrl = url;
   logAzione('Piano: solver esterno', (prima || 'vuoto') + ' \u2192 ' + (url || 'vuoto'));
   _pianoRegistraModifica('Impostazioni', 'Solver esterno', 'indirizzo', prima || 'vuoto', url || 'vuoto');
-  toast(url ? 'Solver collegato: ' + url : 'Solver scollegato: resta la bozza integrata');
+  toast(url ? 'Motore avanzato collegato: ' + url : 'Motore avanzato scollegato: resta Prepara il mese');
   renderPiano();
+}
+// PREPARA CON IL MOTORE AVANZATO (v462). Il motore NON scrive nel database: calcola una
+// PROPOSTA (le celle da cambiare) che qui si controlla con «Controlla le regole» (le stesse
+// funzioni del programma, sul piano proposto in memoria), si mostra con i numeri prima e dopo
+// e, con «Applica», si scrive con le scritture sicure (piano_scrivi_celle: tutto o niente, si
+// ferma se un collega ha cambiato una cella nel frattempo) in un passo di Annulla.
+// Il motore riceve dal programma i valori per persona calcolati con le funzioni di sempre
+// (_pianoSolverContesto): idoneita (PianoRegole.idoneita, come la bozza), limiti e obiettivo
+// delle ore, conto delle domeniche, giorni non disponibili, ore delle celle: cosi le regole
+// restano scritte in un posto solo.
+const PIANO_SOLVER_TEMPI = [
+  { valore: '60', etichetta: 'circa 1 minuto' },
+  { valore: '120', etichetta: 'circa 2 minuti (consigliato)' },
+  { valore: '300', etichetta: 'circa 5 minuti (risultato migliore)' },
+];
+// chiamata al servizio del motore: il token di sessione nell intestazione (lo verifica il database)
+async function _pianoSolverChiama(metodo, percorso, corpo) {
+  const r = await fetch(window._pianoSolverUrl + percorso, {
+    method: metodo,
+    headers: { 'Content-Type': 'application/json', 'X-Diario-Token': getOpToken() || '' },
+    body: corpo ? JSON.stringify(corpo) : undefined,
+    cache: 'no-store',
+  });
+  let j = null;
+  try {
+    j = await r.json();
+  } catch (e) {}
+  if (!r.ok || !j || j.ok === false) {
+    const e = new Error((j && j.errore) || 'risposta del motore non valida (' + r.status + ')');
+    e.status = r.status;
+    e.dati = j;
+    throw e;
+  }
+  return j;
+}
+// VALORI PER PERSONA calcolati con le funzioni del programma (stessi di bozza e Controlla)
+async function _pianoSolverContesto(ym, rep) {
+  await _pianoCaricaDomAnno(ym, rep).catch(() => {});
+  if (typeof _pianoCaricaStoriaGruppi === 'function') await _pianoCaricaStoriaGruppi(rep).catch(() => {});
+  const nG = _pianoUltimoGiorno(ym);
+  const fine = ym + '-' + String(nG).padStart(2, '0');
+  const nomi = collaboratoriCache.filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c)).map((c) => c.nome);
+  await _pianoAggiornaYtd(nomi);
+  if (typeof _pianoCaricaOreMese === 'function') await _pianoCaricaOreMese(ym);
+  const domAnno = _pianoDomAnnoDi(ym);
+  const conDom = _pianoRegolaVal('domeniche_libere_anno') != null;
+  const assente = _pianoAssenzeLettore();
+  const turni = _pianoTurniReparto();
+  const vp = _pianoRegolaVal('turno_preferito_sigle');
+  const sigleSpunta = String(vp == null ? 'L1' : vp)
+    .split(',')
+    .map((x) => x.trim().toUpperCase())
+    .filter(Boolean);
+  const persone = {};
+  nomi.forEach((n) => {
+    const info = _pianoCollabInfo(n) || {};
+    const pct = parseFloat(info.percentuale) || 1;
+    // gruppi gia fatti fino alla fine del mese: la storia che usa la bozza (_pianoIdoneoStatico)
+    const storia = (typeof _pianoStoriaGruppiDi === 'function' && _pianoStoriaGruppiDi(n, fine, rep)) || new Set();
+    const idoneo = {};
+    turni.forEach((t) => {
+      const dows = [];
+      for (let dow = 0; dow < 7; dow++) if (_pianoIdoneoStatico(n, t, dow, { [n]: storia })) dows.push(dow);
+      if (dows.length) idoneo[t.codice] = dows;
+    });
+    const lim = _pianoLimitiOre(n, nG);
+    const ob = _pianoObiettivoConSaldo(n, (_pianoGgDovuti(n, ym) / 7) * _pianoOreSett * pct, nG);
+    const domOk = conDom && !_pianoEsenteRiposi(info) && !_pianoDomSospesaMese(n, ym);
+    const conto = domOk && domAnno ? _pianoDomAttese(n, ym, domAnno) : null;
+    const nd = [];
+    for (let g = 1; g <= nG; g++) {
+      const d = ym + '-' + String(g).padStart(2, '0');
+      if (assente(n, d)) nd.push(d);
+    }
+    const oreCelle = {};
+    (_pianoRighe || []).forEach((r) => {
+      if (r.collaboratore !== n || !String(r.data).startsWith(ym)) return;
+      oreCelle[String(r.data).substring(0, 10)] = _pianoOreDiRiga(r, pct) || 0;
+    });
+    const pref = (_pianoMappFunzione(info.funzione) || [])
+      .filter((m) => m.tipo === 'PREFERITO')
+      .map((m) => m.turno_codice);
+    if (info.prefers_l1) sigleSpunta.forEach((x) => pref.push(x));
+    persone[n] = {
+      idoneo: idoneo,
+      obiettivo: ob,
+      min: lim.min,
+      max: lim.max,
+      jolly: !!lim.jolly,
+      dom: conto
+        ? {
+            prima: conto.prima,
+            attese: conto.attese,
+            arretrato: conto.arretrato,
+            diritto: conto.diritto,
+            restanti: conto.restanti,
+          }
+        : null,
+      dom_controlla: domOk,
+      max_gg_sett: _pianoMaxGiorniSett(n),
+      solo_a_mano: !!info.turni_solo_a_mano,
+      non_disponibili: nd,
+      ore_celle: oreCelle,
+      preferiti: pref,
+    };
+  });
+  return { versione: 1, settore: rep, mese: ym, persone: persone };
+}
+// NUMERI DI UN PIANO con Controlla le regole: il mese in memoria, con le celle della proposta al
+// loro posto (niente viene scritto). celle: [{ collaboratore, data, codice }] o null = com e.
+function _pianoSolverMisura(celle, fabb) {
+  const ym = _pianoMeseSel;
+  const rep = _pianoReparto();
+  const salvate = _pianoRighe;
+  try {
+    if (celle) {
+      const k = (n, d) => n + '|' + d;
+      const idx = new Map(salvate.map((r, i) => [k(r.collaboratore, String(r.data).substring(0, 10)), i]));
+      const nuove = salvate.slice();
+      const togli = new Set();
+      celle.forEach((c) => {
+        const i = idx.get(k(c.collaboratore, c.data));
+        if (!c.codice) {
+          if (i != null) togli.add(i);
+          return;
+        }
+        const r = Object.assign({}, i != null ? nuove[i] : {}, {
+          collaboratore: c.collaboratore,
+          data: c.data,
+          codice: c.codice,
+          reparto_dip: rep,
+          protetto: false,
+          generato: true,
+          ora_inizio: null,
+          ora_fine: null,
+          fasce: null,
+        });
+        if (i != null) nuove[i] = r;
+        else nuove.push(r);
+      });
+      _pianoRighe = nuove.filter((_, i) => !togli.has(i));
+    }
+    const v = _pianoCalcolaViolazioni();
+    const bl = _pianoBlocchiMese();
+    const conta = {};
+    _pianoRighe.forEach((x) => {
+      if (!String(x.data).startsWith(ym) || !_pianoCopreQui(x)) return;
+      const kk = String(x.data).substring(0, 10) + '|' + x.codice;
+      conta[kk] = (conta[kk] || 0) + 1;
+    });
+    let scoperti = 0;
+    (fabb || []).forEach((f) => {
+      scoperti += Math.max(0, (f.quantita || 0) - (conta[String(f.data).substring(0, 10) + '|' + f.turno_codice] || 0));
+    });
+    const legge = v.lista.filter((x) => _pianoViolDiLegge(x.msg));
+    return {
+      scoperti: scoperti,
+      buchi: bl.length,
+      isolati: bl.filter((b) => b.tipo === 'lavoro_isolato' && b.lungo === 1).length,
+      legge: legge.length,
+      leggeLista: legge,
+      altre: v.lista.length - legge.length,
+      ore: v.lista.filter((x) => /^ore mese /.test(x.msg)).length,
+    };
+  } finally {
+    _pianoRighe = salvate;
+  }
+}
+// finestra del risultato: numeri prima e dopo (Controlla le regole), cambi, Applica / Lascia
+function _pianoSolverFinestra(r, prima, dopo) {
+  return new Promise((risolvi) => {
+    const velo = document.createElement('div');
+    velo.className = 'finestra-velo';
+    const riga = (nome, a, b, meglioSeMeno) => {
+      const peggio = meglioSeMeno ? b > a : b < a;
+      const meglio = meglioSeMeno ? b < a : b > a;
+      return (
+        '<tr><td style="padding:3px 8px">' +
+        nome +
+        '</td><td style="padding:3px 8px;text-align:right">' +
+        a +
+        '</td><td style="padding:3px 8px;text-align:right;font-weight:700;color:' +
+        (peggio ? 'var(--red,#b42318)' : meglio ? 'var(--green,#1a7f37)' : 'inherit') +
+        '">' +
+        b +
+        '</td></tr>'
+      );
+    };
+    const perPersona = {};
+    (r.celle || []).forEach((c) => (perPersona[c.collaboratore] = (perPersona[c.collaboratore] || 0) + 1));
+    const cambi = (r.celle || [])
+      .slice()
+      .sort((a, b) => a.collaboratore.localeCompare(b.collaboratore) || a.data.localeCompare(b.data))
+      .slice(0, 400)
+      .map(
+        (c) =>
+          '<tr><td style="padding:1px 6px">' +
+          esc(c.collaboratore) +
+          '</td><td style="padding:1px 6px">' +
+          esc(c.data.split('-').reverse().join('.')) +
+          '</td><td style="padding:1px 6px">' +
+          esc((c.prima && c.prima.codice) || 'vuota') +
+          ' → ' +
+          esc(c.codice || 'vuota') +
+          '</td></tr>',
+      )
+      .join('');
+    const legge = dopo.leggeLista
+      .slice(0, 30)
+      .map((x) => '<li>' + esc(x.nome) + (x.giorno ? ', giorno ' + x.giorno : '') + ': ' + esc(x.msg) + '</li>')
+      .join('');
+    const peggioLegge = dopo.legge > prima.legge;
+    velo.innerHTML =
+      '<div class="finestra-box" role="dialog" aria-modal="true" style="max-width:640px;max-height:90vh;overflow:auto"><h3>Il motore avanzato propone</h3>' +
+      '<div class="finestra-testo">' +
+      esc(repartoLabel(r.settore) + ' · ' + r.mese) +
+      ' · calcolo di ' +
+      esc(String(r.secondi_calcolo)) +
+      ' secondi (' +
+      esc(r.stato === 'OPTIMAL' ? 'ottimo dimostrato' : 'migliore trovato nel tempo') +
+      ')' +
+      (r.preparata_il ? ' · preparata il ' + esc(r.preparata_il) : '') +
+      '. Numeri di «Controlla le regole» sul piano di adesso e su quello proposto:</div>' +
+      '<table style="border-collapse:collapse;margin:8px 0;font-size:var(--fs-md,.875rem)"><tr><th></th><th style="padding:3px 8px">adesso</th><th style="padding:3px 8px">proposta</th></tr>' +
+      riga('Posti scoperti', prima.scoperti, dopo.scoperti, true) +
+      riga('Buchi nei blocchi', prima.buchi, dopo.buchi, true) +
+      riga('di cui giorni di lavoro isolati', prima.isolati, dopo.isolati, true) +
+      riga('Regole di legge violate', prima.legge, dopo.legge, true) +
+      riga('Altre segnalazioni', prima.altre, dopo.altre, true) +
+      riga('Ore del mese fuori tolleranza', prima.ore, dopo.ore, true) +
+      '</table>' +
+      '<div class="finestra-testo">' +
+      (r.celle || []).length +
+      ' celle cambiano, per ' +
+      Object.keys(perPersona).length +
+      ' persone. Non si toccano vacanze, malattie, celle protette o bloccate, inserimenti a mano, giorni chiusi.' +
+      (peggioLegge
+        ? '<br><b style="color:var(--red,#b42318)">Attenzione: la proposta ha piu regole di legge violate del piano di adesso.</b>'
+        : '') +
+      '</div>' +
+      (legge
+        ? '<details style="margin:6px 0"><summary>Regole di legge ancora violate nella proposta (' +
+          dopo.legge +
+          ')</summary><ul style="margin:4px 0 0 18px">' +
+          legge +
+          '</ul><div style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">Di solito vengono dalle celle che il motore non puo cambiare (vacanze, malattie, celle a mano).</div></details>'
+        : '') +
+      '<details style="margin:6px 0"><summary>Le celle che cambiano</summary><table style="font-size:var(--fs-sm,.8125rem)">' +
+      cambi +
+      '</table>' +
+      ((r.celle || []).length > 400 ? '<div>... e altre ' + ((r.celle || []).length - 400) + '</div>' : '') +
+      '</details>' +
+      '<div class="finestra-pulsanti"><button type="button" class="finestra-no" data-x="lascia">Lascia</button><button type="button" class="finestra-ok" data-x="applica">Applica</button></div></div>';
+    velo.addEventListener('click', (ev) => {
+      const b = ev.target.closest('button[data-x]');
+      if (!b) return;
+      velo.remove();
+      risolvi(b.getAttribute('data-x') === 'applica');
+    });
+    document.body.appendChild(velo);
+  });
+}
+// SCRITTURA della proposta: piano_scrivi_celle (tutto o niente per blocco), con la cella come
+// l ha letta il motore (atteso): se un collega l ha cambiata nel frattempo non si scrive niente
+// e si chiede se applicare il resto. Un passo di Annulla.
+async function _pianoSolverApplica(r) {
+  const op = getOperatore();
+  const ora = new Date().toISOString();
+  const ops = (r.celle || []).map((c) => ({
+    collaboratore: c.collaboratore,
+    data: c.data,
+    atteso: c.prima || null,
+    dati: !c.codice
+      ? null
+      : c.prima
+        ? { codice: c.codice, operatore: op, updated_at: ora }
+        : {
+            codice: c.codice,
+            protetto: false,
+            generato: true,
+            reparto_dip: r.settore,
+            operatore: op,
+            updated_at: ora,
+          },
+  }));
+  if (!ops.length) return 0;
+  const passo = _pianoUndoSnap('motore avanzato ' + r.mese);
+  const chiave = (x) => x.collaboratore + '|' + String(x.data).substring(0, 10);
+  let scritte = 0;
+  const saltate = [];
+  try {
+    for (let i = 0; i < ops.length; i += 2500) {
+      let blocco = ops.slice(i, i + 2500);
+      for (let giro = 0; blocco.length && giro < 4; giro++) {
+        const es = await _pianoScriviCelle(blocco);
+        if (es.ok) {
+          scritte += blocco.length;
+          blocco = [];
+          break;
+        }
+        const conf = es.conflitti || [];
+        const via = new Set(conf.map(chiave));
+        if (!via.size) throw _pianoErroreConflitto(conf);
+        conf.forEach((c) => saltate.push(c));
+        const avanti = await chiediConferma(
+          'Mentre il motore calcolava un collega ha cambiato ' +
+            (conf.length === 1 ? '1 cella' : conf.length + ' celle') +
+            ' della proposta:\n\n• ' +
+            conf.slice(0, 12).map(_pianoConflittoTesto).join('\n• ') +
+            (conf.length > 12 ? '\n... e altre ' + (conf.length - 12) : '') +
+            '\n\nNon ho scritto niente. Conferma = applico gli altri cambi e le sue celle restano come le ha scritte (poi conviene ricontrollare le regole). Annulla = lascio il piano com era.',
+          { titolo: 'Piano cambiato da un collega' },
+        );
+        if (!avanti) {
+          if (!scritte) _pianoUndoScarta(passo);
+          await renderPiano();
+          return scritte;
+        }
+        blocco = blocco.filter((o) => !via.has(chiave(o)));
+      }
+      if (blocco.length) throw new Error('celle cambiate di continuo da un collega: riprova fra poco');
+    }
+  } catch (e) {
+    if (!scritte) _pianoUndoScarta(passo);
+    _pianoErroreScrittura(
+      scritte ? 'Scrittura interrotta (con Annulla del piano si torna a prima): ' : 'Proposta NON applicata: ',
+      e,
+    );
+    await renderPiano();
+    return scritte;
+  }
+  if (!scritte) _pianoUndoScarta(passo);
+  logAzione(
+    'Piano: motore avanzato applicato',
+    r.mese +
+      ' ' +
+      r.settore +
+      ' · ' +
+      scritte +
+      ' celle' +
+      (saltate.length ? ' · ' + saltate.length + ' lasciate perché modificate nel frattempo' : '') +
+      ' · scoperti ' +
+      ((r.dopo && r.dopo.scoperti) != null ? r.dopo.scoperti : '?') +
+      ', buchi ' +
+      ((r.dopo && r.dopo.buchi) != null ? r.dopo.buchi : '?'),
+  );
+  return scritte;
 }
 async function generaConSolver() {
   if (!_pianoAzioneAutoConsentita('genera')) return; // azione automatica: permesso apposito
   if (!puoGestirePiano()) return;
-  const url = window._pianoSolverUrl;
-  if (!url) return;
+  if (!window._pianoSolverUrl) return;
   const ym = _pianoMeseSel;
   const rep = _pianoReparto();
-  if (
-    !(await chiediConferma(
-      'Genero il piano di ' +
-        ym +
-        ' (' +
-        repartoLabel(rep) +
-        ') con il solver sul server interno?\n\nLe celle esistenti (vacanze, protette, malattie, blocchi) non vengono toccate; le celle generate da una bozza precedente vengono sostituite. Il calcolo può durare fino a due minuti.',
-    ))
-  )
-    return;
-  _pianoUndoSnap('solver ' + ym);
-  toast('Solver in esecuzione, attendi...', 6000);
+  let stato;
   try {
-    const risposta = await fetch(url + '/solve', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        anno: parseInt(ym.split('-')[0]),
-        mese: parseInt(ym.split('-')[1]),
-        settore: rep,
-        sostituisci: true,
-        timeout: 120,
-        operatore: getOperatore(),
-        token: getOpToken(),
-      }),
+    stato = await _pianoSolverChiama('GET', '/stato');
+  } catch (e) {
+    toastErrore(
+      'Motore avanzato non raggiungibile (' + (e.message || '') + '). Resta disponibile "Prepara il mese".',
+      10000,
+    );
+    return;
+  }
+  // proposta preparata di notte (esegui_mese_prossimo.ps1), se c e
+  let notte = null;
+  try {
+    notte = (await _pianoSolverChiama('GET', '/proposta/' + encodeURIComponent(rep) + '/' + ym)).risultato;
+  } catch (e) {}
+  const maxS = parseInt(stato.max_secondi) || 300;
+  const opzioni = PIANO_SOLVER_TEMPI.filter((x) => parseInt(x.valore) <= maxS);
+  if (notte && notte.ok && notte.celle)
+    opzioni.push({
+      valore: 'notte',
+      etichetta: 'usa la proposta preparata stanotte (' + (notte.preparata_il || '') + ')',
     });
-    const testo = await risposta.text();
-    let r = null;
+  const scelta = await chiediModulo(
+    'Il motore avanzato sul server interno prepara ' +
+      ym +
+      ' (' +
+      repartoLabel(rep) +
+      ') su tutto il mese insieme: prima le regole di legge e i limiti del settore, poi i posti scoperti, poi i blocchi di lavoro e riposo, le ore e l equita.\n\nNon scrive niente da solo: alla fine mostra la proposta con i numeri di «Controlla le regole» (adesso e dopo) e si sceglie Applica o Lascia. Prima, come Prepara il mese, si mettono le vacanze del mese (V, C e WD attorno). Non tocca vacanze, malattie, celle protette o bloccate, inserimenti a mano, giorni chiusi.' +
+      (stato.in_corso && stato.in_corso.length
+        ? '\n\nCalcoli gia in corso sul server: ' +
+          stato.in_corso.map((x) => x.settore + ' (' + x.operatore + ')').join(', ')
+        : ''),
+    [{ titolo: 'Tempo a disposizione', campi: [{ id: 'sec', tipo: 'scelta', valore: '120', opzioni: opzioni }] }],
+    { titolo: 'Prepara con il motore avanzato', ok: 'Avvia' },
+  );
+  if (!scelta) return;
+  let r = null;
+  if (scelta.sec === 'notte') r = notte;
+  else {
+    // passo 0 come Prepara il mese: le vacanze del mese prima di tutto (un passo di Annulla a parte)
+    const passoV = _pianoUndoSnap('vacanze ' + ym + ' (motore avanzato)');
     try {
-      r = JSON.parse(testo);
-    } catch (e) {}
-    if (!risposta.ok || !r || r.ok === false) {
-      toastErrore(
-        'Solver: ' + ((r && (r.errore || r.error)) || testo.substring(0, 200) || 'risposta non valida'),
-        10000,
-      );
+      const v = await _applicaVacanzeMese(false);
+      if (!v || !(v.v || v.c || v.wd || v.orfane || v.altre)) _pianoUndoScarta(passoV);
+    } catch (e) {
+      _pianoUndoScarta(passoV);
+      toastErrore('Vacanze del mese non applicate: ' + (e.message || e), 9000);
       return;
     }
-    logAzione(
-      'Piano: solver esterno eseguito',
-      ym + ' · ' + (r.inserite != null ? r.inserite + ' celle' : 'ok') + (r.stato ? ' · ' + r.stato : ''),
-    );
-    toast(
-      'Solver: ' +
-        (r.inserite != null ? r.inserite + ' celle scritte' : 'fatto') +
-        (r.stato ? ' (' + r.stato + ')' : ''),
-    );
-    _pianoViolCelle = {};
-    _pianoViolLista = null;
-    renderPiano();
-  } catch (e) {
-    toastErrore('Solver non raggiungibile (' + (e.message || '') + '). Resta disponibile "Prepara il mese".', 10000);
+    await renderPiano();
+    const secondi = parseInt(scelta.sec) || 120;
+    const velo = document.createElement('div');
+    velo.className = 'finestra-velo';
+    velo.innerHTML =
+      '<div class="finestra-box" role="dialog" aria-modal="true" style="max-width:460px"><h3>Motore avanzato</h3>' +
+      '<div class="finestra-testo" id="slv-testo">Preparo i dati del mese...</div>' +
+      '<div style="height:8px;background:var(--line,#ddd);border-radius:4px;overflow:hidden;margin:10px 0"><div id="slv-barra" style="height:100%;width:0;background:var(--accent2,#1a4a7a);transition:width .5s"></div></div>' +
+      '<div class="finestra-pulsanti"><button type="button" class="finestra-no" id="slv-ferma">Ferma e mostra il risultato</button></div></div>';
+    document.body.appendChild(velo);
+    const testo = velo.querySelector('#slv-testo');
+    const barra = velo.querySelector('#slv-barra');
+    let lavoro = null;
+    velo.querySelector('#slv-ferma').onclick = function () {
+      this.disabled = true;
+      this.textContent = 'Mi fermo...';
+      if (lavoro) _pianoSolverChiama('POST', '/lavoro/' + lavoro + '/ferma', {}).catch(() => {});
+    };
+    try {
+      const contesto = await _pianoSolverContesto(ym, rep);
+      testo.textContent = 'Invio al motore...';
+      try {
+        lavoro = (
+          await _pianoSolverChiama('POST', '/calcola', {
+            settore: rep,
+            anno: parseInt(ym.split('-')[0]),
+            mese: parseInt(ym.split('-')[1]),
+            secondi: secondi,
+            contesto: contesto,
+          })
+        ).lavoro;
+      } catch (e) {
+        // un calcolo dello stesso operatore gia in corso sul settore: si aspetta quello
+        if (e.status === 409 && e.dati && e.dati.lavoro) lavoro = e.dati.lavoro;
+        else throw e;
+      }
+      for (;;) {
+        await new Promise((x) => setTimeout(x, 2000));
+        const s = await _pianoSolverChiama('GET', '/lavoro/' + lavoro);
+        const pass = Math.round(s.trascorsi || 0);
+        barra.style.width = Math.min(100, Math.round((pass / (secondi + 5)) * 100)) + '%';
+        testo.textContent =
+          s.stato === 'in_coda'
+            ? 'In coda: il server sta finendo un altro calcolo...'
+            : 'Calcolo in corso: ' + pass + ' secondi su circa ' + secondi + '.';
+        if (s.stato === 'finito') {
+          r = s.risultato;
+          break;
+        }
+        if (s.stato === 'errore') throw new Error(s.errore || 'errore del motore');
+      }
+    } catch (e) {
+      velo.remove();
+      toastErrore('Motore avanzato: ' + (e.message || e), 10000);
+      return;
+    }
+    velo.remove();
+  }
+  if (!r || !r.ok) {
+    toastErrore('Motore avanzato: ' + ((r && r.errore) || 'nessuna proposta'), 10000);
+    return;
+  }
+  // controllo con le regole del programma: piano di adesso e piano proposto
+  await renderPiano();
+  const fabb =
+    (await secGet(
+      'piano_fabbisogni?data=gte.' +
+        ym +
+        '-01&data=lte.' +
+        ym +
+        '-' +
+        String(_pianoUltimoGiorno(ym)).padStart(2, '0') +
+        '&reparto_dip=eq.' +
+        rep +
+        '&limit=5000',
+    )) || [];
+  const prima = _pianoSolverMisura(null, fabb);
+  const dopo = _pianoSolverMisura(r.celle || [], fabb);
+  logAzione(
+    'Piano: motore avanzato, proposta',
+    ym +
+      ' ' +
+      rep +
+      ' · scoperti ' +
+      prima.scoperti +
+      ' → ' +
+      dopo.scoperti +
+      ', buchi ' +
+      prima.buchi +
+      ' → ' +
+      dopo.buchi +
+      ', legge ' +
+      prima.legge +
+      ' → ' +
+      dopo.legge,
+  );
+  if (!(await _pianoSolverFinestra(r, prima, dopo))) {
+    toast('Proposta lasciata: il piano resta com era');
+    return;
+  }
+  if (
+    dopo.legge > prima.legge &&
+    !(await chiediConferma('La proposta ha piu regole di legge violate del piano di adesso. Applico lo stesso?', {
+      pericolo: true,
+    }))
+  )
+    return;
+  const n = await _pianoSolverApplica(r);
+  _pianoViolCelle = {};
+  _pianoViolLista = null;
+  await renderPiano();
+  if (n) {
+    toast('Motore avanzato: ' + n + ' celle scritte (Annulla del piano rimette tutto)');
+    if (typeof validaPiano === 'function') validaPiano();
   }
 }
 async function salvaMaxCambi(v) {
@@ -758,7 +1215,7 @@ async function esportaPianoDati(tipo) {
             _pianoGiorniLavoroTesto(c.giorni_lavoro),
             c.giorni_settimana || '',
             c.turni_bloccati || '',
-            c.turni_consentiti || '',
+            _pianoTurniConsentitiTesto(c),
             ...(colCsv.preferiti.length ? [c.prefers_l1 ? 'SI' : ''] : []),
             ...(colCsv.accoglienza ? [c.accoglienza || 0] : []),
             c.accompagnamento_settori || '',
@@ -2062,22 +2519,35 @@ async function pdfNonDisponibilitaJolly() {
   if (!window.jspdf) await caricaJsPDF();
   if (!window.jspdf) return;
   if (typeof modelliCarica === 'function') await modelliCarica();
-  const doc = _pdfNdVuotoDoc();
+  const doc = await _pdfNdVuotoDoc();
   mostraPdfPreview(doc, 'non_disponibilita_jolly.pdf', 'Lista non disponibilità Jolly');
 }
 // modulo 1187 vuoto; testi fissi dal modello del documento "nd1187" (gli stessi del modulo
-// compilato, js/modulo-nd.js); testiSovra = testi da usare al posto di quelli salvati
-function _pdfNdVuotoDoc(testiSovra) {
+// compilato, js/modulo-nd.js); testiSovra = testi da usare al posto di quelli salvati.
+// In alto il logo, come nel modulo compilato (riverifica B17: prima c era solo il nome
+// dell azienda scritto); senza logo caricabile resta il nome
+async function _pdfNdVuotoDoc(testiSovra) {
   const t = _ndTesti(testiSovra, { settore: repartoNomeDocumento(_pianoReparto()) });
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF('portrait', 'mm', 'a4');
   const M = 16;
   let y = 14;
   // intestazione documento ufficiale
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.setTextColor(140, 20, 50);
-  doc.text(identita().azienda.toUpperCase(), M, y);
+  let logo = null;
+  try {
+    logo = typeof _ndLogoRitagliato === 'function' ? await _ndLogoRitagliato() : null;
+  } catch (e) {
+    logo = null;
+  }
+  if (logo) {
+    _ndDisegnaLogo(doc, logo);
+    y = 22;
+  } else {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(140, 20, 50);
+    doc.text(identita().azienda.toUpperCase(), M, y);
+  }
   doc.setTextColor(51, 51, 51);
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
@@ -2284,11 +2754,7 @@ function _pianoRegolaLivelloChi(r) {
       ? persone.filter(
           (c) =>
             !ok.includes(c) &&
-            String(c.turni_consentiti || '')
-              .toUpperCase()
-              .split(',')
-              .map((x) => x.trim())
-              .some((x) => parti[0].toUpperCase().split(',').includes(x)),
+            PianoRegole.turniConsentitiVoci(c).some((v) => parti[0].toUpperCase().split(',').includes(v.sigla)),
         ).length
       : 0;
   const nMin = tipo === 'minimo_livello_giorno' ? parseInt(parti[1]) || 1 : 1;
@@ -3025,7 +3491,7 @@ function _renderPianoPreferenzeCard() {
   h +=
     '<fieldset' +
     (prefSolaLettura ? ' disabled' : '') +
-    ' style="border:0;padding:0;margin:0;min-width:0"><div style="overflow-x:auto"><table class="piano-table" id="pref-collab-table" style="min-width:760px;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Funzione</th><th>%</th><th>Solo diurni</th><th title="Solo turni notturni">Solo notturni</th><th title="Non sta nella rotazione (es. ufficio): bozza, Migliora, coperture e cambi non le propongono mai turni e la bozza non riempie i giorni vuoti. Turni scritti a mano; le ore contano come sempre">Turni solo a mano</th><th style="text-align:left" title="Giorni in cui lavora: negli altri non viene mai proposto (bozza, Migliora, generazione automatica, cerca cambio, copertura malattia, formazioni). Nessuna spunta = tutti i giorni">Giorni di lavoro</th><th style="text-align:left">Turni bloccati (CSV)</th><th style="text-align:left" title="Eccezioni alle regole Turni per livello e Turni riservati a certe funzioni: questi turni li può fare anche senza il livello o la funzione richiesti (CSV, es. L1)">Turni consentiti</th>' +
+    ' style="border:0;padding:0;margin:0;min-width:0"><div style="overflow-x:auto"><table class="piano-table" id="pref-collab-table" style="min-width:760px;font-size:var(--fs-md,.875rem)"><thead><tr><th style="text-align:left">Collaboratore</th><th>Funzione</th><th>%</th><th>Solo diurni</th><th title="Solo turni notturni">Solo notturni</th><th title="Non sta nella rotazione (es. ufficio): bozza, Migliora, coperture e cambi non le propongono mai turni e la bozza non riempie i giorni vuoti. Turni scritti a mano; le ore contano come sempre">Turni solo a mano</th><th style="text-align:left" title="Giorni in cui lavora: negli altri non viene mai proposto (bozza, Migliora, generazione automatica, cerca cambio, copertura malattia, formazioni). Nessuna spunta = tutti i giorni">Giorni di lavoro</th><th style="text-align:left">Turni bloccati (CSV)</th><th style="text-align:left" title="Turni scelti per la persona: valgono più delle regole generiche di funzione e di gruppo (turni riservati a certe funzioni, turni per funzione e giorno, turni per funzione) e delle regole Turni per livello; mai più delle competenze di Formazione (CSV, es. L1)">Turni consentiti</th>' +
     (colPref.preferiti.length
       ? '<th title="La bozza dà per primi a queste persone i turni ' +
         escP(prefSigle) +
@@ -3043,6 +3509,7 @@ function _renderPianoPreferenzeCard() {
       escP(c.nome.toLowerCase()) +
       '"><td style="text-align:left;font-weight:600">' +
       escP(c.nome) +
+      _pianoSpiaPreferenze(c) +
       '</td><td>' +
       escP(c.funzione || '-') +
       '</td><td>' +
@@ -3074,11 +3541,11 @@ function _renderPianoPreferenzeCard() {
       escP(c.turni_bloccati || '') +
       '" placeholder="Es: S8,S7C" onchange="salvaPreferenzaCollab(' +
       c.id +
-      ',\'turni_bloccati\',this.value)" style="width:140px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td style="text-align:left"><input type="text" value="' +
-      escP(c.turni_consentiti || '') +
-      '" placeholder="Es: 10,9" title="Turni che può fare anche senza il livello richiesto (regole Turni per livello)" onchange="salvaPreferenzaCollab(' +
+      ',\'turni_bloccati\',this.value)" style="width:140px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td><td style="text-align:left;max-width:220px"><span style="font-size:var(--fs-sm,.8125rem)">' +
+      (escP(_pianoTurniConsentitiTesto(c)) || '<span style="color:var(--muted)">nessuno</span>') +
+      '</span> <button type="button" class="btn-act" style="font-size:var(--fs-xs,.75rem);padding:1px 8px" title="Turni scelti per la persona: sempre oppure solo se serve, con o senza la formazione dell area" onclick="pianoTurniConsentitiModifica(' +
       c.id +
-      ',\'turni_consentiti\',this.value)" style="width:100px;padding:2px 6px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td>' +
+      ')">Modifica</button></td>' +
       (colPref.preferiti.length
         ? '<td><input type="checkbox"' +
           (c.prefers_l1 ? ' checked' : '') +
@@ -3368,6 +3835,127 @@ function _pianoColonnePreferenze() {
     collaboratoriCache.some((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && parseInt(c.accoglienza) > 0);
   return { preferiti: [...new Set(preferiti)], accoglienza: accoglienza };
 }
+// SPIA "Preferenza non rispettabile" (titolare 23/10/2026): le preferenze esplicite valgono piu
+// delle regole generiche; qui si vede quando una e davvero impossibile (competenza, campo,
+// turno bloccato...), con il motivo e il rimedio (_pianoPreferenzeNonRispettabili)
+function _pianoSpiaPreferenze(c) {
+  let lista = [];
+  try {
+    lista = typeof _pianoPreferenzeNonRispettabili === 'function' ? _pianoPreferenzeNonRispettabili(c) : [];
+  } catch (e) {}
+  if (!lista.length) return '';
+  return (
+    '<div class="pref-spia" style="font-weight:400;font-size:var(--fs-xs,.75rem);color:var(--c-oro,#8b6914);margin-top:2px;max-width:340px;white-space:normal"><i class="icx icx-avviso" aria-hidden="true"></i> Preferenza non rispettabile: ' +
+    lista.map((x) => escP(x.msg)).join('<br>') +
+    '</div>'
+  );
+}
+// TURNI CONSENTITI CON IL LIVELLO (titolare 23/10/2026): per ogni sigla "sempre" o "solo se
+// serve" (lo riceve solo se nessun altro idoneo puo coprire il posto) e, se la persona non ha
+// l area del turno, "anche senza la formazione dell area" (eccezione di competenza solo per quel
+// turno, anche da sola). La colonna tiene i segni ? e ! (PianoRegole.turniConsentitiVoci): qui
+// non si vedono mai.
+async function pianoTurniConsentitiModifica(id) {
+  if (!puoGestirePiano() && !puoModificareStoricoHr()) {
+    toast('Non hai il permesso');
+    return;
+  }
+  const c = collaboratoriCache.find((x) => x.id === id);
+  if (!c) return;
+  const voci = PianoRegole.turniConsentitiVoci(c);
+  const gruppoDi = (sig) => {
+    const t = _pianoTurniReparto().find((x) => String(x.codice).toUpperCase() === sig);
+    return t ? String(t.gruppo || '').toUpperCase() : '';
+  };
+  const gruppi = voci.map((v) => ({
+    titolo: v.sigla + (gruppoDi(v.sigla) ? ' (area ' + gruppoDi(v.sigla) + ')' : ''),
+    campi: [
+      {
+        id: 'liv_' + v.sigla,
+        tipo: 'scelta',
+        valore: v.seServe ? 'serve' : 'sempre',
+        opzioni: [
+          { valore: 'sempre', etichetta: 'Sempre' },
+          { valore: 'serve', etichetta: 'Solo se serve' },
+          { valore: 'togli', etichetta: 'Togli' },
+        ],
+      },
+      {
+        id: 'area_' + v.sigla,
+        tipo: 'scelta',
+        valore: v.senzaArea ? 'senza' : 'con',
+        opzioni: [
+          { valore: 'con', etichetta: 'Serve la formazione dell area' },
+          { valore: 'senza', etichetta: 'Anche senza formazione (solo questo turno)' },
+        ],
+      },
+    ],
+  }));
+  gruppi.push({
+    titolo: 'Aggiungi turni',
+    nota: 'Sigle separate da virgola (es. L1, 10). Poi scegli come per le altre.',
+    campi: [
+      { id: 'nuove', tipo: 'testo', valore: '', segnaposto: 'Es: L1', larghezza: 120 },
+      {
+        id: 'liv_nuove',
+        tipo: 'scelta',
+        valore: 'sempre',
+        opzioni: [
+          { valore: 'sempre', etichetta: 'Sempre' },
+          { valore: 'serve', etichetta: 'Solo se serve' },
+        ],
+      },
+      {
+        id: 'area_nuove',
+        tipo: 'scelta',
+        valore: 'con',
+        opzioni: [
+          { valore: 'con', etichetta: 'Serve la formazione dell area' },
+          { valore: 'senza', etichetta: 'Anche senza formazione' },
+        ],
+      },
+    ],
+  });
+  const r = await chiediModulo(
+    c.nome +
+      ': turni scelti per la persona. Valgono più delle regole generiche di funzione e di gruppo (turni riservati a certe funzioni, turni per funzione e giorno), mai della legge.\n' +
+      '· Sempre: la bozza li dà come i suoi turni.\n· Solo se serve: li riceve solo se nessun altro idoneo può coprire il posto (bozza, Copri i buchi, Migliora, coperture).\n' +
+      '· Anche senza formazione: per quel turno solo, l area di Formazione non serve e può farlo anche da sola (Affiancato in vale per tutta l area e mai da sola).',
+    gruppi,
+    { titolo: 'Turni consentiti', ok: 'Salva' },
+  );
+  if (!r) return;
+  const out = [];
+  voci.forEach((v) => {
+    const liv = r['liv_' + v.sigla];
+    if (liv === 'togli') return;
+    out.push({ sigla: v.sigla, seServe: liv === 'serve', senzaArea: r['area_' + v.sigla] === 'senza' });
+  });
+  String(r.nuove || '')
+    .split(/[\s,;]+/)
+    .map((x) => x.replace(/[?!]/g, '').trim().toUpperCase())
+    .filter((x) => x && !out.some((v) => v.sigla === x))
+    .forEach((x) => out.push({ sigla: x, seServe: r.liv_nuove === 'serve', senzaArea: r.area_nuove === 'senza' }));
+  const ignote = out.filter((v) => !gruppoDi(v.sigla)).map((v) => v.sigla);
+  await salvaPreferenzaCollab(id, 'turni_consentiti', PianoRegole.turniConsentitiScrivi(out));
+  const nuoveSenza = out.filter((v) => v.senzaArea && !voci.some((x) => x.sigla === v.sigla && x.senzaArea));
+  if (nuoveSenza.length || ignote.length)
+    mostraAvviso(
+      (nuoveSenza.length
+        ? c.nome +
+          ' potrà fare ' +
+          nuoveSenza.map((v) => v.sigla).join(', ') +
+          ' anche senza la formazione dell area, anche da sola: è un eccezione di competenza scelta da te, solo per ' +
+          (nuoveSenza.length === 1 ? 'questo turno' : 'questi turni') +
+          '. Resta segnata nella riga della persona; per tutta l area serve la Formazione (o Affiancato in, mai da sola).'
+        : '') +
+        (ignote.length
+          ? (nuoveSenza.length ? '\n\n' : '') + 'Sigle che non esistono nel settore: ' + ignote.join(', ')
+          : ''),
+      { titolo: 'Turni consentiti' },
+    );
+  if (typeof renderPiano === 'function') renderPiano();
+}
 function _pianoGiorniLavoroChips(c) {
   const set = String(c.giorni_lavoro || '')
     .split(',')
@@ -3415,6 +4003,19 @@ async function salvaGiorniLavoro(id, el) {
 // regolamento (minimo all anno) non sono garantite. Si avvisa con la soluzione.
 function _pianoAvvisoDomenicheGiorni(c) {
   if (!c || _pianoRegolaVal('domeniche_libere_anno') == null) return;
+  // DOMENICHE NON CONTEGGIATE (titolare 23/10/2026): con queste preferenze una domenica valida non
+  // e mai possibile (es. solo venerdi e sabato sera): si dice che il diritto non si conta
+  const sosp = typeof _pianoDomSospesaMese === 'function' ? _pianoDomSospesaMese(c.nome, _pianoMeseSel) : null;
+  if (sosp) {
+    mostraAvviso(
+      sosp.nota +
+        '.\n\n' +
+        c.nome +
+        ' non può avere una domenica libera valida: la domenica non lavora, ma il sabato è un suo giorno di lavoro e tutti i turni che può fare finiscono dopo le 23. È una scelta del Casinò, come un contratto a parte: nei mesi con queste preferenze le sue domeniche non si contano (nessuna violazione, nessun arretrato, nessun avviso «perde la domenica»; Controlla le regole, Domeniche e Benessere mostrano una nota grigia).',
+      { titolo: 'Domeniche non conteggiate' },
+    );
+    return;
+  }
   const set = String(c.giorni_lavoro || '')
     .split(',')
     .map((x) => (parseInt(x) === 7 ? 0 : parseInt(x))) // domenica: 0 (o 7)
@@ -3438,6 +4039,17 @@ function _pianoAvvisoDomenicheGiorni(c) {
     { titolo: 'Domeniche libere non garantite' },
   );
 }
+// "s8 s7c; S8" -> { testo: 'S8,S7C', ignote: [] } (sigle note = turni di tutti i settori)
+function _pianoBloccatiNormalizza(valore, sigleNote) {
+  const note = new Set((sigleNote || []).map((x) => String(x).toUpperCase()));
+  const lista = [];
+  String(valore == null ? '' : valore)
+    .split(/[\s,;]+/)
+    .map((x) => x.trim().toUpperCase())
+    .filter(Boolean)
+    .forEach((x) => !lista.includes(x) && lista.push(x));
+  return { testo: lista.join(','), ignote: lista.filter((x) => !note.has(x)) };
+}
 async function salvaPreferenzaCollab(id, campo, valore) {
   // preferenze del piano (es. solo diurni): chi gestisce il piano o lo Storico HR
   if (!puoGestirePiano() && !puoModificareStoricoHr()) {
@@ -3451,7 +4063,28 @@ async function salvaPreferenzaCollab(id, campo, valore) {
     else if (campo === 'giorni_lavoro') patch[campo] = String(valore || '').trim() || null;
     else if (campo === 'giorni_settimana') patch[campo] = parseInt(valore) > 0 ? Math.min(6, parseInt(valore)) : null;
     else if (campo === 'accoglienza') patch[campo] = Math.max(0, Math.min(2, parseInt(valore) || 0));
-    else patch[campo] = String(valore).trim().toUpperCase() || null;
+    else if (campo === 'turni_bloccati') {
+      // TURNI BLOCCATI (controllo QA 23/10/2026, D25): prima testo libero, una sigla sbagliata
+      // ("S88") o separata da spazi ("S8 S7C") non bloccava niente in silenzio. Si
+      // normalizza in "S8,S7C" e le sigle che non esistono si rifiutano con l elenco.
+      const r = _pianoBloccatiNormalizza(
+        valore,
+        (pianoTurniCache || []).map((t) => t.codice),
+      );
+      if (r.ignote.length) {
+        await mostraAvviso(
+          'Turni bloccati non salvati: ' +
+            (r.ignote.length === 1 ? 'la sigla ' : 'le sigle ') +
+            r.ignote.join(', ') +
+            (r.ignote.length === 1 ? ' non esiste' : ' non esistono') +
+            ' nella scheda Turni. Correggi e riprova (sigle separate da virgola, es. S8,S7C).',
+          { titolo: 'Turni bloccati' },
+        );
+        if (typeof renderPiano === 'function') renderPiano();
+        return;
+      }
+      patch[campo] = r.testo || null;
+    } else patch[campo] = String(valore).trim().toUpperCase() || null;
     // solo diurni e solo notti non vanno insieme: scegliendone uno si toglie l altro
     if (campo === 'solo_diurni' && patch[campo]) patch.solo_notti = false;
     if (campo === 'solo_notti' && patch[campo]) patch.solo_diurni = false;
@@ -3462,7 +4095,8 @@ async function salvaPreferenzaCollab(id, campo, valore) {
       renderPiano();
     logAzione('Piano: preferenza collaboratore', (c ? c.nome : id) + ' ' + campo);
     toast('Preferenza salvata');
-    if (campo === 'giorni_lavoro' || campo === 'giorni_settimana') _pianoAvvisoDomenicheGiorni(c);
+    if (campo === 'giorni_lavoro' || campo === 'giorni_settimana' || (campo === 'solo_notti' && patch[campo]))
+      _pianoAvvisoDomenicheGiorni(c);
   } catch (e) {
     toast('Errore salvataggio preferenza');
   }

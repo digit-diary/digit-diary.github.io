@@ -177,14 +177,17 @@ function renderAlertCompatti() {
   // riga compatta rimetteva visibili anche quelli di cassa/rischio nascosti dai permessi)
   const okCassa = typeof isVis !== 'function' || isVis('alert_cassa');
   const okRischio = typeof isVis !== 'function' || isVis('alert_rischio');
+  const punti = document.getElementById('punti-alerts-container');
   const banners = [
     ...(cassa && okCassa ? cassa.querySelectorAll('.cassa-alert-banner') : []),
     ...(rischio && okRischio ? rischio.querySelectorAll('.rischio-alert-banner, .cassa-alert-banner') : []),
+    ...(punti ? punti.querySelectorAll('.cassa-alert-banner') : []),
   ];
   if (banners.length < 2) {
     if (strip) strip.remove();
     if (cassa) cassa.style.display = okCassa ? '' : 'none';
     if (rischio) rischio.style.display = okRischio ? '' : 'none';
+    if (punti) punti.style.display = '';
     return;
   }
   if (!strip) {
@@ -207,6 +210,7 @@ function renderAlertCompatti() {
   const vis = window._alertEspansi ? '' : 'none';
   if (cassa) cassa.style.display = okCassa ? vis : 'none';
   if (rischio) rischio.style.display = okRischio ? vis : 'none';
+  if (punti) punti.style.display = vis;
 }
 function toggleCassaDD(type) {
   const dd = document.getElementById('cassa-' + type + '-dd');

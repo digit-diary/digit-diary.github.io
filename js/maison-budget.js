@@ -278,6 +278,14 @@ function _maisonClientiAggiornaViste() {
   renderMaisonBudgetUI();
   if (typeof renderMaisonDashboard === 'function') renderMaisonDashboard();
   if (typeof renderMaisonBudgetAlerts === 'function') renderMaisonBudgetAlerts();
+  // la Home ha il riquadro dei compleanni dei clienti: si ridisegna subito (prima restava vecchio)
+  if (typeof renderDashboard === 'function') {
+    try {
+      renderDashboard();
+    } catch (e) {
+      console.warn('Home non aggiornata', e);
+    }
+  }
 }
 // NOME GIA USATO (il nome del cliente e unico in tutto il database): se e un cliente tolto
 // di questo settore si propone di rimetterlo, altrimenti si dice dove e. Ritorna la riga
@@ -366,12 +374,23 @@ async function _salvaMaisonBudgetEsegui() {
       riga = esiste;
       logAzione('Cliente Maison aggiornato', esiste.nome + (cat ? ' · ' + maisonCatLabel(cat) : ''));
     } else {
+      // il nome e' unico in tutto il database: prima si guarda se e' gia' usato (cliente nel
+      // Cestino o di un altro settore), cosi' non si passa da un errore di doppione (409)
+      let giaUsato = false;
       try {
+        giaUsato = ((await secGet('maison_budget?select=id&nome=eq.' + encodeURIComponent(nome))) || []).length > 0;
+      } catch (e) {}
+      try {
+        if (giaUsato) {
+          const err = new Error('esiste gia');
+          err.giaUsato = true;
+          throw err;
+        }
         const r = await secPost('maison_budget', Object.assign({ nome, reparto_dip: currentReparto }, dati));
         riga = r && r[0];
         if (riga) maisonBudgetCache.push(riga);
       } catch (e) {
-        if (!/duplicate|unique|23505|esiste gia/i.test((e && e.message) || '')) throw e;
+        if (!(e && e.giaUsato) && !/duplicate|unique|23505|esiste gia/i.test((e && e.message) || '')) throw e;
         riga = await _maisonClienteNomeOccupato(nome);
         if (!riga) return;
         await secPatch('maison_budget', 'id=eq.' + riga.id, dati);
@@ -669,7 +688,7 @@ async function esportaListaMaisonPDF() {
     }
     mostraPdfPreview(doc, 'clienti_maison.pdf', 'Lista Clienti Maison');
   } catch (e) {
-    toast('Errore PDF');
+    toastNonRiuscito('PDF non creato', e);
   }
 }
 // Titolo di colonna (o di gruppo) con il nome di un tipo di buono configurato oltre a BU e BL,
@@ -1330,8 +1349,27 @@ function _soloCorrezioneCognome(nomeVecchio, matchBudget) {
   const tokensBudget = matchBudget.trim().split(/\s+/);
   // Se il vecchio è solo cognome e il budget ha cognome+nome, usa il cognome corretto (non aggiungere nome)
   // MA se il cognome è identico, ritorna il cognome (nessuna correzione ortografica necessaria)
+  // 23/10/2026: si cerca QUALE parte del nome della scheda corrisponde a quanto scritto (anche piu
+  // parole unite: "Dalozzo" = "Da Lozzo"). Se e' l'inizio, e' il cognome: si corregge solo quello.
+  // Se e' una parte dopo (doppio cognome: "Baroni" in "Micheli Baroni Cristina") si usa il nome
+  // completo della scheda: prima diventava "Micheli", un nome che non esiste. Nessuna parte
+  // corrispondente: il nome resta come e' scritto.
   if (tokensVecchio.length === 1) {
-    const cogCorretto = capitalizzaNome(tokensBudget[0]);
+    const v = nomeVecchio.trim().toLowerCase();
+    const soglia = v.length >= 7 ? 2 : v.length >= 4 ? 1 : 0;
+    let trovato = null;
+    for (let i = 0; i < tokensBudget.length && !trovato; i++) {
+      for (let j = i + 1; j <= Math.min(tokensBudget.length, i + 3); j++) {
+        const pezzo = tokensBudget.slice(i, j).join('').toLowerCase();
+        if (_levenshtein(v, pezzo) <= soglia) {
+          trovato = { i, j };
+          break;
+        }
+      }
+    }
+    if (!trovato) return nomeVecchio;
+    if (trovato.i > 0) return matchBudget.trim().replace(/\s+/g, ' ');
+    const cogCorretto = tokensBudget.slice(0, trovato.j).map(capitalizzaNome).join(' ');
     if (cogCorretto.toLowerCase() === nomeVecchio.toLowerCase()) return nomeVecchio; // stesso cognome, nessun fix ortografico
     return cogCorretto;
   }

@@ -93,6 +93,23 @@ eq(
 r = u(base, { sup_note: 'uguale', cassa_note: '', n_assegni: 0 }, { sup_note: 'uguale', cassa_note: '', n_assegni: 0 });
 eq(r.conflitti, [], 'stesso testo su entrambi: nessun avviso');
 
+r = u(
+  { sup_note: 'Rossi malato dal 03/05/2027 al 04/05/2027' },
+  { sup_note: 'Rossi malato dal 03/05/2027 al 04/05/2027\nBianchi ferie' },
+  { sup_note: 'Rossi malato dal 03/05/2027 al 03/05/2027', cassa_note: '', n_assegni: 0 },
+);
+eq(
+  r.valori.sup_note,
+  'Rossi malato dal 03/05/2027 al 03/05/2027\nBianchi ferie',
+  'voce corretta dal Diario e riga aggiunta da un collega: niente doppione (A9)',
+);
+r = u(
+  { sup_note: 'Rossi malato\nBianchi ferie' },
+  { sup_note: 'Bianchi ferie' },
+  { sup_note: 'Rossi malato\nBianchi ferie\nVerdi assente', cassa_note: '', n_assegni: 0 },
+);
+eq(r.valori.sup_note, 'Bianchi ferie\nVerdi assente', 'riga tolta da me, riga aggiunta dal collega');
+
 console.log('esc: apostrofo');
 eq(
   ctx.esc('D\'Amico <b>"x"</b>\n'),

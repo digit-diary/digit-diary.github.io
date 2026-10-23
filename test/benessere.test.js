@@ -306,5 +306,31 @@ console.log('\n== soglie dalle regole ==');
 const s = B.soglieDa((n) => ({ min_riposo_ore: '12', benessere_notti_fila: '4' })[n]);
 ok(s.minRiposo === 12 && s.nottiFila === 4 && s.recuperoOre === 46, 'soglie lette, predefiniti per le altre');
 
+console.log('\n== domeniche non conteggiate per le preferenze (titolare 23/10/2026) ==');
+{
+  const prima = globalThis.PianoRegole;
+  globalThis.PianoRegole = require('../js/piano-regole.js');
+  const nota = 'Domeniche non conteggiate: lavora solo ven e sab sera (preferenze)';
+  // ven e sab notte, tutte le domeniche dopo un sabato tardi: senza la regola sarebbe critico
+  const sosp = (gg) => gg.map((g) => (g.dow === 0 ? Object.assign({}, g, { domenica: 'sospesa', notaDom: nota }) : g));
+  const sett = rip('. . . . N N .', 4);
+  const info = { giorni_lavoro: '5,6', solo_notti: true, data_assunzione: '2026-09-01' };
+  const tutto = B.valutaSettore([{ nome: 'Zeta', info: info, giorni: sosp(giorni(DA, sett)) }], {
+    da: DA,
+    a: A,
+    turnoDi: () => null,
+  })[0];
+  const v = voce(tutto.res, 'domeniche');
+  ok(v.livello === 'nota' && v.testo === nota, 'tutte le domeniche sospese: solo la nota grigia');
+  ok(tutto.res.stato !== 'critico', 'nessun critico per le domeniche');
+  // settembre contato (assunto il 1.9), ottobre sospeso: il diritto non comprende ottobre
+  const gg = giorni(DA, sett).map((g) =>
+    g.dow === 0 && g.data >= '2026-10-01' ? Object.assign({}, g, { domenica: 'sospesa', notaDom: nota }) : g,
+  );
+  const m = B.misura(gg, { da: '2026-01-01', a: A });
+  ok(m.domSosp === 1 && m.domSospMesi.join() === '10', 'misura: la domenica di ottobre fuori dal conto');
+  globalThis.PianoRegole = prima;
+}
+
 console.log('\n' + passati + ' passati, ' + falliti + ' falliti');
 process.exit(falliti ? 1 : 0);

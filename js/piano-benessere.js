@@ -128,6 +128,9 @@
       domTardi: 0,
       domAssenza: 0,
       domFuture: 0,
+      domSosp: 0, // domeniche non conteggiate per le preferenze (domenica: 'sospesa')
+      domSospMesi: [],
+      domSospNota: '',
       vac: 0,
       mal: 0,
     };
@@ -181,6 +184,16 @@
           m.weTot++;
           if (lav || s.stato === 'lavoro') m.weLav++;
         }
+      }
+      // DOMENICHE NON CONTEGGIATE PER LE PREFERENZE (PianoRegole.domenicheSospese, titolare
+      // 23/10/2026): fuori da tutti i conti delle domeniche, anche quelle future; il mese esce dai
+      // mesi di contratto (valuta)
+      if (d.dow === 0 && d.domenica === 'sospesa') {
+        m.domSosp++;
+        const mm = d.data.substring(5, 7);
+        if (m.domSospMesi.indexOf(mm) < 0) m.domSospMesi.push(mm);
+        if (d.notaDom) m.domSospNota = d.notaDom;
+        continue;
       }
       // domenica futura ancora senza piano: puo ancora diventare libera
       // (non dopo la fine del rapporto ne prima dell assunzione: in quei giorni la persona non c e)
@@ -436,6 +449,9 @@
     //    come la tabella Domeniche e Controlla le regole; arretrato recuperabile fino a dicembre)
     const ma = mAnno || m;
     const domConosciute = ma.domTot + ma.domAssenza;
+    // domeniche non conteggiate per le preferenze: una nota grigia, mai un allarme
+    const notaSosp = ma.domSosp ? ma.domSospNota || 'Domeniche non conteggiate (preferenze)' : '';
+    if (!domConosciute && notaSosp) voce('domeniche', 'Domeniche libere', 'nota', notaSosp, true);
     if (domConosciute > 0) {
       let attese = Math.floor((so.domenicheAnno * domConosciute) / 52);
       // CON LA DATA DI INIZIO (titolare 21/10/2026): 1 domenica per mese di contratto, come
@@ -443,7 +459,13 @@
       const PR = root.PianoRegole;
       const ctr =
         p.inizio && PR && PR.domenicheContratto && ma.a
-          ? PR.domenicheContratto(parseInt(ma.a.substring(0, 4)), p.inizio, p.fine, so.domenicheAnno)
+          ? PR.domenicheContratto(
+              parseInt(ma.a.substring(0, 4)),
+              p.inizio,
+              p.fine,
+              so.domenicheAnno,
+              ma.domSospMesi || [],
+            )
           : null;
       if (ctr) attese = ctr.attese(ma.a.substring(5, 7));
       const manca = attese - ma.domLib;
@@ -459,7 +481,8 @@
       const servono = dirittoAnno - ma.domLib;
       let testo =
         ma.domLib +
-        ' domeniche libere da gennaio (attese ' +
+        (ma.domLib === 1 ? ' domenica libera' : ' domeniche libere') +
+        ' da gennaio (attese ' +
         attese +
         (ctr ? '' : ', data di inizio mancante') +
         (ma.domTardi ? ', ' + ma.domTardi + ' non valide per il sabato oltre le 23' : '') +
@@ -471,7 +494,9 @@
         testo +=
           servono > restanti
             ? ', minimo dell anno non più raggiungibile'
-            : ': servono ' + servono + ' domeniche libere sulle ' + restanti + ' che restano';
+            : ': ' +
+              (servono === 1 ? 'serve 1 domenica libera' : 'servono ' + servono + ' domeniche libere') +
+              (restanti === 1 ? " sull'unica che resta" : ' sulle ' + restanti + ' che restano');
       }
       // giorni fissi con il sabato o la domenica: il minimo di legge resta, ma una scelta non e mai
       // critica (al massimo da tenere d occhio, da parlarne con la persona)
@@ -479,6 +504,10 @@
         if (liv === 'critico') liv = 'attenzione';
         testo += ' · vale anche con la scelta lavora ' + p.giorniLavoro.map((x) => GIORNI_N[x]).join(', ');
       }
+      // mesi non conteggiati per le preferenze (fuori dal conto qui sopra): lo si dice
+      if (notaSosp)
+        testo +=
+          ' · ' + notaSosp + ' (' + ma.domSosp + (ma.domSosp === 1 ? ' domenica' : ' domeniche') + ' fuori dal conto)';
       voce('domeniche', 'Domeniche libere', liv, testo, true);
     }
 
@@ -893,6 +922,16 @@ async function pianoBenessereCalcola(opz) {
         const cod = r && r.codice ? String(r.codice).trim() : '';
         const dow = new Date(d + 'T12:00:00').getDay();
         const g = { data: d, dow: dow, stato: 'ignoto' };
+        // domeniche non conteggiate per le preferenze valide in quel mese (_pianoDomSospesaMese,
+        // la stessa funzione di Controlla le regole e della tabella Domeniche)
+        const sospDom =
+          dow === 0 && typeof _pianoDomSospesaMese === 'function'
+            ? _pianoDomSospesaMese(c.nome, d.substring(0, 7))
+            : null;
+        if (sospDom) {
+          g.domenica = 'sospesa';
+          g.notaDom = sospDom.nota;
+        }
         if (!cod) return g;
         if (_pianoIsLavoro(cod)) {
           g.stato = 'lavoro';
@@ -913,7 +952,7 @@ async function pianoBenessereCalcola(opz) {
           g.stato = 'riposo';
           g.sceltoNd = cod.toUpperCase() === 'ND';
         }
-        if (dow === 0 && typeof _pianoStatoDomenica === 'function') {
+        if (dow === 0 && !sospDom && typeof _pianoStatoDomenica === 'function') {
           const isoSab = _benPiu(d, -1);
           const rs = celle[isoSab];
           g.domenica = _pianoStatoDomenica(cod, rs ? rs.codice : '', isoSab, rs, c.nome);

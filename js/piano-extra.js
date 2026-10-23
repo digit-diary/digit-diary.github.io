@@ -32,19 +32,41 @@ function _pianoStatSelezione() {
   const sel = [
     ...document.querySelectorAll('#piano-content .blocco-sel, #piano-content .col-selected, #piano-content .tot-sel'),
   ];
-  const valori = [];
+  // TRE TIPI DI CELLE (controllo 23/10/2026: con una colonna selezionata la barra sommava
+  // ore dei turni, posti del fabbisogno e righe dei totali, «Min -1»): le celle delle
+  // persone (ore dei turni), quelle del fabbisogno (posti) e le righe di riepilogo (numeri
+  // gia calcolati). Ogni tipo ha la sua somma; con un tipo solo la barra resta come prima.
+  const gruppi = { turni: [], fabb: [], altri: [] };
   let piene = 0;
+  let coperti = 0;
+  let richiesti = 0;
+  let conCoperti = false;
   sel.forEach((td) => {
     const txt = (td.textContent || '').trim();
     if (!txt) return;
     piene++;
+    const tipo = td.closest('table[data-seltab="fabb"]') ? 'fabb' : td.closest('tr[data-nome]') ? 'turni' : 'altri';
+    const numerico = /^[-+]?[0-9.,]+$/.test(txt);
     const num = parseFloat(txt.replace(',', '.'));
-    if (!isNaN(num) && /^[-+]?[0-9.,]+$/.test(txt)) {
-      valori.push(num);
-    } else {
+    if (tipo === 'turni') {
+      // nelle celle delle persone c e una sigla (anche numerica: «1», «21» dei Tavoli): ore del turno
       const t = _pianoTurnoInfo(txt.toUpperCase());
-      if (t && parseFloat(t.durata_ore)) valori.push(parseFloat(t.durata_ore));
-    }
+      if (t) {
+        if (parseFloat(t.durata_ore)) gruppi.turni.push(parseFloat(t.durata_ore));
+      } else if (numerico && !isNaN(num)) gruppi.turni.push(num);
+    } else if (tipo === 'fabb') {
+      // fabbisogno: «coperti/richiesti» oppure solo il numero richiesto
+      const m = txt.match(/^(\d+)\s*\/\s*(\d+)$/);
+      if (m) {
+        conCoperti = true;
+        coperti += parseInt(m[1]);
+        richiesti += parseInt(m[2]);
+        gruppi.fabb.push(parseInt(m[2]));
+      } else if (numerico && !isNaN(num)) {
+        richiesti += num;
+        gruppi.fabb.push(num);
+      }
+    } else if (numerico && !isNaN(num)) gruppi.altri.push(num);
   });
   if (!sel.length) {
     if (box) box.style.display = 'none';
@@ -55,24 +77,40 @@ function _pianoStatSelezione() {
     box.id = 'piano-statbar';
     document.body.appendChild(box);
   }
-  const somma = Math.round(valori.reduce((a, b) => a + b, 0) * 100) / 100;
-  const media = valori.length ? Math.round((somma / valori.length) * 100) / 100 : 0;
+  const arr = (x) => Math.round(x * 100) / 100;
+  const stat = (v, pieno) => {
+    const somma = arr(v.reduce((a, b) => a + b, 0));
+    if (!pieno) return 'Somma <b>' + somma + '</b>';
+    return (
+      'Somma <b>' +
+      somma +
+      '</b> &nbsp;&middot;&nbsp; Media <b>' +
+      arr(somma / v.length) +
+      '</b>' +
+      (v.length > 1
+        ? ' &nbsp;&middot;&nbsp; Min <b>' +
+          Math.min.apply(null, v) +
+          '</b> &nbsp;&middot;&nbsp; Max <b>' +
+          Math.max.apply(null, v) +
+          '</b>'
+        : '')
+    );
+  };
+  const tipi = Object.keys(gruppi).filter((k) => gruppi[k].length);
+  const NOMI = { turni: 'Ore dei turni', fabb: 'Fabbisogno', altri: 'Righe di riepilogo' };
+  const testoFabb = () =>
+    conCoperti ? 'coperti <b>' + coperti + '</b> su <b>' + arr(richiesti) + '</b> posti' : stat(gruppi.fabb, false);
   box.innerHTML =
     '<b>' +
     sel.length +
     '</b> celle (' +
     piene +
     ' piene)' +
-    (valori.length
-      ? ' &nbsp;&middot;&nbsp; Somma <b>' + somma + '</b> &nbsp;&middot;&nbsp; Media <b>' + media + '</b>'
-      : '') +
-    (valori.length > 1
-      ? ' &nbsp;&middot;&nbsp; Min <b>' +
-        Math.min.apply(null, valori) +
-        '</b> &nbsp;&middot;&nbsp; Max <b>' +
-        Math.max.apply(null, valori) +
-        '</b>'
-      : '');
+    (tipi.length === 1 && tipi[0] !== 'fabb'
+      ? ' &nbsp;&middot;&nbsp; ' + stat(gruppi[tipi[0]], true)
+      : tipi
+          .map((k) => ' &nbsp;&middot;&nbsp; ' + NOMI[k] + ': ' + (k === 'fabb' ? testoFabb() : stat(gruppi[k], false)))
+          .join(''));
   box.style.display = 'block';
 }
 // ================= ANNULLA / RIPRISTINA (stile Excel) =================
@@ -579,6 +617,12 @@ async function pianoAnnulla() {
     toast('Preparazione del piano in corso su questo PC: Annulla e Ripristina alla fine');
     return false;
   }
+  // operazione lunga in corso (Prepara il mese, Migliora, Svuota...: D2/D6 23/10/2026): il
+  // suo passo di Annulla e ancora aperto, si annulla alla fine
+  if (typeof pianoLungaOccupato === 'function' && pianoLungaOccupato()) {
+    toast(pianoLungaOccupato() + ' in corso su questo PC: Annulla e Ripristina alla fine');
+    return false;
+  }
   const u = window._pianoUndo || (window._pianoUndo = []);
   if (!u.length) {
     toast('Niente da annullare');
@@ -840,6 +884,10 @@ async function pianoRipristina() {
     toast('Preparazione del piano in corso su questo PC: Annulla e Ripristina alla fine');
     return false;
   }
+  if (typeof pianoLungaOccupato === 'function' && pianoLungaOccupato()) {
+    toast(pianoLungaOccupato() + ' in corso su questo PC: Annulla e Ripristina alla fine');
+    return false;
+  }
   const rd = window._pianoRedo || (window._pianoRedo = []);
   if (!rd.length) {
     toast('Niente da ripristinare');
@@ -960,15 +1008,29 @@ async function _pianoCancellaSelezioneEsegui() {
     toast('Nessuna cella piena nella selezione');
     return;
   }
+  const it = (d) => String(d).split('-').reverse().join('.');
   const prot = daCanc.filter((r) => r.protetto).length;
-  if (
-    !(await chiediConferma(
-      'Cancellare ' + daCanc.length + ' celle selezionate' + (prot ? ' (di cui ' + prot + ' protette)' : '') + '?',
-    ))
-  )
-    return;
-  // giorni chiusi: ogni giorno toccato va sbloccato con motivo, come per la singola cella
-  for (const d of [...new Set(daCanc.map((x) => x.data))].sort()) if (!(await _pianoConsentiScrittura(d))) return;
+  const domanda =
+    'Cancellare ' +
+    (daCanc.length === 1
+      ? 'la cella ' + daCanc[0].codice + ' di ' + daCanc[0].collaboratore + ' del ' + it(daCanc[0].data)
+      : daCanc.length + ' celle selezionate') +
+    (prot ? (daCanc.length === 1 ? ' (protetta)' : ' (di cui ' + prot + ' protette)') : '') +
+    '?';
+  // giorni chiusi: UNA finestra con la domanda e il motivo (prima «Cancellare?» e poi il
+  // motivo per ogni giorno chiuso); senza giorni chiusi la conferma di sempre
+  if (typeof _pianoCancellaConMotivo === 'function') {
+    if (
+      !(await _pianoCancellaConMotivo(
+        domanda,
+        daCanc.map((x) => x.data),
+      ))
+    )
+      return;
+  } else {
+    if (!(await chiediConferma(domanda))) return;
+    for (const d of [...new Set(daCanc.map((x) => x.data))].sort()) if (!(await _pianoConsentiScrittura(d))) return;
+  }
   const passo = _pianoUndoSnap('cancellazione di ' + daCanc.length + ' celle');
   // in UNA scrittura e solo se le celle sono ancora quelle mostrate (un collega puo
   // averle cambiate nel frattempo): altrimenti niente e cancellato e si ricarica
@@ -3707,7 +3769,13 @@ function _pianoGruppiConFormazione() {
 }
 // ritorna il gruppo per cui il collaboratore NON risulta formato, oppure null. I commenti
 // di formazione/affiancamento non contano. Prima valeva solo per SALA, REC e CASSA.
-function _pianoGruppoNonFormato(nome, codTurno, commento) {
+// opz.inBlocco (proposta dei livelli in blocco: import, incolla, "Proponi livelli", "Come
+// iniziare"): chi non ha NESSUNA competenza collegata a un gruppo conta come non formato per
+// quei gruppi. Per l avviso della singola cella resta "nessuna configurazione = puo tutto"
+// (_pianoSettoriEffettivi null), altrimenti ogni turno di chi non e ancora in Formazione
+// darebbe un avviso. Prima anche la proposta in blocco lo saltava: nei dati veri 71 persone
+// senza competenze (Valet 8 con 140-190 turni X, Tavoli 58 su 63) non erano mai proposte.
+function _pianoGruppoNonFormato(nome, codTurno, commento, opz) {
   const t = _pianoTurnoInfo(codTurno);
   if (!t) return null;
   const g = (t.gruppo || '').toUpperCase();
@@ -3722,6 +3790,11 @@ function _pianoGruppoNonFormato(nome, codTurno, commento) {
   // chi lavora quel settore IN ACCOMPAGNAMENTO (es. guardaroba con la rec)
   // è una situazione voluta: nessun avviso
   if (_pianoAccompagnamentoDi(info).includes(g)) return null;
+  if (opz && opz.inBlocco) {
+    const mappa = _pianoCompetenzeGruppi();
+    const comp = info.competenze || {};
+    if (!Object.keys(mappa).some((k) => mappa[k] && comp[k] === true)) return g;
+  }
   const sett = _pianoSettoriEffettivi(info);
   if (!sett || sett.includes(g)) return null;
   return g;
@@ -3749,7 +3822,7 @@ async function _pianoProponiCertificazioniBulk(coppie, opz) {
   const cfgAll = typeof getCompetenzeConfigAll === 'function' ? getCompetenzeConfigAll() : {};
   const perNome = {}; // nome -> { gruppi: {GRUPPO: n turni}, key piu alta }
   coppie.forEach((c) => {
-    const g = _pianoGruppoNonFormato(c.nome, c.codice, c.commento);
+    const g = _pianoGruppoNonFormato(c.nome, c.codice, c.commento, { inBlocco: true });
     if (!g || !inv[g]) return;
     const p = (perNome[c.nome] = perNome[c.nome] || { gruppi: {} });
     p.gruppi[g] = (p.gruppi[g] || 0) + 1;
@@ -3785,7 +3858,10 @@ async function _pianoProponiCertificazioniBulk(coppie, opz) {
     });
   });
   if (!proposte.length) {
-    if (opz.avvisaVuoto) toast('Nessun livello da aggiornare: i turni fatti corrispondono ai livelli di Formazione');
+    if (opz.avvisaVuoto)
+      toast(
+        'Nessun livello da proporre: chi ha fatto turni dei gruppi collegati alla Formazione ha gia le competenze di quei gruppi',
+      );
     return;
   }
   const cfgPunti = typeof getPuntiConfig === 'function' ? getPuntiConfig() : { punti_livello: {}, azioni: [] };
@@ -3794,12 +3870,11 @@ async function _pianoProponiCertificazioniBulk(coppie, opz) {
   // raggiunti; il premio del livello si legge a parte
   const puntiDi = (p) => {
     let t = (azComp && parseInt(azComp.punti)) || 0;
-    // punti e premi del settore della persona (valori propri del settore o globali)
-    for (let lv = p.prima + 1; lv <= p.dopo; lv++)
-      t +=
-        typeof puntiLivelloDi === 'function'
-          ? puntiLivelloDi(lv, p.rep, cfgPunti)
-          : parseInt((cfgPunti.punti_livello || {})[String(lv)]) || 0;
+    // punti e premi del settore della persona (valori propri del settore o globali), SOLO
+    // del livello raggiunto: i livelli saltati non danno punti (C27, come in Formazione)
+    if (typeof puntiPassaggioLivello === 'function')
+      puntiPassaggioLivello(p.prima, p.dopo, p.rep, cfgPunti).forEach((x) => (t += x.punti));
+    else if (p.dopo > p.prima) t += parseInt((cfgPunti.punti_livello || {})[String(p.dopo)]) || 0;
     return t;
   };
   const premioDi = (p) =>
@@ -3828,7 +3903,7 @@ async function _pianoProponiCertificazioniBulk(coppie, opz) {
           )
           .join('\n') +
         '\n\nLi certifico in Formazione (con le competenze dei livelli sotto)' +
-        (incentivi ? ' e assegno l incentivo dei livelli raggiunti' : '') +
+        (incentivi ? ' e assegno l incentivo del livello raggiunto' : '') +
         '?',
     ))
   )
@@ -4168,6 +4243,16 @@ async function _renderPianoCreditiTab() {
   const anno = parseInt(_pianoMeseSel.split('-')[0]);
   const MESI_L = MESI_FULL || [];
   const meseLbl = (MESI_L[parseInt(_pianoMeseSel.split('-')[1]) - 1] || '') + ' ' + anno;
+  // il saldo ore dell anno si calcola da solo (D31: prima «da calcolare» finche non si premeva il
+  // pulsante, mentre la scheda Saldo aveva gia il numero; il calcolo dura un decimo di secondo)
+  if (!(window._pianoSaldoAnnoDati && window._pianoSaldoAnnoDati.anno === anno)) {
+    try {
+      await _pianoCaricaSaldoIniziale(anno);
+      window._pianoSaldoAnnoDati = await _pianoSaldoAnnoCalcola(anno);
+    } catch (e) {
+      console.warn('[crediti] saldo ore', e);
+    }
+  }
   const dati = await _pianoCreditiDati(anno);
   const saldoPronto = !!(window._pianoSaldoAnnoDati && window._pianoSaldoAnnoDati.anno === anno);
   let h =
@@ -4376,7 +4461,7 @@ async function _pianoCreditiScheda(nome) {
 //  - Regole del mese: riposo minimo, giorni di fila, idoneita...;
 //  - Chiusura d anno: chi al 31.12 non arriva in pari con saldo ore, recuperi CGF,
 //    domeniche libere (mesi gia pianificati);
-//  - Posti scoperti: fabbisogno non coperto nei prossimi 7 giorni;
+//  - Posti scoperti: fabbisogno non coperto nei prossimi 7 giorni (altri mesi: il mese aperto);
 //  - Malattie lunghe: malattie in corso oltre il 14. giorno (5.857 ore al giorno).
 // Il numero compare anche sulla scheda Avvisi e sulla voce Piano del menu.
 const _AVV_SEZIONI = [
@@ -4496,7 +4581,6 @@ async function _pianoAvvisiLenti(forza) {
     const mesiPian = Object.keys(dati.mesiConPiano || {}).sort();
     const ultimo = mesiPian.length ? mesiPian[mesiPian.length - 1] : '';
     const cgf = (await _pianoSaldoCgf(anno + '-12')).saldo;
-    const diritto = parseInt(_pianoRegolaVal('domeniche_libere_anno')) || 12;
     const righeAnno =
       (await secGet(
         'piano?data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31&reparto_dip=eq.' + rep + '&limit=40000',
@@ -4599,6 +4683,8 @@ async function _pianoAvvisiLenti(forza) {
       domeniche.forEach((dstr) => {
         if (dstr > oggi) future++;
         if (!mesiPersona[nome + '|' + dstr.substring(5, 7)]) return;
+        // mese non conteggiato per le preferenze (_pianoDomSospesaMese): fuori dal conto
+        if (_pianoDomSospesaMese(nome, dstr.substring(0, 7))) return;
         visto = true;
         const cod = perG[nome + '|' + dstr];
         // stessa regola delle C rosse del calendario (una sola funzione)
@@ -4615,7 +4701,7 @@ async function _pianoAvvisiLenti(forza) {
       const daMeseD =
         oggiD.substring(0, 4) === String(anno) ? oggiD.substring(5, 7) : oggiD < String(anno) ? '00' : '13';
       const contrD = _pianoDomContratto(nome, anno, mesiP, daMeseD);
-      const dirittoP = contrD.inizioMancante ? diritto : contrD.diritto;
+      const dirittoP = _pianoDomDirittoDi(contrD);
       if (visto && libere < dirittoP) {
         const restano = dirittoP - libere;
         voci.push({
@@ -4634,13 +4720,18 @@ async function _pianoAvvisiLenti(forza) {
   } catch (e) {
     console.error('avvisi: chiusura anno', e);
   }
-  // --- posti scoperti nei prossimi 7 giorni ---
+  // --- posti scoperti: nel mese in corso i prossimi 7 giorni, negli altri mesi il mese
+  //     aperto (prima un mese futuro diceva «Posti scoperti 0» sotto «Avvisi · Marzo 2027»
+  //     con 75 posti scoperti: contava solo la settimana di oggi, controllo 23/10 D11) ---
   try {
     const da = new Date();
     const a = new Date();
     a.setDate(a.getDate() + 6);
-    const dI = _pianoIsoData(da);
-    const dF = _pianoIsoData(a);
+    const ymAp = String(_pianoMeseSel);
+    const meseOggi = _pianoIsoData(da).substring(0, 7) === ymAp;
+    out.scopertiPeriodo = meseOggi ? '7' : 'mese';
+    const dI = meseOggi ? _pianoIsoData(da) : ymAp + '-01';
+    const dF = meseOggi ? _pianoIsoData(a) : ymAp + '-' + String(_pianoUltimoGiorno(ymAp)).padStart(2, '0');
     const fabb =
       (await secGet('piano_fabbisogni?data=gte.' + dI + '&data=lte.' + dF + '&reparto_dip=eq.' + rep + '')) || [];
     // tutte le celle con le sigle richieste, in qualunque piano siano scritte:
@@ -4973,7 +5064,7 @@ async function _pianoVacanzeMettiVEsegui(i) {
   }
   // TUTTE LE V IN UNA SCRITTURA (tutto o niente), solo se le celle sono ancora come lette:
   // prima una alla volta, un errore a meta lasciava meta settimana in V
-  const passo = _pianoUndoSnap('V dal file ' + x.nome.split(' ')[0] + ' sett. ' + x.settimana);
+  const passo = _pianoUndoSnap('V dal file ' + _cognomeDi(x.nome) + ' sett. ' + x.settimana);
   let es;
   try {
     es = await _pianoScriviCelle(ops);
@@ -5246,7 +5337,9 @@ async function _renderPianoAvvisiTab() {
         ));
   // scoperti
   sez.scoperti =
-    '<p class="avv-intro">Fabbisogno non coperto dal piano nei prossimi 7 giorni.</p>' +
+    '<p class="avv-intro">Fabbisogno non coperto dal piano ' +
+    (l.scopertiPeriodo === 'mese' ? 'nel mese aperto.' : 'nei prossimi 7 giorni.') +
+    '</p>' +
     (!l.scoperti.length
       ? vuoto('Tutti i posti sono coperti.')
       : tabella(

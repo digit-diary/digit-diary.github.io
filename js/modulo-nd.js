@@ -98,6 +98,12 @@ async function ndSincronizzaPersona(nome, ym, opz) {
       !attivo && giorni.length
         ? esistenti.filter((m) => m.eliminato && !m.eliminato_da).sort((x, y) => y.id - x.id)[0]
         : null;
+    // TESTI FISSI DI ALLORA (23/10/2026): il modulo tiene i testi del modello con cui e' nato
+    // (solo quelli cambiati rispetto agli originali, {} = originali) e si ristampa con quelli,
+    // come allineamento, RDI e cambio turno. Aggiornare i giorni non li cambia.
+    const datiPrima = (attivo || tolto || {}).dati;
+    if (!(datiPrima && datiPrima.modello_testi) && typeof modelliCarica === 'function') await modelliCarica();
+    dati.modello_testi = _ndTestiDelModulo(datiPrima);
     if (tolto) {
       const patch = { dati: dati, eliminato: false };
       await secPatch('moduli', 'id=eq.' + tolto.id, patch);
@@ -363,11 +369,24 @@ function _ndTesti(testiSovra, valori) {
   const giorno = typeof _pianoGiornoNd === 'function' ? _pianoGiornoNd() : 3;
   return modelloTestoDi(modelloTesti('nd1187', testiSovra), modelloValori(Object.assign({ giorno: giorno }, valori)));
 }
+// testi del modello da salvare in un modulo 1187: quelli che il modulo ha gia', altrimenti quelli
+// cambiati di oggi (un modulo nuovo nasce con i testi in uso)
+function _ndTestiDelModulo(datiPrima) {
+  if (datiPrima && datiPrima.modello_testi && typeof datiPrima.modello_testi === 'object')
+    return datiPrima.modello_testi;
+  return (typeof modelloTestiCambiati === 'function' ? modelloTestiCambiati('nd1187') : {}) || {};
+}
+// testi con cui ristampare un modulo salvato: quelli di allora; i moduli fatti prima del
+// 23/10/2026 non li hanno e usano quelli in uso (come il foglio di cambio turno)
+function _ndTestiRistampa(dati) {
+  return dati && dati.modello_testi && typeof dati.modello_testi === 'object' ? dati.modello_testi : undefined;
+}
 async function ndApriModulo(id) {
   const m = (typeof moduliCache !== 'undefined' ? moduliCache : []).find((x) => x.id === id);
   if (!m) return;
   try {
-    const doc = await _pdfListaNd(m.dati);
+    if (typeof modelliCarica === 'function') await modelliCarica();
+    const doc = await _pdfListaNd(m.dati, _ndTestiRistampa(m.dati));
     const nome =
       'non_disponibilita_' +
       String(m.collaboratore || '').replace(/\s+/g, '_') +

@@ -119,39 +119,45 @@ function preparaLibrerie() {
   if (typeof requestIdleCallback === 'function') requestIdleCallback(via, { timeout: 3000 });
   else setTimeout(via, 1200);
 }
+const _NOMI_PARTICELLE = [
+  'di',
+  'da',
+  'de',
+  'del',
+  'della',
+  'dello',
+  'dei',
+  'degli',
+  'delle',
+  'dal',
+  'dalla',
+  'con',
+  'e',
+  'in',
+  'la',
+  'le',
+  'lo',
+  'il',
+  'gli',
+  'von',
+  'van',
+  'el',
+  'al',
+  'ben',
+];
+// Iniziali maiuscole nei nomi. SIGLE (23/10/2026): in un nome scritto con maiuscole e minuscole
+// una parola tutta maiuscola di 2-4 caratteri (es. "QA-B", "BL", "SA") e' una sigla voluta e resta
+// com'e'; un nome scritto tutto in maiuscolo ("ROSSI MARIO") si sistema come sempre.
+function _nomeSigla(w, tutto) {
+  if (tutto === tutto.toUpperCase()) return false;
+  const lettere = w.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ]/g, '');
+  return lettere.length >= 2 && w.length <= 4 && w === w.toUpperCase() && w !== w.toLowerCase();
+}
 function capitalizzaNome(s) {
   return s.replace(/\S+/g, (w) => {
     const l = w.toLowerCase();
-    if (
-      [
-        'di',
-        'da',
-        'de',
-        'del',
-        'della',
-        'dello',
-        'dei',
-        'degli',
-        'delle',
-        'dal',
-        'dalla',
-        'con',
-        'e',
-        'in',
-        'la',
-        'le',
-        'lo',
-        'il',
-        'gli',
-        'von',
-        'van',
-        'el',
-        'al',
-        'ben',
-      ].includes(l) &&
-      s.indexOf(w) > 0
-    )
-      return l;
+    if (_nomeSigla(w, s) && !_NOMI_PARTICELLE.includes(l)) return w;
+    if (_NOMI_PARTICELLE.includes(l) && s.indexOf(w) > 0) return l;
     return l.replace(/(^|['-])(\w)/g, (m, sep, ch) => sep + ch.toUpperCase());
   });
 }
@@ -169,6 +175,7 @@ const _ERRORI_IN_CHIARO = [
   [/violates not-null constraint/gi, 'manca un dato obbligatorio'],
   [/value too long for type[^,.;)]*/gi, 'testo troppo lungo'],
   [/invalid input syntax for type \w+[^,.;)]*/gi, 'valore non valido'],
+  [/date\/time field value out of range[^,;)]*/gi, 'data che non esiste nel calendario'],
   [/permission denied[^,.;)]*/gi, 'permesso negato dal database'],
   [/JWT expired/gi, 'sessione scaduta: esci e rientra'],
   [/canceling statement due to statement timeout|statement timeout/gi, 'il database ha impiegato troppo: riprova'],
@@ -202,6 +209,13 @@ function toast(m, durata, tipo) {
 }
 function toastErrore(m, durata) {
   toast(m, durata, 'errore');
+}
+// "Cosa NON e' riuscito: perche'" (23/10/2026), al posto dei vecchi "Errore eliminazione",
+// "Errore salvataggio nota": il motivo arriva dall'errore, in parole semplici
+function toastNonRiuscito(cosa, e) {
+  const motivo = erroreInChiaro((e && e.message) || e || '').trim();
+  console.warn(cosa, e);
+  toastErrore(cosa + (motivo ? ': ' + motivo : '') + '. Riprova; se succede ancora avvisa l’amministratore.', 9000);
 }
 // Anche le virgolette vanno convertite: un nome con " o ' finiva dentro
 // value="..." (o value='...') e chiudeva l'attributo (iniezione di attributi).
@@ -726,6 +740,50 @@ function pwdModalInAttesa() {
   const m = b && b.querySelector('.pwd-modal-annulla');
   return !!(modal && !modal.classList.contains('hidden') && m && m._annulla);
 }
+// QUANTO DUE NOMI SI SOMIGLIANO (23/10/2026), per la finestra "Nome simile": 0 = uguali,
+// Infinity = da non proporre. Errori di battitura ammessi in proporzione alla lunghezza
+// (parola di 3 lettere: nessuno; 4-6: uno; 7 e oltre: due). Con piu parole scritte devono
+// somigliare TUTTE (a parole diverse del nome): una sola parola uguale non basta. Prima
+// "Kaya Sevina" proponeva "Bujic Nada" (Kaya/Nada, 2 errori su 4 lettere).
+function _nomeSimileSoglia(len) {
+  return len >= 7 ? 2 : len >= 4 ? 1 : 0;
+}
+function _nomeSimileDist(scritto, nome) {
+  const a = String(scritto || '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+  const b = String(nome || '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!a || !b) return Infinity;
+  if (a === b) return 0;
+  const intero = _levenshtein(a, b);
+  if (intero <= _nomeSimileSoglia(Math.min(a.replace(/ /g, '').length, b.replace(/ /g, '').length))) return intero;
+  const pa = a.split(' ');
+  const pb = b.split(' ');
+  const usate = new Set();
+  let somma = 0;
+  for (const w of pa) {
+    let mig = Infinity,
+      jMig = -1;
+    pb.forEach((cw, j) => {
+      if (usate.has(j)) return;
+      const d = _levenshtein(w, cw);
+      if (d <= _nomeSimileSoglia(Math.min(w.length, cw.length)) && d < mig) {
+        mig = d;
+        jMig = j;
+      }
+    });
+    if (jMig < 0) return Infinity;
+    usate.add(jMig);
+    somma += mig;
+  }
+  // una parola sola (di almeno 3 lettere) che e' un pezzo del nome: "Rossi" per "Rossi Mario"
+  if (pa.length === 1 && a.length < 3) return Infinity;
+  return somma;
+}
 // VERIFICA NOME COLLABORATORE (anti-doppioni). Ritorna il nome scelto. Finestra chiusa
 // senza scegliere (clic fuori, Esc): con annullabile=true ritorna null e chi chiama si
 // ferma (Diario); altrimenti il nome cosi come e stato scritto, senza aggiungerlo.
@@ -733,28 +791,19 @@ async function _verificaNome(nome, annullabile) {
   const _annulla = () => (annullabile ? null : nome);
   if (!nome) return nome;
   const nl = nome.toLowerCase();
-  // Esiste esattamente?
-  if (getCollaboratoriReparto().find((c) => c.nome.toLowerCase() === nl)) return nome;
-  // Cerca simile (Levenshtein ≤ 2) · solo tra i collaboratori del reparto corrente
+  // Esiste esattamente? Vale il nome dell anagrafica, non quello scritto: capitalizzaNome
+  // trasformava «QA-A Rossi» in «Qa-A Rossi» e «De Andrade» in «de Andrade», e la
+  // registrazione (e la malattia nel Piano, che cerca il nome esatto) restava staccata (A18)
+  const _esatto = getCollaboratoriReparto().find((c) => c.nome.toLowerCase() === nl);
+  if (_esatto) return _esatto.nome;
+  // Cerca simile · solo tra i collaboratori del reparto corrente (soglie in _nomeSimileDist)
   let best = null,
     bestDist = 3;
   for (const c of getCollaboratoriReparto()) {
-    const dist = _levenshtein(nl, c.nome.toLowerCase());
+    const dist = _nomeSimileDist(nome, c.nome);
     if (dist < bestDist) {
       bestDist = dist;
       best = c.nome;
-    }
-    // Anche per singole parole (cognome)
-    const words = c.nome.toLowerCase().split(/\s+/);
-    const nWords = nl.split(/\s+/);
-    for (const w of nWords) {
-      for (const cw of words) {
-        const wd = _levenshtein(w, cw);
-        if (wd < bestDist && w.length >= 3) {
-          bestDist = wd;
-          best = c.nome;
-        }
-      }
     }
   }
   if (best && bestDist <= 2) {
@@ -769,7 +818,7 @@ async function _verificaNome(nome, annullabile) {
         escP(best) +
         '"</button></div><div style="text-align:center"><button class="btn-salva" data-verify-usa="nome" style="background:var(--paper2);color:var(--muted);border:1px solid var(--line);padding:10px 20px;font-size:var(--fs-md,.875rem);box-shadow:none">No, usa "' +
         escP(nome) +
-        '" così com\'e</button></div>';
+        '" così com\'è</button></div>';
       const scelte = { best, nome };
       b.querySelectorAll('[data-verify-usa]').forEach((btn) => {
         btn.addEventListener('click', () => {
@@ -834,18 +883,28 @@ function nascitaNonFutura(iso) {
   const oggi = oggiLocale();
   return iso > oggi ? String(parseInt(iso.slice(0, 4)) - 100) + iso.slice(4) : iso;
 }
+// giorno che esiste davvero nel calendario (31.02 e 31.04 no, 29.02 solo negli anni bisestili):
+// prima passava e il database rispondeva con "date/time field value out of range" (C21)
+function _dataEsiste(a, m, g) {
+  const d = new Date(a, m - 1, g);
+  return d.getFullYear() === a && d.getMonth() === m - 1 && d.getDate() === g;
+}
 function _parseDataNascita(input) {
   if (!input) return '';
   input = input.trim();
   // Prova formato ISO (YYYY-MM-DD) già valido
-  if (/^\d{4}-\d{2}-\d{2}$/.test(input)) return input;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(input)) {
+    const [ia, im, ig] = input.split('-').map((x) => parseInt(x, 10));
+    return _dataEsiste(ia, im, ig) ? input : '';
+  }
   // Solo giorno e mese (12.01): l'anno non e' noto, si usa 1900 come segnaposto
   // e in lettura non viene mostrato. Serve per i compleanni presi dalle liste.
   const sm = input.match(/^(\d{1,2})[\/\.\-](\d{1,2})$/);
   if (sm) {
     const g0 = parseInt(sm[1]);
     const m0 = parseInt(sm[2]);
-    if (g0 < 1 || g0 > 31 || m0 < 1 || m0 > 12) return '';
+    // l anno segnaposto 1900 non e bisestile: il 29.02 serve con l anno (il database lo rifiuta)
+    if (!_dataEsiste(1900, m0, g0)) return '';
     return '1900-' + String(m0).padStart(2, '0') + '-' + String(g0).padStart(2, '0');
   }
   // Match: gg.mm.aaaa, gg/mm/aaaa, gg-mm-aaaa, gg.mm.aa, gg/mm/aa, ecc.
@@ -855,7 +914,7 @@ function _parseDataNascita(input) {
     me = parseInt(m[2]);
   let a = parseInt(m[3]);
   if (a < 100) a = annoNascitaDaDueCifre(a); // 97 -> 1997, 05 -> 2005, 43 -> 1943
-  if (g < 1 || g > 31 || me < 1 || me > 12 || a < 1900 || a > 2030) return '';
+  if (a < 1900 || a > 2030 || !_dataEsiste(a, me, g)) return '';
   return a + '-' + String(me).padStart(2, '0') + '-' + String(g).padStart(2, '0');
 }
 function _initNascitaInput(id) {
@@ -913,15 +972,23 @@ function conservazioneGiorniGrazia() {
   const v = typeof conservazioneGraziaCfg !== 'undefined' ? parseInt(conservazioneGraziaCfg) : NaN;
   return !isNaN(v) && v >= 0 ? v : 30;
 }
-// true = il record e' nell'archivio protetto e NON va eliminato definitivamente
-function inArchivioProtetto(dataRecord) {
+// true = il record e' nell'archivio protetto e NON va eliminato definitivamente.
+// dataRecord = data del fatto (archivio: ultimi N anni); inseritoIl = quando e stato
+// scritto (created_at): la correzione di cio che e appena stato inserito vale da QUESTA
+// data. Prima la tolleranza si misurava sulla data del fatto: una voce scritta oggi per un
+// fatto di agosto risultava archivio, una scritta nel 2024 con data futura si eliminava
+// (controllo C, C16). Senza inseritoIl nessuna tolleranza: vale solo l archivio.
+function inArchivioProtetto(dataRecord, inseritoIl) {
   const anni = conservazioneAnni();
   if (!anni) return false; // protezione disattivata
   const d = new Date(dataRecord);
   if (isNaN(d.getTime())) return true; // data illeggibile: si protegge per prudenza
   const oggi = new Date();
-  const eta = (oggi - d) / 86400000; // giorni
-  if (eta < conservazioneGiorniGrazia()) return false; // inserito da poco: correzione ammessa
+  const ins = inseritoIl ? new Date(inseritoIl) : null;
+  if (ins && !isNaN(ins.getTime())) {
+    const etaIns = (oggi - ins) / 86400000; // giorni da quando e stato scritto
+    if (etaIns >= 0 && etaIns < conservazioneGiorniGrazia()) return false; // correzione ammessa
+  }
   const limite = new Date(oggi);
   limite.setFullYear(limite.getFullYear() - anni);
   return d >= limite; // dentro la finestra dei N anni = protetto

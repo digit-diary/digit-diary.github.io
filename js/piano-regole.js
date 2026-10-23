@@ -175,6 +175,59 @@
       );
     });
   }
+  // ===== PREFERENZE ESPLICITE PRIMA DELLE REGOLE GENERICHE (titolare 23/10/2026) =====
+  // "Se io metto una preferenza, il programma la deve rispettare." I turni scelti per la persona
+  // nelle Preferenze collaboratori (Turni consentiti e, con la spunta Preferisce, i turni
+  // preferiti del settore: impostazione turno_preferito_sigle, L1 nelle Slots) valgono piu delle
+  // regole GENERICHE di funzione e di gruppo: turni riservati a funzioni (turni_solo_funzioni),
+  // turni per funzione e giorno (funzione_turni_giorni), turni per funzione (mappature PRINCIPALE /
+  // AMMESSO). MAI piu della legge, delle competenze (area di Formazione o affiancamento, campi
+  // richiesti, livello: per il livello vale solo Turni consentiti, come prima), dei turni
+  // riservati per nome ad altri collaboratori e di "Turni solo a mano".
+  //   info._preferiti: sigle del turno preferito del settore (chi chiama le passa, di solito
+  //   ctx.turniPreferiti()); vale solo con info.prefers_l1
+  // TURNI CONSENTITI CON IL LIVELLO (titolare 23/10/2026): ogni sigla della colonna
+  // turni_consentiti puo avere due segni dopo la sigla (scritti dalla finestra delle Preferenze,
+  // mai a mano): '?' = SOLO SE SERVE (come AMMESSO nei turni per funzione, ma per la persona: lo
+  // riceve solo se nessun altro idoneo puo coprire il posto), '!' = ANCHE SENZA LA FORMAZIONE
+  // DELL AREA, solo per quel turno (eccezione di competenza scelta dal titolare: puo farlo anche da
+  // sola, a differenza di Affiancato in). Senza segni: sempre, come prima.
+  // Ritorna [{ sigla, seServe, senzaArea }].
+  function turniConsentitiVoci(info) {
+    const visti = new Map(); // ordine di scrittura (le sigle numeriche non si riordinano)
+    String((info && info.turni_consentiti) || '')
+      .split(',')
+      .map((x) => x.trim().toUpperCase())
+      .filter(Boolean)
+      .forEach((x) => {
+        const m = /^(.*?)([?!]*)$/.exec(x);
+        const sigla = m[1].trim();
+        if (!sigla) return;
+        if (!visti.has(sigla)) visti.set(sigla, { sigla: sigla, seServe: false, senzaArea: false });
+        const v = visti.get(sigla);
+        if (m[2].includes('?')) v.seServe = true;
+        if (m[2].includes('!')) v.senzaArea = true;
+      });
+    return [...visti.values()];
+  }
+  // testo della colonna (sempre senza i segni): voci -> 'L1?!,10'
+  function turniConsentitiScrivi(voci) {
+    return (voci || [])
+      .filter((v) => v && v.sigla)
+      .map((v) => String(v.sigla).toUpperCase() + (v.seServe ? '?' : '') + (v.senzaArea ? '!' : ''))
+      .join(',');
+  }
+  function turnoConsentitoDi(info, cod) {
+    const c = String(cod || '').toUpperCase();
+    return turniConsentitiVoci(info).find((v) => v.sigla === c) || null;
+  }
+  function turniPersonali(info, preferiti) {
+    const out = new Set(turniConsentitiVoci(info).map((v) => v.sigla));
+    const pref = preferiti != null ? preferiti : info && info._preferiti;
+    if (info && info.prefers_l1 && Array.isArray(pref))
+      pref.forEach((x) => x && out.add(String(x).trim().toUpperCase()));
+    return out;
+  }
   function violazioneFunzioneTurno(info, turno, dow, regole) {
     if (!turno || !turno.codice || !Array.isArray(regole) || !regole.length) return null;
     if (sceltoPerTurno(info, turno, regole)) return null; // scelto per nome: le regole sulla funzione non lo fermano
@@ -192,10 +245,9 @@
     const dowPy = dow == null ? null : (dow + 6) % 7;
     // turni consentiti alla persona (Preferenze collaboratori): eccezioni alle regole sui
     // turni riservati a funzioni e ai turni per livello
-    const consentiti = String((info && info.turni_consentiti) || '')
-      .split(',')
-      .map((x) => x.trim().toUpperCase())
-      .filter(Boolean);
+    const consentiti = turniConsentitiVoci(info).map((v) => v.sigla);
+    // turni scelti per la persona (consentiti e preferiti): prima delle regole generiche
+    const personali = turniPersonali(info);
     for (const rg of regole) {
       if (rg.attivo === false) continue;
       const tipo = String(rg.tipo_regola || '').toLowerCase();
@@ -211,7 +263,8 @@
         // ECCEZIONE PER PERSONA (15/10/2026): la sigla fra i "Turni consentiti" (Preferenze
         // collaboratori) vale anche qui, come per i turni per livello. Prima chi aveva la spunta
         // Preferisce L1 ma un altra funzione non riceveva mai L1, senza modo di dirlo
-        if (consentiti.includes(cod)) continue;
+        // e (23/10/2026) anche il turno preferito con la spunta Preferisce
+        if (personali.has(cod)) continue;
         return 'turno ' + cod + ' riservato a ' + funzioni.join(', ') + ' (funzione: ' + (fz || 'nessuna') + ')';
       }
       if (tipo === 'turni_solo_collaboratori') {
@@ -257,6 +310,7 @@
           .filter((x) => !isNaN(x));
         if (giorni.length && !giorni.includes(dowPy)) continue;
         if (modelli.some(combacia)) continue;
+        if (personali.has(cod)) continue; // scelto per la persona: prima della regola della funzione
         return (
           fz +
           ' con turno ' +
@@ -341,12 +395,18 @@
     // con la sola storia, come la bozza: una mappatura con turni principali o ammessi
     // decide da sola; altrimenti serve il gruppo gia fatto (o un lasciapassare)
     if (storia && !haSettore && !campoGrant && !voci.length) return false;
-    if (voci.length && !voci.includes(turno.codice)) return false;
+    const personaliI = turniPersonali(
+      info,
+      typeof ctx.turniPreferiti === 'function' ? ctx.turniPreferiti() : info._preferiti,
+    );
+    if (voci.length && !voci.includes(turno.codice) && !personaliI.has(String(turno.codice).toUpperCase()))
+      return false;
     // regole "chi fa cosa" del settore (senza giorno: solo turni_solo_funzioni)
     if (typeof ctx.regoleTurnoFunzione === 'function') {
       const infoS = Object.assign({}, info, {
         _settori: settoriC || [],
         _livello: typeof ctx.livelloDi === 'function' ? ctx.livelloDi(info) : info._livello,
+        _preferiti: typeof ctx.turniPreferiti === 'function' ? ctx.turniPreferiti() : info._preferiti,
       });
       // con il giorno (ctx.dow) valgono anche le regole per giorno (funzione_turni_giorni)
       if (violazioneFunzioneTurno(infoS, turno, ctx.dow != null ? ctx.dow : null, ctx.regoleTurnoFunzione()))
@@ -405,7 +465,10 @@
     const infoS = Object.assign({}, info, {
       _settori: settoriC || [],
       _livello: typeof ctx.livelloDi === 'function' ? ctx.livelloDi(info) : info._livello,
+      _preferiti: typeof ctx.turniPreferiti === 'function' ? ctx.turniPreferiti() : info._preferiti,
     });
+    // turni scelti per la persona (Turni consentiti, Preferisce): prima delle regole generiche
+    const personale = turniPersonali(infoS).has(cod);
     const vf = violazioneFunzioneTurno(infoS, turno, ctx.dow != null ? ctx.dow : null, regTF);
     if (vf)
       return no('funzione_turno', {
@@ -427,7 +490,11 @@
       : storia
         ? storia.has(gruppoT) || storia.has(turno.gruppo)
         : !!(storia === null && (mano || ctx.storiaSconosciutaPassa !== false));
-    const haArea = haAreaPropria || affiancato;
+    // eccezione di competenza per QUESTO turno (Turni consentiti "anche senza la formazione
+    // dell area"): l area vale come propria, anche da sola; le altre regole del gruppo restano
+    const vocePers = turnoConsentitoDi(info, cod);
+    const senzaArea = !!(vocePers && vocePers.senzaArea);
+    const haArea = haAreaPropria || affiancato || senzaArea;
     let lasciapassare = null;
     for (const rg of typeof ctx.regoleGruppoDi === 'function' ? ctx.regoleGruppoDi(gruppoT) : []) {
       const tipoR = String(rg.tipo_regola || '').toLowerCase();
@@ -453,8 +520,19 @@
     const mapp = (typeof ctx.mappFunzione === 'function' ? ctx.mappFunzione(info.funzione) : null) || [];
     const voci = mapp.filter((m) => m.tipo === 'PRINCIPALE' || m.tipo === 'AMMESSO');
     const preferito = mapp.some((m) => m.tipo === 'PREFERITO' && String(m.turno_codice).toUpperCase() === cod);
-    const comuni = { gruppo: gruppoT, funzione: fzU, affiancato: affiancato, preferito: preferito };
-    if (voci.length) {
+    const comuni = {
+      gruppo: gruppoT,
+      funzione: fzU,
+      affiancato: affiancato,
+      preferito: preferito,
+      personale: personale,
+      // turno "solo se serve" per la persona: chi decide lo mette dopo tutti gli altri idonei
+      seServe: !!(vocePers && vocePers.seServe),
+      senzaArea: senzaArea && !haAreaPropria,
+    };
+    // turno scelto per la persona fuori dai turni della sua funzione: la mappatura non lo ferma,
+    // l area (Formazione o affiancamento) e le regole del gruppo si (passo qui sotto)
+    if (voci.length && !(personale && !voci.some((x) => x.turno_codice === turno.codice))) {
       const m = voci.find((x) => x.turno_codice === turno.codice);
       if (!m) return no('mapp_fuori', Object.assign({ voci: voci.map((x) => x.turno_codice) }, comuni));
       const cop = typeof ctx.coperturaDi === 'function' ? ctx.coperturaDi(info) : null;
@@ -478,11 +556,13 @@
         ? 'area_' + lasciapassare.via
         : !haAreaPropria && affiancato
           ? 'area_affiancamento'
-          : settoriC
-            ? 'area_settori'
-            : storia
-              ? 'area_storia'
-              : 'area_sconosciuta',
+          : !haAreaPropria && senzaArea
+            ? 'area_eccezione'
+            : settoriC
+              ? 'area_settori'
+              : storia
+                ? 'area_storia'
+                : 'area_sconosciuta',
       Object.assign({ lasciapassare: lasciapassare }, comuni),
     );
   }
@@ -886,13 +966,17 @@
   //   fino al 31 dicembre); dirittoAnno: regola domeniche_libere_anno (predefinito 12)
   // Ritorna { mesi: ['08', ...], diritto, inizioMancante, attese(mm): domeniche attese fino a
   // fine del mese mm (compreso) }
-  function domenicheContratto(anno, inizio, fine, dirittoAnno) {
+  //   escludi (facoltativo): mesi 'MM' in cui le domeniche non si contano per le preferenze della
+  //   persona (domenicheSospese): restano fuori dai mesi di contratto, come i mesi fuori rapporto
+  function domenicheContratto(anno, inizio, fine, dirittoAnno, escludi) {
     const dir = dirittoAnno == null || isNaN(dirittoAnno) ? 12 : Number(dirittoAnno);
     const ini = inizio ? String(inizio).substring(0, 10) : '';
     const fin = fine ? String(fine).substring(0, 10) : '';
     const p2 = (n) => String(n).padStart(2, '0');
+    const fuori = new Set(escludi || []);
     const mesi = [];
     for (let m = 1; m <= 12; m++) {
+      if (fuori.has(p2(m))) continue;
       const n = new Date(anno, m, 0).getDate();
       const primo = anno + '-' + p2(m) + '-01';
       const ultimo = anno + '-' + p2(m) + '-' + p2(n);
@@ -910,6 +994,94 @@
       attese: (mm) => quota(mesi.filter((x) => x <= mm).length),
     };
   }
+  // ===== DOMENICHE NON CONTEGGIATE PER LE PREFERENZE (richiesta del titolare 23/10/2026) =====
+  // REGOLA GENERALE: una regola si sospende per una persona quando le sue preferenze (scelte dal
+  // Casino, come un contratto a parte) le impediscono di rispettarla in ogni settimana in cui
+  // lavora i suoi giorni. Per le domeniche libere: la domenica vale solo se non si lavora e il
+  // sabato prima finisce entro le 23. Se le preferenze escludono la domenica, mettono il sabato
+  // fra i giorni di lavoro, non lasciano scegliere quali giorni dare (nessun "a settimana" piu
+  // basso dei giorni spuntati, al massimo 5 giorni) e TUTTI i turni che la persona puo fare il
+  // sabato finiscono dopo le 23, una domenica valida si avrebbe solo togliendole un giorno del
+  // suo contratto: il diritto di quella persona non si conta (niente violazione, niente avviso
+  // "perde la domenica", niente arretrato, niente critico nel Benessere; una nota grigia).
+  // Esempio: solo venerdi e sabato, solo notti (turni 20-05): domeniche non conteggiate.
+  //   info: riga del collaboratore con le scelte valide nel periodo (PianoScelte.infoIl)
+  //   turniSabato: [{ codice, tardi }] i turni che la persona puo fare il sabato (idoneita gia
+  //   applicata: solo notti / solo diurni, turni bloccati e consentiti, chi fa cosa) con tardi =
+  //   finisce dopo le 23 (in tutti i sabati del periodo)
+  // Ritorna null (si conta) o { motivo: 'lavora solo ven e sab sera' }.
+  const GG_BREVI = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'];
+  function giorniDiLavoro(info) {
+    const g = String((info && info.giorni_lavoro) || '').trim();
+    if (!g) return [];
+    const set = new Set(
+      g
+        .split(',')
+        .map((x) => parseInt(x))
+        .filter((x) => !isNaN(x) && x >= 0 && x <= 7)
+        .map((x) => (x === 7 ? 0 : x)),
+    );
+    return set.size >= 7 ? [] : [...set].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7));
+  }
+  // la parte che dipende solo dalle preferenze (prima dei turni): sabato fisso, domenica esclusa
+  function domenicheSospesePossibili(info) {
+    const d = giorniDiLavoro(info);
+    if (!d.length || d.includes(0) || !d.includes(6) || d.length > 5) return false;
+    const gs = parseInt(info && info.giorni_settimana) || 0;
+    return !(gs > 0 && gs < d.length);
+  }
+  function domenicheSospese(info, turniSabato) {
+    if (!info || !domenicheSospesePossibili(info)) return null;
+    const ts = turniSabato || [];
+    if (!ts.length || ts.some((t) => !t.tardi)) return null;
+    const d = giorniDiLavoro(info);
+    const nomi = d.map((x) => GG_BREVI[x]);
+    const elenco = nomi.length > 1 ? nomi.slice(0, -1).join(', ') + ' e ' + nomi[nomi.length - 1] : nomi[0];
+    return {
+      motivo:
+        'lavora solo ' + elenco + (info.solo_notti ? ' sera' : ', il sabato sempre con turni che finiscono dopo le 23'),
+    };
+  }
+  // ===== ORE MINIME RAGGIUNGIBILI CON LE PREFERENZE (stessa regola generale, titolare 23/10/2026)
+  // Se i giorni di lavoro (e i giorni a settimana) non permettono di arrivare al minimo del mese
+  // con la percentuale impostata (es. solo ven e sab all 80%), il minimo scende a quello che si
+  // puo raggiungere: nessuna violazione "SOTTO il minimo", una nota grigia.
+  // giorni: un elemento per giorno del mese: { sett: chiave della settimana lun-dom, fisse: ore
+  // gia date da una cella che non si cambia (vacanza, malattia...), lavoro: ore del turno piu
+  // lungo che la persona puo fare quel giorno (0 = non puo lavorare), cap: giorni a settimana al
+  // massimo (0 = nessun limite) }. Ritorna le ore massime del mese.
+  function oreRaggiungibili(giorni) {
+    let tot = 0;
+    const perSett = {};
+    (giorni || []).forEach((g) => {
+      tot += g.fisse || 0;
+      if (g.lavoro > 0) {
+        const s = (perSett[g.sett] = perSett[g.sett] || { cap: g.cap || 0, ore: [] });
+        s.ore.push(g.lavoro);
+      }
+    });
+    Object.keys(perSett).forEach((k) => {
+      const s = perSett[k];
+      const ore = s.ore.sort((a, b) => b - a);
+      (s.cap > 0 ? ore.slice(0, s.cap) : ore).forEach((x) => (tot += x));
+    });
+    return Math.round(tot * 10) / 10;
+  }
+  // testo della nota grigia delle ore (Controlla, Avvisi)
+  function oreMinimoNota(motivo, massimo) {
+    return (
+      'Ore sotto il minimo per le preferenze (' +
+      (motivo || 'preferenze') +
+      '): massimo raggiungibile ' +
+      String(Math.round(massimo * 10) / 10).replace('.', ',') +
+      ' h'
+    );
+  }
+  // testo della nota grigia, uguale ovunque (Controlla, Domeniche, Avvisi, Benessere)
+  function domenicheSospeseNota(motivo) {
+    return 'Domeniche non conteggiate: ' + (motivo || 'preferenze della persona') + ' (preferenze)';
+  }
+
   // LA BOZZA PUO METTERE QUESTO TURNO? (vincolo, non preferenza) prima/dopo: gli stati delle
   // domeniche del mese senza e con il turno nuovo (una domenica lavorata, o un sabato che
   // finisce oltre le 23 prima di una domenica libera). Il turno si puo mettere se la persona
@@ -1093,6 +1265,10 @@
     idoneita,
     lavoraNelGiorno,
     violazioneFunzioneTurno,
+    turniPersonali,
+    turniConsentitiVoci,
+    turniConsentitiScrivi,
+    turnoConsentitoDi,
     sceltoPerTurno,
     indiceBenessere,
     giorniVacanzaSpettanti,
@@ -1106,6 +1282,12 @@
     domenicheIndietro,
     domenicheVerdetto,
     domenicheContratto,
+    domenicheSospese,
+    domenicheSospesePossibili,
+    domenicheSospeseNota,
+    oreRaggiungibili,
+    oreMinimoNota,
+    giorniDiLavoro,
     livelloScala,
   };
 });

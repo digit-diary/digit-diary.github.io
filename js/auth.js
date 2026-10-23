@@ -52,7 +52,8 @@ async function checkPwd() {
       }
       _initNoteRealtime();
       applicaVisibilita();
-      switchPage('diario');
+      // dopo l accesso si apre la Home (decisione del titolare 23.10, A27)
+      switchPage('dashboard');
       _renderPostLogin();
       if (res.deve_cambiare_pwd) setTimeout(() => forzaCambioPwdOperatore(nome), 300);
       else {
@@ -120,7 +121,8 @@ async function checkPwd() {
     document.getElementById('tab-registro').style.display = '';
     applicaVisibilita();
     registraPushSubscription();
-    switchPage('diario');
+    // dopo l accesso si apre la Home (decisione del titolare 23.10, A27)
+    switchPage('dashboard');
     _renderPostLogin();
     setTimeout(() => mostraNoteNonLette(), 500);
     setTimeout(() => mostraPromemoriaLogin(), 1200);
@@ -142,8 +144,8 @@ async function eseguiPrimoCambio() {
   const p1 = document.getElementById('new-pwd-1').value,
     p2 = document.getElementById('new-pwd-2').value,
     err = document.getElementById('pwd-modal-error');
-  if (p1.length < 4) {
-    err.textContent = 'Troppo corta';
+  if (regolaPassword(p1)) {
+    err.textContent = regolaPassword(p1);
     return;
   }
   if (p1 !== p2) {
@@ -175,7 +177,9 @@ async function eseguiPrimoCambio() {
 function cambiaPassword() {
   const b = document.getElementById('pwd-modal-content');
   b.innerHTML =
-    '<h3>Cambia password</h3><p>Inserisci la password attuale</p><div class="pwd-field"><label>Password attuale</label><input type="password" id="old-pwd"></div><div class="pwd-field"><label>Nuova password</label><input type="password" id="new-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiCambioPwd()">Conferma</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';
+    '<h3>Cambia password</h3><p>Inserisci la password attuale</p><div class="pwd-field"><label>Password attuale</label><input type="password" id="old-pwd"></div><div class="pwd-field"><label>Nuova password (' +
+    PASSWORD_REGOLA +
+    ')</label><input type="password" id="new-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiCambioPwd()">Conferma</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
 }
 async function eseguiCambioPwd() {
@@ -183,8 +187,8 @@ async function eseguiCambioPwd() {
     p1 = document.getElementById('new-pwd-1').value,
     p2 = document.getElementById('new-pwd-2').value,
     err = document.getElementById('pwd-modal-error');
-  if (p1.length < 4) {
-    err.textContent = 'Troppo corta';
+  if (regolaPassword(p1)) {
+    err.textContent = regolaPassword(p1);
     return;
   }
   if (p1 !== p2) {
@@ -220,7 +224,9 @@ async function recuperoPassword() {
   }
   const b = document.getElementById('pwd-modal-content');
   b.innerHTML =
-    '<h3>Recupero</h3><div class="pwd-field"><label>Codice recupero</label><input type="text" id="recovery-input" style="text-transform:uppercase;letter-spacing:.2em;text-align:center"></div><div class="pwd-field"><label>Nuova password</label><input type="password" id="new-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiRecupero()">Reimposta</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';
+    '<h3>Recupero</h3><div class="pwd-field"><label>Codice recupero</label><input type="text" id="recovery-input" style="text-transform:uppercase;letter-spacing:.2em;text-align:center"></div><div class="pwd-field"><label>Nuova password (' +
+    PASSWORD_REGOLA +
+    ')</label><input type="password" id="new-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiRecupero()">Reimposta</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
 }
 async function eseguiRecupero() {
@@ -228,8 +234,8 @@ async function eseguiRecupero() {
     p1 = document.getElementById('new-pwd-1').value,
     p2 = document.getElementById('new-pwd-2').value,
     err = document.getElementById('pwd-modal-error');
-  if (p1.length < 4) {
-    err.textContent = 'Troppo corta';
+  if (regolaPassword(p1)) {
+    err.textContent = regolaPassword(p1);
     return;
   }
   if (p1 !== p2) {
@@ -294,7 +300,9 @@ function forzaCambioPwdOperatore(nome) {
   b.innerHTML =
     '<h3>Benvenuto ' +
     escP(nome) +
-    '!</h3><p>Per sicurezza, scegli una nuova password personale.</p><div class="pwd-field"><label>Nuova password (min 4 car.)</label><input type="password" id="op-new-pwd-1"></div><div class="pwd-field"><label>Conferma password</label><input type="password" id="op-new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="eseguiForzaCambioPwdOp(\'' +
+    '!</h3><p>Per sicurezza, scegli una nuova password personale.</p><div class="pwd-field"><label>Nuova password (' +
+    PASSWORD_REGOLA +
+    ')</label><input type="password" id="op-new-pwd-1"></div><div class="pwd-field"><label>Conferma password</label><input type="password" id="op-new-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-ok" onclick="eseguiForzaCambioPwdOp(\'' +
     _jsArg(nome) +
     '\')">Imposta</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
@@ -304,8 +312,8 @@ async function eseguiForzaCambioPwdOp(nome) {
   const p1 = document.getElementById('op-new-pwd-1').value,
     p2 = document.getElementById('op-new-pwd-2').value,
     err = document.getElementById('pwd-modal-error');
-  if (p1.length < 4) {
-    err.textContent = 'Troppo corta (min 4)';
+  if (regolaPassword(p1)) {
+    err.textContent = regolaPassword(p1);
     return;
   }
   if (p1 !== p2) {
@@ -397,11 +405,34 @@ function getBioName() {
     var h = window.screen.height;
     return h >= 812 ? 'Face ID' : 'Touch ID';
   }
-  if (/iPad|Macintosh/.test(ua) && navigator.maxTouchPoints > 0) return 'Touch ID';
+  // iPad (anche quelli che si presentano come Mac): con Face ID o Touch ID secondo il modello
+  if (/iPad|Macintosh/.test(ua) && navigator.maxTouchPoints > 0) return 'Face ID / Touch ID';
   if (/Mac/.test(ua)) return 'Touch ID';
   if (/Android/.test(ua)) return 'Sblocco biometrico';
   if (/Windows/.test(ua)) return 'Windows Hello';
-  return 'Face ID / Touch ID';
+  // altri dispositivi: nome generico (prima "Face ID / Touch ID" anche dove non esistono, C32)
+  return 'Accesso biometrico';
+}
+// "Attiva" delle Impostazioni (C32): prima chiamava offriBiometrico, che usciva in silenzio
+// senza autenticatore o se in passato si era risposto "No grazie"
+async function attivaBiometricoDaImpostazioni() {
+  if (!(await biometricAvailable())) {
+    toastErrore(
+      getBioName() + ' non disponibile: su questo dispositivo non c e un autenticatore (impronta, volto o PIN)',
+    );
+    return;
+  }
+  var op = getOperatore();
+  if (!op) {
+    toast('Accedi prima con la password');
+    return;
+  }
+  localStorage.removeItem('bio_declined_' + op);
+  if (_hasBioForCurrentOp()) {
+    toast(getBioName() + ' è già attivo per ' + op);
+    return;
+  }
+  await offriBiometrico();
 }
 async function offriBiometrico() {
   if (!(await biometricAvailable())) return;
@@ -475,7 +506,9 @@ async function registraBiometrico() {
   } catch (e) {
     document.getElementById('pwd-modal').classList.add('hidden');
     if (e && e.dalDatabase) toastErrore('Attivazione non riuscita: ' + (e.message || ''));
-    else if (e.name !== 'NotAllowedError') toast('Non disponibile su questo dispositivo');
+    else if (e && e.name === 'NotAllowedError')
+      toast(getBioName() + ' non attivato: richiesta annullata o scaduta, puoi riprovare dalle Impostazioni');
+    else toastErrore(getBioName() + ' non disponibile su questo dispositivo');
   }
 }
 // Impronta del dispositivo biometrico registrato per 'op' (null se non c'e').
@@ -576,7 +609,8 @@ async function tentaBiometrico() {
     }
     _initNoteRealtime();
     applicaVisibilita();
-    switchPage('diario');
+    // dopo l accesso si apre la Home (decisione del titolare 23.10, A27)
+    switchPage('dashboard');
     _renderPostLogin();
     // Controlla se admin ha resettato la password → forza cambio
     // la risposta vale solo con la sessione della persona (20260911)
@@ -630,7 +664,7 @@ function renderBiometricSettings() {
         el.innerHTML = ok
           ? '<div style="display:flex;align-items:center;justify-content:space-between"><div><strong>' +
             bn +
-            '</strong><br><span style="font-size:var(--fs-md,.875rem);color:var(--muted)">Non attivo</span></div><button onclick="offriBiometrico()" style="padding:8px 16px;font-size:var(--fs-md,.875rem);font-family:Source Sans 3,sans-serif;font-weight:600;border:1.5px solid var(--accent2);color:var(--accent2);background:none;border-radius:2px;cursor:pointer">Attiva</button></div>'
+            '</strong><br><span style="font-size:var(--fs-md,.875rem);color:var(--muted)">Non attivo</span></div><button onclick="attivaBiometricoDaImpostazioni()" style="padding:8px 16px;font-size:var(--fs-md,.875rem);font-family:Source Sans 3,sans-serif;font-weight:600;border:1.5px solid var(--accent2);color:var(--accent2);background:none;border-radius:2px;cursor:pointer">Attiva</button></div>'
           : '<span style="font-size:var(--fs-md,.875rem);color:var(--muted)">' +
             bn +
             ' non disponibile su questo dispositivo</span>';
@@ -641,7 +675,7 @@ function renderBiometricSettings() {
       el.innerHTML = ok
         ? '<div style="display:flex;align-items:center;justify-content:space-between"><div><strong>' +
           bn +
-          '</strong><br><span style="font-size:var(--fs-md,.875rem);color:var(--muted)">Non attivo</span></div><button onclick="offriBiometrico()" style="padding:8px 16px;font-size:var(--fs-md,.875rem);font-family:Source Sans 3,sans-serif;font-weight:600;border:1.5px solid var(--accent2);color:var(--accent2);background:none;border-radius:2px;cursor:pointer">Attiva</button></div>'
+          '</strong><br><span style="font-size:var(--fs-md,.875rem);color:var(--muted)">Non attivo</span></div><button onclick="attivaBiometricoDaImpostazioni()" style="padding:8px 16px;font-size:var(--fs-md,.875rem);font-family:Source Sans 3,sans-serif;font-weight:600;border:1.5px solid var(--accent2);color:var(--accent2);background:none;border-radius:2px;cursor:pointer">Attiva</button></div>'
         : '<span style="font-size:var(--fs-md,.875rem);color:var(--muted)">' +
           bn +
           ' non disponibile su questo dispositivo</span>';
@@ -653,7 +687,9 @@ async function resetPasswordOperatore(nome) {
   b.innerHTML =
     '<h3>Nuova password</h3><p>Imposta una nuova password temporanea per <strong>' +
     escP(nome) +
-    '</strong></p><div class="pwd-field"><label>Nuova password</label><input type="password" id="reset-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="reset-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiResetPwdOp(\'' +
+    '</strong></p><div class="pwd-field"><label>Nuova password (' +
+    PASSWORD_REGOLA +
+    ')</label><input type="password" id="reset-pwd-1"></div><div class="pwd-field"><label>Conferma</label><input type="password" id="reset-pwd-2"></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="eseguiResetPwdOp(\'' +
     _jsArg(nome) +
     '\')">Resetta</button></div><div class="pwd-modal-error" id="pwd-modal-error"></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
@@ -662,8 +698,8 @@ async function eseguiResetPwdOp(nome) {
   const p1 = document.getElementById('reset-pwd-1').value,
     p2 = document.getElementById('reset-pwd-2').value,
     err = document.getElementById('pwd-modal-error');
-  if (p1.length < 4) {
-    err.textContent = 'Minimo 4 caratteri';
+  if (regolaPassword(p1)) {
+    err.textContent = regolaPassword(p1);
     return;
   }
   if (p1 !== p2) {

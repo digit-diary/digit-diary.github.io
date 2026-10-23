@@ -353,9 +353,39 @@ function _rgVai(it) {
     pianoApriCella(x, oggiLocale());
   } else if (tipo === 'diario') {
     switchPage('diario');
-    _rgImposta('filt-cerca', q);
+    // la voce cliccata si deve vedere (A6): via Persona, Tipo, Dal e Al rimasti dal Diario;
+    // trovata grazie al tipo («ammonimento»), che Cerca non guarda, si filtra per tipo
+    const rec = (typeof datiCache !== 'undefined' ? datiCache : []).find((e) => String(e.id) === id);
+    _rgImposta('filt-persona', '');
+    _rgImposta('filt-tipo', '');
+    ['filt-dal', 'filt-al'].forEach((k) => {
+      const el = document.getElementById(k);
+      if (el && el._flatpickr) el._flatpickr.clear();
+      else if (el) el.value = '';
+    });
+    const ql = String(q || '').toLowerCase();
+    const soloTipo =
+      rec &&
+      ql &&
+      !rec.nome.toLowerCase().includes(ql) &&
+      !String(rec.testo || '')
+        .toLowerCase()
+        .includes(ql);
+    if (soloTipo) {
+      _rgImposta('filt-cerca', '');
+      _rgImposta('filt-tipo', rec.tipo);
+    } else _rgImposta('filt-cerca', q);
+    if (typeof _saveFiltri === 'function') _saveFiltri();
     render();
-    _rgEvidenzia(() => document.querySelector('#page-diario .entry[data-id="' + CSS.escape(id) + '"]'));
+    const voce = () => document.querySelector('#page-diario .entry[data-id="' + CSS.escape(id) + '"]');
+    _rgEvidenzia(voce);
+    // al telefono la pagina si ridisegna ancora dopo lo scorrimento: si rimette al centro
+    setTimeout(() => {
+      const el = voce();
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      if (r.top < 0 || r.bottom > window.innerHeight - 40) el.scrollIntoView({ block: 'center' });
+    }, 1200);
   } else if (tipo === 'moduli') {
     switchPage('moduli');
     setTimeout(() => apriModuloSalvato(isNaN(Number(id)) ? id : Number(id)), 300);
@@ -674,28 +704,14 @@ async function _eseguiRiepilogoMensile() {
       doc.setFontSize(11);
       doc.text('Moduli generati', mx, y);
       y += 2;
-      const tipiModulo = ['allineamento', 'rdi', 'apprezzamento'];
-      const modBody = [];
-      tipiModulo.forEach((tipo) => {
-        const mm = meseModuli.filter((m) => m.tipo === tipo);
-        if (mm.length) {
-          const collab = {};
-          mm.forEach((m) => {
-            collab[m.nome] = (collab[m.nome] || 0) + 1;
-          });
-          Object.entries(collab)
-            .sort((a, b) => b[1] - a[1])
-            .forEach(([n, c]) => {
-              modBody.push([tipo.charAt(0).toUpperCase() + tipo.slice(1), n, String(c)]);
-            });
-        }
-      });
+      // righe Tipo / Collaboratore / Quantita' (js/moduli.js): prima "undefined" al posto del nome
+      const modBody = moduliRiepilogoRighe(meseModuli);
       if (modBody.length) {
         doc.autoTable({
           theme: 'grid',
           startY: y,
           margin: { left: mx, right: mx },
-          head: [['Tipo', 'Collaboratore', 'Quantita']],
+          head: [['Tipo', 'Collaboratore', 'Quantità']],
           body: modBody,
           headStyles: { fillColor: [142, 68, 173], textColor: [255, 255, 255] },
           styles: { lineColor: [220, 215, 205], lineWidth: 0.15, fontSize: 9, cellPadding: 3 },

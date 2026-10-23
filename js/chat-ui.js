@@ -121,24 +121,29 @@ function modificaNotaCollega(id) {
   // FIX EDGE CASE #2: salva snapshot del messaggio corrente per optimistic lock
   // Se al momento del salvataggio il messaggio risulta cambiato (es. modificato altrove via realtime),
   // abortiamo con warning invece di sovrascrivere ciecamente.
+  // i segni interni in testa al messaggio (risposta «[REPLY:..]», nome del gruppo «[GNAME:..]»)
+  // non si mostrano nel campo e si rimettono uguali salvando: prima il campo mostrava
+  // «[REPLY:3:Camponovo Andrea:...]» (A30)
+  const _tag = (String(n.messaggio || '').match(/^(?:\[(?:REPLY:\d+:[^:]*:[^\]]*|GNAME:[^\]]*)\])+/) || [''])[0];
   window._editNoteSnapshot = {
     id: id,
     originalMsg: n.messaggio,
     originalCreatedAt: n.created_at,
+    tag: _tag,
   };
   const b = document.getElementById('pwd-modal-content');
   b.innerHTML =
     '<h3>Modifica nota</h3><p>Destinatari: <strong>' +
     destLabel +
     '</strong></p><div class="pwd-field"><label>Messaggio</label><textarea id="edit-nota-msg" style="width:100%;min-height:80px;padding:10px;font-family:\'Source Sans 3\',sans-serif;font-size:var(--fs-base,.9375rem);border:1.5px solid var(--line);border-radius:2px;resize:vertical">' +
-    n.messaggio.replace(/</g, '&lt;') +
+    escP(String(n.messaggio || '').substring(_tag.length)) +
     '</textarea></div><div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button><button class="btn-modal-ok" onclick="salvaModificaNota(' +
     id +
     ')">Salva</button></div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
 }
 async function salvaModificaNota(id) {
-  const msg = document.getElementById('edit-nota-msg').value.trim();
+  let msg = document.getElementById('edit-nota-msg').value.trim();
   if (!msg) {
     toast('Scrivi un messaggio');
     return;
@@ -156,6 +161,7 @@ async function salvaModificaNota(id) {
     window._editNoteSnapshot = null;
     return;
   }
+  if (snap && snap.id === id && snap.tag) msg = snap.tag + msg;
   // ENTERPRISE: 1 sola PATCH su chat_messages
   const msgEnc = await encryptNota(msg);
   try {
@@ -2489,25 +2495,28 @@ function apriSchedaCollaboratore(nome) {
           '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">' +
           _mdComps.map((k) => escP(k.label)).join(' · ') +
           '</span>';
-      html +=
-        '<span class="mini-badge" style="background:var(--accent2);font-size:var(--fs-sm,.8125rem)" title="Punti ' +
-        new Date().getFullYear() +
-        '">' +
-        _mdPts +
-        ' punti</span>';
-      if (_mdNext)
+      // incentivi spenti: niente punti, premi e contatori (incentiviVisibili, formazione.js)
+      const _mdInc = typeof incentiviVisibili !== 'function' || incentiviVisibili();
+      if (_mdInc)
+        html +=
+          '<span class="mini-badge" style="background:var(--accent2);font-size:var(--fs-sm,.8125rem)" title="Punti ' +
+          new Date().getFullYear() +
+          '">' +
+          _mdPts +
+          ' punti</span>';
+      if (_mdInc && _mdNext)
         html +=
           '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">-' +
           (_mdNext.punti - _mdPts) +
           ' pt al premio: ' +
           escP(_mdNext.premio) +
           '</span>';
-      if (_mdCop)
+      if (_mdInc && _mdCop)
         html +=
           '<span class="mini-badge" style="background:#2c6e49;font-size:var(--fs-sm,.8125rem)" title="Coperture turno">' +
           _mdCop +
           ' coperture</span>';
-      if (_mdRif)
+      if (_mdInc && _mdRif)
         html +=
           '<span class="mini-badge" style="background:var(--accent);font-size:var(--fs-sm,.8125rem)" title="Disponibilità negate">' +
           _mdRif +
@@ -2645,7 +2654,9 @@ function apriSchedaCollaboratore(nome) {
       html +=
         '<div class="scheda-suggestion" style="background:rgba(44,110,73,0.12);color:var(--c-verde,#2c6e49)">&#11088; 0 errori da 3 mesi + ' +
         recentApprMod +
-        ' apprezzamenti &#8594; Candidato per premio</div>';
+        ' apprezzamenti' +
+        (typeof incentiviVisibili !== 'function' || incentiviVisibili() ? ' &#8594; Candidato per premio' : '') +
+        '</div>';
     } else if (recentErr === 0 && totReg > 5) {
       html +=
         '<div class="scheda-suggestion" style="background:rgba(44,110,73,0.12);color:var(--c-verde,#2c6e49)"><i class="icx icx-check"></i> 0 errori negli ultimi 3 mesi</div>';
@@ -3219,6 +3230,8 @@ function _renderStoricoHrSezione(nome) {
   var eventi = (window._schedaVistaCompleta ? hrEventiCache : getHrEventiReparto())
     .filter(function (e) {
       if (_soloFormazioni && e.tipo !== 'formazione') return false;
+      // incentivi spenti: i premi consegnati non si mostrano (restano nel database)
+      if (e.tipo === 'premio' && typeof incentiviVisibili === 'function' && !incentiviVisibili()) return false;
       return e.collaboratore.toLowerCase() === nome.toLowerCase();
     })
     .sort(function (a, b) {
@@ -3917,19 +3930,27 @@ async function stampaSchedaPDF(nome) {
       .map(function (k) {
         return k.label;
       });
+    // incentivi spenti: solo livello e competenze (niente punti e contatori)
+    var incPdf = typeof incentiviVisibili !== 'function' || incentiviVisibili();
     doc.autoTable({
       theme: 'grid',
       startY: doc.lastAutoTable.finalY + 4,
       head: [
-        [
-          'Livello multidisciplinare',
-          'Punti ' + new Date().getFullYear(),
-          'Coperture',
-          'Rifiuti disp.',
-          'Competenze certificate',
-        ],
+        incPdf
+          ? [
+              'Livello multidisciplinare',
+              'Punti ' + new Date().getFullYear(),
+              'Coperture',
+              'Rifiuti disp.',
+              'Competenze certificate',
+            ]
+          : ['Livello multidisciplinare', 'Competenze certificate'],
       ],
-      body: [[lvPdf, ptsPdf, copPdf, rifPdf, compsPdf.length ? compsPdf.join(', ') : '-']],
+      body: [
+        incPdf
+          ? [lvPdf, ptsPdf, copPdf, rifPdf, compsPdf.length ? compsPdf.join(', ') : '-']
+          : [lvPdf, compsPdf.length ? compsPdf.join(', ') : '-'],
+      ],
       headStyles: { fillColor: [139, 105, 20], fontSize: 7 },
       bodyStyles: { fontSize: 8, halign: 'center' },
       margin: { left: 14, right: 14 },
@@ -4011,29 +4032,59 @@ async function stampaSchedaPDF(nome) {
       return (m.created_at || m.data_modulo) <= al + 'T23:59:59';
     });
   }
+  // 23/10/2026: descrizioni intere (la tabella va a capo; oltre 600 caratteri si taglia a fine
+  // parola con "…", prima a 110 caratteri a meta parola), moduli con il loro contenuto e non
+  // solo il responsabile, ordine per data vera (la data italiana senza zeri non si ordinava)
+  var _taglia = function (t, max) {
+    t = String(t || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (t.length <= max) return t;
+    var c = t.slice(0, max);
+    var sp = c.lastIndexOf(' ');
+    return (sp > max * 0.6 ? c.slice(0, sp) : c) + '…';
+  };
+  var _chiaveData = function (v) {
+    var d = new Date(v);
+    return isNaN(d) ? String(v || '') : d.toISOString();
+  };
   filteredEntries.forEach(function (e) {
     var txt = e.testo || '';
     var _iSeg = importoConSegno(e);
     if (_iSeg) txt += ' (' + _iSeg.txt + ' ' + (e.valuta || 'CHF') + ')';
-    items.push([new Date(e.data).toLocaleDateString('it-IT'), e.tipo, txt.substring(0, 110), e.operatore || '']);
+    items.push({
+      k: _chiaveData(e.data),
+      r: [new Date(e.data).toLocaleDateString('it-IT'), e.tipo, _taglia(txt, 600), e.operatore || ''],
+    });
   });
   filteredModuli.forEach(function (m) {
-    var label =
-      {
-        allineamento: 'Allineamento',
-        apprezzamento: 'Apprezzamento',
-        rdi: 'RDI',
-      }[m.tipo] || m.tipo;
-    items.push([
-      new Date(m.created_at || m.data_modulo).toLocaleDateString('it-IT'),
-      '[Modulo] ' + label,
-      m.resp_settore || '',
-      m.operatore || '',
-    ]);
+    var label = typeof moduloTipoEtichetta === 'function' ? moduloTipoEtichetta(m.tipo) : m.tipo;
+    var c = _moduloCampi(m);
+    var desc = [
+      c.non_conformita || c.descrizione,
+      c.obiettivo ? 'Obiettivo: ' + c.obiettivo : '',
+      m.tipo === 'rdi' && c.livello ? 'Livello ' + c.livello : '',
+      m.resp_settore ? 'Resp. ' + m.resp_settore : '',
+    ]
+      .filter(Boolean)
+      .join(' · ');
+    items.push({
+      k: _chiaveData(m.created_at || m.data_modulo),
+      r: [
+        new Date(m.created_at || m.data_modulo).toLocaleDateString('it-IT'),
+        '[Modulo] ' + label,
+        _taglia(desc, 600),
+        m.operatore || '',
+      ],
+    });
   });
-  items.sort(function (a, b) {
-    return b[0].split('/').reverse().join('').localeCompare(a[0].split('/').reverse().join(''));
-  });
+  items = items
+    .sort(function (a, b) {
+      return b.k.localeCompare(a.k);
+    })
+    .map(function (x) {
+      return x.r;
+    });
 
   if (items.length) {
     doc.autoTable({
@@ -4063,16 +4114,21 @@ async function stampaSchedaPDF(nome) {
 function apriConfrontoScheda(nomeIniziale) {
   var nomi = getNomiLista();
   var mc = document.getElementById('pwd-modal-content');
-  var optHtml = nomi
-    .map(function (n) {
-      return '<option value="' + escP(n) + '"' + (n === nomeIniziale ? ' selected' : '') + '>' + escP(n) + '</option>';
-    })
-    .join('');
+  // "selected" solo nella prima casella (23/10/2026): prima tutte e tre proponevano la persona
+  // aperta e "Confronta" usciva "De Lima vs De Lima vs De Lima"
+  var opzioni = function (scelto) {
+    return nomi
+      .map(function (n) {
+        return '<option value="' + escP(n) + '"' + (n === scelto ? ' selected' : '') + '>' + escP(n) + '</option>';
+      })
+      .join('');
+  };
+  var optHtml = opzioni('');
   var h =
     '<h3>Confronta collaboratori</h3><p style="color:var(--muted);margin-bottom:14px">Seleziona 2-3 collaboratori da confrontare</p>';
   h +=
     '<div class="modulo-field"><label>Collaboratore 1</label><select id="conf-c1" style="padding:10px">' +
-    optHtml +
+    opzioni(nomeIniziale) +
     '</select></div>';
   h +=
     '<div class="modulo-field"><label>Collaboratore 2</label><select id="conf-c2" style="padding:10px"><option value="">&middot; Seleziona &middot;</option>' +
@@ -4093,12 +4149,16 @@ function eseguiConfronto() {
   var c2 = (document.getElementById('conf-c2') || {}).value || '';
   var c3 = (document.getElementById('conf-c3') || {}).value || '';
   if (!c1 || !c2) {
-    toast('Seleziona almeno 2 collaboratori');
+    toastErrore('Seleziona almeno 2 collaboratori');
+    return;
+  }
+  var selezione = [c1, c2];
+  if (c3) selezione.push(c3);
+  if (new Set(selezione).size !== selezione.length) {
+    toastErrore('Hai scelto due volte lo stesso collaboratore: scegline uno diverso per ogni casella');
     return;
   }
   document.getElementById('pwd-modal').classList.add('hidden');
-  var selezione = [c1, c2];
-  if (c3) selezione.push(c3);
   _mostraConfronto(selezione);
 }
 

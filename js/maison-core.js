@@ -271,6 +271,10 @@ async function _salvaRegaloEsegui() {
         await chiediConferma('Hai scritto "' + nome + '" ma esiste "' + simile.nome + '". Usare "' + simile.nome + '"?')
       )
         nome = simile.nome;
+    } else if (simile && simile.tipo === 'ambiguo') {
+      const scelto = await _maisonScegliTraSimili(nome, simile.nomi);
+      if (scelto === null) return;
+      nome = scelto;
     }
   }
   const desc = document.getElementById('regalo-desc').value.trim();
@@ -304,7 +308,7 @@ async function _salvaRegaloEsegui() {
     logAzione('Regalo aggiunto', nome + ' - ' + desc);
     toast('Regalo registrato');
   } catch (e) {
-    toast('Errore aggiunta regalo');
+    toastNonRiuscito('Regalo NON salvato', e);
   }
 }
 async function rinominaRegalo(id) {
@@ -333,7 +337,7 @@ async function eliminaRegalo(id) {
     renderRegali();
     toast('Eliminato');
   } catch (e) {
-    toast('Errore eliminazione regalo');
+    toastNonRiuscito('Regalo NON eliminato', e);
   }
 }
 function renderRegali() {
@@ -366,16 +370,7 @@ function renderRegali() {
   data.forEach(function (r) {
     var d = new Date((r.data_regalo || r.created_at) + 'T12:00:00');
     var ne = _jsArg(r.nome);
-    var _regBudget = getBudgetReparto().find(function (b) {
-      return b.nome.toLowerCase() === r.nome.toLowerCase();
-    });
-    if (!_regBudget) {
-      var _rc = r.nome.toLowerCase().split(/\s+/)[0];
-      if (_rc.length >= 3)
-        _regBudget = getBudgetReparto().find(function (b) {
-          return b.nome.toLowerCase().split(/\s+/)[0] === _rc;
-        });
-    }
+    var _regBudget = maisonClienteDi(r.nome);
     var _regCatBadge = maisonCatBadgeHtml(_regBudget && _regBudget.categoria, 'font-size:var(--fs-sm,.8125rem)');
     html +=
       '<tr><td style="font-weight:600">' +
@@ -429,7 +424,7 @@ async function _salvaNotaClienteEsegui(nome) {
     apriDettaglioMaison(nome);
     toast('Nota salvata');
   } catch (e) {
-    toast('Errore salvataggio nota');
+    toastNonRiuscito('Nota del cliente NON salvata', e);
   }
 }
 async function eliminaNotaCliente(id, nome) {
@@ -442,7 +437,7 @@ async function eliminaNotaCliente(id, nome) {
     apriDettaglioMaison(nome);
     toast('Nota eliminata');
   } catch (e) {
-    toast('Errore eliminazione nota');
+    toastNonRiuscito('Nota del cliente NON eliminata', e);
   }
 }
 function getMaisonFiltrati() {
@@ -536,8 +531,12 @@ function renderMaisonDashboard() {
     totPx.toLocaleString('de-CH') +
     '</div><div class="stat-label">Persone</div></div><div class="stat"><div class="stat-num teal">' +
     nGiorni +
-    '</div><div class="stat-label">Giorni</div></div><div class="stat"><div class="stat-num red">' +
-    _colsB.map((c) => _nB[c] + ' ' + escP(c)).join(' / ') +
+    // buoni: piu tipi in un riquadro solo, carattere piu piccolo e ogni "19 BU" senza a capo
+    // in mezzo (al telefono andava su 4 righe a carattere grande)
+    '</div><div class="stat-label">Giorni</div></div><div class="stat"><div class="stat-num red" style="' +
+    (_colsB.length > 1 ? 'font-size:var(--fs-xl,1.25rem);line-height:1.25' : '') +
+    '">' +
+    _colsB.map((c) => '<span style="white-space:nowrap">' + _nB[c] + ' ' + escP(c) + '</span>').join(' · ') +
     '</div><div class="stat-label">Buoni</div></div></div>';
   // Tabella
   const byNome = {};
@@ -616,12 +615,7 @@ function renderMaisonDashboard() {
     '<th class="num" style="background:var(--paper)">Totale CHF</th><th class="num" style="background:var(--paper)">Media CHF</th><th style="background:var(--paper)"></th></tr></thead><tbody>';
   const _brDash = getBudgetReparto();
   sorted.forEach(([nome, d], _idx) => {
-    let budget = _brDash.find((b) => b.nome.toLowerCase() === nome.toLowerCase());
-    // Fallback: match per cognome (primo token)
-    if (!budget) {
-      const _cog = nome.toLowerCase().split(/\s+/)[0];
-      if (_cog.length >= 3) budget = _brDash.find((b) => b.nome.toLowerCase().split(/\s+/)[0] === _cog);
-    }
+    const budget = maisonClienteDi(nome, _brDash);
     // Il budget e' mensile: si confronta con lo speso di questo mese, non con il periodo filtrato
     const _spesoMese = budget && budget.budget_chf ? _spesoPerBudget(budget.nome) : 0;
     const overBudget = budget && budget.budget_chf && _spesoMese >= budget.budget_chf;
@@ -834,16 +828,7 @@ function renderMaisonGdOggi() {
       const totPxGruppo = gruppoRighe.reduce((s, x) => s + (x.px || 0), 0);
       const primoNome = gruppoRighe[0].nome;
       const neP = _jsArg(primoNome);
-      var budget = _brGd.find(function (b) {
-        return b.nome.toLowerCase() === primoNome.toLowerCase();
-      });
-      if (!budget) {
-        var _cog = primoNome.toLowerCase().split(/\s+/)[0];
-        if (_cog.length >= 3)
-          budget = _brGd.find(function (b) {
-            return b.nome.toLowerCase().split(/\s+/)[0] === _cog;
-          });
-      }
+      var budget = maisonClienteDi(primoNome, _brGd);
       var catBadge =
         budget && budget.categoria
           ? '<span class="mini-badge" style="background:' +
@@ -855,11 +840,7 @@ function renderMaisonGdOggi() {
       const altriNomi = gruppoRighe
         .slice(1)
         .map((x) => {
-          let bAltro = _brGd.find((b) => b.nome.toLowerCase() === x.nome.toLowerCase());
-          if (!bAltro) {
-            const c = x.nome.toLowerCase().split(/\s+/)[0];
-            if (c.length >= 3) bAltro = _brGd.find((b) => b.nome.toLowerCase().split(/\s+/)[0] === c);
-          }
+          const bAltro = maisonClienteDi(x.nome, _brGd);
           const cBadge =
             bAltro && bAltro.categoria
               ? ' <span class="mini-badge" style="background:' +
@@ -909,16 +890,7 @@ function renderMaisonGdOggi() {
         '\')" title="Elimina gruppo">Elimina</button></td></tr>';
     } else {
       _gdVisti.add(r.id);
-      var budget = _brGd.find(function (b) {
-        return b.nome.toLowerCase() === r.nome.toLowerCase();
-      });
-      if (!budget) {
-        var _cog = r.nome.toLowerCase().split(/\s+/)[0];
-        if (_cog.length >= 3)
-          budget = _brGd.find(function (b) {
-            return b.nome.toLowerCase().split(/\s+/)[0] === _cog;
-          });
-      }
+      var budget = maisonClienteDi(r.nome, _brGd);
       var catBadge =
         budget && budget.categoria
           ? '<span class="mini-badge" style="background:' +
@@ -1089,11 +1061,7 @@ function esportaGdOggiCSV() {
   ];
   const _br = getBudgetReparto();
   grouped.forEach((g) => {
-    let b = _br.find((x) => x.nome.toLowerCase() === g.nome.toLowerCase());
-    if (!b) {
-      const c = g.nome.toLowerCase().split(/\s+/)[0];
-      if (c.length >= 3) b = _br.find((x) => x.nome.toLowerCase().split(/\s+/)[0] === c);
-    }
+    const b = maisonClienteDi(g.nome, _br);
     const label = g.nome + (g.altriNomi.length ? '/' + g.altriNomi.join('/') : '');
     const _qm = (g.note || '').match(buonoRegexQta());
     const _qn = _qm ? parseInt(_qm[1]) : 1;
@@ -1162,7 +1130,18 @@ async function esportaGdOggiPDF() {
       },
     );
     y += 5;
-    doc.text(righe.length + ' clienti · ' + totPx + ' persone · CHF ' + fmtCHF(tot), pw / 2, y, { align: 'center' });
+    // clienti diversi, non righe: 11 righe possono essere di 8 clienti
+    const nClientiGd = new Set(righe.map((r) => String(r.nome || '').toLowerCase())).size;
+    doc.text(
+      nClientiGd +
+        (nClientiGd === 1 ? ' cliente · ' : ' clienti · ') +
+        totPx +
+        (totPx === 1 ? ' persona · CHF ' : ' persone · CHF ') +
+        fmtCHF(tot),
+      pw / 2,
+      y,
+      { align: 'center' },
+    );
     y += 10;
     doc.setTextColor(0);
     const grouped = _raggruppaGdRighe(righe);
@@ -1172,11 +1151,7 @@ async function esportaGdOggiPDF() {
       margin: { left: 16, right: 16 },
       head: [['Cliente', 'Categoria', 'Tipo', 'PX', 'Costo CHF']],
       body: grouped.map((g) => {
-        let b = _br.find((x) => x.nome.toLowerCase() === g.nome.toLowerCase());
-        if (!b) {
-          const c = g.nome.toLowerCase().split(/\s+/)[0];
-          if (c.length >= 3) b = _br.find((x) => x.nome.toLowerCase().split(/\s+/)[0] === c);
-        }
+        const b = maisonClienteDi(g.nome, _br);
         const label = g.nome + (g.altriNomi.length ? '/' + g.altriNomi.join('/') : '');
         const _qm = (g.note || '').match(buonoRegexQta());
         const _qn = _qm ? parseInt(_qm[1]) : 1;
@@ -1188,6 +1163,7 @@ async function esportaGdOggiPDF() {
           fmtCHF(g.costo),
         ];
       }),
+      showFoot: 'lastPage',
       foot: [
         [
           'TOTALE',
@@ -1196,7 +1172,7 @@ async function esportaGdOggiPDF() {
             ? buoniColonne(righe)
                 .map((c) => (_contaBuoni(righe, c) ? _contaBuoni(righe, c) + ' ' + c : ''))
                 .filter(Boolean)
-                .join(' · ')
+                .join('\n') // un tipo per riga: "2 BU · 4 / BL · 3 CG" andava a capo a meta
             : '',
           totPx + ' PX',
           'CHF ' + fmtCHF(tot),
@@ -1215,11 +1191,11 @@ async function esportaGdOggiPDF() {
         cellPadding: 3,
       },
       columnStyles: {
-        0: { halign: 'left', cellWidth: 50 },
-        1: { halign: 'left', cellWidth: 30 },
-        2: { halign: 'center', cellWidth: 22 },
-        3: { halign: 'center', cellWidth: 18 },
-        4: { halign: 'right', cellWidth: 28 },
+        0: { halign: 'left', cellWidth: 62 },
+        1: { halign: 'left', cellWidth: 32 },
+        2: { halign: 'center', cellWidth: 30 },
+        3: { halign: 'center', cellWidth: 20 },
+        4: { halign: 'right', cellWidth: 34 },
       },
       didParseCell: function (d) {
         if (d.section === 'body' && d.column.index === 1) {
@@ -1241,7 +1217,7 @@ async function esportaGdOggiPDF() {
     );
     mostraPdfPreview(doc, 'formulario_gd_' + oggi + '.pdf', 'Formulario GD ' + dt.toLocaleDateString('it-IT'));
   } catch (e) {
-    toast('Errore PDF');
+    toastNonRiuscito('PDF non creato', e);
   }
 }
 function renderMaisonCharts(data, sorted) {
@@ -1384,19 +1360,37 @@ function _isCompleannoOggi(dataNascita) {
   const dn = new Date(dataNascita + 'T12:00:00');
   return dn.getDate() === oggi.getDate() && dn.getMonth() === oggi.getMonth();
 }
-function _getCompleanniProssimi(giorni) {
-  const now = new Date();
+// COMPLEANNI DEI PROSSIMI GIORNI per «Da fare oggi/domani» della Home (23/10/2026, controllo
+// A25): collaboratori del settore (stesso criterio del riquadro Compleanni e della fascia in
+// cima: anagrafica, attivi) e clienti Maison, ognuno con il suo tipo. Prima solo i clienti, e
+// senza dire che erano clienti.
+function _getCompleanniProssimi(giorni, opz) {
+  const now = (opz && opz.oggi) || new Date();
   const oggi = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const result = [];
-  getBudgetReparto().forEach((b) => {
-    if (!b.data_nascita) return;
-    const dn = new Date(b.data_nascita + 'T12:00:00');
+  const aggiungi = (nome, dataNascita, tipo) => {
+    if (!dataNascita) return;
+    const dn = new Date(String(dataNascita).substring(0, 10) + 'T12:00:00');
+    if (isNaN(dn)) return;
     const quest = new Date(now.getFullYear(), dn.getMonth(), dn.getDate());
     if (quest < oggi) quest.setFullYear(quest.getFullYear() + 1);
     const diff = Math.round((quest - oggi) / 86400000);
-    if (diff >= 0 && diff <= giorni) result.push({ nome: b.nome, data: quest, giorni: diff });
+    if (diff >= 0 && diff <= giorni) result.push({ nome: nome, data: quest, giorni: diff, tipo: tipo });
+  };
+  const collab = (opz && opz.collaboratori) || (typeof collaboratoriCache !== 'undefined' ? collaboratoriCache : []);
+  const rep = (opz && opz.reparto) || currentReparto;
+  collab.forEach((c) => {
+    if (c.attivo === false) return;
+    const r = c.reparto_dip || 'slots';
+    if (r !== rep && r !== 'entrambi') return;
+    aggiungi(c.nome, c.data_nascita, 'collaboratore');
   });
-  return result.sort((a, b) => a.giorni - b.giorni);
+  ((opz && opz.clienti) || getBudgetReparto()).forEach((b) => aggiungi(b.nome, b.data_nascita, 'cliente'));
+  return result.sort((a, b) => a.giorni - b.giorni || (a.tipo === b.tipo ? 0 : a.tipo === 'collaboratore' ? -1 : 1));
+}
+// parola dopo il nome nella Home: chi e (il cliente Maison si distingue dal collega)
+function compleannoChi(bd) {
+  return bd && bd.tipo === 'cliente' ? 'cliente Maison' : 'collaboratore';
 }
 function _maisonFilePeriodo(data) {
   if (!data || !data.length) return '';
@@ -1418,11 +1412,7 @@ function apriDettaglioMaison(nome) {
   const righe = getMaisonRepartoExpanded()
     .filter((r) => r.nome === nome)
     .sort((a, b) => a.data_giornata.localeCompare(b.data_giornata));
-  let budget = getBudgetReparto().find((b) => b.nome.toLowerCase() === nome.toLowerCase());
-  if (!budget) {
-    const _cog = nome.toLowerCase().split(/\s+/)[0];
-    if (_cog.length >= 3) budget = getBudgetReparto().find((b) => b.nome.toLowerCase().split(/\s+/)[0] === _cog);
-  }
+  const budget = maisonClienteDi(nome);
   const _seCheck = getSpeseReparto().filter((r) => r.beneficiario.toLowerCase() === nome.toLowerCase());
   const _regCheck = getRegaliReparto().filter(function (r) {
     return r.nome.toLowerCase() === nome.toLowerCase();
@@ -1471,9 +1461,9 @@ function apriDettaglioMaison(nome) {
     mesiCliente +
     '</p><p style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">' +
     righe.length +
-    ' visite · ' +
+    (righe.length === 1 ? ' visita · ' : ' visite · ') +
     totPx +
-    ' persone · ' +
+    (totPx === 1 ? ' persona · ' : ' persone · ') +
     fmtCHF(tot) +
     ' CHF' +
     _detB.map(([c, n]) => ' · ' + n + ' ' + escP(c)).join('') +
@@ -1879,7 +1869,7 @@ async function salvaDetailNascita(nome) {
       logAzione('Data nascita maison', nome + ' → ' + val);
       toast('Data nascita salvata per ' + nome);
     } catch (e) {
-      toast('Errore salvataggio data nascita');
+      toastNonRiuscito('Data di nascita NON salvata', e);
     }
   } else {
     try {
@@ -1894,7 +1884,7 @@ async function salvaDetailNascita(nome) {
       renderMaisonBudgetUI();
       toast('Data nascita salvata per ' + nome);
     } catch (e) {
-      toast('Errore salvataggio data nascita');
+      toastNonRiuscito('Data di nascita NON salvata', e);
     }
   }
 }
@@ -1918,7 +1908,7 @@ async function salvaDetailCat(nome) {
       logAzione('Categoria maison', nome + ' → ' + (cat || 'nessuna'));
       toast(nome + ' → ' + (maisonCatLabel(cat) || 'Nessuna categoria'));
     } catch (e) {
-      toast('Errore salvataggio categoria');
+      toastNonRiuscito('Categoria NON salvata', e);
     }
   } else {
     try {
@@ -1935,7 +1925,7 @@ async function salvaDetailCat(nome) {
       logAzione('Categoria maison', nome + ' → ' + cat);
       toast(nome + ' → ' + (maisonCatLabel(cat) || 'Nessuna categoria'));
     } catch (e) {
-      toast('Errore salvataggio categoria');
+      toastNonRiuscito('Categoria NON salvata', e);
     }
   }
 }
@@ -2283,11 +2273,7 @@ function esportaMaisonClienteCSV(nome) {
     return;
   }
   const _csvCatLabels = maisonCatMappa('label');
-  let _csvBudget = getBudgetReparto().find((b) => b.nome.toLowerCase() === nome.toLowerCase());
-  if (!_csvBudget) {
-    const _cog = nome.toLowerCase().split(/\s+/)[0];
-    if (_cog.length >= 3) _csvBudget = getBudgetReparto().find((b) => b.nome.toLowerCase().split(/\s+/)[0] === _cog);
-  }
+  const _csvBudget = maisonClienteDi(nome);
   const _csvCat = _csvBudget && _csvBudget.categoria ? _csvCatLabels[_csvBudget.categoria] : '';
   const rows = [
     [nome + (_csvCat ? ' · ' + _csvCat : '')],
@@ -2421,11 +2407,7 @@ async function esportaMaisonClientePDF(nome) {
     doc.setFontSize(14);
     const _clCatLabels = maisonCatMappa('label');
     const _clCatColors = maisonCatMappa('rgb');
-    let _clBudget = budget;
-    if (!_clBudget) {
-      const _cog = nome.toLowerCase().split(/\s+/)[0];
-      if (_cog.length >= 3) _clBudget = getBudgetReparto().find((b) => b.nome.toLowerCase().split(/\s+/)[0] === _cog);
-    }
+    const _clBudget = budget;
     const _clCat = _clBudget && _clBudget.categoria ? _clCatLabels[_clBudget.categoria] : '';
     doc.text('Scheda Cliente · ' + nome, pw / 2, y, { align: 'center' });
     y += 7;
@@ -2519,6 +2501,7 @@ async function esportaMaisonClientePDF(nome) {
             r.note || '',
           ];
         }),
+        showFoot: 'lastPage',
         foot: [['TOTALE', '', totPx, 'CHF ' + fmtCHF(tot), '', '', '']],
         headStyles: { fillColor: [26, 18, 8] },
         footStyles: {
@@ -2557,6 +2540,7 @@ async function esportaMaisonClientePDF(nome) {
               fmtCHF(r.importo),
             ];
           }),
+          showFoot: 'lastPage',
           foot: [['TOTALE EXTRA', '', '', '', 'CHF ' + fmtCHF(totSE)]],
           headStyles: { fillColor: [142, 68, 173] },
           footStyles: {
@@ -2620,7 +2604,7 @@ async function esportaMaisonClientePDF(nome) {
     );
   } catch (e) {
     console.error(e);
-    toast('Errore PDF');
+    toastNonRiuscito('PDF non creato', e);
   }
 }
 
@@ -2677,7 +2661,7 @@ async function eliminaMaisonCliente(nome) {
     renderMaisonBudgetAlerts();
     toast(nome + ' eliminato (' + count + (count === 1 ? ' riga' : ' righe') + ')');
   } catch (e) {
-    toast('Errore eliminazione cliente');
+    toastNonRiuscito('Cliente NON tolto', e);
   }
 }
 function _eliminaCondivisoModal(nome) {
@@ -2937,7 +2921,7 @@ async function salvaModificaMaisonRiga(id, nome) {
     renderMaisonDashboard();
     toast('Riga modificata');
   } catch (e) {
-    toast('Errore modifica');
+    toastNonRiuscito('Riga NON modificata', e);
   }
 }
 // Sposta da costi_maison a spese_extra
@@ -2965,7 +2949,7 @@ async function eliminaMaisonRigaDettaglio(id, nome) {
     apriDettaglioMaison(nome);
     renderMaisonDashboard();
   } catch (e) {
-    toast('Errore eliminazione');
+    toastNonRiuscito('Riga NON eliminata', e);
   }
 }
 async function spostaMaisonToExtra(id, nome) {
@@ -2996,7 +2980,7 @@ async function spostaMaisonToExtra(id, nome) {
     apriDettaglioMaison(nome);
     renderMaisonDashboard();
   } catch (e) {
-    toast('Errore spostamento');
+    toastNonRiuscito('Riga NON spostata', e);
   }
 }
 // Sposta da spese_extra a costi_maison
@@ -3035,7 +3019,7 @@ async function spostaExtraToMaison(id, nome) {
     apriDettaglioMaison(nome);
     renderMaisonDashboard();
   } catch (e) {
-    toast('Errore spostamento');
+    toastNonRiuscito('Riga NON spostata', e);
   }
 }
 // Elimina tutti i dati di un giorno
@@ -3074,7 +3058,7 @@ async function eliminaMaisonGiorno() {
     renderMaisonBudgetAlerts();
     toast('Giorno ' + label + ' eliminato');
   } catch (e) {
-    toast('Errore eliminazione giorno');
+    toastNonRiuscito('Giorno NON eliminato', e);
   }
 }
 async function eliminaMaisonMese() {
@@ -3123,7 +3107,7 @@ async function eliminaMaisonMese() {
     renderMaisonBudgetAlerts();
     toast(label + ' eliminato (' + count + (count === 1 ? ' riga' : ' righe') + ')');
   } catch (e) {
-    toast('Errore eliminazione mese');
+    toastNonRiuscito('Mese NON eliminato', e);
   }
 }
 

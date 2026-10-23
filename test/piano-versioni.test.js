@@ -41,7 +41,7 @@ vm.createContext(ctx);
 vm.runInContext(
   [
     estrai('piano-core.js', ['PIANO_CAMPI_CELLA', '_pianoValNorm', '_pianoCelleUguali', '_pianoCampiDi']),
-    estrai('piano-schede.js', ['_pianoVersioneCalcola', '_pianoVersioneCella']),
+    estrai('piano-schede.js', ['PIANO_VERSIONE_DIARIO', '_pianoVersioneCalcola', '_pianoVersioneCella']),
     estrai('piano-schede.js', ['PIANO_PERMESSO_VERSIONI', 'puoRipristinareVersioni']),
     estrai('piano-extra.js', ['_pianoRipristinaStato', '_pianoMappaRighe', '_pianoPassoVersioneConsentito']),
     'this.T = { _pianoPassoVersioneConsentito, puoRipristinareVersioni, _pianoVersioneCalcola, _pianoVersioneCella, _pianoRipristinaStato, _pianoMappaRighe, _pianoCelleUguali };',

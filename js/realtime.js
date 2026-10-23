@@ -357,6 +357,21 @@ async function secureHash(password, salt) {
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
 }
+// REGOLA DELLA PASSWORD (controllo C, 20260928): almeno 10 caratteri, con almeno una lettera e
+// almeno un numero. Vale per ogni password NUOVA (operatori, amministratore, recupero, reset):
+// le password di oggi restano valide fino al prossimo cambio. Il database riceve solo
+// l impronta PBKDF2 e non puo misurare la password: la regola si controlla qui.
+const PASSWORD_MIN = 10;
+const PASSWORD_REGOLA = 'almeno ' + PASSWORD_MIN + ' caratteri, con lettere e numeri';
+// '' = va bene; altrimenti il motivo, da mostrare cosi com e
+function regolaPassword(p) {
+  const s = String(p || '');
+  if (s.length < PASSWORD_MIN)
+    return 'Password troppo corta: ' + PASSWORD_REGOLA + ' (ne hai scritti ' + s.length + ')';
+  if (!/\p{L}/u.test(s)) return 'La password deve contenere almeno una lettera';
+  if (!/\d/.test(s)) return 'La password deve contenere almeno un numero';
+  return '';
+}
 let _loginFailCount = 0,
   _loginLockUntil = 0;
 function getAdminToken() {
@@ -480,6 +495,20 @@ async function _renewTokenUnaVolta() {
   }
   return false;
 }
+// LETTURE SENZA UN catch A SESSIONE SCADUTA (riverifica C-N6): aprendo Impostazioni con la
+// sessione chiusa alcune letture (modelli, istruzioni, ...) finivano in un errore non gestito
+// della pagina. La sessione scaduta ha gia la sua finestra «Rientra» (sopra): qui l errore
+// si ferma e, se nessuno l ha ancora detto, compare l avviso
+if (typeof window !== 'undefined' && window.addEventListener)
+  window.addEventListener('unhandledrejection', (ev) => {
+    const r = ev && ev.reason;
+    if (!r || !(r.sessione || /Sessione non valida/i.test(String(r.message || r)))) return;
+    ev.preventDefault();
+    if (window._sessioneFinita || window._sessioneScadutaAvvisata) return;
+    window._sessioneScadutaAvvisata = true;
+    if (typeof toastErrore === 'function')
+      toastErrore('Sessione scaduta: esci e rientra con la password per continuare a salvare.', 9000);
+  });
 let _renewingToken = false;
 async function _ensureToken() {
   if (_renewingToken) return;

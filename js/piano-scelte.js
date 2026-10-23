@@ -235,17 +235,117 @@ function pianoSceltaNota(c, campo) {
   if (!c) return '';
   if (!_pianoScelteIdx) pianoScelteCarica().then(() => pianoScelteNoteAggiorna());
   const n = _pianoSceltaNotaTesto(c, campo);
+  const modifica = _pianoSceltaDalModificabile();
   return (
     '<span class="scelta-dal" data-scelta-id="' +
     c.id +
     '" data-scelta-campo="' +
     campo +
     '" title="' +
-    n.titolo +
-    '" style="display:block;font-size:var(--fs-xs,.75rem);color:var(--muted);line-height:1.1;white-space:nowrap">' +
+    [n.titolo, modifica ? 'clic per cambiare la data di inizio' : ''].filter(Boolean).join(' · ') +
+    '"' +
+    (modifica
+      ? ' role="button" tabindex="0" onclick="pianoSceltaCambiaDal(' +
+        c.id +
+        ",'" +
+        campo +
+        '\')" onkeydown="if(event.key===\'Enter\')this.click()"'
+      : '') +
+    ' style="display:block;font-size:var(--fs-xs,.75rem);color:var(--muted);line-height:1.1;white-space:nowrap' +
+    (modifica ? ';cursor:pointer;text-decoration:underline dotted' : '') +
+    '">' +
     n.testo +
     '</span>'
   );
+}
+// DATA DI INIZIO MODIFICABILE (titolare 23/10/2026): una scelta scritta oggi ma valida da prima
+// (es. "lavora solo venerdi e sabato" da sempre). Chi modifica le preferenze (Piano o Storico HR)
+// sceglie "da sempre" o una data; il database controlla permessi e date
+// (scelte_storico_imposta_dal, migrazione 20260927) e lo scrive nel registro.
+function _pianoSceltaDalModificabile() {
+  return (
+    (typeof puoGestirePiano === 'function' && puoGestirePiano()) ||
+    (typeof puoModificareStoricoHr === 'function' && puoModificareStoricoHr())
+  );
+}
+// "31.02.2026" -> { errore } con un messaggio nostro (prima arrivava l errore del database
+// «date/time field value out of range», controllo QA 23/10/2026, D17); il futuro si rifiuta qui
+function _pianoSceltaDataDaTesto(t, oggiIso) {
+  const m = /^\s*(\d{1,2})[./-](\d{1,2})[./-](\d{4})\s*$/.exec(String(t == null ? '' : t));
+  if (!m) return { errore: 'Data non valida: scrivi GG.MM.AAAA (per esempio 01.10.2026)' };
+  const g = parseInt(m[1]);
+  const me = parseInt(m[2]);
+  const a = parseInt(m[3]);
+  const d = new Date(a, me - 1, g, 12);
+  if (me < 1 || me > 12 || g < 1 || d.getFullYear() !== a || d.getMonth() !== me - 1 || d.getDate() !== g)
+    return { errore: 'Il ' + m[1] + '.' + m[2] + '.' + m[3] + ' non esiste: controlla giorno e mese' };
+  const iso = a + '-' + String(me).padStart(2, '0') + '-' + String(g).padStart(2, '0');
+  const oggi =
+    oggiIso ||
+    (typeof dataLocaleISO === 'function' ? dataLocaleISO(new Date()) : new Date().toISOString().slice(0, 10));
+  if (iso > oggi) return { errore: 'La data non può essere nel futuro: la scelta di oggi vale al massimo da oggi' };
+  return { iso: iso };
+}
+// i messaggi del database senza accenti (la funzione SQL e gia in uso): mostrati in italiano corretto
+function _pianoSceltaTestoErrore(msg) {
+  return String(msg || '')
+    .replace(/\bnon puo essere\b/g, 'non può essere')
+    .replace(/\bLa data e prima\b/g, 'La data è prima');
+}
+async function pianoSceltaCambiaDal(id, campo) {
+  if (!_pianoSceltaDalModificabile()) {
+    toast('Non hai il permesso');
+    return;
+  }
+  const c = (collaboratoriCache || []).find((x) => x.id === id);
+  if (!c) return;
+  const v = _pianoScelteIdx ? PianoScelte.validaDal(c, campo, _pianoScelteIdx) : { dal: null };
+  const ora = v.dal ? 'oggi vale dal ' + v.dal.split('-').reverse().join('.') : 'oggi vale da sempre';
+  const scelta = await chiediScelta(
+    c.nome +
+      ' · ' +
+      PianoScelte.NOMI[campo] +
+      ': ' +
+      ora +
+      '.\n\nDa quando vale la scelta di oggi? I mesi da quel giorno si giudicano con questa scelta (domeniche, ore, Benessere, Controlla le regole).',
+    [
+      { valore: 'sempre', etichetta: 'Da sempre' },
+      { valore: 'data', etichetta: 'Da una data' },
+    ],
+    { titolo: 'Scelta valida dal' },
+  );
+  if (!scelta) return;
+  let iso = null;
+  if (scelta === 'data') {
+    const t = await chiediTesto('Data di inizio (GG.MM.AAAA):', v.dal ? v.dal.split('-').reverse().join('.') : '', {
+      titolo: 'Scelta valida dal',
+    });
+    if (t == null) return;
+    const d = _pianoSceltaDataDaTesto(t);
+    if (d.errore) {
+      mostraAvviso(d.errore, { titolo: 'Scelta valida dal' });
+      return;
+    }
+    iso = d.iso;
+  }
+  try {
+    await _conSessione(
+      (tk) =>
+        _rpcSicura('scelte_storico_imposta_dal', { p_token: tk, p_collaboratore_id: id, p_campo: campo, p_data: iso }),
+      getOpToken(),
+    );
+  } catch (e) {
+    mostraAvviso('Data non cambiata: ' + _pianoSceltaTestoErrore((e && e.message) || 'errore'), {
+      titolo: 'Scelta valida dal',
+    });
+    return;
+  }
+  // i conti delle domeniche dell anno si rifanno con lo storico nuovo
+  if (typeof _pianoDomAnnoCache !== 'undefined')
+    Object.keys(_pianoDomAnnoCache).forEach((k) => delete _pianoDomAnnoCache[k]);
+  await pianoScelteCarica(true);
+  pianoScelteNoteAggiorna();
+  toast(iso ? 'Scelta valida dal ' + iso.split('-').reverse().join('.') : 'Scelta valida da sempre');
 }
 function pianoScelteNoteAggiorna() {
   if (typeof document === 'undefined') return;
@@ -254,6 +354,8 @@ function pianoScelteNoteAggiorna() {
     const c = (collaboratoriCache || []).find((x) => x.id === id);
     const n = _pianoSceltaNotaTesto(c, el.dataset.sceltaCampo);
     el.textContent = n.testo;
-    el.title = n.titolo;
+    el.title = [n.titolo, _pianoSceltaDalModificabile() ? 'clic per cambiare la data di inizio' : '']
+      .filter(Boolean)
+      .join(' · ');
   });
 }

@@ -115,6 +115,16 @@ function creaCtx(db, log) {
   ctx.secGet = async (q) => db.get(q);
   ctx.secDel = async (tab, q) => db.del(tab, q);
   ctx.secPost = async (tab, r) => db.post(tab, r);
+  // la copia del fabbisogno passa da UNA funzione del database (piano_fabbisogno_copia, 20260930_b)
+  ctx.getOpToken = () => 'tk';
+  ctx._conSessione = (f, t) => f(t);
+  ctx._pianoErroreFunzioneAssente = () => false;
+  ctx._rpcSicura = async (fn, p) => {
+    if (fn !== 'piano_fabbisogno_copia') throw new Error('funzione inattesa ' + fn);
+    const righe = p.p_righe.map((r) => Object.assign({ id: db.id++ }, r));
+    righe.forEach((r) => db.piano_fabbisogni.push(r));
+    return { ok: true, righe: righe };
+  };
   ctx.logAzione = () => {};
   ctx.dataLocaleISO = (d) =>
     d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');

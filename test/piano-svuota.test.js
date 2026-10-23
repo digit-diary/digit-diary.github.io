@@ -43,7 +43,7 @@ vm.runInContext(
   [
     estrai('piano-core.js', ['PIANO_CAMPI_CELLA', '_pianoValNorm', '_pianoCelleUguali', '_pianoCampiDi']),
     estrai('piano-genera.js', ['PIANO_SVUOTA_TIENI', '_pianoSvuotaCalcola']),
-    estrai('piano-schede.js', ['_pianoNdDaSvuota', '_pianoVersioneCalcola']),
+    estrai('piano-schede.js', ['_pianoNdDaSvuota', 'PIANO_VERSIONE_DIARIO', '_pianoVersioneCalcola']),
     estrai('piano-extra.js', [
       '_pianoAnnullaFinestra',
       '_pianoRiapriChiusi',

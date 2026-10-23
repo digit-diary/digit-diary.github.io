@@ -5238,6 +5238,28 @@ body.dark-theme .piano-fisse3 td:nth-child(-n + 3) {
   font-size: var(--fs-sm);
   max-width: min(520px, calc(100vw - 32px));
 }
+/* avvisi delle coperture: al computer aperti; al telefono una riga che si apre al tocco */
+#cop-avvisi .cop-riassunto {
+  display: none;
+}
+@media (max-width: 600px) {
+  #cop-avvisi:not(.aperto) .cop-avviso {
+    display: none;
+  }
+  #cop-avvisi:not(.aperto) .cop-riassunto {
+    display: block;
+    background: var(--paper, #fff);
+    color: var(--ink, #222);
+    border: 1px solid var(--line, #ccc);
+    border-left: 4px solid var(--c-rosso, #c0392b);
+    border-radius: 3px;
+    padding: 8px 12px;
+    font-size: var(--fs-sm, 0.8125rem);
+    font-weight: 600;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+    cursor: pointer;
+  }
+}
 .annulla-bar button {
   font: inherit;
   font-weight: 700;
@@ -5340,6 +5362,15 @@ body.dark-theme .finestra-box {
   line-height: 1.5;
   white-space: pre-line;
   overflow-wrap: anywhere;
+}
+.finestra-nota {
+  margin-top: 10px;
+  font-size: var(--fs-sm, 0.9em);
+  color: var(--muted, #666);
+}
+.finestra-nota-tasti {
+  color: var(--c-rosso, #c0392b);
+  font-weight: 700;
 }
 .finestra-campo {
   width: 100%;
@@ -6782,6 +6813,29 @@ tr.nav-evidenza > td {
    stile scritto nella pagina vinceva e il campo Data usciva dallo schermo */
 .form-row.cols-3 {
   grid-template-columns: 1fr 1fr 1fr;
+}
+/* Formazione, Punti · assegnazione: tre campi e il pulsante; sul telefono uno sotto l altro e
+   lo storico scorre di lato (controllo C, C13: Nota e "+ Assegna" erano a x=644 su 390) */
+.form-row.fz-punti-assegna {
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 10px;
+  align-items: flex-end;
+}
+.fz-punti-storico {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+@media (max-width: 700px) {
+  .form-row.fz-punti-assegna {
+    grid-template-columns: 1fr;
+  }
+  .form-row.fz-punti-assegna .btn-add-tipo {
+    justify-self: start;
+  }
+  /* storico: colonne leggibili, la tabella scorre di lato invece di stringere Nota e Da */
+  .fz-punti-storico .collab-table {
+    min-width: 680px;
+  }
 }
 .form-row.cols-3.ultima-stretta {
   grid-template-columns: 1fr 1fr 80px;
@@ -10722,4 +10776,90 @@ body.dark-theme .btn-act.cop-btn-copri {
 .piano-ass-ng {
   outline: 2px dashed var(--c-viola);
   outline-offset: -3px;
+}
+
+/* ===== REGISTRO ATTIVITA (controllo C, C11 e C33) ===== */
+/* conteggio "mostrate N di M", tabella che scorre di lato, Dettaglio che va a capo: sul
+   telefono la colonna Dettaglio era tagliata di circa 9px */
+.reg-conta {
+  color: var(--muted);
+  font-size: var(--fs-sm, 0.8125rem);
+  margin: 0 0 8px;
+}
+.reg-scorre {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.reg-tab {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-md, 0.875rem);
+}
+.reg-tab thead tr {
+  border-bottom: 2px solid var(--line);
+  text-align: left;
+}
+.reg-tab th {
+  padding: 8px;
+}
+.reg-tab td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.reg-tab .reg-quando {
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: var(--fs-sm, 0.8125rem);
+}
+.reg-tab .reg-chi {
+  font-weight: 600;
+}
+.reg-tab .reg-dettaglio {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px) {
+  #registro-list {
+    padding: 10px 8px !important;
+  }
+  .reg-tab th,
+  .reg-tab td {
+    padding: 6px 4px;
+  }
+  /* data e ora su due righe: la tabella sta nello schermo senza scorrere */
+  .reg-tab .reg-quando {
+    white-space: normal;
+    min-width: 62px;
+  }
+}
+
+/* OPERAZIONE LUNGA DEL PIANO IN CORSO (pianoLunga in piano-core.js, controllo 23/10/2026 D2):
+   i comandi delle operazioni lunghe restano spenti finche non finisce, anche se la griglia
+   si ridisegna */
+body.piano-lunga .pbar-lunga,
+body.piano-lunga [onclick*='pianoLunga'],
+body.piano-lunga [onclick*='applicaVacanzePiano'],
+body.piano-lunga [onclick*='pianoStoricoRiporta'] {
+  pointer-events: none;
+  opacity: 0.5;
+}
+/* riquadro di Prepara il mese: barra che scorre (la durata non si conosce prima) */
+@keyframes pp-scorre {
+  0% {
+    margin-left: -35%;
+  }
+  100% {
+    margin-left: 100%;
+  }
+}
+.pp-barra-scorre {
+  animation: pp-scorre 1.6s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pp-barra-scorre {
+    animation: none;
+    width: 100% !important;
+    opacity: 0.5;
+  }
 }

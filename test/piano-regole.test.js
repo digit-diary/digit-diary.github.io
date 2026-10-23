@@ -696,6 +696,147 @@ console.log('\n== idoneita: motore unico (10.10) ==');
   );
 }
 
+console.log('\n== preferenze esplicite prima delle regole generiche (23/10/2026) ==');
+{
+  const tL1 = { codice: 'L1', gruppo: 'BO', tipo: 'PRESTO' };
+  const regole = [{ id: 9, tipo_regola: 'turni_solo_funzioni', valore: 'L1,9:BO,SUP,RESP' }];
+  const ctx = (extra) =>
+    Object.assign(
+      {
+        settoriDi: (i) => i.settori || null,
+        regoleGruppoDi: () => [],
+        campoOk: () => true,
+        mappFunzione: () => null,
+        regoleTurnoFunzione: () => regole,
+        accompagnamentoDi: (i) => (i.affiancato ? [i.affiancato] : []),
+        turniPreferiti: () => ['L1'],
+      },
+      extra || {},
+    );
+  const host = { nome: 'Prova Host', funzione: 'HOST', settori: ['SALA', 'REC'], affiancato: 'BO', prefers_l1: true };
+  eq(
+    R.idoneita(Object.assign({}, host, { prefers_l1: false }), tL1, ctx()).passo,
+    'funzione_turno',
+    'senza Preferisce: L1 solo BO, SUP, RESP',
+  );
+  const r = R.idoneita(host, tL1, ctx());
+  eq(
+    r.ok && r.affiancato && r.personale,
+    true,
+    'Preferisce L1: ammessa (affiancata in BO), prima della regola della funzione',
+  );
+  eq(
+    R.idoneita(Object.assign({}, host, { affiancato: '' }), tL1, ctx()).passo,
+    'area',
+    'Preferisce L1 senza BO: la competenza resta',
+  );
+  eq(
+    R.idoneita(Object.assign({}, host, { turni_bloccati: 'L1' }), tL1, ctx()).passo,
+    'bloccato',
+    'turno bloccato: resta',
+  );
+  eq(
+    R.idoneita(Object.assign({}, host, { turni_solo_a_mano: true }), tL1, ctx()).passo,
+    'solo_a_mano',
+    'turni solo a mano: resta',
+  );
+  eq(
+    R.idoneita(host, tL1, ctx({ turniPreferiti: () => [] })).passo,
+    'funzione_turno',
+    'L1 non e il turno preferito del settore: la regola resta',
+  );
+  // turni per funzione (mappatura): il turno consentito o preferito passa, l area no
+  const mapp = { HOST: [{ turno_codice: 'S5', tipo: 'PRINCIPALE' }] };
+  eq(
+    R.idoneita(
+      Object.assign({}, host, { prefers_l1: false }),
+      tL1,
+      ctx({ mappFunzione: (f) => mapp[f], regoleTurnoFunzione: () => [] }),
+    ).passo,
+    'mapp_fuori',
+    'mappatura HOST: L1 fuori',
+  );
+  eq(
+    R.idoneita(
+      Object.assign({}, host, { prefers_l1: false, turni_consentiti: 'L1' }),
+      tL1,
+      ctx({ mappFunzione: (f) => mapp[f], regoleTurnoFunzione: () => [] }),
+    ).ok,
+    true,
+    'L1 fra i Turni consentiti: la mappatura non lo ferma',
+  );
+  // per giorno (funzione_turni_giorni)
+  const perGiorno = [{ id: 10, tipo_regola: 'funzione_turni_giorni', valore: 'HOST:S*:0,1,2,3' }];
+  eq(
+    R.idoneita(
+      Object.assign({}, host, { prefers_l1: false }),
+      tL1,
+      ctx({ dow: 1, regoleTurnoFunzione: () => perGiorno }),
+    ).passo,
+    'funzione_turno',
+    'HOST il lunedi solo S*',
+  );
+  eq(
+    R.idoneita(host, tL1, ctx({ dow: 1, regoleTurnoFunzione: () => perGiorno })).ok,
+    true,
+    'Preferisce L1: anche il lunedi',
+  );
+  eq(
+    [...R.turniPersonali({ turni_consentiti: '10, 9', prefers_l1: true }, ['L1'])].join(),
+    '10,9,L1',
+    'turni personali',
+  );
+}
+
+console.log('\n== turni consentiti: solo se serve e senza formazione (23/10/2026) ==');
+{
+  const tL1 = { codice: 'L1', gruppo: 'BO', tipo: 'PRESTO' };
+  const regole = [{ id: 9, tipo_regola: 'turni_solo_funzioni', valore: 'L1,9:BO,SUP,RESP' }];
+  const ctx = {
+    settoriDi: (i) => i.settori || null,
+    regoleGruppoDi: (g) => (g === 'BO' ? [{ id: 1, tipo_regola: 'richiede_funzione', valore: 'BO,SUP' }] : []),
+    campoOk: () => true,
+    mappFunzione: () => null,
+    regoleTurnoFunzione: () => regole,
+    accompagnamentoDi: () => [],
+    turniPreferiti: () => ['L1'],
+  };
+  const v = R.turniConsentitiVoci({ turni_consentiti: 'L1?!, 10 ,10?' });
+  eq(
+    JSON.stringify(v),
+    JSON.stringify([
+      { sigla: 'L1', seServe: true, senzaArea: true },
+      { sigla: '10', seServe: true, senzaArea: false },
+    ]),
+    'lettura dei segni',
+  );
+  eq(R.turniConsentitiScrivi(v), 'L1?!,10?', 'scrittura');
+  const host = { nome: 'Prova', funzione: 'HOST', settori: ['SALA', 'REC'], solo_diurni: true };
+  eq(
+    R.idoneita(Object.assign({}, host, { turni_consentiti: 'L1?' }), tL1, ctx).passo,
+    'area_funzioni',
+    'solo se serve senza BO: la competenza resta',
+  );
+  const r = R.idoneita(Object.assign({}, host, { turni_consentiti: 'L1?!' }), tL1, ctx);
+  eq(
+    r.ok && r.seServe && r.senzaArea && r.passo === 'area_eccezione',
+    true,
+    'solo se serve, anche senza formazione BO: ammessa, solo se serve',
+  );
+  eq(
+    R.idoneita(Object.assign({}, host, { turni_consentiti: 'L1!' }), { codice: '9', gruppo: 'BO', tipo: 'PRESTO' }, ctx)
+      .ok,
+    false,
+    'eccezione solo per quel turno: 9 no',
+  );
+  eq(
+    R.idoneita(Object.assign({}, host, { turni_consentiti: 'L1?!' }), Object.assign({}, tL1, { tipo: 'NOTTURNO' }), ctx)
+      .passo,
+    'solo_diurni',
+    'solo diurni resta',
+  );
+}
+
 console.log('== domeniche libere dell anno: una regola per Valida e bozza ==');
 {
   const conto = { prima: 8, attese: 10 }; // ne servono 2 in questo mese

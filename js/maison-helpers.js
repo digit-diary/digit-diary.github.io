@@ -222,7 +222,7 @@ async function riallineaNomiMaison() {
       if (cogMatch.length === 1) matchBudget = cogMatch[0];
     }
     // Senza spazi (Dalozzo → Da Lozzo)
-    matchBudget = budgetNomi.find((b) => b.toLowerCase().replace(/\s/g, '') === nlNoSp);
+    if (!matchBudget) matchBudget = budgetNomi.find((b) => b.toLowerCase().replace(/\s/g, '') === nlNoSp);
     // Levenshtein (Armelin → Armellin)
     if (!matchBudget && nl.length > 3)
       matchBudget = budgetNomi.find(
@@ -257,7 +257,7 @@ async function riallineaNomiMaison() {
       const cogMatch = budgetNomi.filter((b) => b.toLowerCase().split(/\s+/)[0] === nl);
       if (cogMatch.length === 1) matchBudget = cogMatch[0];
     }
-    matchBudget = budgetNomi.find((b) => b.toLowerCase().replace(/\s/g, '') === nlNoSp);
+    if (!matchBudget) matchBudget = budgetNomi.find((b) => b.toLowerCase().replace(/\s/g, '') === nlNoSp);
     if (!matchBudget && nl.length > 3)
       matchBudget = budgetNomi.find(
         (b) => _levenshtein(nl, b.toLowerCase().split(/\s+/)[0]) <= 2 && nl.length <= b.split(/\s+/)[0].length + 2,
@@ -990,11 +990,7 @@ function esportaMaisonCSV() {
   const _cols = buoniColonne(data);
   const rows = [['Cliente', 'Categoria', 'Visite', 'PX'].concat(_cols, ['Totale CHF', 'Media CHF'])];
   sorted.forEach(([n, d]) => {
-    let budget = getBudgetReparto().find((b) => b.nome.toLowerCase() === n.toLowerCase());
-    if (!budget) {
-      const _cog = n.toLowerCase().split(/\s+/)[0];
-      if (_cog.length >= 3) budget = getBudgetReparto().find((b) => b.nome.toLowerCase().split(/\s+/)[0] === _cog);
-    }
+    const budget = maisonClienteDi(n);
     const cat = budget && budget.categoria ? _catLabels[budget.categoria] || '' : '';
     rows.push([n, cat, d.visite, d.px, ..._cols.map((c) => d.buoni[c] || ''), fmtCHF(d.tot), fmtCHF(d.tot / d.visite)]);
   });
@@ -1102,14 +1098,11 @@ async function esportaMaisonPDF() {
       margin: { left: 16, right: 16 },
       head: [['Cliente', 'Categoria', 'Visite', 'PX'].concat(_cols, ['Totale CHF', 'Media CHF'])],
       body: sorted.map(([n, d]) => {
-        let budget = getBudgetReparto().find((b) => b.nome.toLowerCase() === n.toLowerCase());
-        if (!budget) {
-          const _cog = n.toLowerCase().split(/\s+/)[0];
-          if (_cog.length >= 3) budget = getBudgetReparto().find((b) => b.nome.toLowerCase().split(/\s+/)[0] === _cog);
-        }
+        const budget = maisonClienteDi(n);
         const cat = budget && budget.categoria ? _catLabels[budget.categoria] || '' : '';
         return [n, cat, d.visite, d.px, ..._cols.map((c) => d.buoni[c] || ''), fmtCHF(d.tot), fmtCHF(d.tot / d.visite)];
       }),
+      showFoot: 'lastPage',
       foot: [
         [
           'TOTALE',
@@ -1276,6 +1269,10 @@ async function _salvaSpeseExtraEsegui() {
         )
       )
         benef = simile.nome;
+    } else if (simile && simile.tipo === 'ambiguo') {
+      const scelto = await _maisonScegliTraSimili(benef, simile.nomi);
+      if (scelto === null) return;
+      benef = scelto;
     }
   }
   if (!data) {
@@ -1336,7 +1333,7 @@ async function _salvaSpeseExtraEsegui() {
     renderMaisonDashboard();
     toast('Spesa aggiunta');
   } catch (e) {
-    toast('Errore aggiunta spesa');
+    toastNonRiuscito('Spesa extra NON salvata', e);
   }
 }
 async function eliminaSpeseExtra(id) {
@@ -1349,7 +1346,7 @@ async function eliminaSpeseExtra(id) {
     logAzione('Eliminata spesa extra', 'ID ' + id);
     toast('Eliminata');
   } catch (e) {
-    toast('Errore eliminazione spesa');
+    toastNonRiuscito('Spesa extra NON eliminata', e);
   }
 }
 function modificaSpeseExtra(id) {
@@ -1428,7 +1425,7 @@ async function salvaModificaSE(id) {
     )
       apriDettaglioMaison(benef);
   } catch (e) {
-    toast('Errore modifica spesa');
+    toastNonRiuscito('Spesa extra NON modificata', e);
   }
 }
 function getSpeseExtraFiltrate() {
@@ -1513,7 +1510,7 @@ async function eliminaSpeseExtraGiorno() {
     renderSpeseExtra();
     toast('Spese extra del ' + label + ' eliminate');
   } catch (e) {
-    toast('Errore eliminazione spese extra');
+    toastNonRiuscito('Spese extra NON eliminate', e);
   }
 }
 async function eliminaSpeseExtraMese() {
@@ -1559,7 +1556,7 @@ async function eliminaSpeseExtraMese() {
     renderSpeseExtra();
     toast('Spese extra di ' + label + ' eliminate (' + count + (count === 1 ? ' riga' : ' righe') + ')');
   } catch (e) {
-    toast('Errore eliminazione spese extra');
+    toastNonRiuscito('Spese extra NON eliminate', e);
   }
 }
 function renderSpeseExtra() {
@@ -1611,11 +1608,7 @@ function renderSpeseExtra() {
     '<div style="overflow-x:auto"><table class="collab-table"><thead><tr><th>Beneficiario</th><th class="num">Visite</th><th>Tipi</th><th class="num">Totale CHF</th><th class="num">Media CHF</th><th></th></tr></thead><tbody>';
   sorted.forEach(([nome, d], idx) => {
     const ne = _jsArg(nome);
-    let _seBudget = getBudgetReparto().find((b) => b.nome.toLowerCase() === nome.toLowerCase());
-    if (!_seBudget) {
-      const _cog = nome.toLowerCase().split(/\s+/)[0];
-      if (_cog.length >= 3) _seBudget = getBudgetReparto().find((b) => b.nome.toLowerCase().split(/\s+/)[0] === _cog);
-    }
+    const _seBudget = maisonClienteDi(nome);
     const _seCatBadge = maisonCatBadgeHtml(_seBudget && _seBudget.categoria, 'font-size:var(--fs-sm,.8125rem)');
     const tipiBadges = Object.entries(d.tipi)
       .map(
@@ -1679,7 +1672,7 @@ async function eliminaSpeseExtraBenef(nome) {
     renderMaisonDashboard();
     toast(nome + ' eliminato (' + ids.length + ' spese)');
   } catch (e) {
-    toast('Errore eliminazione');
+    toastNonRiuscito('Spese del beneficiario NON eliminate', e);
   }
 }
 function rinominaSpeseExtraBenef(vecchio) {
@@ -1726,7 +1719,7 @@ async function eseguiRinominaSE(vecchio) {
     renderSpeseExtra();
     toast(vecchio + ' → ' + nuovo + ' (' + ids.length + (ids.length === 1 ? ' riga' : ' righe') + ')');
   } catch (e) {
-    toast('Errore rinomina');
+    toastNonRiuscito('Beneficiario NON rinominato', e);
   }
 }
 function resetSpeseExtraFiltri() {
@@ -1813,6 +1806,7 @@ async function esportaSpeseExtraPDF() {
         r.descrizione || '',
         fmtCHF(r.importo),
       ]),
+      showFoot: 'lastPage',
       foot: [['', '', '', '', 'TOTALE', 'CHF ' + fmtCHF(tot)]],
       headStyles: { fillColor: [26, 18, 8] },
       footStyles: {
@@ -1838,7 +1832,7 @@ async function esportaSpeseExtraPDF() {
     }
     mostraPdfPreview(doc, 'spese_extra.pdf', 'Spese Extra');
   } catch (e) {
-    toast('Errore PDF');
+    toastNonRiuscito('PDF non creato', e);
   }
 }
 
@@ -2076,6 +2070,27 @@ function getBudgetReparto() {
     return (b.reparto_dip || 'slots') === currentReparto;
   });
 }
+// CLIENTE MAISON DI UN NOME REGISTRATO (23/10/2026, unica funzione per categoria, budget e scheda):
+// 1) nome uguale (maiuscole e spazi non contano); 2) solo se il nome registrato e' di UNA parola
+// (es. "Porcello") e un solo cliente ha quel cognome, quel cliente. Prima bastava il primo
+// cognome uguale: "Porcello Bruno" prendeva la categoria di "Porcello Angelo", "QA-B Uno" quella
+// di "QA-B Cliente BL", e un cliente tolto quella di un omonimo.
+function _maisonNomeChiave(n) {
+  return String(n == null ? '' : n)
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+function maisonClienteDi(nome, lista) {
+  const k = _maisonNomeChiave(nome);
+  if (!k) return null;
+  const clienti = lista || getBudgetReparto();
+  const uguale = clienti.find((b) => _maisonNomeChiave(b.nome) === k);
+  if (uguale) return uguale;
+  if (k.indexOf(' ') >= 0 || k.length < 3) return null;
+  const perCognome = clienti.filter((b) => _maisonNomeChiave(b.nome).split(' ')[0] === k);
+  return perCognome.length === 1 ? perCognome[0] : null;
+}
 function getSpeseReparto() {
   return speseExtraCache.filter(function (r) {
     return (r.reparto_dip || 'slots') === currentReparto;
@@ -2269,7 +2284,7 @@ async function eliminaHrAllegato(id, nome) {
     toast('Allegato eliminato');
     caricaAllegatiCollab(nome);
   } catch (e) {
-    toast('Errore eliminazione allegato');
+    toastNonRiuscito('Allegato NON eliminato', e);
   }
 }
 async function caricaNuovoAllegatoScheda(input, nome) {
@@ -2291,7 +2306,7 @@ async function caricaNuovoAllegatoScheda(input, nome) {
       caricaAllegatiCollab(nome);
     }
   } catch (e) {
-    toast('Errore caricamento allegato');
+    toastNonRiuscito('Allegato NON caricato', e);
   }
 }
 
@@ -2360,7 +2375,7 @@ function giubileiCollaboratore(c) {
 }
 async function registraGiubileo(nome, anni, importo, dataMat) {
   if (!puoModificareStoricoHr()) {
-    toast('Non hai il permesso');
+    toastErrore('Giubileo non registrato: serve il permesso di modificare lo Storico HR');
     return;
   }
   if (
@@ -2428,8 +2443,14 @@ async function _checkGiubileiNotifiche() {
     );
     notificati.push(x.nome + '|' + x.g.anni);
   });
-  await setImp('giubileo_notificati', JSON.stringify(notificati.slice(-500)));
-  logAzione('Notifiche giubileo', nuovi.length + ' avvisi inviati a HR');
+  // controllo automatico all'accesso, non un'azione dell'utente: niente voce nella barretta
+  // Annulla (23/10/2026, controllo A28: compariva «Annulla (1) Notifiche giubileo»)
+  const scrivi = async () => {
+    await setImp('giubileo_notificati', JSON.stringify(notificati.slice(-500)));
+    logAzione('Notifiche giubileo', nuovi.length + ' avvisi inviati a HR');
+  };
+  if (window.Annulla && typeof window.Annulla.senzaTraccia === 'function') await window.Annulla.senzaTraccia(scrivi);
+  else await scrivi();
 }
 // STORICO HR: due permessi distinti (v348). "storico_hr" = VEDERE i dati HR
 // (contratto, anzianita, giubilei, congedi, allegati, costo errori, malattie,
@@ -2478,38 +2499,68 @@ const INV_CAMPO_PAREGGIO = 'pareggio_maison_id';
 function getInventarioReparto() {
   return inventarioCache.filter((r) => (r.reparto_dip || 'slots') === currentReparto);
 }
+// MOVIMENTI DEI BUONI (23/10/2026): un'unica lista per la tabella a schermo, il CSV, il PDF e le
+// giacenze, cosi' i conti tornano sempre. Ogni riga ha _conta = quanto sposta la giacenza:
+//   Carico +q · Uscita manuale -q · Pre-assegnato -q (anche quando poi e' pareggiato con la Maison:
+//   prima, pareggiato, il buono non contava piu' e la giacenza risaliva) · Da Maison -q, oppure 0
+//   se un pre-assegnato in attesa dello stesso tipo e cliente lo copre gia' (stato "Coperto").
+// Le righe Maison gia' pareggiate non compaiono: il buono e' quello del pre-assegnato.
+const INV_MOV_ETICHETTE = {
+  entrata: 'Carico',
+  uscita: 'Uscita manuale',
+  preassegno: 'Pre-assegnato',
+  auto: 'Da Maison',
+};
+function _invMovimentiBuoni(inv, maison) {
+  const buoni = (inv || getInventarioReparto()).filter((r) => r.categoria === 'buono');
+  const linkedIds = new Set(buoni.filter((r) => r[INV_CAMPO_PAREGGIO]).map((r) => r[INV_CAMPO_PAREGGIO]));
+  const out = buoni.map((r) => {
+    const q = parseInt(r.quantita) || 0;
+    const conta = r.movimento === 'entrata' ? q : ['uscita', 'preassegno'].includes(r.movimento) ? -q : 0;
+    const stato = r.movimento === 'preassegno' ? (r.pareggiato ? 'Pareggiato' : 'In attesa') : '';
+    return Object.assign({}, r, { _conta: conta, _stato: stato });
+  });
+  (maison || getMaisonReparto())
+    .filter((r) => r.tipo_buono && !linkedIds.has(r.id))
+    .forEach((r) => {
+      const q = _contaBuoniFromNote(r);
+      const coperto = buoni.some(
+        (p) =>
+          p.movimento === 'preassegno' &&
+          !p.pareggiato &&
+          p.tipo === r.tipo_buono &&
+          String(p.cliente || '').toLowerCase() === String(r.nome || '').toLowerCase(),
+      );
+      out.push({
+        tipo: r.tipo_buono,
+        movimento: 'auto',
+        quantita: q,
+        cliente: r.nome,
+        data_movimento: r.data_giornata,
+        note: 'Da Maison',
+        _auto: true,
+        _conta: coperto ? 0 : -q,
+        _stato: coperto ? 'Coperto dal pre-assegnato' : 'auto',
+      });
+    });
+  return out.sort((a, b) => (b.data_movimento || '').localeCompare(a.data_movimento || ''));
+}
 function calcolaGiacenzaBuoni() {
   const inv = getInventarioReparto().filter((r) => r.categoria === 'buono');
   const giacenze = {};
   // tipi attivi e quelli disattivati che hanno ancora movimenti
   const _tipiInv = [...new Set(buoniCodici(false).concat(inv.map((r) => r.tipo).filter(Boolean)))];
   _tipiInv.forEach((t) => (giacenze[t] = 0));
-  _tipiInv.forEach((t) => {
-    const recs = inv.filter((r) => r.tipo === t);
-    const entrate = recs.filter((r) => r.movimento === 'entrata').reduce((s, r) => s + r.quantita, 0);
-    const uscite = recs.filter((r) => r.movimento === 'uscita').reduce((s, r) => s + r.quantita, 0);
-    const preAss = recs
-      .filter((r) => r.movimento === 'preassegno' && !r.pareggiato)
-      .reduce((s, r) => s + r.quantita, 0);
-    giacenze[t] = entrate - uscite - preAss;
-  });
-  const maisonBuoni = getMaisonReparto().filter((r) => r.tipo_buono);
-  const linkedIds = new Set(inv.filter((r) => r[INV_CAMPO_PAREGGIO]).map((r) => r[INV_CAMPO_PAREGGIO]));
-  maisonBuoni.forEach((r) => {
-    if (linkedIds.has(r.id)) return;
-    const preMatch = inv.find(
-      (p) =>
-        p.movimento === 'preassegno' &&
-        !p.pareggiato &&
-        p.tipo === r.tipo_buono &&
-        p.cliente.toLowerCase() === r.nome.toLowerCase(),
-    );
-    if (!preMatch) {
-      const qty = _contaBuoniFromNote(r);
-      if (giacenze[r.tipo_buono] !== undefined) giacenze[r.tipo_buono] -= qty;
-    }
+  _invMovimentiBuoni(inv).forEach((m) => {
+    if (giacenze[m.tipo] !== undefined) giacenze[m.tipo] += m._conta;
   });
   return giacenze;
+}
+// quantita' di una riga con il segno con cui conta (0 = gia' coperta da un pre-assegnato)
+function _invQtaSegno(r) {
+  if (r.movimento === 'entrata') return '+' + r.quantita;
+  if (r._auto && r._conta === 0) return '(' + r.quantita + ')';
+  return '-' + r.quantita;
 }
 function _contaBuoniFromNote(r) {
   const m = (r.note || '').match(buonoRegexQta());
@@ -3022,7 +3073,7 @@ async function _salvaInvCustomMovimentoEsegui(catKey, movimento) {
     renderInventario();
     toast((isIn ? 'Caricati ' : 'Usciti ') + qty + ' × ' + art);
   } catch (e) {
-    toast('Errore: ' + e.message);
+    toastErrore('Movimento di inventario NON salvato: ' + ((e && e.message) || e));
   }
 }
 function renderInventarioBuoni() {
@@ -3093,70 +3144,61 @@ function _invPopulateAnni() {
       sorted.map((a) => '<option' + (a === cv ? ' selected' : '') + '>' + a + '</option>').join('');
   });
 }
+// filtri della tabella dei buoni (gli stessi per schermo, CSV e PDF)
+function _invFiltriBuoni() {
+  const v = (id) => (document.getElementById(id) || {}).value || '';
+  return {
+    ft: v('inv-b-filt-tipo'),
+    fc: v('inv-b-filt-cliente'),
+    fq: v('inv-b-filt-cerca'),
+    fmese: v('inv-b-filt-mese'),
+    fanno: v('inv-b-filt-anno'),
+    fd: v('inv-b-filt-dal'),
+    fa: v('inv-b-filt-al'),
+    fs: v('inv-b-filt-stato'),
+  };
+}
+function _invFiltraBuoni(lista, f) {
+  f = f || {};
+  const okData = (d) => {
+    if (!d) return false;
+    if (f.fd && d < f.fd) return false;
+    if (f.fa && d > f.fa) return false;
+    if (f.fmese && d.substring(5, 7) !== f.fmese) return false;
+    if (f.fanno && d.substring(0, 4) !== f.fanno) return false;
+    return true;
+  };
+  const q = String(f.fq || '').toLowerCase();
+  const c = String(f.fc || '').toLowerCase();
+  return lista.filter((r) => {
+    if (f.ft && r.tipo !== f.ft) return false;
+    if (
+      c &&
+      !String(r.cliente || '')
+        .toLowerCase()
+        .includes(c)
+    )
+      return false;
+    if (!okData(r.data_movimento)) return false;
+    if (
+      q &&
+      ![r.tipo, r.cliente, r.note, r.movimento, INV_MOV_ETICHETTE[r.movimento]].some((x) =>
+        String(x || '')
+          .toLowerCase()
+          .includes(q),
+      )
+    )
+      return false;
+    if (f.fs === 'pareggiato' && !r.pareggiato) return false;
+    if (f.fs === 'non_pareggiato' && !(r.movimento === 'preassegno' && !r.pareggiato)) return false;
+    return true;
+  });
+}
 function renderInventarioBuoniTable() {
   const el = document.getElementById('inv-buoni-table');
   if (!el) return;
   _invPopulateAnni();
-  const ft = (document.getElementById('inv-b-filt-tipo') || {}).value || '';
-  const fc = (document.getElementById('inv-b-filt-cliente') || {}).value || '';
-  const fq = (document.getElementById('inv-b-filt-cerca') || {}).value || '';
-  const fmese = (document.getElementById('inv-b-filt-mese') || {}).value || '';
-  const fanno = (document.getElementById('inv-b-filt-anno') || {}).value || '';
-  const fd = (document.getElementById('inv-b-filt-dal') || {}).value || '';
-  const fa = (document.getElementById('inv-b-filt-al') || {}).value || '';
-  const fs = (document.getElementById('inv-b-filt-stato') || {}).value || '';
-  function _filtDate(d) {
-    if (!d) return false;
-    if (fd && d < fd) return false;
-    if (fa && d > fa) return false;
-    if (fmese && d.substring(5, 7) !== fmese) return false;
-    if (fanno && d.substring(0, 4) !== fanno) return false;
-    return true;
-  }
-  function _filtCerca(r) {
-    if (!fq) return true;
-    const q = fq.toLowerCase();
-    return (
-      (r.tipo || '').toLowerCase().includes(q) ||
-      (r.cliente || '').toLowerCase().includes(q) ||
-      (r.note || '').toLowerCase().includes(q) ||
-      (r.movimento || '').toLowerCase().includes(q)
-    );
-  }
-  let rows = getInventarioReparto().filter((r) => r.categoria === 'buono');
-  if (ft) rows = rows.filter((r) => r.tipo === ft);
-  if (fc) rows = rows.filter((r) => (r.cliente || '').toLowerCase().includes(fc.toLowerCase()));
-  rows = rows.filter((r) => _filtDate(r.data_movimento));
-  rows = rows.filter(_filtCerca);
-  if (fs === 'pareggiato') rows = rows.filter((r) => r.pareggiato);
-  if (fs === 'non_pareggiato') rows = rows.filter((r) => r.movimento === 'preassegno' && !r.pareggiato);
-  const linkedIds = new Set(
-    getInventarioReparto()
-      .filter((r) => r[INV_CAMPO_PAREGGIO])
-      .map((r) => r[INV_CAMPO_PAREGGIO]),
-  );
-  let autoRows = getMaisonReparto()
-    .filter((r) => r.tipo_buono && !linkedIds.has(r.id))
-    .map((r) => ({
-      tipo: r.tipo_buono,
-      movimento: 'auto',
-      quantita: _contaBuoniFromNote(r),
-      cliente: r.nome,
-      data_movimento: r.data_giornata,
-      note: 'Da Maison',
-      _auto: true,
-    }));
-  const all = [
-    ...rows,
-    ...autoRows.filter((r) => {
-      if (ft && r.tipo !== ft) return false;
-      if (fc && !r.cliente.toLowerCase().includes(fc.toLowerCase())) return false;
-      if (!_filtDate(r.data_movimento)) return false;
-      if (!_filtCerca(r)) return false;
-      if (fs) return false;
-      return true;
-    }),
-  ].sort((a, b) => (b.data_movimento || '').localeCompare(a.data_movimento || ''));
+  const all = _invFiltraBuoni(_invMovimentiBuoni(), _invFiltriBuoni());
   if (!all.length) {
     el.innerHTML = '<p style="color:var(--muted);padding:16px;text-align:center">Nessun movimento</p>';
     return;
@@ -3185,14 +3227,13 @@ function renderInventarioBuoniTable() {
     const d = r.data_movimento ? new Date(r.data_movimento + 'T12:00:00').toLocaleDateString('it-IT') : '';
     const mov = movLabels[r.movimento] || r.movimento;
     const col = movColors[r.movimento] || 'var(--ink)';
-    const qSign = r.movimento === 'entrata' ? '+' : '-';
     const stato =
       r.movimento === 'preassegno'
         ? r.pareggiato
           ? '<span style="color:var(--c-verde,#2c6e49)">&#10003; Pareggiato</span>'
           : '<span style="color:var(--c-arancio,#b85c0e)">&#9203; In attesa</span>'
         : r._auto
-          ? '<span style="color:var(--muted)">auto</span>'
+          ? '<span style="color:var(--muted)">' + escP(r._stato || 'auto') + '</span>'
           : '';
     const actions = r._auto
       ? ''
@@ -3211,8 +3252,7 @@ function renderInventarioBuoniTable() {
       '</span></td><td style="padding:6px 8px;font-weight:700;color:' +
       col +
       '">' +
-      qSign +
-      r.quantita +
+      _invQtaSegno(r) +
       '</td><td style="padding:6px 8px;color:' +
       col +
       '">' +
@@ -3363,7 +3403,7 @@ async function _salvaInventarioCaricoEsegui() {
     renderInventario();
     toast(qty + ' ' + tipo + ' caricati');
   } catch (e) {
-    toast('Errore: ' + e.message);
+    toastErrore('Carico di inventario NON salvato: ' + ((e && e.message) || e));
   }
 }
 // un salvataggio alla volta: il doppio click creava righe doppie (unaVoltaSola in utils.js)
@@ -3413,7 +3453,7 @@ async function _salvaInventarioUscitaEsegui() {
     renderInventario();
     toast(qty + ' ' + tipo + ' assegnati a ' + cliente);
   } catch (e) {
-    toast('Errore: ' + e.message);
+    toastErrore('Uscita di inventario NON salvata: ' + ((e && e.message) || e));
   }
 }
 // un salvataggio alla volta: il doppio click creava righe doppie (unaVoltaSola in utils.js)
@@ -3451,7 +3491,7 @@ async function _salvaInventarioSigEntrataEsegui() {
     renderInventario();
     toast(marca + ' aggiunta alla scorta');
   } catch (e) {
-    toast('Errore: ' + e.message);
+    toastErrore('Entrata di sigarette NON salvata: ' + ((e && e.message) || e));
   }
 }
 // un salvataggio alla volta: il doppio click creava righe doppie (unaVoltaSola in utils.js)
@@ -3490,7 +3530,7 @@ async function _salvaInventarioSigUscitaEsegui() {
     renderInventario();
     toast(marca + ' data a ' + cliente);
   } catch (e) {
-    toast('Errore: ' + e.message);
+    toastErrore('Uscita di sigarette NON salvata: ' + ((e && e.message) || e));
   }
 }
 async function eliminaInventario(id) {
@@ -3502,7 +3542,7 @@ async function eliminaInventario(id) {
     renderInventario();
     toast('Movimento eliminato');
   } catch (e) {
-    toast('Errore eliminazione');
+    toastNonRiuscito('Spese del beneficiario NON eliminate', e);
   }
 }
 function modificaInventario(id) {
@@ -3675,45 +3715,56 @@ function initInventarioFP() {
     if (el && !el._flatpickr) flatpickr('#' + id, fOpts);
   });
 }
-function esportaInventarioCSV() {
-  const isBuoni = _invTab === 'buoni';
-  const _catCsv = _invTab === 'buoni' ? 'buono' : _invTab === 'sigarette' ? 'sigaretta' : _invTab;
-  const _catLbl = ['buoni', 'sigarette'].includes(_invTab)
-    ? invNomeBase(_invTab).toLowerCase()
-    : (getInvCategorieExtra().find((c) => c.key === _invTab) || {}).label || _invTab;
-  const data = getInventarioReparto().filter((r) => r.categoria === _catCsv);
-  if (!data.length) {
-    toast('Nessun dato');
-    return;
-  }
-  const headers = isBuoni
-    ? ['Data', 'Tipo', 'Quantit\u00e0', 'Movimento', 'Cliente', 'Stato', 'Nota']
-    : ['Data', 'Marca', 'Quantit\u00e0', 'Movimento', 'Cliente', 'Collaboratore'];
-  const rows = data.map((r) => {
-    const d = r.data_movimento ? new Date(r.data_movimento + 'T12:00:00').toLocaleDateString('it-IT') : '';
-    if (isBuoni)
-      return [
-        d,
-        r.tipo,
-        (r.movimento === 'entrata' ? '+' : '-') + r.quantita,
-        r.movimento,
+// righe del CSV e del PDF dell'inventario (23/10/2026): per i buoni le stesse della tabella a
+// schermo e delle giacenze (anche "Da Maison"), con le etichette di schermo e non i codici interni
+function _invRigheEsporta(tab) {
+  const cat = tab === 'buoni' ? 'buono' : tab === 'sigarette' ? 'sigaretta' : tab;
+  const dIt = (x) => (x ? new Date(x + 'T12:00:00').toLocaleDateString('it-IT') : '');
+  if (tab === 'buoni') {
+    return {
+      headers: ['Data', 'Tipo', 'Quantità', 'Movimento', 'Cliente', 'Stato', 'Nota'],
+      rows: _invMovimentiBuoni().map((r) => [
+        dIt(r.data_movimento),
+        r.tipo || '',
+        _invQtaSegno(r),
+        INV_MOV_ETICHETTE[r.movimento] || r.movimento || '',
         r.cliente || '',
-        r.pareggiato ? 'Pareggiato' : r.movimento === 'preassegno' ? 'In attesa' : '',
-        r.note || '',
-      ];
-    return [
-      d,
+        r._stato === 'auto' ? '' : r._stato || '',
+        r._auto ? '' : r.note || '',
+      ]),
+    };
+  }
+  const data = getInventarioReparto()
+    .filter((r) => r.categoria === cat)
+    .sort((a, b) => (b.data_movimento || '').localeCompare(a.data_movimento || ''));
+  return {
+    headers: ['Data', 'Marca', 'Quantità', 'Movimento', 'Cliente', 'Collaboratore'],
+    rows: data.map((r) => [
+      dIt(r.data_movimento),
       r.tipo,
       (r.movimento === 'entrata' ? '+' : '-') + r.quantita,
       r.movimento === 'entrata' ? 'Sbagliata' : 'Data a cliente',
       r.cliente || '',
       r.note || '',
-    ];
-  });
+    ]),
+  };
+}
+function _invEtichettaTab() {
+  return ['buoni', 'sigarette'].includes(_invTab)
+    ? invNomeBase(_invTab)
+    : (getInvCategorieExtra().find((c) => c.key === _invTab) || {}).label || _invTab;
+}
+function esportaInventarioCSV() {
+  const _catLbl = _invEtichettaTab();
+  const { headers, rows } = _invRigheEsporta(_invTab);
+  if (!rows.length) {
+    toast('Nessun movimento da esportare');
+    return;
+  }
   const csv = [headers, ...rows]
     .map((r) => r.map((c) => '"' + (c + '').replace(/"/g, '""') + '"').join(','))
     .join('\n');
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'inventario_' + _catLbl.toLowerCase().replace(/\s+/g, '_') + '_' + oggiLocale() + '.csv';
@@ -3722,87 +3773,91 @@ function esportaInventarioCSV() {
 async function esportaInventarioPDF() {
   if (!(await assicuraLibreria('jspdf'))) return;
   if (!window.jspdf) {
-    toast('Libreria PDF non caricata');
+    toastErrore('Non riesco a preparare il PDF: controlla la connessione internet e riprova');
     return;
   }
   const isBuoni = _invTab === 'buoni';
-  const _catPdf = _invTab === 'buoni' ? 'buono' : _invTab === 'sigarette' ? 'sigaretta' : _invTab;
-  const _catLbl = ['buoni', 'sigarette'].includes(_invTab)
-    ? invNomeBase(_invTab)
-    : (getInvCategorieExtra().find((c) => c.key === _invTab) || {}).label || _invTab;
-  const data = getInventarioReparto().filter((r) => r.categoria === _catPdf);
-  if (!data.length) {
-    toast('Nessun dato');
+  const _catLbl = _invEtichettaTab();
+  const { headers, rows } = _invRigheEsporta(_invTab);
+  if (!rows.length) {
+    toast('Nessun movimento da esportare');
     return;
   }
+  if (typeof _logoB64 !== 'undefined' && !_logoB64 && typeof _loadLogo === 'function') await _loadLogo();
+  const settore = repartoNomeDocumento(currentReparto);
   const jsPDF = window.jspdf.jsPDF;
   const doc = new jsPDF('landscape', 'mm', 'a4');
-  doc.setFontSize(14);
+  const pw = doc.internal.pageSize.getWidth();
+  let y = 10;
+  identitaLogoPdf(doc, pw / 2, y, 32, 18, true);
+  y += 24;
+  doc.setFontSize(15);
   doc.setFont('helvetica', 'bold');
-  doc.text(
-    'Inventario ' + _catLbl + ' \u2014 ' + currentReparto.charAt(0).toUpperCase() + currentReparto.slice(1),
-    14,
-    16,
-  );
+  doc.text('Inventario ' + _catLbl + ' · ' + settore, pw / 2, y, { align: 'center' });
+  y += 6;
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100);
   doc.text(
-    'Generato il ' +
+    identita().azienda +
+      ' · generato il ' +
       new Date().toLocaleDateString('it-IT') +
       ' alle ' +
-      new Date().toLocaleTimeString('it-IT', {
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
-    14,
-    22,
+      new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
+    pw / 2,
+    y,
+    { align: 'center' },
   );
+  doc.setTextColor(0);
+  y += 6;
   if (isBuoni) {
     const giacenze = calcolaGiacenzaBuoni();
-    // i tipi del settore aperto (prima BU, BL, CG e WL fissi: "undefined" dove un tipo non c era)
+    doc.setFont('helvetica', 'bold');
     doc.text(
-      'Giacenze: ' +
+      'Giacenze attuali: ' +
         Object.keys(giacenze)
-          .map((t) => t + '=' + giacenze[t])
-          .join(' | '),
-      14,
-      28,
+          .map((t) => buonoNome(t) + ' (' + t + ') ' + giacenze[t])
+          .join(' · '),
+      pw / 2,
+      y,
+      { align: 'center' },
     );
+    doc.setFont('helvetica', 'normal');
+    y += 4.5;
+    doc.setFontSize(7.5);
+    doc.setTextColor(100);
+    doc.text(
+      'Giacenza = carichi meno uscite manuali, pre-assegnati e buoni usati nella Maison. Una quantità tra parentesi è già contata nel suo pre-assegnato.',
+      pw / 2,
+      y,
+      { align: 'center' },
+    );
+    doc.setTextColor(0);
+    y += 3;
   }
-  const headers = isBuoni
-    ? [['Data', 'Tipo', 'Qty', 'Movimento', 'Cliente', 'Stato', 'Nota']]
-    : [['Data', 'Marca', 'Qty', 'Movimento', 'Cliente', 'Collaboratore']];
-  const rows = data.map((r) => {
-    const d = r.data_movimento ? new Date(r.data_movimento + 'T12:00:00').toLocaleDateString('it-IT') : '';
-    if (isBuoni)
-      return [
-        d,
-        r.tipo,
-        (r.movimento === 'entrata' ? '+' : '-') + r.quantita,
-        r.movimento,
-        r.cliente || '',
-        r.pareggiato ? 'Pareggiato' : r.movimento === 'preassegno' ? 'In attesa' : '',
-        r.note || '',
-      ];
-    return [
-      d,
-      r.tipo,
-      (r.movimento === 'entrata' ? '+' : '-') + r.quantita,
-      r.movimento === 'entrata' ? 'Sbagliata' : 'Data a cliente',
-      r.cliente || '',
-      r.note || '',
-    ];
-  });
   doc.autoTable({
-    head: headers,
+    head: [headers],
     body: rows,
-    startY: isBuoni ? 32 : 26,
+    startY: y + 2,
     theme: 'grid',
-    styles: { fontSize: 8, cellPadding: 3, lineColor: [200, 200, 200] },
-    headStyles: { fillColor: [44, 62, 80], textColor: 255, fontStyle: 'bold' },
-    footStyles: { fillColor: [245, 245, 245], fontStyle: 'bold' },
+    margin: { left: 14, right: 14 },
+    styles: { fontSize: 8, cellPadding: 2.5, lineColor: [220, 215, 205], lineWidth: 0.15 },
+    headStyles: { fillColor: [26, 18, 8], textColor: 255, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [250, 247, 242] },
+    columnStyles: { 2: { halign: 'right' } },
   });
-  doc.save('inventario_' + _catLbl.toLowerCase().replace(/\s+/g, '_') + '_' + oggiLocale() + '.pdf');
+  const nP = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= nP; p++) {
+    doc.setPage(p);
+    doc.setFontSize(7);
+    doc.setTextColor(130);
+    doc.text(identita().azienda + ' · Pag. ' + p + '/' + nP, pw - 14, doc.internal.pageSize.getHeight() - 6, {
+      align: 'right',
+    });
+  }
+  doc.setTextColor(0);
+  const nomeFile = 'inventario_' + _catLbl.toLowerCase().replace(/\s+/g, '_') + '_' + oggiLocale() + '.pdf';
+  mostraPdfPreview(doc, nomeFile, 'Inventario ' + _catLbl + ' · ' + settore);
 }
 
 // MENU MOBILE (telefono): pannello a sinistra con le pagine in gruppi, come il menu del computer,

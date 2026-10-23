@@ -1545,7 +1545,7 @@ function _peGeneraLunGio(sh, ctx, dataStr) {
   if (lblQ2) sotto += ' - ' + lblQ2;
   if (bg3.nBG3) sotto += ' - ' + bg3.lblBG3;
   if (hasR24) sotto += ' [+R24]';
-  _peScrTitolo(sh, 'LUNEDI - GIOVEDI', dataStr, sotto, _PE_CLR.giallo);
+  _peScrTitolo(sh, 'LUNEDÌ - GIOVEDÌ', dataStr, sotto, _PE_CLR.giallo);
   _peScrHeader(sh, 5, 1, bg1.lblBG1, bg1.nBG1, bg1.orBG1, _PE_CLR.giallo);
   _peScrHeaderQ2(sh, ctx, lblQ2, nS3, nC23bg, nC20, nS22);
   if (bg3.nBG3) _peScrHeader(sh, 5, 7, bg3.lblBG3, bg3.nBG3, bg3.orBG3, _PE_CLR.giallo);
@@ -1815,7 +1815,7 @@ function _peGeneraVenSab(sh, ctx, dataStr) {
   if (numR8 >= 2) lblR8 += ' - R8';
   else if (numR8 === 1) lblR8 += ' - R8(1)';
 
-  _peScrTitolo(sh, 'VENERDI - SABATO', dataStr, lblR8, _PE_CLR.venerdi);
+  _peScrTitolo(sh, 'VENERDÌ - SABATO', dataStr, lblR8, _PE_CLR.venerdi);
   _peScrHeader(sh, 5, 1, bg1.lblBG1, bg1.nBG1, bg1.orBG1, _PE_CLR.giallo);
   if (numR8 >= 2) {
     _peScrHeader(sh, 5, 4, 'R8', nR8, '20.50 - 05.00', _PE_CLR.verdeScuro);

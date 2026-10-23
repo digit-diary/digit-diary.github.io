@@ -348,6 +348,7 @@
     <div class="scadenze-banner compleanni-banner hidden" id="compleanni-banner"></div>
     <div id="cassa-alerts-container"></div>
     <div id="rischio-alerts-container"></div>
+    <div id="punti-alerts-container"></div>
 
     <div class="ricerca-globale-wrap">
       <span class="ricerca-globale-icon"><i class="icx icx-cerca"></i></span>
@@ -2992,13 +2993,8 @@
                 color: var(--ink);
               "
             >
+              <!-- le categorie arrivano dal database con i dati (registro_leggi) -->
               <option value="">Tutte</option>
-              <option value="registrazione">Registrazioni</option>
-              <option value="modulo">Moduli</option>
-              <option value="collaboratore">Collaboratori</option>
-              <option value="operatore">Operatori</option>
-              <option value="scadenza">Scadenze</option>
-              <option value="tipo">Tipi evento</option>
             </select>
           </div>
           <div class="filter-group filter-cerca">
@@ -3520,7 +3516,7 @@
       <div class="settings-section" data-gruppo="Accessi">
         <div class="sez-head"><div><h4>Operatori</h4><p class="sez-desc">Chi accede al programma con nome e password. Operatore attuale: <strong id="op-attuale">-</strong>.</p></div></div>
         <div id="operatori-list" class="tipo-list"></div>
-        <div class="add-tipo-row sez-form"><div class="field"><label>Nome</label><input type="text" id="new-operatore-nome" placeholder="Nome e cognome" /></div><div class="field"><label>Password (minimo 4 caratteri)</label><input type="password" id="new-operatore-pwd" autocomplete="new-password" placeholder="Password" /></div><div class="field"><label>Conferma password</label><input type="password" id="new-operatore-pwd2" autocomplete="new-password" placeholder="Ripeti la password" /></div><div class="field"><label>Settore</label><select id="new-operatore-rep"><option value="entrambi">Tutti i settori</option><option value="slots">Slots</option><option value="tavoli">Tavoli</option><option value="valet">Valet</option><option value="cleaning">Cleaning</option></select></div><div class="field"><label>Posizione e permessi</label><select id="new-operatore-prof"><option value="">Da impostare dopo</option></select></div><button class="btn-add-tipo" onclick="aggiungiOperatoreConPwd()">Crea operatore</button></div>
+        <div class="add-tipo-row sez-form"><div class="field"><label>Nome</label><input type="text" id="new-operatore-nome" placeholder="Nome e cognome" /></div><div class="field"><label>Password (almeno 10 caratteri, con lettere e numeri)</label><input type="password" id="new-operatore-pwd" autocomplete="new-password" placeholder="Password" /></div><div class="field"><label>Conferma password</label><input type="password" id="new-operatore-pwd2" autocomplete="new-password" placeholder="Ripeti la password" /></div><div class="field"><label>Settore</label><select id="new-operatore-rep"><option value="">Scegli il settore</option><option value="entrambi">Tutti i settori</option><option value="slots">Slots</option><option value="tavoli">Tavoli</option><option value="valet">Valet</option><option value="cleaning">Cleaning</option></select></div><div class="field"><label>Posizione e permessi</label><select id="new-operatore-prof"><option value="">Da impostare dopo</option></select></div><button class="btn-add-tipo" onclick="aggiungiOperatoreConPwd()">Crea operatore</button></div>
       </div>
       <div class="settings-section" data-gruppo="Settori e moduli" id="settori-section" style="display: none">
         <div class="sez-head"><div><h4>Settori</h4><p class="sez-desc">Slots e Tavoli sono fissi; gli altri si aggiungono, si rinominano, hanno un colore e le pagine visibili al loro interno. Disattivare un settore lo nasconde senza toccare i dati. "Nome nei documenti" è il nome ufficiale stampato nei fogli di cambio turno e nelle stampe (es. FoBoSlot per Slots); vuoto = nome breve.</p></div></div>
@@ -3593,8 +3589,8 @@
         <div id="db-stats-content"><button class="btn-secondario" onclick="caricaDbStats()">Verifica spazio</button></div>
       </div>
       <div class="settings-section" data-gruppo="Dati" id="cestino-section" style="display: none">
-        <div class="sez-head"><div><h4>Cestino</h4><p class="sez-desc" id="cestino-desc">Le registrazioni del Diario e i moduli eliminati del settore aperto: si ripristinano da qui. L’eliminazione definitiva è riservata all’amministratore e solo se il periodo di conservazione lo consente.</p></div></div>
-        <div class="add-tipo-row sez-form sez-filtri"><button class="btn-add-tipo" onclick="caricaCestino()">Carica cestino</button><div class="field"><label>Tipo</label><select id="cestino-filt-tipo" onchange="renderCestino()"><option value="">Tutti i tipi</option><option value="registrazioni">Registrazioni</option><option value="moduli">Moduli</option><option value="clienti_maison">Clienti Maison</option></select></div><div class="field"><label>Nome</label><input class="campo-cerca" type="text" id="cestino-filt-nome" placeholder="Cerca nome..." aria-label="Cerca nome" oninput="renderCestino()" /></div><div class="field"><label>Eliminato da</label><input type="text" id="cestino-filt-chi" placeholder="Operatore" oninput="renderCestino()" /></div><button class="btn-secondario" onclick="document.getElementById('cestino-filt-tipo').value='';document.getElementById('cestino-filt-nome').value='';document.getElementById('cestino-filt-chi').value='';renderCestino();">Azzera filtri</button></div>
+        <div class="sez-head"><div><h4>Cestino</h4><p class="sez-desc" id="cestino-desc">Le registrazioni del Diario, i moduli e le valutazioni eliminati e i clienti Maison tolti del settore aperto: si ripristinano da qui. L’eliminazione definitiva è riservata all’amministratore e solo se il periodo di conservazione lo consente.</p></div></div>
+        <div class="add-tipo-row sez-form sez-filtri"><button class="btn-add-tipo" onclick="caricaCestino()">Carica cestino</button><div class="field"><label>Tipo</label><select id="cestino-filt-tipo" onchange="renderCestino()"><option value="">Tutti i tipi</option><option value="registrazioni">Registrazioni</option><option value="moduli">Moduli</option><option value="valutazioni">Valutazioni</option><option value="clienti_maison">Clienti Maison</option><option value="schede_collaboratori">Schede collaboratore</option></select></div><div class="field"><label>Nome</label><input class="campo-cerca" type="text" id="cestino-filt-nome" placeholder="Cerca nome..." aria-label="Cerca nome" oninput="renderCestino()" /></div><div class="field"><label>Eliminato da</label><input type="text" id="cestino-filt-chi" placeholder="Operatore" oninput="renderCestino()" /></div><button class="btn-secondario" onclick="document.getElementById('cestino-filt-tipo').value='';document.getElementById('cestino-filt-nome').value='';document.getElementById('cestino-filt-chi').value='';renderCestino();">Azzera filtri</button></div>
         <div id="cestino-content"></div>
       </div>
     </div>
@@ -3642,6 +3638,7 @@
     <script src="js/moduli.js"></script>
     <script src="js/modelli-documenti.js"></script>
     <script src="js/formazione.js"></script>
+    <script src="js/punti-proposte.js"></script>
     <script src="js/formazione-import.js"></script>
     <script src="js/valutazioni.js"></script>
     <script src="js/rapporto.js"></script>
@@ -3656,6 +3653,7 @@
     <script src="js/organico-modello.js"></script>
     <script src="js/piano-core.js"></script>
     <script src="js/piano-genera.js"></script>
+    <script src="js/piano-blocchi.js"></script>
     <script src="js/piano-ricerca.js"></script>
     <script src="js/piano-ricerca-ui.js"></script>
     <script src="js/modulo-nd.js"></script>
@@ -3677,6 +3675,7 @@
     <script src="js/griglia-excel.js"></script>
     <script src="js/piano-briefing-ui.js"></script>
     <script src="js/piano-extra.js"></script>
+    <script src="js/piano-coerenza.js"></script>
     <script src="js/piano-organico.js"></script>
     <script src="js/pause-controlli.js"></script>
     <script src="js/pause-engine.js"></script>

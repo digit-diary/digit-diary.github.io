@@ -26,6 +26,7 @@ const IDENTITA_PREDEFINITA = Object.freeze({
   colore: '', // vuoto = colori del tema (--accent)
   accento: '', // vuoto = colori del tema (--accent2)
   proprietario: false, // riga del proprietario del programma in fondo alla pagina (testo fisso)
+  indirizzo: '', // vuoto = l'indirizzo del sito da cui si usa il programma (QR dei moduli)
 });
 const IDENTITA_LOGO_FILE = 'logo_casino.png';
 const IDENTITA_LOGO_MAX_BYTE = 300 * 1024; // limite del logo salvato (immagine decodificata)
@@ -55,7 +56,34 @@ function _identitaPulisci(o) {
     if (typeof o[k] === 'string' && /^#[0-9a-f]{6}$/i.test(o[k])) r[k] = o[k].toLowerCase();
   });
   if (o.proprietario === true) r.proprietario = true;
+  const ind = _identitaIndirizzoPulito(o.indirizzo);
+  if (ind) r.indirizzo = ind;
   return r;
+}
+// indirizzo del programma scritto dall'amministratore: solo http(s), senza barra finale e
+// senza #...; testo non valido = vuoto (vale il sito corrente)
+function _identitaIndirizzoPulito(v) {
+  if (typeof v !== 'string') return '';
+  let t = v
+    .trim()
+    .replace(/#.*$/, '')
+    .replace(/\/index\.html?$/i, '')
+    .replace(/\/+$/, '');
+  if (!t) return '';
+  if (!/^https?:\/\//i.test(t)) t = 'https://' + t;
+  if (t.length > 200 || !/^https?:\/\/[a-z0-9.-]+(:\d+)?(\/[^\s"'<>]*)?$/i.test(t)) return '';
+  return t;
+}
+// INDIRIZZO A CUI PORTA IL QR DEI MODULI (23/10/2026): quello dell'Identita se impostato,
+// altrimenti il sito da cui si usa il programma (server interno, sito di prova o pubblico);
+// prima era fisso su digit-diary.github.io anche sul server interno
+function identitaIndirizzo(loc) {
+  const fisso = identita().indirizzo;
+  if (fisso) return fisso;
+  const l = loc || (typeof location !== 'undefined' ? location : null);
+  if (!l || !/^https?:$/.test(l.protocol || '')) return 'https://digit-diary.github.io';
+  const cartella = String(l.pathname || '/').replace(/[^/]*$/, '');
+  return (l.origin + cartella).replace(/\/+$/, '');
 }
 
 // L'IDENTITA IN USO: sempre completa (i campi mancanti hanno il valore predefinito).
@@ -308,6 +336,9 @@ function renderIdentitaUI() {
     '</div><span class="sez-stato" id="identita-logo-info" style="font-size:var(--fs-xs,.75rem)"></span></div>' +
     '</div>' +
     '<div class="add-tipo-row sez-form"><label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="identita-proprietario" onchange="_identitaDaModulo()" /> Mostra il proprietario del programma in fondo alla pagina</label></div>' +
+    '<div class="add-tipo-row sez-form"><div class="field" style="flex:1 1 320px"><label for="identita-indirizzo">Indirizzo del programma (codice QR dei moduli)</label>' +
+    '<input type="text" id="identita-indirizzo" maxlength="200" placeholder="vuoto = il sito da cui si usa il programma" oninput="_identitaDaModulo()" />' +
+    '<span class="sez-stato" id="identita-indirizzo-info" style="font-size:var(--fs-xs,.75rem)"></span></div></div>' +
     '<p class="sez-sottotitolo">Anteprima</p>' +
     '<div id="identita-anteprima" style="display:flex;gap:16px;flex-wrap:wrap;align-items:stretch"></div>' +
     '<p class="sez-stato" style="font-size:var(--fs-sm,.8125rem)">I colori scelti vengono schiariti o scuriti il minimo necessario per restare leggibili nel tema chiaro e nel tema scuro; lo sfondo non cambia. Il nome del programma, l azienda e il logo valgono anche alla schermata di accesso dal prossimo avvio di ogni dispositivo.</p>' +
@@ -326,6 +357,8 @@ function _identitaRiempiModulo() {
   });
   const pr = document.getElementById('identita-proprietario');
   if (pr) pr.checked = !!_identitaBozza.proprietario;
+  const ind = document.getElementById('identita-indirizzo');
+  if (ind) ind.value = _identitaBozza.indirizzo || '';
   [
     ['colore', '#c0392b'],
     ['accento', '#8b6914'],
@@ -346,6 +379,8 @@ function _identitaDaModulo(coloreToccato) {
   });
   const pr = document.getElementById('identita-proprietario');
   if (pr) _identitaBozza.proprietario = pr.checked;
+  const ind = document.getElementById('identita-indirizzo');
+  if (ind) _identitaBozza.indirizzo = ind.value;
   ['colore', 'accento'].forEach((k) => {
     const c = document.getElementById('identita-' + k);
     const t = document.getElementById('identita-' + k + '-tema');
@@ -400,6 +435,14 @@ function _identitaAnteprima() {
       : 'Logo predefinito (' + IDENTITA_LOGO_FILE + ')';
   const tg = document.getElementById('identita-logo-togli');
   if (tg) tg.disabled = !id.logo;
+  const ii = document.getElementById('identita-indirizzo-info');
+  if (ii) {
+    const scritto = String((_identitaBozza && _identitaBozza.indirizzo) || '').trim();
+    ii.textContent =
+      scritto && !id.indirizzo
+        ? 'Indirizzo non valido: scrivilo come https://server/cartella. Finché non è valido vale il sito corrente.'
+        : 'Il QR porta a: ' + (id.indirizzo || identitaIndirizzo()) + '/#modulo/…';
+  }
 }
 function _identitaTogliLogo() {
   if (!_identitaBozza) _identitaBozza = {};

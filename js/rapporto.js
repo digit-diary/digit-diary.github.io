@@ -93,8 +93,10 @@ async function renderRapportoCalendario() {
   for (let d = 1; d <= daysInMonth; d++) {
     const ds = rapportoAnno + '-' + String(rapportoMese + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
     const rdata = _rapportoCacheGet(ds);
-    const hasP = rdata.PRESTO && (rdata.PRESTO.sup_note || rdata.PRESTO.cassa_note || rdata.PRESTO.sala_note);
-    const hasN = rdata.NOTTE && (rdata.NOTTE.sup_note || rdata.NOTTE.cassa_note || rdata.NOTTE.sala_note);
+    // pallino per QUALSIASI campo compilato (assenze, prelievi, assegni, differenze, campi del
+    // settore): prima solo le tre note, e in Valet e Cleaning i rapporti non si vedevano (A14)
+    const hasP = _rapportoHaDati(rdata.PRESTO);
+    const hasN = _rapportoHaDati(rdata.NOTTE);
     html +=
       '<div class="rapporto-day-cell' +
       (ds === oggiStr ? ' today' : '') +
@@ -274,7 +276,6 @@ async function apriGiorno(ds) {
 // === D-FULL PARSER ASSENZE: analyze + execute + audit + transactional ============
 // Schema flags per gestire deployment senza migration applicata (graceful degradation)
 let _origineSchemaSupported = true; // false se DB non ha ancora la colonna 'origine'
-let _transactionalRpcSupported = false; // DISABILITATO: la function ha bug INTEGER[] vs BIGINT[]. Usa REST diretto.
 function _stripOrigine(rec) {
   const r = Object.assign({}, rec);
   delete r.origine;
@@ -312,7 +313,7 @@ function _recIsCurrentRapporto(rec, _rapLabel, _rapLabelOld, ds) {
 // === ANALYZE: parsa il campo assenze e ritorna lista operazioni (NESSUN side effect) ===
 // Parole che indicano un'assenza NON per malattia (nessuna registrazione da creare)
 const _ASSENZE_ALTRO_RE =
-  /\b(lutto|ferie|vacanza|vacanze|infortunio|permesso|giorno libero|riposo|congedo|ritardo|in ritardo)\b/i;
+  /\b(lutto|ferie|vacanza|vacanze|infortunio|permesso|giorno libero|riposo|congedo|ritardo|in ritardo|non disponibil[ei])\b/i;
 // Parole che indicano malattia/assenza, al singolare E al plurale ("assenti", "malati")
 const _ASSENZE_MAL_RE =
   /\b(assent[ei]|malattia|malat[oaie]|malessere|non.{0,10}present[ei]|non.{0,10}vien[ei]|non.{0,10}vengono|chiamat[oaie]|si (?:è|e'|sono) sentit[oaie]|non.{0,10}sar[àa]|non.{0,10}saranno|non sta bene|non stanno bene|sta male|stanno male|ricoverat[oaie]|ospedale|pronto soccorso|visita medica|controllo medico|certificato medico)\b/i;
@@ -344,21 +345,175 @@ function _vociAssenzaDaFrammento(riga, _rigaPulita) {
   }
   if (!_ASSENZE_MAL_RE.test(riga)) return [];
   // Parola chiave in mezzo alla frase: si cercano i collaboratori nominati. Con lo stato al
-  // plurale valgono tutti quelli trovati, al singolare solo il primo (come prima)
+  // plurale valgono tutti quelli trovati, al singolare solo il primo (come prima). Un nome
+  // che vale per piu collaboratori (due «Provetti») resta il cognome scritto: la scelta la
+  // fa scegliCollaboratore, che chiede (A5: prima si prendeva il primo dell elenco)
   const plurale = /\b(assenti|malat[ie]|vengono|saranno|stanno)\b/i.test(riga);
   const trovati = [];
-  for (const c of collaboratoriCache) {
-    const words = c.nome.toLowerCase().split(/\s+/);
-    for (const w of words) {
-      if (w.length >= 3 && new RegExp('\\b' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i').test(riga)) {
-        if (!trovati.includes(c.nome)) trovati.push(c.nome);
-        break;
-      }
-    }
-    if (trovati.length && !plurale) break;
+  for (const x of nominatiInFrase(riga)) {
+    const n = x.nomi.length === 1 ? x.nomi[0] : capitalizzaNome(x.testo);
+    if (!trovati.includes(n)) trovati.push(n);
+    if (!plurale) break;
   }
   const _cm = riga.match(/\b([A-Z])\s*(\d{1,2})\b/);
   return trovati.map((n) => [riga, n, _cm ? _cm[0] : 'assente', _cm ? _cm[1] : null, _cm ? _cm[2] : null]);
+}
+// PERIODO DI UN FRAMMENTO DELLE ASSENZE («dal 27 al 2», «dal 30/12 al 2/1», «fino al 3»,
+// «domani», «oggi e venerdi», «il 2»), dal giorno del rapporto ds (AAAA-MM-GG).
+// Ritorna { inizio, fine } (Date alle 12) oppure { errore }. Regole (A1 del controllo 23.10):
+//  - un giorno senza mese vale la data piu vicina al rapporto fra il mese prima, quello del
+//    rapporto e quello dopo (a parita il futuro): «il 2» scritto il 27/02 e il 02/03;
+//  - un mese senza anno vale l anno piu vicino al rapporto: «dal 30/12» scritto il 02/01 e
+//    dell anno prima;
+//  - la fine senza mese (o senza anno) e la prima data uguale o dopo l inizio: «dal 27 al 2»
+//    finisce il 2 del mese dopo, «dal 30/12 al 2/1» il 2 gennaio dell anno dopo;
+//  - fine prima dell inizio con le date intere: errore (prima le date si scambiavano in
+//    silenzio e «dal 27 al 2» diventava dal 2 al 27 dello stesso mese).
+function _rappPeriodoFrammento(riga, rigaPulita, ds) {
+  riga = String(riga || '');
+  rigaPulita = String(rigaPulita || riga);
+  const rif = new Date(ds + 'T12:00:00');
+  const giorno = (y, m, g) => {
+    const d = new Date(y, m, g, 12);
+    return d.getFullYear() === y && d.getMonth() === m && d.getDate() === g ? d : null;
+  };
+  const anno = (a) => (a == null || a === '' ? null : parseInt(a) < 100 ? 2000 + parseInt(a) : parseInt(a));
+  const mese = (m) => (m == null || m === '' ? null : parseInt(m) - 1);
+  const piuGiorni = (d, n) => {
+    const x = new Date(d);
+    x.setDate(x.getDate() + n);
+    return x;
+  };
+  const scritta = (g, m, a) => g + (m != null ? '/' + (m + 1) : '') + (a != null ? '/' + a : '');
+  // data vicina al rapporto (inizio, o giorno solo)
+  const vicina = (g, m, a) => {
+    if (a != null && m != null) return giorno(a, m, g);
+    const cand = [];
+    if (m != null) [-1, 0, 1].forEach((k) => cand.push(giorno(rif.getFullYear() + k, m, g)));
+    else
+      [-1, 0, 1].forEach((k) => {
+        const b = new Date(rif.getFullYear(), rif.getMonth() + k, 1, 12);
+        cand.push(giorno(b.getFullYear(), b.getMonth(), g));
+      });
+    let best = null;
+    cand.forEach((d) => {
+      if (!d) return;
+      const dist = Math.abs(d - rif);
+      if (!best || dist < Math.abs(best - rif) || (dist === Math.abs(best - rif) && d > best)) best = d;
+    });
+    return best;
+  };
+  // fine: la prima data uguale o dopo l inizio con il giorno (e il mese) scritti
+  // fine: con il giorno (e il mese) scritti, la prima data uguale o dopo l inizio. Si passa al
+  // mese dopo solo se il giorno e prima di quello d inizio («dal 27 al 2»), all anno dopo solo
+  // se il mese e prima di quello d inizio («dal 30/12 al 2/1»); altrimenti la data resta
+  // quella (giorno che non esiste = null, fine prima dell inizio = errore di chi chiama)
+  const dopo = (g, m, a, ini) => {
+    if (a != null && m != null) return giorno(a, m, g);
+    if (m != null) return giorno(ini.getFullYear() + (m < ini.getMonth() ? 1 : 0), m, g);
+    if (g >= ini.getDate()) return giorno(ini.getFullYear(), ini.getMonth(), g);
+    const b = new Date(ini.getFullYear(), ini.getMonth() + 1, 1, 12);
+    return giorno(b.getFullYear(), b.getMonth(), g);
+  };
+  const D = '(\\d{1,2})(?:[\\/\\.\\-](\\d{1,2}))?(?:[\\/\\.\\-](\\d{2,4}))?';
+  const domaniMatch = /\bdomani\b/i.test(riga);
+  const dopodomaniMatch = /\bdopodomani\b/i.test(riga);
+  const oggiMatch = /\b(oggi|stasera|questa sera)\b/i.test(riga);
+  const dalAlMatch = rigaPulita.match(new RegExp('\\bdal\\s+' + D + '\\s+(?:fino\\s+)?al?\\s+' + D + '(?!\\d)', 'i'));
+  const finoMatch = dalAlMatch ? null : riga.match(new RegExp('\\bfino\\s+(?:al?\\s+)?' + D + '(?!\\d)', 'i'));
+  // un giorno solo: «assente il 14», «dal 12» senza «al» (vale quel giorno)
+  const unGiornoMatch = dalAlMatch ? null : rigaPulita.match(new RegExp('\\b(?:il|dal)\\s+' + D + '(?!\\d)', 'i'));
+  // DATE SCRITTE CON I NUMERI: vengono prima delle parole (piu precise)
+  if (dalAlMatch) {
+    const m1 = mese(dalAlMatch[2]),
+      a1 = anno(dalAlMatch[3]);
+    const g2 = parseInt(dalAlMatch[4]),
+      m2 = mese(dalAlMatch[5]),
+      a2s = anno(dalAlMatch[6]);
+    // «dal 30/12/2026 al 2/1»: l anno della fine segue l inizio
+    const inizio = vicina(parseInt(dalAlMatch[1]), m1, a1);
+    if (!inizio) return { errore: 'data non valida (' + scritta(dalAlMatch[1], m1, a1) + ')' };
+    const fine = dopo(g2, m2, a2s, inizio);
+    if (!fine) return { errore: 'data non valida (' + scritta(g2, m2, a2s) + ')' };
+    if (fine < inizio) return { errore: 'la fine (' + fine.toLocaleDateString('it-IT') + ") è prima dell'inizio" };
+    return { inizio, fine };
+  }
+  if (finoMatch) {
+    const inizio = dopodomaniMatch ? piuGiorni(rif, 2) : domaniMatch && !oggiMatch ? piuGiorni(rif, 1) : new Date(rif);
+    const g2 = parseInt(finoMatch[1]),
+      m2 = mese(finoMatch[2]),
+      a2 = anno(finoMatch[3]);
+    const fine = dopo(g2, m2, a2, inizio);
+    if (!fine) return { errore: 'data non valida (' + scritta(g2, m2, a2) + ')' };
+    if (fine < inizio) return { errore: 'la fine (' + fine.toLocaleDateString('it-IT') + ") è prima dell'inizio" };
+    return { inizio, fine };
+  }
+  const _giorniSett = {
+    lunedi: 1,
+    lunedì: 1,
+    martedi: 2,
+    martedì: 2,
+    mercoledi: 3,
+    mercoledì: 3,
+    giovedi: 4,
+    giovedì: 4,
+    venerdi: 5,
+    venerdì: 5,
+    sabato: 6,
+    domenica: 0,
+  };
+  const _giorniTrovati = [];
+  const rigaLow = riga.toLowerCase();
+  for (const [g, idx] of Object.entries(_giorniSett)) {
+    if (new RegExp('\\b' + g + '(?![a-zà-ü])', 'i').test(rigaLow) && !_giorniTrovati.includes(idx))
+      _giorniTrovati.push(idx);
+  }
+  const finoGiornoMatch = riga.match(
+    /fino\s+(?:a\s+)?(luned[iì]|marted[iì]|mercoled[iì]|gioved[iì]|venerd[iì]|sabato|domenica)/i,
+  );
+  // prossimo giorno della settimana dopo d (mai d stesso)
+  const prossimo = (d, idx) => {
+    let diff = (idx - d.getDay() + 7) % 7;
+    if (diff === 0) diff = 7;
+    return piuGiorni(d, diff);
+  };
+  let inizio = new Date(rif),
+    fine = new Date(rif);
+  // "oggi e domani" / "oggi e dopodomani": il periodo parte dal giorno del rapporto e arriva
+  // al giorno indicato. Vanno prima delle altre, altrimenti "domani" da solo vincerebbe.
+  if (oggiMatch && dopodomaniMatch) fine = piuGiorni(rif, 2);
+  else if (oggiMatch && domaniMatch) fine = piuGiorni(rif, 1);
+  else if (oggiMatch && _giorniTrovati.length === 1) fine = prossimo(rif, _giorniTrovati[0]);
+  else if (dopodomaniMatch && domaniMatch) {
+    inizio = piuGiorni(rif, 1);
+    fine = piuGiorni(rif, 2);
+  } else if (domaniMatch && _giorniTrovati.length) {
+    inizio = piuGiorni(rif, 1);
+    fine = prossimo(rif, _giorniTrovati[0]);
+    if (fine < inizio) fine = piuGiorni(fine, 7);
+  } else if (finoGiornoMatch) fine = prossimo(rif, _giorniSett[finoGiornoMatch[1].toLowerCase()]);
+  else if (_giorniTrovati.length >= 2) {
+    const dates = _giorniTrovati.map((g) => prossimo(rif, g)).sort((a, b) => a - b);
+    inizio = dates[0];
+    fine = dates[dates.length - 1];
+  } else if (_giorniTrovati.length === 1) {
+    inizio = prossimo(rif, _giorniTrovati[0]);
+    fine = new Date(inizio);
+  } else if (dopodomaniMatch) {
+    // "dopodomani" da solo: come prima, da domani a dopodomani
+    inizio = piuGiorni(rif, 1);
+    fine = piuGiorni(rif, 2);
+  } else if (domaniMatch) {
+    inizio = piuGiorni(rif, 1);
+    fine = new Date(inizio);
+  } else if (unGiornoMatch) {
+    const m1 = mese(unGiornoMatch[2]),
+      a1 = anno(unGiornoMatch[3]);
+    inizio = vicina(parseInt(unGiornoMatch[1]), m1, a1);
+    if (!inizio) return { errore: 'data non valida (' + scritta(unGiornoMatch[1], m1, a1) + ')' };
+    fine = new Date(inizio);
+  }
+  return { inizio, fine };
 }
 // scelte = { "somma": "Somma Alfonso" }: nomi ambigui gia chiariti dall operatore
 // (un nome ambiguo senza scelta finisce in ops.ambigui e non si registra)
@@ -403,11 +558,16 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno, scelte) {
     // Ogni riga puo' contenere piu' persone separate da virgola o punto e virgola: si valuta
     // ogni frammento da solo, cosi' "Rossi ferie, Bianchi malato" non perde piu' Bianchi
     const frammenti = rigaIntera.split(/\s*[;,]\s*/).filter((f) => f.trim());
+    let _nomeNellaRiga = false;
     for (const riga of frammenti) {
       const _rigaPulita = riga.replace(/([a-zà-ü])(dal\s|fino\s)/gi, '$1 $2');
       const voci = _vociAssenzaDaFrammento(riga, _rigaPulita);
       // null = assenza non per malattia (ferie, permesso...) o segnaposto: si ignora senza errore
       if (voci === null) continue;
+      if (voci.length) _nomeNellaRiga = true;
+      // seguito della frase di prima, senza nomi e senza date («Oggi ha chiamato Rossi, non sta
+      // bene»): non e un frammento da controllare a mano
+      else if (_nomeNellaRiga && !/\d/.test(riga)) continue;
       if (!voci.length) {
         // Prima il frammento spariva in silenzio: ora chi compila lo vede e lo controlla a mano
         ops.errors.push({
@@ -421,139 +581,36 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno, scelte) {
         const nome = capitalizzaNome(m[1].trim());
         const isCodice = !!m[3] && /^[a-zA-Z]$/.test(m[3]);
         const codiceNum = m[4] ? parseInt(m[4]) : 0;
-        const domaniMatch = /\bdomani\b/i.test(riga);
-        const dopodomaniMatch = /\bdopodomani\b/i.test(riga);
-        const oggiMatch = /\b(oggi|stasera|questa sera)\b/i.test(riga);
-        const finoMatch = riga.match(/fino\s+(?:al?\s+)?(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?/i);
-        const dalAlMatch = _rigaPulita.match(
-          /dal\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?\s+al\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?/i,
-        );
-        // un giorno solo: «assente il 14», «dal 12» senza «al» (vale quel giorno)
-        const unGiornoMatch = dalAlMatch
-          ? null
-          : _rigaPulita.match(/\b(?:il|dal)\s+(\d{1,2})(?:[\/\.\-](\d{1,2}))?(?:[\/\.\-](\d{2,4}))?\b/i);
-        const _giorniSett = {
-          lunedi: 1,
-          lunedì: 1,
-          martedi: 2,
-          martedì: 2,
-          mercoledi: 3,
-          mercoledì: 3,
-          giovedi: 4,
-          giovedì: 4,
-          venerdi: 5,
-          venerdì: 5,
-          sabato: 6,
-          domenica: 0,
-        };
-        const _giorniTrovati = [];
-        const rigaLow = riga.toLowerCase();
-        for (const [g, idx] of Object.entries(_giorniSett)) {
-          if (rigaLow.includes(g)) _giorniTrovati.push(idx);
-        }
-        const finoGiornoMatch = riga.match(
-          /fino\s+(?:a\s+)?(luned[iì]|marted[iì]|mercoled[iì]|gioved[iì]|venerd[iì]|sabato|domenica)/i,
-        );
-        const dataRapp = new Date(ds + 'T12:00:00');
-        let dataInizio = new Date(ds + 'T12:00:00'),
-          dataFine = new Date(ds + 'T12:00:00');
-        // "oggi e domani" / "oggi e dopodomani": il periodo parte dal giorno del
-        // rapporto e arriva al giorno indicato. Vanno prima delle altre, altrimenti
-        // "domani" da solo vincerebbe e il primo giorno andrebbe perso.
-        if (oggiMatch && dopodomaniMatch) {
-          dataInizio = new Date(dataRapp);
-          dataFine = new Date(dataRapp);
-          dataFine.setDate(dataFine.getDate() + 2);
-        } else if (oggiMatch && domaniMatch) {
-          dataInizio = new Date(dataRapp);
-          dataFine = new Date(dataRapp);
-          dataFine.setDate(dataFine.getDate() + 1);
-        } else if (oggiMatch && _giorniTrovati.length === 1) {
-          // "oggi e venerdi": dal giorno del rapporto fino a quel giorno
-          dataInizio = new Date(dataRapp);
-          const _t = _giorniTrovati[0];
-          dataFine = new Date(dataRapp);
-          let _d = (_t - dataFine.getDay() + 7) % 7;
-          if (_d === 0) _d = 7;
-          dataFine.setDate(dataFine.getDate() + _d);
-        } else if (dopodomaniMatch && domaniMatch) {
-          dataInizio = new Date(dataRapp);
-          dataInizio.setDate(dataInizio.getDate() + 1);
-          dataFine = new Date(dataRapp);
-          dataFine.setDate(dataFine.getDate() + 2);
-        } else if (domaniMatch && _giorniTrovati.length) {
-          dataInizio = new Date(dataRapp);
-          dataInizio.setDate(dataInizio.getDate() + 1);
-          const targetDay = _giorniTrovati[0];
-          dataFine = new Date(dataRapp);
-          let diff = (targetDay - dataFine.getDay() + 7) % 7;
-          if (diff === 0) diff = 7;
-          dataFine.setDate(dataFine.getDate() + diff);
-          if (dataFine < dataInizio) dataFine.setDate(dataFine.getDate() + 7);
-        } else if (finoGiornoMatch) {
-          const targetDay = _giorniSett[finoGiornoMatch[1].toLowerCase()];
-          dataFine = new Date(dataRapp);
-          let diff = (targetDay - dataFine.getDay() + 7) % 7;
-          if (diff === 0) diff = 7;
-          dataFine.setDate(dataFine.getDate() + diff);
-        } else if (_giorniTrovati.length >= 2) {
-          const dates = _giorniTrovati
-            .map((g) => {
-              const d = new Date(dataRapp);
-              let diff = (g - d.getDay() + 7) % 7;
-              if (diff === 0) diff = 7;
-              d.setDate(d.getDate() + diff);
-              return d;
-            })
-            .sort((a, b) => a - b);
-          dataInizio = dates[0];
-          dataFine = dates[dates.length - 1];
-        } else if (_giorniTrovati.length === 1) {
-          const targetDay = _giorniTrovati[0];
-          dataInizio = new Date(dataRapp);
-          let diff = (targetDay - dataInizio.getDay() + 7) % 7;
-          if (diff === 0) diff = 7;
-          dataInizio.setDate(dataInizio.getDate() + diff);
-          dataFine = new Date(dataInizio);
-        } else if (dopodomaniMatch) {
-          dataInizio = new Date(dataRapp);
-          dataInizio.setDate(dataInizio.getDate() + 1);
-          dataFine = new Date(dataRapp);
-          dataFine.setDate(dataFine.getDate() + 2);
-        } else if (domaniMatch) {
-          dataInizio = new Date(dataRapp);
-          dataInizio.setDate(dataInizio.getDate() + 1);
-          dataFine = new Date(dataInizio);
-        } else if (dalAlMatch) {
-          const gInizio = parseInt(dalAlMatch[1]),
-            mInizio = dalAlMatch[2] ? parseInt(dalAlMatch[2]) - 1 : dataRapp.getMonth();
-          const _aInizio = dalAlMatch[3] ? parseInt(dalAlMatch[3]) : null;
-          const annoInizio = _aInizio ? (_aInizio < 100 ? 2000 + _aInizio : _aInizio) : dataRapp.getFullYear();
-          const gFine = parseInt(dalAlMatch[4]),
-            mFine = dalAlMatch[5] ? parseInt(dalAlMatch[5]) - 1 : mInizio;
-          const _aFine = dalAlMatch[6] ? parseInt(dalAlMatch[6]) : null;
-          const annoFine = _aFine ? (_aFine < 100 ? 2000 + _aFine : _aFine) : annoInizio;
-          dataInizio = new Date(annoInizio, mInizio, gInizio, 12);
-          dataFine = new Date(annoFine, mFine, gFine, 12);
-        } else if (finoMatch) {
-          const gFine = parseInt(finoMatch[1]),
-            mFine = finoMatch[2] ? parseInt(finoMatch[2]) - 1 : dataRapp.getMonth();
-          dataFine = new Date(dataRapp.getFullYear(), mFine, gFine, 12);
-          if (dataFine < dataInizio) dataFine.setFullYear(dataFine.getFullYear() + 1);
-        } else if (unGiornoMatch) {
-          const g1 = parseInt(unGiornoMatch[1]),
-            m1 = unGiornoMatch[2] ? parseInt(unGiornoMatch[2]) - 1 : dataRapp.getMonth();
-          const a1 = unGiornoMatch[3] ? parseInt(unGiornoMatch[3]) : null;
-          const y1 = a1 ? (a1 < 100 ? 2000 + a1 : a1) : dataRapp.getFullYear();
-          dataInizio = new Date(y1, m1, g1, 12);
-          dataFine = new Date(dataInizio);
-        }
+        // periodo scritto nel frammento (giorni senza mese o anno letti vicino al rapporto)
+        const _per = _rappPeriodoFrammento(riga, _rigaPulita, ds);
+        let dataInizio = _per.inizio,
+          dataFine = _per.fine;
         // OMONIMI: chi ha gia la registrazione di questo rapporto vale come scelta
-        const _sc = scegliCollaboratore(
+        let _sc = scegliCollaboratore(
           nome,
           _esistenti.map((e) => e.nome),
           scelte,
         );
+        // NOME AL CONTRARIO («Chiara Bianchi» = Bianchi Chiara, «Marco De Lima» = De Lima
+        // Marco); se non c e nessuno in anagrafica non si crea niente (riverifica 2 A-R2: prima
+        // nasceva una registrazione «Pinco Pallino» che il Piano non conosce)
+        if (!_sc) {
+          const pz = nome.split(/\s+/).filter(Boolean);
+          if (pz.length >= 2)
+            for (const inv of [pz.slice(1).concat(pz[0]), [pz[pz.length - 1]].concat(pz.slice(0, -1))]) {
+              _sc = scegliCollaboratore(
+                inv.join(' '),
+                _esistenti.map((e) => e.nome),
+                scelte,
+              );
+              if (_sc) break;
+            }
+        }
+        if (!_sc) {
+          _nomiProcessati.add(nome.toLowerCase());
+          ops.errors.push({ nome: nome, motivo: 'non in anagrafica: nessuna registrazione creata', riga });
+          continue;
+        }
         if (_sc && _sc.ambigui) {
           if (!ops.ambigui.some((a) => a.testo.toLowerCase() === nome.toLowerCase()))
             ops.ambigui.push({ testo: nome, nomi: _sc.ambigui });
@@ -564,19 +621,28 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno, scelte) {
           continue;
         }
         const nomeFinale = (_sc && _sc.nome) || capitalizzaNome(nome);
-        // === D7: VALIDAZIONE DATE ===
-        if (dataFine < dataInizio) {
-          const _tmp = dataInizio;
-          dataInizio = dataFine;
-          dataFine = _tmp;
-        } // auto-swap
+        // === D7: VALIDAZIONE DATE === (niente piu scambio silenzioso: una data che non si
+        // capisce e un avviso, e la registrazione che c e gia resta com e, non si stacca)
+        if (_per.errore) {
+          _nomiProcessati.add(nomeFinale.toLowerCase());
+          ops.errors.push({ nome: nomeFinale, motivo: _per.errore, riga });
+          continue;
+        }
         const _oggi = new Date();
         _oggi.setHours(12, 0, 0, 0);
         const _maxFuturo = new Date(_oggi);
         _maxFuturo.setDate(_maxFuturo.getDate() + 365);
         const _maxPassato = new Date(_oggi);
         _maxPassato.setDate(_maxPassato.getDate() - 180);
-        if (dataInizio > _maxFuturo) {
+        // i limiti servono a fermare una data scritta male nel testo del Rapporto; una M o
+        // una ASS messa nel calendario del Piano ha il giorno giusto (riverifica D-N1: un mese
+        // corretto piu di 6 mesi dopo restava solo nel Piano)
+        const _dalPiano =
+          typeof window !== 'undefined' &&
+          !!window._rapportoDalPiano &&
+          window._rapportoDalPianoNome === nomeFinale.toLowerCase();
+        if (!_dalPiano && dataInizio > _maxFuturo) {
+          _nomiProcessati.add(nomeFinale.toLowerCase());
           ops.errors.push({
             nome: nomeFinale,
             motivo: 'data inizio oltre 12 mesi nel futuro (' + dataInizio.toLocaleDateString('it-IT') + ')',
@@ -584,7 +650,8 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno, scelte) {
           });
           continue;
         }
-        if (dataFine < _maxPassato) {
+        if (!_dalPiano && dataFine < _maxPassato) {
+          _nomiProcessati.add(nomeFinale.toLowerCase());
           ops.errors.push({
             nome: nomeFinale,
             motivo: 'data fine oltre 6 mesi nel passato (' + dataFine.toLocaleDateString('it-IT') + ')',
@@ -594,9 +661,10 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno, scelte) {
         }
         const nGiorni = Math.round((dataFine - dataInizio) / 86400000) + 1;
         if (nGiorni > 180) {
+          _nomiProcessati.add(nomeFinale.toLowerCase());
           ops.errors.push({
             nome: nomeFinale,
-            motivo: 'range eccessivo (' + nGiorni + ' giorni) - probabile errore di data',
+            motivo: 'periodo troppo lungo (' + nGiorni + ' giorni): controlla le date',
             riga,
           });
           continue;
@@ -655,20 +723,58 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno, scelte) {
           // else: no-op
         } else {
           // Cross-rapporto dedup: include ANCHE record manuali (per evitare duplicati visivi)
-          const _newKeyI = dataLocaleISO(dataInizio);
-          const _newKeyF = dataLocaleISO(dataFine);
-          const _giaInAltro = datiCache.find((e) => {
-            if (!_eTipoAss(e.tipo)) return false;
-            if (e.nome.toLowerCase() !== nomeFinale.toLowerCase()) return false;
-            if ((e.reparto_dip || currentReparto) !== currentReparto) return false;
-            if (_recIsCurrentRapporto(e, _rapLabel, _rapLabelOld, ds)) return false;
-            const r = _getRangeMalattiaRec(e);
-            if (!r) return false;
-            return r.i === _newKeyI && r.f === _newKeyF;
+          // GIA REGISTRATA: tutti i giorni del periodo sono gia coperti da una Malattia o
+          // Assenza della persona (Diario, altro rapporto, Piano; le righe «un giorno per riga»
+          // contano il loro giorno). Prima valeva solo lo stesso identico periodo: una Malattia
+          // del Diario e «assente domani» nel Rapporto davano due registrazioni (A19).
+          const _giorniNuovi = [];
+          for (let d = new Date(dataInizio); d <= dataFine && _giorniNuovi.length < 400; d.setDate(d.getDate() + 1))
+            _giorniNuovi.push(dataLocaleISO(d));
+          const _coperti = new Set();
+          let _giaInAltro = null;
+          datiCache.forEach((e) => {
+            if (!_eTipoAss(e.tipo) || e.eliminato) return;
+            if (e.nome.toLowerCase() !== nomeFinale.toLowerCase()) return;
+            if ((e.reparto_dip || currentReparto) !== currentReparto) return;
+            if (_recIsCurrentRapporto(e, _rapLabel, _rapLabelOld, ds)) return;
+            let gg;
+            if (typeof _pianoGiorniRegistrazione === 'function') gg = _pianoGiorniRegistrazione(e.testo || '', e.data);
+            else {
+              const r = _getRangeMalattiaRec(e);
+              gg = r ? [r.i, r.f] : [];
+            }
+            const qui = gg.filter((d) => _giorniNuovi.includes(d));
+            if (!qui.length) return;
+            qui.forEach((d) => _coperti.add(d));
+            if (!_giaInAltro) _giaInAltro = e;
           });
+          // REGISTRATA DAL DIARIO (A9): la voce l ha scritta il Diario (origine 'diario|...'): niente
+          // da creare e niente avviso. Se nel Rapporto le date sono state cambiate e non coincidono
+          // piu, niente doppione: si dice di correggere dal Diario.
+          const _dalDiario = datiCache.find(
+            (e) =>
+              !e.eliminato &&
+              _eTipoAss(e.tipo) &&
+              /^diario\|/.test(e.origine || '') &&
+              e.nome.toLowerCase() === nomeFinale.toLowerCase() &&
+              (e.reparto_dip || currentReparto) === currentReparto &&
+              e.origine === 'diario|' + turno + '|' + ds,
+          );
+          if (_dalDiario) {
+            if (!_giorniNuovi.every((d) => _coperti.has(d)))
+              ops.skipped.push({
+                nome: nomeFinale,
+                motivo: 'registrata dal Diario con altre date: per cambiarle usa il Diario',
+                existingId: _dalDiario.id,
+              });
+            continue;
+          }
+          if (_giaInAltro && !_giorniNuovi.every((d) => _coperti.has(d))) _giaInAltro = null;
           if (_giaInAltro) {
             let _motivo;
-            if (_giaInAltro.origine === 'manual') {
+            if (!/da rapporto (PRESTO|NOTTE)/.test(_giaInAltro.testo || '')) {
+              _motivo = 'già registrata nel Diario (' + _giaInAltro.tipo + ')';
+            } else if (_giaInAltro.origine === 'manual') {
               _motivo = 'già inserita manualmente';
             } else {
               const _refMatch = (_giaInAltro.testo || '').match(
@@ -721,11 +827,210 @@ function _analizzaAssenzeRapporto(assenzeText, ds, turno, scelte) {
   }
   return ops;
 }
-// === EXECUTE: applica le operazioni (D6 transactional con fallback REST + D4 audit) ===
+// === SCRITTURA IN UN UNICA TRANSAZIONE (controllo 23/10 D12) ===============================
+// Il Diario (registrazioni nuove, corrette, staccate dal Rapporto) e il Piano (M/ASS) si scrivono
+// insieme con rapporto_assenze_scrivi (migrazione 20260930_a): tutto o niente, con i controlli di
+// sempre (permessi e settori del canale sicuro, piano_scrivi_celle per le celle). Prima erano
+// scritture una per una: un errore a meta lasciava il Diario scritto e il Piano no.
+// Database senza la funzione: la strada di prima (una per una), detta solo nella console.
+let _rapportoAtomicaManca = false;
+// operazioni del Diario per la funzione (logica pura, test/rapporto-atomico.test.js).
+// cache: le registrazioni in memoria (testo come le ha lette chi scrive: se nel database e
+// cambiato nel frattempo, niente e scritto)
+function _rapportoOpsDiario(creates, updates, staccate, cache, conOrigine) {
+  const trova = (id) => (cache || []).find((e) => e.id === id);
+  const out = [];
+  for (const d of staccate || []) {
+    const rec = trova(d.id);
+    if (!rec) continue;
+    const dati = { testo: String(rec.testo || '').replace(/\bda rapporto (PRESTO|NOTTE)/, 'tolta dal rapporto $1') };
+    if (conOrigine) dati.origine = 'manual';
+    out.push({ action: 'update', id: d.id, atteso_testo: rec.testo == null ? '' : rec.testo, data: dati, staccata: d });
+  }
+  for (const c of creates || []) {
+    const rec = Object.assign({}, c.record);
+    if (!conOrigine) delete rec.origine;
+    out.push({ action: 'create', data: rec, create: c });
+  }
+  for (const u of updates || []) {
+    const rec = trova(u.id);
+    out.push({
+      action: 'update',
+      id: u.id,
+      atteso_testo: rec ? (rec.testo == null ? '' : rec.testo) : u.vecchioTesto || '',
+      data: { testo: u.nuovoTesto },
+      update: u,
+    });
+  }
+  return out;
+}
+// celle del piano di piu assenze in una lista sola, con dove comincia quella di ognuna. La stessa
+// cella da due assenze (stessa persona, giorni sovrapposti) e un errore: niente si scrive
+function _rapportoUnisciCelle(liste) {
+  const ops = [];
+  const da = [];
+  const viste = new Map();
+  (liste || []).forEach((l, n) => {
+    da.push(ops.length);
+    (l || []).forEach((o) => {
+      const k = o.collaboratore + '|' + String(o.data).substring(0, 10);
+      if (viste.has(k))
+        throw new Error(
+          'la stessa cella del piano (' +
+            o.collaboratore +
+            ' ' +
+            String(o.data).substring(0, 10).split('-').reverse().join('.') +
+            ') viene da due assenze diverse: correggi le date nel rapporto',
+        );
+      viste.set(k, n);
+      ops.push(o);
+    });
+  });
+  return { ops: ops, da: da };
+}
+const _rappSenzaCampi = (o) => {
+  const x = Object.assign({}, o);
+  delete x.staccata;
+  delete x.create;
+  delete x.update;
+  return x;
+};
+// Ritorna null se la funzione non c e (si usa la strada di prima), altrimenti
+// { salvate, result, staccate } con cio che il database ha salvato (tutto). Lancia se niente
+// e stato scritto (errore del database, cella o registrazione cambiata da un collega).
+async function _rapportoScriviAtomico(ops, staccate, ds, turno) {
+  if (_rapportoAtomicaManca || !getOpToken()) return null;
+  const conPiano = typeof sincronizzaMalattiaPiano === 'function';
+  const assTipo = ops.meta && ops.meta.assTipo;
+  // 1. le celle del piano, preparate come le scrive il Diario (nessuna scrittura qui)
+  const prep = [];
+  if (conPiano) {
+    for (const c of ops.creates) {
+      const x = await sincronizzaMalattiaPiano(c.nome, '', c.record.data, c.record.testo || '', {
+        soloPrepara: true,
+        codice: c.record.tipo === assTipo ? 'ASS' : undefined,
+      });
+      if (x) prep.push(x);
+    }
+    for (const u of ops.updates) {
+      const rec = datiCache.find((x) => x.id === u.id);
+      const x = await sincronizzaMalattiaPiano(u.nome, u.vecchioTesto || '', rec ? rec.data : '', u.nuovoTesto || '', {
+        soloPrepara: true,
+        codice: rec && rec.tipo === assTipo ? 'ASS' : undefined,
+      });
+      if (x) prep.push(x);
+    }
+  }
+  const regOps = _rapportoOpsDiario(ops.creates, ops.updates, staccate, datiCache, _origineSchemaSupported);
+  let celle = _rapportoUnisciCelle(prep.map((x) => x.ops));
+  const chiama = () =>
+    _conSessione(
+      (t) =>
+        _rpcSicura('rapporto_assenze_scrivi', {
+          p_token: t,
+          p_reg: regOps.map(_rappSenzaCampi),
+          p_piano: celle.ops,
+        }),
+      getOpToken(),
+      true, // rete caduta: niente secondo tentativo alla cieca (la prima potrebbe essere arrivata)
+    );
+  let es;
+  for (let giro = 0; ; giro++) {
+    try {
+      es = await chiama();
+    } catch (e) {
+      if (typeof _pianoErroreFunzioneAssente === 'function' && _pianoErroreFunzioneAssente(e)) {
+        _rapportoAtomicaManca = true;
+        console.warn('rapporto_assenze_scrivi assente (migrazione 20260930_a): scrittura una per una');
+        return null;
+      }
+      throw e;
+    }
+    if (!es || typeof es.ok !== 'boolean') throw new Error('il database non ha confermato il salvataggio');
+    if (es.ok) break;
+    const conf = es.conflitti || [];
+    const diReg = conf.filter((c) => c && c.registrazione != null);
+    if (diReg.length) {
+      const nomi = diReg.map((c) => {
+        const r = regOps.find((o) => o.id === c.registrazione);
+        return (r && ((r.update && r.update.nome) || (r.staccata && r.staccata.nome))) || 'una registrazione';
+      });
+      throw new Error(
+        'nel frattempo ' + nomi.join(', ') + ' è stata cambiata da un collega nel Diario: ricarica e riprova',
+      );
+    }
+    // una cella del piano cambiata fra la lettura e la scrittura: si rilegge e si riprova UNA
+    // volta (la malattia prevale, la nota "Ex" prende la sigla nuova), come dal Diario
+    if (giro >= 1 || !prep.length)
+      throw new Error(
+        'il piano è cambiato mentre salvavi: ' +
+          conf
+            .map((c) => (typeof _pianoConflittoTesto === 'function' ? _pianoConflittoTesto(c) : c.collaboratore))
+            .join('; '),
+      );
+    for (const x of prep) await x.riprepara();
+    celle = _rapportoUnisciCelle(prep.map((x) => x.ops));
+  }
+  // 2. salvato tutto: la memoria e l Annulla (un passo con la registrazione, come dal Diario)
+  const salvate = { creates: [], updates: [], deletes: [] };
+  const result = { created_ids: es.created_ids || [], created: 0, updated: 0, deleted: 0 };
+  const righe = es.righe || [];
+  const staccateOk = [];
+  let iC = 0;
+  let iU = 0;
+  regOps.forEach((o) => {
+    if (o.action === 'create') {
+      salvate.creates.push({ c: o.create, id: (es.created_ids || [])[iC] });
+      iC++;
+      result.created++;
+    } else {
+      const dopo = (es.dopo || [])[iU];
+      const rec = datiCache.find((x) => x.id === o.id);
+      if (rec) Object.assign(rec, o.data);
+      if (window.Annulla && typeof window.Annulla.conferma === 'function' && (es.prima || [])[iU])
+        window.Annulla.conferma({ tipo: 'patch', table: 'registrazioni', prima: [es.prima[iU]], dati: o.data });
+      iU++;
+      if (o.update) {
+        salvate.updates.push(o.update);
+        result.updated++;
+      }
+      if (o.staccata && dopo !== undefined) staccateOk.push(o.staccata);
+    }
+  });
+  if (window.Annulla && typeof window.Annulla.dopoPost === 'function' && righe.length)
+    window.Annulla.dopoPost('registrazioni', righe);
+  // le righe di registro dopo l Annulla (la prima chiude il passo: tutto in uno)
+  for (const d of staccateOk) {
+    toast(d.nome + ' tolto dal Rapporto: nel Diario la registrazione resta');
+    try {
+      logAzione('Tolto dal rapporto (Diario invariato)', d.nome + ' · rapporto ' + turno + ' del ' + ds);
+    } catch (_) {}
+  }
+  // 3. il piano: memoria, recuperi CGF, avvisi e registro di ogni assenza (dopo la scrittura)
+  if (prep.length) {
+    if (typeof _pianoPassoRegistra === 'function') _pianoPassoRegistra(celle.ops, es.fine);
+    for (let n = 0; n < prep.length; n++) {
+      const a = celle.da[n];
+      const b = n + 1 < prep.length ? celle.da[n + 1] : celle.ops.length;
+      try {
+        await prep[n].dopo({ ok: true, ops: celle.ops.slice(a, b), righe: (es.piano || []).slice(a, b) });
+      } catch (e) {
+        toastErrore('Piano: aggiornamento dopo il salvataggio non riuscito (' + ((e && e.message) || e) + ')');
+      }
+    }
+  }
+  return { salvate: salvate, result: result };
+}
+// === EXECUTE: applica le operazioni (una transazione, ripiego REST) + D4 audit ===
 async function _eseguiAssenzeOps(ops, ds, turno) {
   // D7: notifica errori validazione (non bloccanti, gli altri op vanno avanti)
   for (const e of ops.errors) {
-    toast('Attenzione · ' + e.nome + ': ' + e.motivo);
+    // una volta per frase (il rapporto si salva mentre si scrive: prima lo stesso avviso
+    // tornava a ogni salvataggio, A22)
+    const _msg = 'Attenzione · ' + e.nome + ': ' + e.motivo;
+    if (typeof _avvisoUnaVolta === 'function')
+      _avvisoUnaVolta('ass|' + ds + '|' + turno + '|' + (e.riga || '') + '|' + e.motivo, _msg);
+    else toast(_msg);
     try {
       logAzione('Validazione assenza fallita', e.nome + ' - ' + e.motivo + ' (rapporto ' + turno + ' del ' + ds + ')');
     } catch (_) {}
@@ -735,143 +1040,93 @@ async function _eseguiAssenzeOps(ops, ds, turno) {
   // viene piu aggiornata dal Rapporto; un avviso lo dice.
   const staccate = ops.deletes;
   ops.deletes = [];
-  for (const d of staccate) {
-    const rec = datiCache.find((e) => e.id === d.id);
-    if (!rec) continue;
-    const nuovoTesto = String(rec.testo || '').replace(/\bda rapporto (PRESTO|NOTTE)/, 'tolta dal rapporto $1');
-    const patch = { testo: nuovoTesto };
-    if (_origineSchemaSupported) patch.origine = 'manual';
-    try {
-      await secPatch('registrazioni', 'id=eq.' + d.id, patch);
-    } catch (e) {
-      try {
-        await secPatch('registrazioni', 'id=eq.' + d.id, { testo: nuovoTesto });
-      } catch (e2) {
-        toastErrore(d.nome + ': non staccata dal Rapporto, ' + (e2.message || 'errore del database'));
-        continue;
-      }
-    }
-    Object.assign(rec, patch);
-    toast(d.nome + ' tolto dal Rapporto: nel Diario la registrazione resta');
-    try {
-      logAzione('Tolto dal rapporto (Diario invariato)', d.nome + ' · rapporto ' + turno + ' del ' + ds);
-    } catch (_) {}
-  }
-  const totaleDb = ops.creates.length + ops.updates.length + ops.deletes.length;
-  if (totaleDb === 0 && ops.skipped.length === 0) return;
-  // D6: TRANSACTIONAL · costruisci batch operazioni per RPC
-  const rpcOps = [];
-  for (const c of ops.creates) rpcOps.push({ action: 'create', data: c.record });
-  for (const u of ops.updates) rpcOps.push({ action: 'update', id: u.id, data: { testo: u.nuovoTesto } });
-  for (const d of ops.deletes) rpcOps.push({ action: 'delete', id: d.id });
   let result = { created_ids: [], created: 0, updated: 0, deleted: 0 };
   // cio che il database ha DAVVERO salvato: solo questo entra in memoria, nel
   // registro e nel Piano (creates con l id vero dato dal database)
-  const salvate = { creates: [], updates: [], deletes: [] };
+  let salvate = { creates: [], updates: [], deletes: [] };
   const falliti = []; // nomi delle operazioni che il database non ha salvato
   let usedFallback = false;
-  // Strip origine dalle ops se schema non supporta la colonna (graceful degradation pre-migration)
-  const _maybeStripOrigineFromOps = () => {
-    if (!_origineSchemaSupported) {
-      for (const op of rpcOps) {
-        if (op.action === 'create' && op.data) delete op.data.origine;
-      }
-    }
-  };
-  _maybeStripOrigineFromOps();
-  if (rpcOps.length > 0) {
-    const tk = getOpToken();
-    if (tk && _transactionalRpcSupported) {
-      // Tutto o niente: se il database rifiuta, la transazione e annullata e NULLA
-      // e salvato. Si ripiega sulle chiamate una per una solo se la funzione non
-      // e raggiungibile (non esiste, rete); un rifiuto del database si dice e basta.
-      const _chiama = () => _rpcSicura('parse_assenze_transactional', { p_token: getOpToken(), p_ops: rpcOps });
-      let _rpcResult = null;
+  let pianoFatto = false; // celle del piano gia scritte nella stessa transazione
+  if (staccate.length || ops.creates.length || ops.updates.length) {
+    let at = null;
+    try {
+      at = await _rapportoScriviAtomico(ops, staccate, ds, turno);
+    } catch (e) {
+      const msg = (e && e.message) || String(e);
+      console.error('rapporto_assenze_scrivi:', msg);
+      toastErrore('Assenze del rapporto NON salvate (Diario e Piano come prima): ' + msg, 9000);
       try {
-        try {
-          _rpcResult = await _chiama();
-        } catch (e) {
-          const _msg = (e.message || '').toLowerCase();
-          if (e.sessione && (await _renewToken())) {
-            _rpcResult = await _chiama();
-          } else if (_origineSchemaSupported && _msg.includes('origine')) {
-            // colonna origine non ancora presente nel database: si riprova senza
-            console.warn('Colonna origine non disponibile, switching schema legacy');
-            _origineSchemaSupported = false;
-            _maybeStripOrigineFromOps();
-            _rpcResult = await _chiama();
-          } else {
-            throw e;
-          }
-        }
-        if (!_rpcResult || !Array.isArray(_rpcResult.created_ids))
-          throw Object.assign(new Error('risposta vuota dal database'), { dalDatabase: true });
-        result = _rpcResult;
-        salvate.creates = ops.creates.map((c, i) => ({ c: c, id: _rpcResult.created_ids[i] }));
-        salvate.updates = ops.updates.slice();
-        salvate.deletes = ops.deletes.slice();
-      } catch (e) {
-        if (e.dalDatabase && e.status !== 404) {
-          console.error('parse_assenze_transactional rifiutata:', e.message);
-          toastErrore('Assenze del rapporto NON salvate: ' + e.message, 9000);
-          try {
-            logAzione('Assenze da rapporto non salvate', e.message + ' (rapporto ' + turno + ' del ' + ds + ')');
-          } catch (_) {}
-          return;
-        }
-        console.warn('parse_assenze_transactional non disponibile, fallback REST sequenziale:', e.message);
-        _transactionalRpcSupported = false;
-        usedFallback = true;
-      }
-    } else {
-      usedFallback = true;
+        logAzione('Assenze da rapporto non salvate', msg + ' (rapporto ' + turno + ' del ' + ds + ')');
+      } catch (_) {}
+      return { ok: false, errori: ops.errors, falliti: ['tutte (' + msg + ')'] };
     }
-    if (usedFallback) {
-      // Fallback: chiamate REST una per una (senza atomicita). Si tiene SOLO cio
-      // che il database ha davvero salvato: un errore resta un errore visibile.
-      for (const c of ops.creates) {
-        let _recToSend = _origineSchemaSupported ? c.record : _stripOrigine(c.record);
+    if (at) {
+      salvate = at.salvate;
+      result = at.result;
+      pianoFatto = true;
+    } else usedFallback = true;
+  }
+  if (usedFallback) {
+    for (const d of staccate) {
+      const rec = datiCache.find((e) => e.id === d.id);
+      if (!rec) continue;
+      const nuovoTesto = String(rec.testo || '').replace(/\bda rapporto (PRESTO|NOTTE)/, 'tolta dal rapporto $1');
+      const patch = { testo: nuovoTesto };
+      if (_origineSchemaSupported) patch.origine = 'manual';
+      try {
+        await secPatch('registrazioni', 'id=eq.' + d.id, patch);
+      } catch (e) {
         try {
-          let _saved;
-          try {
-            _saved = await secPost('registrazioni', _recToSend);
-          } catch (innerErr) {
-            const _imsg = (innerErr.message || '').toLowerCase();
-            if (_origineSchemaSupported && (_imsg.includes('origine') || _imsg.includes('column'))) {
-              _origineSchemaSupported = false;
-              _saved = await secPost('registrazioni', _stripOrigine(c.record));
-            } else {
-              throw innerErr;
-            }
+          await secPatch('registrazioni', 'id=eq.' + d.id, { testo: nuovoTesto });
+        } catch (e2) {
+          toastErrore(d.nome + ': non staccata dal Rapporto, ' + (e2.message || 'errore del database'));
+          continue;
+        }
+      }
+      Object.assign(rec, patch);
+      toast(d.nome + ' tolto dal Rapporto: nel Diario la registrazione resta');
+      try {
+        logAzione('Tolto dal rapporto (Diario invariato)', d.nome + ' · rapporto ' + turno + ' del ' + ds);
+      } catch (_) {}
+    }
+  }
+  const totaleDb = ops.creates.length + ops.updates.length + ops.deletes.length;
+  if (totaleDb === 0 && ops.skipped.length === 0) return;
+  if (usedFallback && totaleDb > 0) {
+    // Ripiego: chiamate REST una per una (senza atomicita). Si tiene SOLO cio
+    // che il database ha davvero salvato: un errore resta un errore visibile.
+    for (const c of ops.creates) {
+      let _recToSend = _origineSchemaSupported ? c.record : _stripOrigine(c.record);
+      try {
+        let _saved;
+        try {
+          _saved = await secPost('registrazioni', _recToSend);
+        } catch (innerErr) {
+          const _imsg = (innerErr.message || '').toLowerCase();
+          if (_origineSchemaSupported && (_imsg.includes('origine') || _imsg.includes('column'))) {
+            _origineSchemaSupported = false;
+            _saved = await secPost('registrazioni', _stripOrigine(c.record));
+          } else {
+            throw innerErr;
           }
-          const _id = _saved && _saved[0] && _saved[0].id;
-          if (!_id) throw new Error('il database non ha restituito la registrazione');
-          salvate.creates.push({ c: c, id: _id });
-          result.created++;
-        } catch (err) {
-          console.error('Fallback create ' + c.nome + ':', err);
-          falliti.push(c.nome + ' (creazione)');
         }
+        const _id = _saved && _saved[0] && _saved[0].id;
+        if (!_id) throw new Error('il database non ha restituito la registrazione');
+        salvate.creates.push({ c: c, id: _id });
+        result.created++;
+      } catch (err) {
+        console.error('Fallback create ' + c.nome + ':', err);
+        falliti.push(c.nome + ' (creazione)');
       }
-      for (const u of ops.updates) {
-        try {
-          await secPatch('registrazioni', 'id=eq.' + u.id, { testo: u.nuovoTesto });
-          salvate.updates.push(u);
-          result.updated++;
-        } catch (err) {
-          console.error('Fallback update ' + u.nome + ':', err);
-          falliti.push(u.nome + ' (aggiornamento)');
-        }
-      }
-      for (const d of ops.deletes) {
-        try {
-          await secDel('registrazioni', 'id=eq.' + d.id);
-          salvate.deletes.push(d);
-          result.deleted++;
-        } catch (err) {
-          console.error('Fallback delete ' + d.nome + ':', err);
-          falliti.push(d.nome + ' (rimozione)');
-        }
+    }
+    for (const u of ops.updates) {
+      try {
+        await secPatch('registrazioni', 'id=eq.' + u.id, { testo: u.nuovoTesto });
+        salvate.updates.push(u);
+        result.updated++;
+      } catch (err) {
+        console.error('Fallback update ' + u.nome + ':', err);
+        falliti.push(u.nome + ' (aggiornamento)');
       }
     }
   }
@@ -931,7 +1186,7 @@ async function _eseguiAssenzeOps(ops, ds, turno) {
   }
   // PIANO: la malattia scritta nel Rapporto scrive le M nel Piano come quella registrata
   // nel Diario (nota "Ex C0 - operatore", recuperi CGF, festivi persi)
-  if (typeof sincronizzaMalattiaPiano === 'function') {
+  if (!pianoFatto && typeof sincronizzaMalattiaPiano === 'function') {
     for (const { c } of salvate.creates) {
       try {
         await sincronizzaMalattiaPiano(
@@ -967,7 +1222,9 @@ async function _eseguiAssenzeOps(ops, ds, turno) {
   }
   // SKIPPED: solo audit + toast
   for (const s of ops.skipped) {
-    toast(s.nome + ': ' + s.motivo + ', non duplicato');
+    if (typeof _avvisoUnaVolta === 'function')
+      _avvisoUnaVolta('ass-dup|' + ds + '|' + turno + '|' + s.existingId, s.nome + ': ' + s.motivo + ', non duplicato');
+    else toast(s.nome + ': ' + s.motivo + ', non duplicato');
     try {
       logAzione(
         'Duplicato cross-rapporto saltato',
@@ -976,12 +1233,16 @@ async function _eseguiAssenzeOps(ops, ds, turno) {
     } catch (_) {}
   }
   // Toast riepilogo
+  // testo per chi usa il programma (prima «Assenze: 1 create (modalità compatibilita)»,
+  // controllo 23/10 D12); il modo di scrittura resta solo nella console
   const summary = [];
-  if (result.created) summary.push(result.created + ' create');
-  if (result.updated) summary.push(result.updated + ' aggiornate');
-  if (result.deleted) summary.push(result.deleted + ' eliminate');
-  if (ops.skipped.length) summary.push(ops.skipped.length + ' duplicati saltati');
-  if (summary.length) toast('Assenze: ' + summary.join(', ') + (usedFallback ? ' (modalità compatibilita)' : ''));
+  const nn = (n, uno, piu) => n + ' ' + (n === 1 ? uno : piu);
+  if (result.created) summary.push(nn(result.created, 'registrata', 'registrate'));
+  if (result.updated) summary.push(nn(result.updated, 'corretta', 'corrette'));
+  if (result.deleted) summary.push(nn(result.deleted, 'tolta', 'tolte'));
+  if (ops.skipped.length) summary.push(nn(ops.skipped.length, 'già presente', 'già presenti'));
+  if (usedFallback) console.info('assenze del rapporto: scrittura una per una (REST)');
+  if (summary.length) toast('Assenze nel Diario: ' + summary.join(', '));
   // per ultimo, perche nessun altro avviso lo copra
   if (falliti.length) {
     toastErrore('Assenze NON salvate per: ' + falliti.join(', ') + '. Riprova a salvare il rapporto.', 9000);
@@ -1015,6 +1276,8 @@ async function _eseguiAssenzeOps(ops, ds, turno) {
       else await apriPopupCopertura(c.nome, dIso);
     }
   }
+  // esito per chi scrive dal Piano (D-N1): con un errore niente «registrata anche nel Diario»
+  return { ok: !falliti.length && !ops.errors.length, errori: ops.errors, falliti: falliti };
 }
 // === ORCHESTRATOR ===
 async function _processaAssenzeRapporto(assenzeText, ds, turno) {
@@ -1032,7 +1295,33 @@ async function _processaAssenzeRapporto(assenzeText, ds, turno) {
         )) || '';
     ops = _analizzaAssenzeRapporto(assenzeText, ds, turno, scelte);
   }
-  await _eseguiAssenzeOps(ops, ds, turno);
+  const esito = await _eseguiAssenzeOps(ops, ds, turno);
+  await _rapportoStaccaDalDiario(assenzeText, ds, turno);
+  return esito || { ok: true, errori: [], falliti: [] };
+}
+// VOCE SCRITTA DAL DIARIO E TOLTA DAL RAPPORTO (A9): il Diario resta (come per le assenze nate
+// nel Rapporto) e il collegamento si toglie, cosi una cancellazione futura nel Diario non tocca
+// piu questo Rapporto
+async function _rapportoStaccaDalDiario(assenzeText, ds, turno) {
+  const orig = 'diario|' + turno + '|' + ds;
+  const via = datiCache.filter(
+    (e) =>
+      !e.eliminato &&
+      e.origine === orig &&
+      (e.reparto_dip || currentReparto) === currentReparto &&
+      !_rapportoParolaNome(assenzeText || '', e.nome),
+  );
+  const nomi = new Set();
+  for (const e of via) {
+    try {
+      await secPatch('registrazioni', 'id=eq.' + e.id, { origine: 'manual' });
+      e.origine = 'manual';
+      nomi.add(e.nome);
+    } catch (er) {
+      console.error('rapporto: stacca dal diario', er);
+    }
+  }
+  nomi.forEach((n) => toast(n + ' tolto dal Rapporto: nel Diario la registrazione resta'));
 }
 // =================================================================================
 // un salvataggio alla volta: il doppio click creava righe doppie (unaVoltaSola in utils.js)
@@ -1111,7 +1400,19 @@ function _rappUnisciTre(campi, base, mio, suo) {
       conflitti.push(c.label || k);
       if (c.type === 'number') valori[k] = m;
       else if (b && m.startsWith(b) && s.startsWith(b)) valori[k] = s + m.substring(b.length);
-      else valori[k] = s.trim() ? (m.trim() ? s + '\n' + m : s) : m;
+      else if (!s.trim()) valori[k] = m;
+      else {
+        // RIGA PER RIGA: le righe del collega, senza quelle che ho tolto io, piu quelle che ho
+        // aggiunto io. Prima i due testi si mettevano uno dopo l altro e una voce corretta dal
+        // Diario (A9) restava due volte, vecchia e nuova.
+        const righe = (t) => t.split('\n').filter((x) => x.trim());
+        const B = righe(b),
+          M = righe(m);
+        const tolte = B.filter((x) => !M.includes(x));
+        const out = righe(s).filter((x) => !tolte.includes(x));
+        M.filter((x) => !B.includes(x) && !out.includes(x)).forEach((x) => out.push(x));
+        valori[k] = out.join('\n');
+      }
     }
   });
   return { valori, conflitti };
@@ -1191,12 +1492,11 @@ async function _salvaRapportoTurnoEsegui(ds, turno, cls) {
     // Auto-differenze cassa: parse differenze_cassa field
     const diffExtra = data.note_extra ? JSON.parse(data.note_extra) : {};
     const diffText = diffExtra.differenze_cassa || '';
-    if (diffText.trim()) {
-      await parseDifferenzeCassa(diffText, ds, turno);
-      renderCassaAlerts();
-      renderRischioAlerts();
-      renderAmmonimentiAlerts();
-    }
+    // anche vuoto: chi e stato tolto dal campo si stacca dal Rapporto (resta nel Diario)
+    await parseDifferenzeCassa(diffText, ds, turno);
+    renderCassaAlerts();
+    renderRischioAlerts();
+    renderAmmonimentiAlerts();
     return true;
   } catch (e) {
     console.error(e);
@@ -1220,7 +1520,8 @@ function getRapportoDateRange() {
 }
 function _rapportoHaDati(r) {
   if (!r) return false;
-  const skip = ['id', 'data_rapporto', 'turno', 'operatore', 'updated_at', 'created_at'];
+  // reparto_dip non e un dato del rapporto (prima ogni riga risultava compilata)
+  const skip = ['id', 'data_rapporto', 'turno', 'operatore', 'updated_at', 'created_at', 'reparto_dip'];
   for (const k in r) {
     if (skip.includes(k)) continue;
     const v = r[k];
@@ -1259,6 +1560,10 @@ async function fetchRapportiRange(dal, al) {
 }
 async function esportaRapportoCSV() {
   const { dal, al } = getRapportoDateRange();
+  if (dal > al) {
+    toastErrore('Date invertite: "Dal" è dopo "Al". Correggi il periodo.');
+    return;
+  }
   const byDate = await fetchRapportiRange(dal, al);
   const dates = Object.keys(byDate).sort();
   if (!dates.length) {
@@ -1298,6 +1603,10 @@ async function esportaRapportoPDF() {
     }
   }
   const { dal, al } = getRapportoDateRange();
+  if (dal > al) {
+    toastErrore('Date invertite: "Dal" è dopo "Al". Correggi il periodo.');
+    return;
+  }
   const byDate = await fetchRapportiRange(dal, al);
   const dates = Object.keys(byDate).sort();
   if (!dates.length) {
@@ -1404,21 +1713,88 @@ function _rapportoOrigineDi(rec) {
   if (!campo) return null;
   return { turno: m[1], ds: ds, campo: campo, reparto: rec.reparto_dip || currentReparto };
 }
-// parole del nome (almeno 3 lettere) presenti nel testo, come erano scritte li
-function _rapportoParolaNome(testo, nome) {
-  const parole = String(nome || '')
+// LA PERSONA NEL TESTO DEL RAPPORTO (riverifica A-N1, 23/10): il testo con cui il Rapporto
+// nomina il collaboratore «nome», come e scritto li; '' se non lo nomina. Vale il nome intero
+// (anche al contrario: «Chiara Clemente») oppure una parola del nome che in anagrafica e solo
+// sua (cognome unico). Una parola in comune con un collega non basta: prima bastava una
+// parola qualsiasi di 3 lettere e la malattia di «Bianchi Chiara» riscriveva «Clemente Chiara
+// malato», «Raineri Andrea» toglieva «Molinari Andrea ferie», un prefisso comune un altro.
+const _RAPP_LETTERE = "A-Za-zÀ-ÖØ-öø-ÿ'’";
+function _rapportoEsc(w) {
+  return String(w).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+function _rapportoTrovaNelTesto(testo, pezzo) {
+  const m = String(testo || '').match(
+    new RegExp('(^|[^' + _RAPP_LETTERE + '])(' + pezzo + ')(?![' + _RAPP_LETTERE + '])', 'i'),
+  );
+  return m ? m[2] : '';
+}
+// parole del nome che lo possono riconoscere: almeno 3 lettere e non una particella («Del»,
+// «Della», «Dal»: in «malato del turno» non c e Del Prete Roberta, riverifica 2 A-R1)
+function _rapportoParoleDi(nome) {
+  const part = typeof _NOMI_PARTICELLE !== 'undefined' ? _NOMI_PARTICELLE : ['di', 'da', 'de', 'del', 'della', 'dal'];
+  return String(nome || '')
+    .trim()
+    .toLowerCase()
     .split(/\s+/)
-    .filter((w) => w.replace(/[^A-Za-zÀ-ü]/g, '').length >= 3);
-  for (const w of parole) {
-    const re = new RegExp('\\b' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
-    const m = String(testo || '').match(re);
-    if (m) return m[0];
+    .filter((w) => w.replace(/[^a-zà-öø-ÿ]/g, '').length >= 3 && !part.includes(w));
+}
+function _rapportoParolaNome(testo, nome) {
+  const n = String(nome || '').trim();
+  if (!n) return '';
+  const parole = n.split(/\s+/);
+  let w = _rapportoTrovaNelTesto(testo, parole.map(_rapportoEsc).join('\\s+'));
+  if (!w && parole.length === 2)
+    w = _rapportoTrovaNelTesto(testo, [parole[1], parole[0]].map(_rapportoEsc).join('\\s+'));
+  if (w) return w;
+  const lc = n.toLowerCase();
+  const altri = (typeof collaboratoriCache !== 'undefined' ? collaboratoriCache || [] : []).filter(
+    (c) =>
+      String(c.nome || '')
+        .trim()
+        .toLowerCase() !== lc,
+  );
+  for (const p of _rapportoParoleDi(n)) {
+    if (altri.some((c) => _rapportoParoleDi(c.nome).includes(p))) continue; // parola in comune
+    // con le particelle che la precedono nel nome («Del Prete»), se sono scritte anche li
+    const tutte = parole.map((w) => w.toLowerCase());
+    const k = tutte.indexOf(p);
+    let k0 = k;
+    while (k0 > 0 && !_rapportoParoleDi(tutte[k0 - 1]).length) k0--;
+    const x =
+      (k0 < k &&
+        _rapportoTrovaNelTesto(
+          testo,
+          parole
+            .slice(k0, k + 1)
+            .map(_rapportoEsc)
+            .join('\\s+'),
+        )) ||
+      _rapportoTrovaNelTesto(testo, _rapportoEsc(p));
+    if (x) return x;
   }
   return '';
+}
+// il frammento nomina (oltre a «nome», gia tolto: resto) un altro collaboratore? Lo si
+// riconosce come sempre: nome intero o cognome unico (A-R1: prima bastava una parola qualsiasi
+// del suo nome, anche «del» di «Del Prete»)
+function _rapportoNominaAltri(resto, nome) {
+  const lc = String(nome || '')
+    .trim()
+    .toLowerCase();
+  return (typeof collaboratoriCache !== 'undefined' ? collaboratoriCache || [] : []).some(
+    (c) =>
+      String(c.nome || '')
+        .trim()
+        .toLowerCase() !== lc && !!_rapportoParolaNome(resto, c.nome),
+  );
 }
 // toglie (o sostituisce con 'nuovo') la parte del testo che riguarda la persona:
 // "Rossi malato, Bianchi ferie" -> "Bianchi ferie"; "Rossi e Bianchi assenti" ->
 // "Bianchi assenti". Righe e frammenti (separati da virgola o punto e virgola).
+// Un frammento che nomina anche un altro collaboratore non si cancella e non si riscrive
+// (A-N1): se ne toglie solo il nome quando e «Rossi e Bianchi ...», altrimenti resta com e
+// e la voce nuova si aggiunge a parte.
 function _rapportoTogliNome(testo, nome, nuovo) {
   let fatto = false;
   const righe = String(testo || '')
@@ -1429,19 +1805,27 @@ function _rapportoTogliNome(testo, nome, nuovo) {
       for (let i = 0; i < pezzi.length; i += 2) {
         const fr = pezzi[i];
         const sep = pezzi[i + 1] || '';
-        const w = _rapportoParolaNome(fr, nome);
-        if (!w || fatto) {
+        const w = fatto ? '' : _rapportoParolaNome(fr, nome);
+        if (!w) {
           out.push(fr, sep);
           continue;
         }
-        fatto = true;
-        const e = w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const e = w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
         const conAltri = new RegExp('(^|\\s)' + e + '\\s+(?:e|ed|&)\\s+|\\s+(?:e|ed|&)\\s+' + e + '(?=\\s|$)', 'i');
         if (conAltri.test(fr)) {
           // piu persone nello stesso frammento: si toglie solo il nome
+          fatto = true;
           out.push(fr.replace(conAltri, (x, a) => a || '').trim(), sep);
           if (nuovo) out.push(nuovo, sep || ', ');
-        } else if (nuovo) out.push(nuovo, sep);
+          continue;
+        }
+        const resto = fr.replace(new RegExp(e, 'i'), ' ');
+        if (_rapportoNominaAltri(resto, nome)) {
+          out.push(fr, sep); // nomina un collega: non si tocca
+          continue;
+        }
+        fatto = true;
+        if (nuovo) out.push(nuovo, sep);
         else out.push('', '');
       }
       return out
@@ -1513,7 +1897,9 @@ async function _rapportoRimettiRegistrazione(rec) {
     if (!riga) return false;
     const vecchio = _rapportoValoreCampo(riga, o.campo);
     if (_rapportoParolaNome(vecchio, rec.nome)) return false; // gia presente
-    const parola = String(rec.nome).split(/\s+/)[0];
+    // il nome intero (A-N1): la prima parola («De» di «De Lima Marco», un nome in comune con
+    // un collega) non riconosceva piu la persona
+    const parola = String(rec.nome).trim();
     let voce = '';
     if (o.campo === 'assenze') {
       const rg = _getRangeMalattiaRec(rec);
@@ -1541,7 +1927,22 @@ async function _rapportoCorreggiRegistrazione(rec, nomeVecchio, opz) {
     const riga = await _rapportoRiga(o);
     if (!riga) return false;
     const vecchio = _rapportoValoreCampo(riga, o.campo);
-    const parola = _rapportoParolaNome(vecchio, nomeVecchio || rec.nome) || String(rec.nome).split(/\s+/)[0];
+    // il nome come e scritto nel Rapporto: intero se c e intero («Balliu Bledar assente» ->
+    // «Balliu Bledar malato con certificato»; prima restava solo «Balliu», controllo 23/10
+    // D15), altrimenti la parola usata (chi scrive «Rossi malato» resta «Rossi»)
+    const nomeIntero = String(nomeVecchio || rec.nome || '').trim();
+    const mIntero = nomeIntero
+      ? String(vecchio || '').match(
+          new RegExp(
+            '(^|[^A-Za-zÀ-ü])(' +
+              nomeIntero.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+') +
+              ')(?![A-Za-zÀ-ü])',
+            'i',
+          ),
+        )
+      : null;
+    const parola =
+      (mIntero && rec.nome) || _rapportoParolaNome(vecchio, nomeVecchio || rec.nome) || String(rec.nome).trim();
     let nuovo = '';
     if (o.campo === 'assenze') {
       const rg = _getRangeMalattiaRec(rec);
@@ -1597,11 +1998,20 @@ async function _rapportoAggiungiAssenza(nome, dal, al, codiceSostituito, codice)
     _rapportoCacheSet(dal, turno, { data_rapporto: dal, turno: turno, assenze: nuovo });
   }
   window._rapportoDalPiano = true;
+  // i limiti di data valgono per gli altri frammenti del Rapporto, non per la persona del Piano
+  window._rapportoDalPianoNome = String(nome).trim().toLowerCase();
+  let esito = null;
   try {
-    await _processaAssenzeRapporto(nuovo, dal, turno);
+    esito = await _processaAssenzeRapporto(nuovo, dal, turno);
   } finally {
     window._rapportoDalPiano = false;
+    window._rapportoDalPianoNome = '';
   }
+  // errori di questa persona (date, nome da chiarire, scrittura rifiutata): chi chiama
+  // registra nel Diario per un altra strada e non annuncia un successo (D-N1)
+  const lc = String(nome).trim().toLowerCase();
+  o.errori = ((esito && esito.errori) || []).filter((e) => String(e.nome || '').toLowerCase() === lc);
+  if (esito && esito.falliti && esito.falliti.length) o.errori.push({ nome: nome, motivo: esito.falliti.join(', ') });
   logAzione(
     codice === 'ASS' ? 'Assenza dal piano nel Rapporto' : 'Malattia dal piano nel Rapporto',
     nome + ' ' + dal + '-' + al + ' · rapporto ' + turno,

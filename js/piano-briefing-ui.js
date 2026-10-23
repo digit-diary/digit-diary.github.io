@@ -210,8 +210,7 @@ function _briefComponi(pianoRighe) {
     const info = _pianoCollabInfo(r.collaboratore);
     if (info && info.attivo === false) return;
     if (info && info.funzione === 'RESP') return;
-    const parole = r.collaboratore.trim().split(/\s+/);
-    const cognome = (parole.length > 1 ? parole.slice(0, -1).join(' ') : parole[0]).toUpperCase();
+    const cognome = _cognomeDi(r.collaboratore).toUpperCase();
     righe.push({
       e: '',
       u: '',
@@ -240,6 +239,76 @@ function _briefComponi(pianoRighe) {
   _briefOrdina(righe);
   return righe;
 }
+// COGNOME DAL NOME DELL ANAGRAFICA («Cognome Nome», convenzione del casino): il cognome e
+// la prima parola, con le particelle che lo compongono (Di Tullio, Della Pace, De Lima,
+// Da Costa, Lucas De Andrade) e senza le iniziali puntate (H. Scappaldi -> Scappaldi).
+// Prima si prendeva «tutto tranne l ultima parola»: Cerrato Lorenzo Mattia diventava
+// CERRATO LORENZO e Troncao Camilo Hugo Miguel TRONCAO CAMILO HUGO (controllo 23/10, D29).
+// I nomi scritti al contrario nell anagrafica (Nicole Marchitelli) non si possono
+// riconoscere: vanno corretti nell anagrafica (Marchitelli Nicole).
+const _COGNOME_PARTICELLE = new Set([
+  'di',
+  'de',
+  'da',
+  'del',
+  'della',
+  'dei',
+  'degli',
+  'delle',
+  'dal',
+  'dalla',
+  'dalle',
+  'dos',
+  'das',
+  'do',
+  'lo',
+  'la',
+  'le',
+  'li',
+  'van',
+  'von',
+  'der',
+  'den',
+  'du',
+  'mc',
+  'mac',
+  'san',
+  'santa',
+  'st',
+  "d'",
+]);
+function _cognomeParti(nomeFull) {
+  // cognome scelto in Controlla il sistema › Coerenza Diario/Piano (nomi scritti al contrario
+  // o di piu parole: Nicole Marchitelli -> MARCHITELLI), impostazione cognomi_foglio
+  const scelto =
+    typeof window !== 'undefined' && window._cognomiFoglio && window._cognomiFoglio[String(nomeFull || '').trim()];
+  if (scelto) {
+    const resto = String(nomeFull || '')
+      .trim()
+      .split(/\s+/)
+      .filter((w) => !String(scelto).split(/\s+/).includes(w) && !/^[A-Za-zÀ-ü]\.$/.test(w));
+    return { cognome: String(scelto), proprio: resto.join(' ') };
+  }
+  const p = String(nomeFull || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  const iniziale = (w) => /^[A-Za-zÀ-ü]\.$/.test(w);
+  const part = (w) => _COGNOME_PARTICELLE.has(String(w).toLowerCase());
+  let i = 0;
+  while (i < p.length - 1 && iniziale(p[i])) i++;
+  const cog = [];
+  while (i < p.length - 1 && part(p[i])) cog.push(p[i++]);
+  if (i < p.length) cog.push(p[i++]);
+  // particella dentro un cognome doppio (Lucas De Andrade): fino alla parola che la segue
+  while (i < p.length - 1 && part(p[i])) cog.push(p[i++], p[i++]);
+  const resto = p.slice(i).filter((w) => !iniziale(w));
+  if (!cog.length) return { cognome: String(nomeFull || '').trim(), proprio: '' };
+  return { cognome: cog.join(' '), proprio: resto.join(' ') };
+}
+function _cognomeDi(nomeFull) {
+  return _cognomeParti(nomeFull).cognome;
+}
 // COGNOMI UGUALI (richiesta del titolare 21/10/2026): sul foglio si scrive il cognome; se
 // quel giorno ci sono piu persone con lo stesso cognome si aggiunge l iniziale del nome
 // (BIANCHI C. e BIANCHI M.), se coincide anche l iniziale le prime due lettere (BIANCHI Ma.
@@ -247,12 +316,8 @@ function _briefComponi(pianoRighe) {
 // distinto e lo stesso delle pause e dei bigliettini (leggono il nome della riga).
 // righe: [{ nome: cognome maiuscolo, nomeFull: 'Cognome Nome' }], cambiate sul posto
 function _briefNomiDistinti(righe) {
-  const proprioDi = (n) => {
-    const p = String(n || '')
-      .trim()
-      .split(/\s+/);
-    return p.length > 1 ? p[p.length - 1] : '';
-  };
+  // il nome proprio: la prima parola dopo il cognome (Rossi Mario Luca -> Mario)
+  const proprioDi = (n) => _cognomeParti(n).proprio.split(' ')[0] || '';
   const perCognome = {};
   (righe || []).forEach((r) => {
     if (!r || !r.nomeFull || !r.nome) return;
@@ -781,13 +846,16 @@ async function _renderPianoBriefingTab() {
         ",'nome',this.value);_briefAllarga(this)\" " +
         'style="width:' +
         largCol('nome', r.fm ? 86 : 138) +
-        ';border:none;background:transparent;padding:4px 2px 4px 6px;font:inherit;color:#000' +
+        ';border:none;background:transparent;padding:4px 2px 4px 6px;font:inherit;color:' +
+        _briefTestoSu(bgNome) +
         (stNome.b || r.bold || r.fm ? ';font-weight:700' : '') +
         (stNome.i || r.ital ? ';font-style:italic' : '') +
         (stNome.t || r.colT ? ';color:' + (stNome.t || r.colT) : '') +
         '">' +
         (r.fm
-          ? '<span style="font-size:var(--fs-sm,.8125rem);font-weight:700;color:#000;padding-right:3px">(formazione)</span>'
+          ? '<span style="font-size:var(--fs-sm,.8125rem);font-weight:700;color:' +
+            _briefTestoSu(bgNome) +
+            ';padding-right:3px">(formazione)</span>'
           : '') +
         '</td>'
       );
@@ -1109,6 +1177,23 @@ async function briefAggiungiRiga() {
   clearTimeout(_briefSaveTimer);
   await briefSalvaBriefing();
   renderPiano();
+}
+// TESTO LEGGIBILE SUL COLORE DELLA CELLA: nero sui colori chiari, bianco su quelli scuri
+// (rosso pieno del coordinatore Valet: prima testo nero su rosso scuro, controllo 23/10
+// D32). Soglia sulla luminanza relativa a 0,25 (non il pareggio WCAG a 0,18): sui rossi e
+// i blu saturi il bianco si legge meglio, come nelle stampe del casino (#FF0000 -> bianco,
+// giallo, verde chiaro e rosa della tavolozza -> nero).
+function _briefTestoSu(bg) {
+  const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(bg || '').trim());
+  if (!m) return '#000';
+  let h = m[1];
+  if (h.length === 3) h = h.replace(/./g, (x) => x + x);
+  const lin = (i) => {
+    const c = parseInt(h.substr(i, 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  };
+  const L = 0.2126 * lin(0) + 0.7152 * lin(2) + 0.0722 * lin(4);
+  return L > 0.25 ? '#000' : '#fff';
 }
 function _briefRigaVuota() {
   return { e: '', u: '', nome: '', nomeFull: null, turno: '', cd: '', uscita: '', firma: '', radio: '', badge: '' };
@@ -1850,7 +1935,16 @@ function _corsiLista() {
 }
 // orario del corso aggiornabile anche dagli operatori (è solo il riferimento
 // proposto alla prossima pianificazione, non tocca il piano)
+// chi puo cambiare i corsi (anche l orario): stesso permesso della scheda Corsi completa
+function _corsiModificabili() {
+  return puoGestirePiano() || (typeof puoModificare === 'function' && puoModificare('gestione_corsi'));
+}
 async function corsoOrarioRapido(cod, inizio, fine) {
+  // controllo QA 23/10/2026 (D36): l operatore con la scheda in sola lettura cambiava l orario
+  if (!_corsiModificabili()) {
+    toast('Sola lettura: l orario dei corsi lo cambia chi gestisce il piano o i corsi');
+    return;
+  }
   const cur = ((window._pianoCorsiOrari || {})[cod] || '').split('-');
   const oi = inizio != null ? inizio : cur[0] || '';
   const of2 = fine != null ? fine : cur[1] || '';
@@ -2006,8 +2100,8 @@ async function corsoRimuovi(cod) {
 }
 function _renderPianoCorsiCard() {
   const corsi = _corsiLista();
-  const puoCorsi = puoGestirePiano() || (typeof puoModificare === 'function' && puoModificare('gestione_corsi'));
-  // operatori senza permesso corsi: elenco in sola lettura (orario aggiornabile)
+  const puoCorsi = _corsiModificabili();
+  // operatori senza permesso corsi: elenco in sola lettura (anche l orario: D36)
   if (!puoCorsi) {
     let hRO =
       '<div class="main-card" style="margin-top:16px"><div class="card-header">Corsi</div><div style="padding:12px 14px"><table class="piano-table" style="min-width:420px;font-size:var(--fs-md,.875rem)"><thead><tr><th>Sigla</th><th style="text-align:left">Descrizione</th><th title="Durata in ore decimali e, accanto, in ore e minuti: 8.33 = 8h20, perché 20 minuti sono un terzo di ora">Ore</th><th>Orario</th></tr></thead><tbody>';
@@ -2020,18 +2114,14 @@ function _renderPianoCorsiCard() {
         escP(c.descrizione) +
         '</td><td>' +
         (c.ore || 0) +
-        '</td><td style="white-space:nowrap"><input type="time" value="' +
-        (orario[0] || '') +
-        '" onchange="corsoOrarioRapido(\'' +
-        c.codice +
-        '\',this.value,null)" style="padding:2px 4px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"> - <input type="time" value="' +
-        (orario[1] || '') +
-        '" onchange="corsoOrarioRapido(\'' +
-        c.codice +
-        '\',null,this.value)" style="padding:2px 4px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink)"></td></tr>';
+        '</td><td style="white-space:nowrap">' +
+        (orario[0] || orario[1]
+          ? escP((orario[0] || '--:--') + ' - ' + (orario[1] || '--:--'))
+          : '<span style="color:var(--muted)">da definire</span>') +
+        '</td></tr>';
     });
     hRO +=
-      '</tbody></table><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:6px">L&#39;orario del corso cambia di volta in volta: qui puoi aggiornarlo, viene proposto alla prossima pianificazione.</p></div></div>';
+      '</tbody></table><p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:6px">Sola lettura: l&#39;orario del corso lo aggiorna chi gestisce il piano o i corsi.</p></div></div>';
     return hRO;
   }
   const collabs = collaboratoriCache

@@ -245,6 +245,8 @@ async function loadAll() {
     try {
       puntiConfig = JSON.parse(pntCfg);
     } catch (e) {}
+  // incentivi spenti: anche i testi fissi (menu Formazione) senza punti
+  if (typeof incentiviAggiornaTesti === 'function') incentiviAggiornaTesti();
   maisonAutoDeleteGiorni = parseInt(maisonAd) || 0;
   if (invCatExtra)
     try {
@@ -433,9 +435,12 @@ async function loadAll() {
   regaliCache = regaliD || [];
   noteClientiCache = noteClD || [];
   inventarioCache = inventarioD || [];
-  valutazioniCache = valutazioniD || [];
+  // valutazioni nel Cestino (eliminato = true, 23/10/2026) fuori da schede, statistiche e report
+  valutazioniCache = (valutazioniD || []).filter((v) => !v.eliminato);
   puntiEventiCache = puntiD || [];
   hrEventiCache = hrEv || [];
+  // proposte di punti da approvare (solo per chi approva: avviso e Formazione)
+  if (typeof puntiProposteCarica === 'function') puntiProposteCarica().catch(() => {});
   // ENTERPRISE CHAT: decifra chat_messages e sintetizza noteColleghiCache
   await decryptChatMessagesCache();
   _chatBuildNoteCache();
@@ -445,10 +450,10 @@ async function loadAll() {
   if (typeof modelliCarica === 'function') modelliCarica().catch(() => {});
   // storico delle scelte del piano (migrazione 20260923): in sottofondo, per Controlla le regole
   if (typeof pianoScelteCarica === 'function') pianoScelteCarica().catch(() => {});
-  // Pulizia automatica: sessioni scadute + log > 12 mesi
-  // con la sessione: senza, il database la rifiuta (migrazione 20260895)
-  // una volta al giorno per questo browser basta (prima a ogni accesso di chiunque)
-  if (_unaVoltaAlGiorno('pulizia_db'))
+  // Pulizia automatica: sessioni scadute, Registro e storico del piano oltre gli anni di
+  // conservazione (Impostazioni > Conservazione, 5 anni). Solo l amministratore (dalla
+  // 20260928 il database la rifiuta agli operatori), una volta al giorno per questo browser
+  if (typeof isAdmin === 'function' && isAdmin() && _unaVoltaAlGiorno('pulizia_db'))
     sbRpc('cleanup_old_data', { p_token: getOpToken() || getAdminToken() }).catch(() => {});
   // Maison: auto-cancellazione GD precedenti se configurata (privacy)
   if (typeof _maisonAutoCleanup === 'function') _maisonAutoCleanup().catch(() => {});

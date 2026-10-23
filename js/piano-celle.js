@@ -400,7 +400,7 @@ async function pianoBloccaCella(nome, dstr, blocca) {
           nome +
           ' \u00b7 ' +
           giorno +
-          "\n\nPerche' non si deve toccare? (es. visita medica, appuntamento)",
+          '\n\nPerché non si deve toccare? (es. visita medica, appuntamento)',
         '',
       );
       if (motivoV === null) return;
@@ -670,7 +670,8 @@ async function _confermaCambioEsigenzeEsegui() {
             avvisi.join('\n• ') +
             '\n\nConfermi comunque il cambio per esigenze in ' +
             nuovo +
-            "? La segnalazione restera' scritta nel commento della cella.",
+            '? La segnalazione resterà scritta nel commento della cella.',
+          { titolo: 'Regole del piano', ok: 'Conferma comunque', attenzione: true },
         ))
       )
         return;
@@ -1134,6 +1135,16 @@ async function _pianoSalvaCellaBaseEsegui(nome, dstr, codice) {
   }
   const r = _pianoRighe.find((x) => x.collaboratore === nome && x.data === dstr);
   const attuale = r ? r.codice : '';
+  // CODICE O TURNO DISATTIVATO (controllo 23/10/2026: TR disattivato si scriveva ancora a
+  // mano senza avviso, mentre le Vacanze lo nascondevano): non si scrive piu. Le celle
+  // che lo hanno gia restano come sono.
+  if (codice && codice !== attuale) {
+    const dis = _pianoSiglaDisattivata(codice);
+    if (dis) {
+      toastErrore(dis, 9000);
+      return false;
+    }
+  }
   // ASS (assenza in attesa di certificato) a mano: solo sopra un turno, come dal Diario; la
   // M sopra un ASS passa da «Certificato ricevuto» (HR), che aggiorna anche Diario e Rapporto
   if (codice === 'ASS' && attuale !== 'ASS' && !_pianoTurnoInfo(attuale)) {
@@ -1197,7 +1208,9 @@ async function _pianoSalvaCellaBaseEsegui(nome, dstr, codice) {
         : [];
     if (_pianoTurnoInfo(codice))
       _pianoAccompagnamentoAvviso([{ nome: nome, data: dstr, codice: codice }]).forEach((a) => avvisi.push(a.testo));
-    const protetta = !!(r && r.protetto && codice !== attuale);
+    // le celle scritte a mano (un turno qualunque) non chiedono conferma: protette lo sono
+    // solo per la bozza. La conferma resta per piano consolidato, vacanze, assenze e blocchi
+    const protetta = !!(r && r.protetto && codice !== attuale && !_pianoCellaSoloAMano(r));
     const blocco = window._pianoScritturaBlocco;
     if (blocco && (avvisi.length || protetta)) {
       // SCRITTURA SU PIU CELLE: la conferma e una sola, data prima (con le protette
@@ -1208,12 +1221,7 @@ async function _pianoSalvaCellaBaseEsegui(nome, dstr, codice) {
       }
     } else if (avvisi.length || protetta) {
       const righe = avvisi.slice();
-      if (protetta)
-        righe.push(
-          r.motivo_blocco
-            ? 'cella BLOCCATA per: ' + r.motivo_blocco + ' (la stai sostituendo)'
-            : 'cella protetta (piano consolidato, vacanza o assenza confermata): la stai sostituendo',
-        );
+      if (protetta) righe.push(_pianoDescriviProtetta(r) + ': la stai sostituendo');
       if (
         !(await chiediConferma(
           '\u26a0 ATTENZIONE \u00b7 ' +
@@ -1225,7 +1233,11 @@ async function _pianoSalvaCellaBaseEsegui(nome, dstr, codice) {
             righe.join('\n\u2022 ') +
             '\n\nConfermi comunque il turno ' +
             codice +
-            "? La segnalazione restera' scritta nel commento della cella.",
+            '?' +
+            (avvisi.length ? ' La segnalazione resterà scritta nel commento della cella.' : ''),
+          // avviso di regola: fuoco su Annulla e Invio non attivo subito (chi scrive in fila
+          // non lo conferma senza leggerlo)
+          { titolo: avvisi.length ? 'Regole del piano' : 'Cella protetta', ok: 'Conferma comunque', attenzione: true },
         ))
       )
         return false;
@@ -1237,7 +1249,7 @@ async function _pianoSalvaCellaBaseEsegui(nome, dstr, codice) {
   if (codice && codice === attuale) return;
   const passo = window._pianoScritturaBlocco
     ? null
-    : _pianoUndoSnap('modifica cella ' + nome.split(' ')[0] + ' ' + dstr.substring(8));
+    : _pianoUndoSnap('modifica cella ' + _cognomeDi(nome) + ' ' + dstr.substring(8));
   // SCRITTURA CONDIZIONATA: la cella deve essere ancora quella che si vedeva (sigla,
   // protetto, blocco). Se un collega l ha cambiata o svuotata non si scrive niente, si
   // dice chi e cosa e si ricarica; nessun passo di Annulla e niente nel Registro.
@@ -1594,7 +1606,18 @@ function pianoCellaInline(nome, dstr, el, opz) {
     pianoBloccoClick('piano', el);
     return;
   }
-  if (!puoGestirePiano() || !el || el.querySelector('input')) return;
+  if (!el) return;
+  if (!puoGestirePiano()) {
+    _pianoAvvisaSenzaPermesso();
+    return;
+  }
+  // la cella sta ancora salvando la sigla di prima: si seleziona, e quello che si scrive
+  // adesso va in coda e la riscrive appena il salvataggio e finito (prima si perdeva)
+  if (el.querySelector('input[data-chiuso]')) {
+    if (typeof _pianoSelezionaCella === 'function') _pianoSelezionaCella(el);
+    return;
+  }
+  if (el.querySelector('input')) return;
   // JG senza orario (arrivato dall Excel): doppio clic o Invio = orario, la sigla resta.
   // Scrivendo una sigla invece si cambia il turno come sempre.
   if (!opz.iniziale) {
@@ -1619,7 +1642,9 @@ function pianoCellaInline(nome, dstr, el, opz) {
   el.innerHTML =
     '<input type="text" value="' +
     escP(attuale) +
-    '" size="1" maxlength="6" style="width:100%;min-width:0;box-sizing:border-box;border:1px solid #1a4a7a;border-radius:0;padding:0;margin:0;font:inherit;font-weight:700;text-transform:uppercase;text-align:center;background:transparent;color:inherit">';
+    '" size="1" maxlength="' +
+    _pianoLunghezzaSigla() +
+    '" style="width:100%;min-width:0;box-sizing:border-box;border:1px solid #1a4a7a;border-radius:0;padding:0;margin:0;font:inherit;font-weight:700;text-transform:uppercase;text-align:center;background:transparent;color:inherit">';
   const inp = el.querySelector('input');
   inp.focus();
   if (opz.iniziale) {
@@ -1632,6 +1657,16 @@ function pianoCellaInline(nome, dstr, el, opz) {
   const conferma = async () => {
     if (chiuso) return;
     chiuso = true;
+    inp.dataset.chiuso = '1'; // campo finito: i tasti dopo vanno in coda, non qui dentro
+    window._pianoCelleInSalvataggio = (window._pianoCelleInSalvataggio || 0) + 1;
+    try {
+      await _pianoCellaInlineConferma();
+    } finally {
+      window._pianoCelleInSalvataggio = Math.max(0, (window._pianoCelleInSalvataggio || 1) - 1);
+      _pianoRiproduciTasti();
+    }
+  };
+  const _pianoCellaInlineConferma = async () => {
     const v = inp.value.trim().toUpperCase();
     // SELEZIONE DI PIU CELLE (come Excel): la sigla va su tutte le celle selezionate
     if (opz.blocco) {
@@ -1656,13 +1691,20 @@ function pianoCellaInline(nome, dstr, el, opz) {
       return;
     }
     const ok = await pianoSalvaCella(nome, dstr, v);
-    if (ok === false) {
-      el.innerHTML = vecchio;
-      // la cella rifiutata lampeggia in rosso: si vede QUALE cella e' tornata indietro
-      el.classList.remove('piano-cella-rifiutata');
-      void el.offsetWidth;
-      el.classList.add('piano-cella-rifiutata');
-      setTimeout(() => el.classList.remove('piano-cella-rifiutata'), 1700);
+    if (ok === false || el.querySelector('input')) {
+      // rifiutata (o annullata): la cella torna com era e si va comunque sulla cella
+      // scelta con Invio/Tab, cosi le sigle scritte in fila dopo finiscono sulla persona
+      // giusta (prima restavano sulla cella di prima o andavano perse)
+      if (el.querySelector('input')) el.innerHTML = vecchio;
+      if (ok === false) {
+        // la cella rifiutata lampeggia in rosso: si vede QUALE cella e' tornata indietro
+        el.classList.remove('piano-cella-rifiutata');
+        void el.offsetWidth;
+        el.classList.add('piano-cella-rifiutata');
+        setTimeout(() => el.classList.remove('piano-cella-rifiutata'), 1700);
+      }
+      if (dopo && dopo !== el && document.body.contains(dopo) && typeof _pianoVaiACella === 'function')
+        _pianoVaiACella(dopo);
     }
   };
   const vicina = (dx, dy) => (typeof _pianoCellaVicina === 'function' ? _pianoCellaVicina(el, dx, dy) : null);
@@ -1801,4 +1843,228 @@ async function pianoStoriaCella(nome, dstr) {
     righe.push('Le operazioni su tutto il mese (bozza, importazione, vacanze) sono nella scheda Storico.');
   }
   await mostraAvviso(righe.join('\n'), { titolo: 'Storia della cella · ' + nome + ' · ' + dataIt });
+}
+
+// PERCHE UNA CELLA E PROTETTA, in parole (controllo 23/10/2026: ogni cella scritta a mano
+// diceva «piano consolidato, vacanza o assenza confermata», anche un turno qualunque)
+const _PIANO_SIGLE_ASSENZA = ['M', 'M1', 'I', 'I1', 'ASS'];
+function _pianoDescriviProtetta(r) {
+  if (!r) return '';
+  const c = String(r.codice || '').toUpperCase();
+  if (r.motivo_blocco) return 'cella BLOCCATA per: ' + r.motivo_blocco;
+  if (c === 'V' || String(r.commento || '').startsWith('Piano vacanze: ')) return 'vacanza (' + c + ')';
+  if (_PIANO_SIGLE_ASSENZA.includes(c)) return 'assenza registrata (' + c + ')';
+  if (r.generato) return 'congedo protetto messo dal programma (' + c + ')';
+  if (!r.operatore) return 'piano consolidato (importato, ' + c + ')';
+  return 'scritta a mano da ' + r.operatore + ' (' + c + ')';
+}
+// cella protetta solo perche scritta a mano: un turno o un congedo normale, senza blocco,
+// che non e vacanza ne assenza ne importato (le altre chiedono conferma prima di cambiarle)
+function _pianoCellaSoloAMano(r) {
+  if (!r || !r.protetto || r.motivo_blocco || r.generato || !r.operatore) return false;
+  const c = String(r.codice || '').toUpperCase();
+  if (c === 'V' || c === 'ND' || _PIANO_SIGLE_ASSENZA.includes(c)) return false;
+  if (String(r.commento || '').startsWith('Piano vacanze: ')) return false;
+  return true;
+}
+// sigla disattivata: testo dell errore, '' se si puo scrivere. Un turno attivo di un altro
+// settore resta valido (coperture: R22 delle Slots scritto nel Valet)
+function _pianoSiglaDisattivata(codice) {
+  const c = String(codice || '').toUpperCase();
+  if (!c) return '';
+  const turni = (typeof pianoTurniCache !== 'undefined' && pianoTurniCache) || [];
+  const codici = (typeof pianoCodiciCache !== 'undefined' && pianoCodiciCache) || [];
+  const tSi = turni.some((t) => String(t.codice).toUpperCase() === c && t.attivo !== false);
+  const kSi = codici.some((k) => String(k.codice).toUpperCase() === c && k.attivo !== false);
+  if (tSi || kSi) return '';
+  if (codici.some((k) => String(k.codice).toUpperCase() === c))
+    return (
+      '«' +
+      c +
+      '» è un codice disattivato: non si scrive più nel piano. Per usarlo di nuovo riattivalo nella scheda Turni, codici speciali.'
+    );
+  if (turni.some((t) => String(t.codice).toUpperCase() === c))
+    return (
+      '«' +
+      c +
+      '» è un turno disattivato: non si scrive più nel piano. Per usarlo di nuovo riattivalo nella scheda Turni.'
+    );
+  return '';
+}
+// lunghezza massima del campo della cella: la sigla piu lunga fra turni e codici (prima 6
+// fisso: ANTINCENDIO, 11 lettere, non si poteva scrivere)
+function _pianoLunghezzaSigla() {
+  let n = 6;
+  ((typeof pianoTurniCache !== 'undefined' && pianoTurniCache) || [])
+    .concat((typeof pianoCodiciCache !== 'undefined' && pianoCodiciCache) || [])
+    .forEach((x) => (n = Math.max(n, String((x && x.codice) || '').length)));
+  return n;
+}
+
+// SIGLE SCRITTE IN FILA (controllo 23/10/2026, D3 e D26): sigla, Invio, sigla, Invio...
+// Mentre una cella si salva (rete, controllo delle regole) i tasti premuti NON vanno nel
+// campo appena chiuso ne in una finestra comparsa nel frattempo: si mettono in coda e si
+// ripetono, nello stesso ordine, quando il salvataggio e finito (sulla cella scelta con
+// Invio o Tab). Prima finivano persi o sulla persona sbagliata.
+const _pianoTastiCoda = [];
+const _PIANO_TASTI_CODA = ['Enter', 'Tab', 'ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Backspace', 'F2'];
+function _pianoTastoDaAccodare(e) {
+  if (!window._pianoCelleInSalvataggio) return false;
+  if (e.ctrlKey || e.metaKey || e.altKey) return false;
+  if (typeof _pianoTab !== 'undefined' && _pianoTab !== 'calendario') return false;
+  if (document.querySelector('.finestra-velo')) return false; // la finestra ha i suoi tasti
+  const t = e.target;
+  // un campo vero aperto (ricerca, nota...): i tasti sono suoi
+  if (t && t.closest && t.closest('input,textarea,select,[contenteditable="true"]') && !(t.dataset && t.dataset.chiuso))
+    return false;
+  return (e.key.length === 1 && /[0-9A-Za-z]/.test(e.key)) || _PIANO_TASTI_CODA.includes(e.key);
+}
+document.addEventListener(
+  'keydown',
+  (e) => {
+    if (!e.isTrusted || !_pianoTastoDaAccodare(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    _pianoTastiCoda.push({ key: e.key, shiftKey: e.shiftKey });
+  },
+  true,
+);
+// avviso di regola aperto mentre la cella si salva (finestre.js): le sigle e gli Invio
+// scritti nel frattempo vanno in coda e si scrivono dopo la risposta, nelle celle successive
+window._finestraPassaTasto = (e) => {
+  if (!window._pianoCelleInSalvataggio || e.ctrlKey || e.metaKey || e.altKey) return false;
+  if (typeof _pianoTab !== 'undefined' && _pianoTab !== 'calendario') return false;
+  if (!((e.key.length === 1 && /[0-9A-Za-z]/.test(e.key)) || e.key === 'Enter')) return false;
+  _pianoTastiCoda.push({ key: e.key, shiftKey: e.shiftKey });
+  return true;
+};
+// un clic su una cella mentre la cella di prima si salva: e una mossa come i tasti, entra in
+// coda nello stesso ordine (prima il ridisegno dopo il salvataggio la riportava sulla cella
+// scelta con Invio e la sigla scritta subito dopo finiva sulla persona sotto)
+document.addEventListener(
+  'mousedown',
+  (e) => {
+    if (!e.isTrusted || e.button !== 0 || !window._pianoCelleInSalvataggio) return;
+    const td =
+      e.target && e.target.closest
+        ? e.target.closest('#piano-content table[data-seltab="piano"] td.piano-cella[data-g]')
+        : null;
+    const tr = td && td.closest('tr[data-nome]');
+    if (!tr) return;
+    _pianoTastiCoda.push({ cella: { nome: tr.dataset.nome, g: td.dataset.g } });
+  },
+  true,
+);
+let _pianoRiproduzioneTasti = false;
+async function _pianoRiproduciTasti() {
+  if (_pianoRiproduzioneTasti) return;
+  _pianoRiproduzioneTasti = true;
+  try {
+    while (_pianoTastiCoda.length && !window._pianoCelleInSalvataggio) {
+      if (document.querySelector('.finestra-velo')) {
+        // una finestra si e aperta (es. dopo il salvataggio): la coda aspetta che si chiuda
+        await new Promise((ok) => setTimeout(ok, 150));
+        continue;
+      }
+      if (typeof _pianoTab !== 'undefined' && _pianoTab !== 'calendario') {
+        // si e cambiata scheda: i tasti non si scrivono altrove, ma si dice quali erano
+        const persi = _pianoTastiCoda
+          .splice(0)
+          .filter((x) => x.key)
+          .map((x) => (x.key.length === 1 ? x.key.toUpperCase() : '⏎'));
+        if (persi.some((k) => k !== '⏎'))
+          toastErrore('Tasti non scritti (hai cambiato scheda prima che il piano li salvasse): ' + persi.join(' '));
+        break;
+      }
+      const t = _pianoTastiCoda.shift();
+      if (t.cella) {
+        const td = typeof _pianoCellaDi === 'function' ? _pianoCellaDi(t.cella.nome, t.cella.g) : null;
+        if (td && typeof _pianoVaiACella === 'function') _pianoVaiACella(td);
+        continue;
+      }
+      const a = document.activeElement;
+      const campo =
+        a && a.tagName === 'INPUT' && a.closest && a.closest('td.piano-cella') && !(a.dataset && a.dataset.chiuso)
+          ? a
+          : null;
+      if (campo && t.key.length === 1) {
+        if (!campo.maxLength || campo.maxLength < 0 || campo.value.length < campo.maxLength)
+          campo.value += t.key.toUpperCase();
+        continue;
+      }
+      if (campo && t.key === 'Backspace') {
+        campo.value = campo.value.slice(0, -1);
+        continue;
+      }
+      const ev = new KeyboardEvent('keydown', { key: t.key, shiftKey: t.shiftKey, bubbles: true, cancelable: true });
+      (campo || document.body).dispatchEvent(ev);
+      await new Promise((ok) => setTimeout(ok, 0));
+    }
+  } finally {
+    _pianoRiproduzioneTasti = false;
+  }
+}
+
+// OPERATORE SENZA PERMESSO (controllo 23/10/2026): scrivere una sigla o fare doppio clic
+// su una cella non faceva niente, senza una parola. Ora lo si dice (una volta ogni tanto).
+let _pianoSenzaPermessoDetto = 0;
+function _pianoAvvisaSenzaPermesso() {
+  if (typeof puoGestirePiano !== 'function' || puoGestirePiano()) return false;
+  if (Date.now() - _pianoSenzaPermessoDetto < 4000) return true;
+  _pianoSenzaPermessoDetto = Date.now();
+  toast(
+    'Puoi solo vedere il piano: per scrivere nelle celle serve il permesso «Gestione piano» (Impostazioni › Visibilità e permessi).',
+    6000,
+  );
+  return true;
+}
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return;
+  if (!(e.key.length === 1 && /[0-9A-Za-z]/.test(e.key)) && e.key !== 'Enter' && e.key !== 'F2' && e.key !== 'Delete')
+    return;
+  if (typeof _pianoTab === 'undefined' || _pianoTab !== 'calendario') return;
+  if (e.target && e.target.closest && e.target.closest('input,textarea,select,[contenteditable="true"]')) return;
+  if (document.querySelector('.finestra-velo')) return;
+  const b = window._pianoBlocco;
+  // una cella del calendario selezionata (anche se il ridisegno ha rifatto la tabella)
+  if (!(b && b.tab === 'piano' && b.t1) && !window._pianoCellaAttiva) return;
+  _pianoAvvisaSenzaPermesso();
+});
+document.addEventListener('dblclick', (e) => {
+  const td = e.target && e.target.closest ? e.target.closest('#piano-content td.piano-cella[data-g]') : null;
+  if (!td || td.hasAttribute('ondblclick') || !td.closest('tr[data-nome]')) return;
+  _pianoAvvisaSenzaPermesso();
+});
+
+// CANC SU GIORNI CHIUSI (controllo 23/10/2026: prima «Cancellare?» e poi, per ogni giorno
+// chiuso, il motivo): UNA finestra che dice cosa si cancella e chiede il motivo. Ritorna
+// true se si procede (giorni sbloccati per dieci minuti, motivo nel registro).
+async function _pianoCancellaConMotivo(testoDomanda, giorni) {
+  const chiusi = [...new Set(giorni)].filter((d) => !_pianoGiornoScrivibile(d)).sort();
+  if (!chiusi.length) return chiediConferma(testoDomanda);
+  const it = (d) => String(d).split('-').reverse().join('.');
+  if (!puoSbloccareGiorniChiusi()) {
+    toast(
+      'Giornate chiuse (' + chiusi.map(it).join(', ') + '): per correggerle serve il permesso "Giorni chiusi"',
+      7000,
+    );
+    return false;
+  }
+  const motivo = await chiediTesto(
+    testoDomanda +
+      '\n\nGIORNATE CHIUSE: ' +
+      chiusi.map(it).join(', ') +
+      '\nIl piano dei giorni passati è un documento: scrivi il MOTIVO della correzione (obbligatorio, resta nel registro). I giorni resteranno sbloccati per dieci minuti.',
+    '',
+    { titolo: 'Cancellare celle di giorni chiusi', ok: 'Cancella' },
+  );
+  if (motivo === null || !String(motivo).trim()) {
+    if (motivo !== null) toast('Cancellazione annullata: senza motivo il giorno resta chiuso');
+    return false;
+  }
+  chiusi.forEach((d) => {
+    _pianoSbloccati[d] = Date.now() + 10 * 60 * 1000;
+    logAzione('Giorno chiuso sbloccato', d + ': ' + String(motivo).trim().substring(0, 200));
+  });
+  return true;
 }

@@ -294,6 +294,8 @@ function _navContaSegnalazioni() {
   const ra = document.getElementById('rischio-alerts-container');
   if (ca && vis('alert_cassa')) n += ca.querySelectorAll('.cassa-alert-banner').length;
   if (ra && vis('alert_rischio')) n += ra.querySelectorAll('.rischio-alert-banner, .cassa-alert-banner').length;
+  const pa = document.getElementById('punti-alerts-container');
+  if (pa) n += pa.querySelectorAll('.cassa-alert-banner').length;
   return n;
 }
 function navAggiornaBarraTelefono() {
@@ -352,7 +354,7 @@ function navApriSegnalazioniTelefono() {
       attributes: true,
       attributeFilter: ['style', 'class'],
     });
-    ['cassa-alerts-container', 'rischio-alerts-container'].forEach((id) => {
+    ['cassa-alerts-container', 'rischio-alerts-container', 'punti-alerts-container'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) new MutationObserver(aggiorna).observe(el, { childList: true, subtree: true });
     });

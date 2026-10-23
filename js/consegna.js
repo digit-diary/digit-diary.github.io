@@ -122,17 +122,36 @@ async function _inviaConsegnaTurnoEsegui() {
     toast('Errore invio consegna');
   }
 }
+// LETTA PER PERSONA (A15 del 23.10): letto_da e l elenco di chi l ha letta («Rossi Mario,
+// Bianchi Anna»). Prima era un nome solo: con una consegna a «Tutti» il primo che la apriva la
+// segnava letta per tutti e spariva dal numero degli altri.
+function _consegnaLettaDa(c, op) {
+  return !!(c && c.letto_da) && _includeOpInCsv(c.letto_da, op);
+}
 async function segnaConsegnaLetta(id) {
   const op = getOperatore();
+  const c = consegneCache.find((x) => x.id === id);
+  if (c && _consegnaLettaDa(c, op)) return;
   try {
-    await secPatch('consegne_turno', 'id=eq.' + id, {
-      letto_da: op,
-      letto_at: new Date().toISOString(),
-    });
-    const c = consegneCache.find((x) => x.id === id);
-    if (c) {
-      c.letto_da = op;
-      c.letto_at = new Date().toISOString();
+    let r = null;
+    try {
+      // il database aggiunge il nome all elenco in una sola istruzione (due colleghi insieme
+      // restano tutti e due)
+      r = await _rpcSicura('consegna_segna_letta', { p_token: getOpToken(), p_id: id });
+    } catch (e) {
+      // database non ancora aggiornato (funzione assente): come prima, solo se nessuno l ha letta
+      if (!(e.status === 404 || /consegna_segna_letta|PGRST202|Could not find the function/i.test(e.message || '')))
+        throw e;
+      if (c && c.letto_da) return;
+      await secPatch('consegne_turno', 'id=eq.' + id + '&letto_da=is.null', {
+        letto_da: op,
+        letto_at: new Date().toISOString(),
+      });
+      r = { letto_da: op, letto_at: new Date().toISOString() };
+    }
+    if (c && r) {
+      c.letto_da = r.letto_da;
+      c.letto_at = r.letto_at;
     }
     renderConsegne();
     aggiornaConsegnaBadge();
@@ -175,8 +194,10 @@ function renderConsegne() {
     .map((c) => {
       const d = new Date(c.created_at);
       const isAlta = c.priorita === 'alta';
-      const letto = !!c.letto_da;
       const isMia = c.operatore === op;
+      // chi l ha scritta la vede «letta» appena qualcuno l ha letta (non si modifica piu); gli
+      // altri quando l hanno letta loro
+      const letto = isMia ? !!c.letto_da : _consegnaLettaDa(c, op);
       const canEdit = isMia && !letto;
       const destLabel = c.destinatario && c.destinatario !== 'tutti' ? c.destinatario : 'Tutti';
       let btns = '';
@@ -259,10 +280,19 @@ async function salvaModificaConsegna(id) {
     return;
   }
   try {
-    await secPatch('consegne_turno', 'id=eq.' + id, { messaggio: msg });
+    // solo se nessuno l ha ancora letta, anche da un altro PC (A16): il filtro lo controlla nel
+    // database e la riga riletta dice com e andata
+    await secPatch('consegne_turno', 'id=eq.' + id + '&letto_da=is.null', { messaggio: msg });
     const c = consegneCache.find((x) => x.id === id);
-    if (c) c.messaggio = msg;
+    const ora = ((await secGet('consegne_turno?id=eq.' + id)) || [])[0];
+    if (ora && c) Object.assign(c, ora);
     document.getElementById('pwd-modal').classList.add('hidden');
+    if (ora && ora.letto_da && ora.messaggio !== msg) {
+      renderConsegne();
+      toastErrore('Non modificata: la consegna è già stata letta da ' + ora.letto_da, 7000);
+      return;
+    }
+    if (c) c.messaggio = msg;
     renderConsegne();
     toast('Consegna modificata');
   } catch (e) {
@@ -285,7 +315,16 @@ async function annullaConsegna(id) {
   )
     return;
   try {
-    await secDel('consegne_turno', 'id=eq.' + id);
+    // solo se nessuno l ha ancora letta, anche da un altro PC (A16)
+    await secDel('consegne_turno', 'id=eq.' + id + '&letto_da=is.null');
+    const resta = ((await secGet('consegne_turno?id=eq.' + id)) || [])[0];
+    if (resta) {
+      Object.assign(c, resta);
+      renderConsegne();
+      aggiornaConsegnaBadge();
+      toastErrore('Invio non annullato: la consegna è già stata letta da ' + (resta.letto_da || 'un collega'), 7000);
+      return;
+    }
     consegneCache = consegneCache.filter((x) => x.id !== id);
     logAzione('Consegna annullata', c.messaggio.substring(0, 50));
     renderConsegne();
@@ -300,7 +339,7 @@ function aggiornaConsegnaBadge() {
   const badge = document.getElementById('consegna-badge');
   if (!badge || !op) return;
   const nonLette = getConsegneReparto().filter(
-    (c) => !c.letto_da && c.operatore !== op && _includeOpInCsv(c.destinatario, op),
+    (c) => !_consegnaLettaDa(c, op) && c.operatore !== op && _includeOpInCsv(c.destinatario, op),
   ).length;
   if (nonLette) {
     badge.style.display = 'inline';
@@ -312,8 +351,11 @@ function aggiornaConsegnaBadge() {
 function mostraConsegnaLogin() {
   const op = getOperatore();
   if (!op) return;
+  // senza la pagina Consegna niente avviso (riverifica A-N2): aprendolo la consegna risultava
+  // «letta» da chi non poteva leggerla e l autore non poteva piu correggerla
+  if (typeof isVis === 'function' && !isVis('consegna')) return;
   const nonLette = getConsegneReparto().filter(
-    (c) => !c.letto_da && c.operatore !== op && _includeOpInCsv(c.destinatario, op),
+    (c) => !_consegnaLettaDa(c, op) && c.operatore !== op && _includeOpInCsv(c.destinatario, op),
   );
   if (!nonLette.length) return;
   const ultima = nonLette[0];
@@ -402,6 +444,13 @@ function renderDashboard() {
   const regOggi = _rd.filter((e) => e.data && e.data.startsWith(oggi)).length;
   const alertRischio = checkRischioAlerts().length;
   let statsH = '';
+  // proposte di punti da approvare (solo per chi approva, punti-proposte.js)
+  const nProp = typeof puntiProposteCache !== 'undefined' ? puntiProposteCache.length : 0;
+  if (nProp)
+    statsH +=
+      '<div class="stat" style="cursor:pointer" onclick="puntiProposteApri()" title="Formazione > Punti da approvare"><div class="stat-num red">' +
+      nProp +
+      '</div><div class="stat-label">Punti da approvare</div></div>';
   if (isVis('promemoria'))
     statsH +=
       '<div class="stat"><div class="stat-num' +
@@ -485,7 +534,9 @@ function renderDashboard() {
     todoH +=
       '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="font-size:var(--fs-lg,1.0625rem)"><i class="icx icx-torta"></i></span><span style="flex:1"><strong>' +
       escP(bd.nome) +
-      '</strong> · <span style="color:var(--accent2);font-weight:700">compie gli anni oggi</span></span></div>';
+      '</strong> <span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">(' +
+      compleannoChi(bd) +
+      ')</span> · <span style="color:var(--accent2);font-weight:700">compie gli anni oggi</span></span></div>';
   });
   const ammA = checkAmmonimentiAlerts();
   ammA.forEach((a) => {
@@ -523,7 +574,9 @@ function renderDashboard() {
     domH +=
       '<div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px"><span style="font-size:var(--fs-lg,1.0625rem)"><i class="icx icx-torta"></i></span><span style="flex:1"><strong>' +
       escP(bd.nome) +
-      '</strong> · compleanno domani</span></div>';
+      '</strong> <span style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">(' +
+      compleannoChi(bd) +
+      ')</span> · compleanno domani</span></div>';
   });
   if (!domH) domH = '<p style="color:var(--muted);text-align:center;padding:20px">Niente in programma</p>';
   domaniEl.innerHTML = domH;
@@ -733,7 +786,20 @@ function renderDashboard() {
   alertEl.innerHTML = alertH;
   // ULTIME REGISTRAZIONI
   const recEl = document.getElementById('dash-recenti-list');
-  const ultimi = _rd.slice(0, 8);
+  // le ultime INSERITE (created_at; quelle appena salvate in questa sessione non l hanno ancora
+  // e vengono prima), non le piu avanti nel tempo: una malattia futura di 8 giorni riempiva
+  // l elenco con 8 righe uguali (A24). Le righe «un giorno per riga» di un periodo: una sola.
+  const _visti = new Set();
+  const ultimi = _rd
+    .slice()
+    .sort((a, b) => String(b.created_at || '9999').localeCompare(String(a.created_at || '9999')))
+    .filter((e) => {
+      const k = e.nome + '|' + e.tipo + '|' + e.testo;
+      if (_visti.has(k)) return false;
+      _visti.add(k);
+      return true;
+    })
+    .slice(0, 8);
   recEl.innerHTML = ultimi.length
     ? ultimi
         .map((e) => {
@@ -986,6 +1052,12 @@ function _getReportSez() {
   return sez;
 }
 function eseguiReport(tipo) {
+  const sez = _getReportSez();
+  // nessuna sezione scelta: prima usciva un PDF vuoto senza dire niente (A26)
+  if (!Object.values(sez).some(Boolean)) {
+    toastErrore('Scegli almeno una sezione del report');
+    return;
+  }
   document.getElementById('pwd-modal').classList.add('hidden');
   if (tipo === 'settimanale') generaReportSettimanale(_getReportSez());
   else generaReportAnnuale(_getReportSez());
@@ -1223,8 +1295,8 @@ async function generaReportSettimanale(sez) {
         head: [['Titolo', 'Scadenza', 'Assegnato', 'Stato']],
         body: settPM.map((p) => [
           p.titolo,
-          p.data_scadenza,
-          p.assegnato_a,
+          p.data_scadenza ? p.data_scadenza.split('-').reverse().join('.') : '',
+          !p.assegnato_a || p.assegnato_a === 'tutti' ? 'Tutti' : p.assegnato_a,
           p.completata ? 'Completato' + (p.completata_da ? ' da ' + p.completata_da : '') : 'In corso',
         ]),
         headStyles: { fillColor: [142, 68, 173] },

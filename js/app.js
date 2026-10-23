@@ -194,8 +194,10 @@ function switchPage(name) {
       if (isAdmin() && typeof renderModuliRespUI === 'function') renderModuliRespUI();
     }
     const nuovoOpRep = document.getElementById('new-operatore-rep');
+    // nessun settore scelto in partenza: si indica per forza (prima era "Tutti i settori", C25)
     if (nuovoOpRep && typeof opzioniRepartoHtml === 'function')
-      nuovoOpRep.innerHTML = opzioniRepartoHtml(nuovoOpRep.value || 'entrambi', true);
+      nuovoOpRep.innerHTML =
+        '<option value="">Scegli il settore</option>' + opzioniRepartoHtml(nuovoOpRep.value || '', true);
     const visSec = document.getElementById('visibilita-section');
     if (visSec) {
       visSec.style.display = isAdmin() ? '' : 'none';
@@ -212,7 +214,14 @@ function switchPage(name) {
     if (typeof modelliPulsanteModuli === 'function') modelliPulsanteModuli();
     if (typeof modelliCarica === 'function') modelliCarica().catch(() => {});
   }
-  if (name === 'formazione') renderFormazione();
+  if (name === 'formazione') {
+    renderFormazione();
+    // proposte di punti aggiornate (anche quelle arrivate da un altro PC)
+    if (typeof puntiProposteCarica === 'function')
+      puntiProposteCarica()
+        .then(() => typeof _ppRidisegna === 'function' && _ppRidisegna())
+        .catch(() => {});
+  }
   if (name === 'piano' && typeof renderPiano === 'function') renderPiano();
   if (name === 'guida' && typeof renderGuida === 'function') renderGuida();
   if (name === 'registro') renderRegistro();

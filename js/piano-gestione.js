@@ -79,6 +79,7 @@ function _renderPianoDomenicheBody() {
   const daMese =
     oggiStr.substring(0, 4) === String(anno) ? oggiStr.substring(5, 7) : oggiStr < String(anno) ? '00' : '13';
   let senzaInizio = 0;
+  const noteSospese = []; // domeniche non conteggiate per le preferenze (_pianoDomSospesaMese)
   let h =
     '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-bottom:8px">Diritto: ' +
     diritto +
@@ -103,6 +104,13 @@ function _renderPianoDomenicheBody() {
       // il mese conta solo se questa persona ha un piano in quel mese
       if (!dati.mesiConPiano[mm] || !(dati.mesiPersona || {})[nome + '|' + mm]) {
         cols += '<td style="color:var(--line)"></td>';
+        continue;
+      }
+      // mese non conteggiato per le preferenze: non conta ne a favore ne contro (nota grigia)
+      const sosp = _pianoDomSospesaMese(nome, anno + '-' + mm);
+      if (sosp) {
+        visto = true;
+        cols += '<td style="color:var(--muted)" title="' + escP(sosp.nota) + '">–</td>';
         continue;
       }
       let lib = 0;
@@ -157,14 +165,17 @@ function _renderPianoDomenicheBody() {
       if ((dati.mesiPersona || {})[nome + '|' + mm]) mesiP.push(mm);
     }
     const contr = _pianoDomContratto(nome, anno, mesiP, daMese);
-    const dirittoP = contr.inizioMancante ? diritto : contr.diritto;
+    const dirittoP = _pianoDomDirittoDi(contr);
     if (contr.inizioMancante) senzaInizio++;
+    const notaSosp = _pianoDomNotaSospesi(nome, contr);
+    if (notaSosp) noteSospese.push('<b>' + escP(nome) + '</b>: ' + escP(notaSosp));
+    const tuttiSospesi = !!notaSosp && !contr.mesi.length;
     const fineR = info.data_fine_rapporto ? String(info.data_fine_rapporto).substring(0, 10) : '';
     const iniR = info.data_assunzione ? String(info.data_assunzione).substring(0, 10) : '';
     const futureP = domFutureDate.filter((x) => (!iniR || x >= iniR) && (!fineR || x <= fineR)).length;
     const restano = Math.max(0, dirittoP - libere);
     // le restanti si possono ancora dare? confronto con le domeniche future (nel contratto)
-    const critico = restano > futureP;
+    const critico = restano > futureP && !tuttiSospesi;
     h +=
       '<tr data-nome="' +
       escP(nome) +
@@ -194,17 +205,34 @@ function _renderPianoDomenicheBody() {
       dirittoP +
       (contr.inizioMancante ? '*' : '') +
       '</td><td style="font-weight:700;color:' +
-      (restano === 0 ? 'var(--c-verde,#2c6e49)' : critico ? 'var(--c-rosso,#c0392b)' : 'var(--c-oro,#8b6914)') +
+      (tuttiSospesi
+        ? 'var(--muted)'
+        : restano === 0
+          ? 'var(--c-verde,#2c6e49)'
+          : critico
+            ? 'var(--c-rosso,#c0392b)'
+            : 'var(--c-oro,#8b6914)') +
       '"' +
       (critico
-        ? ' title="Restano ' + restano + ' da dare ma nell anno ci sono solo ' + futureP + ' domeniche future"'
-        : '') +
+        ? ' title="Restano ' +
+          restano +
+          ' da dare ma nell anno ' +
+          (futureP === 1 ? 'c è solo 1 domenica futura' : 'ci sono solo ' + futureP + ' domeniche future') +
+          '"'
+        : notaSosp
+          ? ' title="' + escP(notaSosp) + '"'
+          : '') +
       '>' +
-      restano +
+      (tuttiSospesi ? '–' : restano) +
       (critico ? ' !' : '') +
       '</td></tr>';
   });
   h += '</tbody></table></div>';
+  if (noteSospese.length)
+    h +=
+      '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:6px">– = mese non conteggiato: le preferenze della persona (scelte dal Casinò, come un contratto a parte) non permettono una domenica libera valida, per esempio solo venerdì e sabato sera. Quei mesi non contano né nel diritto né tra le libere.<br>' +
+      noteSospese.join('<br>') +
+      '</p>';
   if (senzaInizio)
     h +=
       '<p style="font-size:var(--fs-sm,.8125rem);color:var(--c-oro,#8b6914);margin-top:6px">* Data di inizio mancante per ' +
@@ -1129,7 +1157,7 @@ async function _pianoDipendenzeTurno(t, campo, valore) {
     out.push('Turni per funzione: ' + mapp.map((m) => m.funzione + ' ' + String(m.tipo).toLowerCase()).join(', '));
   if (campo !== 'gruppo') {
     const blocc = persone.filter(
-      (c) => lista(c.turni_bloccati).includes(cod) || lista(c.turni_consentiti).includes(cod),
+      (c) => lista(c.turni_bloccati).includes(cod) || PianoRegole.turniConsentitiVoci(c).some((v) => v.sigla === cod),
     );
     if (blocc.length) out.push('turni bloccati o consentiti di ' + nomiDi(blocc.map((c) => c.nome)));
     try {
@@ -1147,6 +1175,61 @@ async function _pianoDipendenzeTurno(t, campo, valore) {
       if (f.length) out.push('fabbisogno da oggi in poi: ' + plur(f.length, 'giorno', 'giorni') + ' con ' + cod);
     } catch (e) {
       out.push('fabbisogno futuro non verificato (collegamento assente)');
+    }
+  }
+  // CELLE GIA SCRITTE CON LA SIGLA (controllo 23/10/2026, D5): disattivare o eliminare un
+  // turno non cambia le celle, ma prima l avviso non diceva quante sono. Le celle restano
+  // del settore con l orario e le ore del turno (anche se la stessa sigla esiste altrove)
+  if (campo === 'attivo' || campo === 'elimina') {
+    try {
+      const oggi = typeof oggiLocale === 'function' ? oggiLocale() : new Date().toISOString().slice(0, 10);
+      const celle =
+        (await secGet(
+          'piano?codice=eq.' + encodeURIComponent(t.codice) + '&reparto_dip=eq.' + rep + '&select=data&limit=50000',
+        )) || [];
+      const future = celle.filter((r) => String(r.data).substring(0, 10) >= oggi).length;
+      if (celle.length)
+        out.push(
+          plur(celle.length, 'cella del piano usa', 'celle del piano usano') +
+            ' ' +
+            cod +
+            ' (' +
+            (celle.length - future) +
+            ' passate, ' +
+            future +
+            ' da oggi in poi): ' +
+            (campo === 'elimina'
+              ? 'senza il turno perdono orario e ore'
+              : 'restano ' +
+                cod +
+                ' di ' +
+                repartoLabel(rep) +
+                ' con orario e ore di adesso; la bozza non lo assegna più'),
+        );
+      const altrove = pianoTurniCache.filter(
+        (x) => x.id !== t.id && String(x.codice).toUpperCase() === cod && (x.reparto_dip || 'slots') !== rep,
+      );
+      if (altrove.length)
+        out.push(
+          'la sigla ' +
+            cod +
+            ' esiste anche in ' +
+            altrove
+              .map(
+                (x) =>
+                  repartoLabel(x.reparto_dip || 'slots') +
+                  (x.ora_inizio
+                    ? ' (' + String(x.ora_inizio).slice(0, 5) + '-' + String(x.ora_fine || '').slice(0, 5) + ')'
+                    : ''),
+              )
+              .join(', ') +
+            ': le celle di ' +
+            repartoLabel(rep) +
+            ' restano di ' +
+            repartoLabel(rep),
+        );
+    } catch (e) {
+      out.push('celle con ' + cod + ' non contate (collegamento assente)');
     }
   }
   return out;
@@ -1969,18 +2052,50 @@ function _pianoRecuperoTotale(nome, ym) {
 }
 // Converte quello che scrive l'operatore in ore decimali.
 // '1:30' e '-1:30' -> 1.5 / -1.5 (sessantesimi) · '1,5' e '1.5' -> 1.5
-// Ritorna stringa vuota quando il campo e' vuoto.
+// Ritorna stringa vuota quando il campo e' vuoto, 'NaN' quando il testo non e un numero
+// (prima '2abc' diventava 2 e 'abc' dava "fuori scala": controllo QA 23/10/2026, D7).
 function _pianoOreDaTesto(valore) {
-  let t = String(valore == null ? '' : valore).trim();
-  if (t === '') return '';
-  t = t.replace(',', '.');
-  const m = t.match(/^([+-]?)(\d+):([0-5]?\d)$/);
+  const a = _pianoOreAnalizza(valore);
+  if (a.vuoto) return '';
+  if (a.errore) return 'NaN';
+  return String(a.ore);
+}
+// Analisi del testo delle ore: { vuoto } | { errore } | { ore } | { ore, dubbio: { orologio, decimale } }
+// "1.30" o "1,45" (due cifre dopo il separatore, minuti validi) e ambiguo: puo essere 1h30
+// (1.5) o 1,30 h (1h18). Si chiede, mai si sceglie da soli (D7).
+function _pianoOreAnalizza(valore) {
+  const t = String(valore == null ? '' : valore)
+    .trim()
+    .replace(/\s+/g, '')
+    .replace(/h$/i, '');
+  if (t === '') return { vuoto: true };
+  const tondo = (x) => Math.round(x * 100) / 100;
+  const m = t.match(/^([+-]?)(\d{1,2}):([0-5]\d)$/) || t.match(/^([+-]?)(\d{1,2})h([0-5]\d)$/i);
   if (m) {
     const segno = m[1] === '-' ? -1 : 1;
-    const ore = parseInt(m[2]) + parseInt(m[3]) / 60;
-    return String(segno * (Math.round(ore * 100) / 100));
+    return { ore: segno * tondo(parseInt(m[2]) + parseInt(m[3]) / 60) };
   }
-  return t;
+  const d = t.match(/^([+-]?)(\d{0,3})(?:[.,](\d{1,2}))?$/);
+  if (!d || (d[2] === '' && d[3] == null)) return { errore: 'Scrivi le ore come 1:30 (un ora e mezza) o 1.5' };
+  const segno = d[1] === '-' ? -1 : 1;
+  const intero = parseInt(d[2] || '0');
+  const dec = d[3];
+  const ore = segno * tondo(parseFloat(intero + '.' + (dec || '0')));
+  // due cifre dopo il punto che possono essere minuti (01-59): dubbio. 1.00 e 1.75 no
+  if (dec && dec.length === 2 && parseInt(dec) > 0 && parseInt(dec) < 60)
+    return { ore: ore, dubbio: { orologio: segno * tondo(intero + parseInt(dec) / 60), decimale: ore } };
+  return { ore: ore };
+}
+// "1h30" / "1h18" per le domande
+function _pianoOreHmm(ore) {
+  const a = Math.abs(ore);
+  let h = Math.floor(a);
+  let mm = Math.round((a - h) * 60);
+  if (mm === 60) {
+    h++;
+    mm = 0;
+  }
+  return (ore < 0 ? '-' : '') + h + 'h' + String(mm).padStart(2, '0');
 }
 // Scrive/aggiorna/cancella uno scostamento del giorno
 async function pianoRecuperoScrivi(nome, dstr, valore) {
@@ -1999,7 +2114,27 @@ async function pianoRecuperoScrivi(nome, dstr, valore) {
   const att = _pianoRecupero[chiave];
   // si accetta sia il decimale (1.5) sia l'orologio (1:30): un'ora e mezza si
   // puo' scrivere in tutti e due i modi, cosi' nessuno sbaglia scrivendo 1.30
-  const testo = _pianoOreDaTesto(valore);
+  const an = _pianoOreAnalizza(valore);
+  if (an.errore) {
+    toast(an.errore);
+    return false;
+  }
+  if (an.dubbio) {
+    const tv = String(valore).trim();
+    const hO = _pianoOreHmm(an.dubbio.orologio);
+    const hD = String(an.dubbio.decimale).replace('.', ',') + ' h';
+    const scelta = await chiediScelta(
+      '«' + tv + '»: ' + hO + ' o ' + hD + ' (' + _pianoOreHmm(an.dubbio.decimale) + ')?',
+      [
+        { valore: 'o', etichetta: hO },
+        { valore: 'd', etichetta: hD },
+      ],
+      { titolo: 'Ore da registrare' },
+    );
+    if (!scelta) return false;
+    an.ore = scelta === 'o' ? an.dubbio.orologio : an.dubbio.decimale;
+  }
+  const testo = an.vuoto ? '' : String(an.ore);
   try {
     if (testo === '' || parseFloat(testo) === 0) {
       if (att) {
@@ -2084,11 +2219,13 @@ function _pianoRecuperoTotaliGenerali() {
     else meno += v;
   });
   const netto = Math.round((piu + meno) * 100) / 100;
+  // niente segno sullo zero (D35: prima «+0h00 in più · -0h00 in meno»)
+  const segnato = (v, segno) => (Math.round(Math.abs(v) * 60) ? segno : '') + _pianoOreHm(Math.abs(v));
   box.innerHTML =
-    '<span class="rec-più">+' +
-    _pianoOreHm(piu) +
-    '</span> in più &middot; <span class="rec-meno">-' +
-    _pianoOreHm(Math.abs(meno)) +
+    '<span class="rec-più">' +
+    segnato(piu, '+') +
+    '</span> in più &middot; <span class="rec-meno">' +
+    segnato(meno, '-') +
     '</span> in meno &middot; saldo del settore <b>' +
     (netto > 0 ? '+' : netto < 0 ? '-' : '') +
     _pianoOreHm(Math.abs(netto)) +

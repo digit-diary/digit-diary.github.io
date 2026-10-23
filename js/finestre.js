@@ -13,6 +13,9 @@
  *   await chiediScelta(testo, [{ valore, etichetta }], { titolo, annulla }) -> valore / null
  * Invio conferma, Esc annulla. Se ne arrivano due insieme, la seconda aspetta
  * la prima (come facevano quelle del browser).
+ * Avvisi di regola o di legge (testo che comincia con il segnale di attenzione, o
+ * opz.attenzione: true): fuoco su Annulla e Invio non risponde finche non si sceglie il
+ * pulsante (clic, o Tab e Invio); i tasti scritti nel frattempo non si perdono.
  */
 let _finestraCoda = Promise.resolve();
 
@@ -98,6 +101,46 @@ function _finestraMostra(tipo, testo, predefinito, opz) {
     const campo = velo.querySelector('.finestra-campo');
     if (campo) campo.value = predefinito == null ? '' : String(predefinito);
 
+    // AVVISO DI REGOLA O DI LEGGE (testo che comincia con il segnale di attenzione, o
+    // opz.attenzione): chi scrive in fila nel calendario (sigla, Invio, sigla, Invio...)
+    // non deve confermarlo senza leggerlo (controllo 23/10/2026: l Invio successivo lo
+    // confermava e le sigle dopo finivano sulle persone sbagliate o si perdevano).
+    // Il fuoco va su Annulla e Invio NON risponde finche non si sceglie un pulsante in modo
+    // esplicito: clic, oppure Tab (o freccia) e poi Invio. Esc annulla sempre.
+    // Le sigle e gli Invio scritti nel frattempo non si perdono: se il calendario li sa
+    // tenere (window._finestraPassaTasto) vanno in coda e si scrivono dopo, nelle celle
+    // successive; altrimenti si mostrano nella finestra come non scritti.
+    const attenzione =
+      tipo === 'conferma' && (opz.attenzione != null ? !!opz.attenzione : /^\s*\u26a0/.test(t)) && !!bNo;
+    let scelto = false; // l utente ha spostato il fuoco sui pulsanti (Tab, frecce)
+    const ignorati = [];
+    const passati = [];
+    let notaTasti = null;
+    if (attenzione) {
+      const n = document.createElement('div');
+      n.className = 'finestra-nota';
+      n.textContent =
+        'Invio non risponde a questo avviso: scegli con un clic, oppure con Tab e poi Invio (Esc = Annulla).';
+      velo.querySelector('.finestra-pulsanti').before(n);
+    }
+    const mostraTasti = () => {
+      if (!notaTasti) {
+        notaTasti = document.createElement('div');
+        notaTasti.className = 'finestra-nota finestra-nota-tasti';
+        velo.querySelector('.finestra-pulsanti').before(notaTasti);
+      }
+      notaTasti.textContent =
+        (passati.length ? 'Scritti dopo la risposta, nelle celle successive: ' + passati.slice(-20).join(' ') : '') +
+        (passati.length && ignorati.length ? ' \u00b7 ' : '') +
+        (ignorati.length ? 'Tasti NON scritti: ' + ignorati.slice(-20).join(' ') : '');
+    };
+    // tasto di chi sta scrivendo (non rivolto alla finestra): in coda al calendario o mostrato
+    const tastoScritto = (e) => {
+      const nome = e.key === 'Enter' ? '\u23ce' : e.key.toUpperCase();
+      if (typeof window._finestraPassaTasto === 'function' && window._finestraPassaTasto(e)) passati.push(nome);
+      else ignorati.push(nome);
+      mostraTasti();
+    };
     const primaFocus = document.activeElement;
     const chiudi = (esito) => {
       document.removeEventListener('keydown', tasti, true);
@@ -113,6 +156,7 @@ function _finestraMostra(tipo, testo, predefinito, opz) {
         : chiudi(tipo === 'testo' ? campo.value : tipo === 'avviso' ? undefined : true);
     const annulla = () => chiudi(tipo === 'testo' || tipo === 'scelta' ? null : tipo === 'avviso' ? undefined : false);
     const tasti = (e) => {
+      const lettera = e.key.length === 1 && /[0-9A-Za-z]/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey;
       if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
@@ -120,13 +164,28 @@ function _finestraMostra(tipo, testo, predefinito, opz) {
       } else if (e.key === 'Enter') {
         e.preventDefault();
         e.stopPropagation();
-        conferma();
-      } else if (e.key === 'Tab') {
+        if (attenzione) {
+          // Invio = il pulsante scelto con Tab o le frecce; prima nessuna risposta
+          const a = document.activeElement;
+          if (scelto && a && velo.contains(a) && a.tagName === 'BUTTON') a.click();
+          else tastoScritto(e);
+        } else conferma();
+      } else if (e.key === ' ' && attenzione && !scelto) {
+        e.preventDefault();
+        e.stopPropagation();
+      } else if (e.key === 'Tab' || (attenzione && (e.key === 'ArrowLeft' || e.key === 'ArrowRight'))) {
         // il tasto Tab resta dentro la finestra
         const el = [...velo.querySelectorAll('input,button')];
         const i = el.indexOf(document.activeElement);
         e.preventDefault();
-        el[(i + (e.shiftKey ? -1 : 1) + el.length) % el.length].focus();
+        e.stopPropagation();
+        scelto = true;
+        const indietro = e.shiftKey || e.key === 'ArrowLeft';
+        el[(i + (indietro ? -1 : 1) + el.length) % el.length].focus();
+      } else if (!campo && lettera) {
+        e.preventDefault();
+        e.stopPropagation();
+        tastoScritto(e);
       }
     };
     if (tipo === 'scelta')
@@ -140,7 +199,8 @@ function _finestraMostra(tipo, testo, predefinito, opz) {
     if (campo) {
       campo.focus();
       campo.select();
-    } else velo.querySelector('.finestra-ok').focus();
+    } else if (attenzione) bNo.focus();
+    else velo.querySelector('.finestra-ok').focus();
   });
 }
 

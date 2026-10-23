@@ -500,6 +500,9 @@ async function _fziApplica() {
         backup.push({ id: nuovo.id, nome: nome, prima: null });
         scritti++;
         logAzione('Collaboratore aggiunto', nome + ' (import competenze ' + repartoLabel(z.rep) + ')');
+        // nello Storico HR come per chi c era gia (prima i nuovi restavano solo nel Registro, C28)
+        if (x.piu.length && typeof _insertHrEvento === 'function')
+          _insertHrEvento(nome, 'formazione', 'Competenze da file (' + z.nomeFile + '): ' + x.piu.join(', '));
       } catch (e) {
         errori.push(nome);
       }

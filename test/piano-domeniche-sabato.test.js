@@ -47,12 +47,15 @@ ctx._pianoDomSabatoParam = () => ({ evita: true, copertura: true });
 ctx.PianoRegole = require('../js/piano-regole.js');
 const schede = {}; // nome -> { data_assunzione, data_fine_rapporto }
 ctx._pianoCollabInfo = (n) => schede[n] || null;
+const sospesiDi = {}; // nome -> mesi 'MM' con le domeniche non conteggiate (preferenze)
+ctx._pianoDomMesiSospesi = (n) => sospesiDi[n] || [];
 vm.createContext(ctx);
 vm.runInContext(
   estrai('piano-genera.js', [
     '_pianoTestoSabatoTardi',
     '_pianoDomContratto',
     '_pianoDomAttese',
+    '_pianoDomDirittoDi',
     '_pianoViolDiLegge',
     '_pianoPesoBuco',
   ]) +
@@ -162,6 +165,81 @@ ok(
 );
 ok(pb({ tipo: 'riposo_singolo', prima: 4, dopo: 4 }) === 1, '4-1-4: un buco');
 ok(pb({ tipo: 'fuori_preferito', lungo: 5 }) === 0.25, '5 invece di 4: un quarto');
+
+console.log('== domeniche non conteggiate per le preferenze (titolare 23/10/2026) ==');
+{
+  const R = require('../js/piano-regole.js');
+  const notte = [
+    { codice: 'R8', tardi: true },
+    { codice: 'R23', tardi: true },
+  ];
+  const vs = { giorni_lavoro: '5,6', solo_notti: true };
+  const s1 = R.domenicheSospese(vs, notte);
+  ok(s1 && s1.motivo === 'lavora solo ven e sab sera', 'solo ven e sab sera: domeniche non conteggiate');
+  ok(
+    R.domenicheSospeseNota(s1.motivo) === 'Domeniche non conteggiate: lavora solo ven e sab sera (preferenze)',
+    'testo della nota grigia',
+  );
+  ok(
+    R.domenicheSospese(vs, notte.concat([{ codice: 'R22', tardi: false }])) === null,
+    'un turno del sabato entro le 23: si conta',
+  );
+  ok(
+    R.domenicheSospese({ giorni_lavoro: '5,6,0', solo_notti: true }, notte) === null,
+    'lavora anche la domenica: si conta (puo lasciarla libera)',
+  );
+  ok(R.domenicheSospese({ giorni_lavoro: '1,2,3,4,5', solo_notti: true }, notte) === null, 'senza sabato: si conta');
+  ok(
+    R.domenicheSospese({ giorni_lavoro: '4,5,6', giorni_settimana: 2 }, notte) === null,
+    'G V S e 2 a settimana: il sabato si puo lasciare libero',
+  );
+  ok(
+    R.domenicheSospese({ giorni_lavoro: '1,2,3,4,5,6', solo_notti: true }, notte) === null,
+    'sei giorni: i riposi possono cadere di sabato',
+  );
+  ok(R.domenicheSospese({ solo_notti: true }, notte) === null, 'senza giorni di lavoro: si conta');
+  ok(R.domenicheSospese(vs, []) === null, 'nessun turno possibile il sabato (dati incompleti): si conta');
+  const s2 = R.domenicheSospese({ giorni_lavoro: '2,3,4,5,6' }, notte);
+  ok(s2 && /mar, mer, gio, ven e sab, il sabato sempre/.test(s2.motivo), 'mar-sab con turni tardi: non conteggiate');
+  const c = R.domenicheContratto(2026, '2026-05-01', null, 12, ['10', '11', '12']);
+  ok(c.diritto === 5 && c.attese('12') === 5 && c.attese('09') === 5, 'mesi esclusi fuori dal diritto: mag-set = 5');
+  ok(R.domenicheContratto(2026, null, null, 12, ['01', '02']).diritto === 10, 'senza inizio, 2 mesi esclusi: 10');
+  // ORE MINIME RAGGIUNGIBILI con le preferenze
+  const sett = (k, lav, cap) => ({ sett: 'S' + k, fisse: 0, lavoro: lav, cap: cap || 0 });
+  // 4 settimane, solo ven e sab (9 ore): 8 turni = 72 h
+  const vsGiorni = [];
+  for (let k = 0; k < 4; k++) for (let d = 0; d < 7; d++) vsGiorni.push(sett(k, d === 4 || d === 5 ? 9 : 0));
+  ok(R.oreRaggiungibili(vsGiorni) === 72, 'solo ven e sab, 4 settimane: 72 h');
+  ok(
+    R.oreRaggiungibili(vsGiorni.concat([{ sett: 'S0', fisse: 8.4, lavoro: 0 }])) === 80.4,
+    'vacanza: le sue ore contano',
+  );
+  const cap2 = [sett(0, 9, 2), sett(0, 8, 2), sett(0, 7, 2)];
+  ok(R.oreRaggiungibili(cap2) === 17, '2 giorni a settimana: i due turni piu lunghi');
+  ok(
+    R.oreMinimoNota('solo ven e sab', 96) ===
+      'Ore sotto il minimo per le preferenze (solo ven e sab): massimo raggiungibile 96 h',
+    'testo della nota delle ore',
+  );
+}
+{
+  // _pianoDomAttese con i mesi non conteggiati: niente arretrato dai mesi sospesi
+  schede['Prova Sospesa'] = { data_assunzione: '2026-05-01' };
+  sospesiDi['Prova Sospesa'] = ['07', '08', '09', '10', '11', '12'];
+  const dm = {};
+  for (let m = 1; m <= 12; m++) dm[String(m).padStart(2, '0')] = 4;
+  const dati = {
+    perNome: { 'Prova Sospesa': { libere: 2, mesi: ['05', '06', '07', '08', '09'] } },
+    domMese: dm,
+    domAnno: 52,
+  };
+  const c = ctx._pianoDomAttese('Prova Sospesa', '2026-10', dati);
+  ok(
+    c.diritto === 2 && c.arretrato === 0 && c.attese === 2,
+    'mesi sospesi lug-dic: diritto 2 (mag, giu), nessun arretrato',
+  );
+  ok(c.sospesi.length === 6, 'mesi sospesi riportati');
+}
 
 console.log('\n=======================================');
 console.log('  ' + passati + ' passati, ' + falliti + ' falliti');

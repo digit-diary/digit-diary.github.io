@@ -116,7 +116,14 @@ async function caricaAiConfig() {
   if (!fornitori.find((f) => f.id === attivo)) attivo = fornitori[0].id;
   _aiConf = { fornitori, attivo, riserva: fornitori.find((f) => f.id === riserva) ? riserva : '' };
   const f = aiFornitoreAttivo();
-  if (f && (AI_TIPI[f.tipo] || {}).chiave) await _aiLeggiChiave(f.id);
+  // la chiave la consegna il database solo a chi usa l intelligenza artificiale (pagina
+  // Assistente o "Intelligenza artificiale nei moduli", migrazione 20260928): gli altri non la chiedono
+  const usaAi =
+    typeof isVis !== 'function' ||
+    (typeof isAdmin === 'function' && isAdmin()) ||
+    isVis('assistente') ||
+    isVis('ai_moduli');
+  if (f && (AI_TIPI[f.tipo] || {}).chiave && usaAi) await _aiLeggiChiave(f.id);
   groqKey = aiPronta() ? 'configurata' : '';
   if (typeof renderAiFornitoriUI === 'function' && document.getElementById('ai-fornitori-ui')) renderAiFornitoriUI();
 }

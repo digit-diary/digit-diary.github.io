@@ -567,11 +567,117 @@ function _pianoLimitiOre(nome, nGiorni) {
     };
   }
   const obiettivo = pieno * (parseFloat(info.percentuale) || 1);
-  return {
+  const out = {
     obiettivo: obiettivo,
     min: isNaN(giu) ? null : obiettivo - giu,
     max: isNaN(su) ? null : obiettivo + su,
   };
+  // ORE MINIME CON LE PREFERENZE (titolare 23/10/2026, _pianoOrePreferenze): se i giorni di lavoro
+  // non permettono di arrivare al minimo, obiettivo e minimo scendono a quello che si puo fare
+  // (con la stessa tolleranza): niente "SOTTO il minimo", niente costo in Migliora, nota grigia
+  if (out.min != null) {
+    const pref = _pianoOrePreferenze(nome, _pianoMeseSel);
+    if (pref && pref.massimo < out.min) {
+      out.minPreferenze = out.min;
+      out.notaPreferenze = pref.nota;
+      out.obiettivo = Math.min(obiettivo, pref.massimo);
+      out.min = Math.max(0, pref.massimo - (isNaN(giu) ? 0 : giu));
+    }
+  }
+  return out;
+}
+// ORE MASSIME RAGGIUNGIBILI NEL MESE CON LE PREFERENZE (giorni di lavoro, giorni a settimana,
+// valide giorno per giorno con lo storico js/piano-scelte.js). UNA funzione per bozza, Migliora,
+// Controlla le regole, Sistema le ore e Avvisi (tutti passano da _pianoLimitiOre). Conta, per ogni
+// giorno nel rapporto, le ore delle celle che non si cambiano (vacanza, malattia, CGF...) oppure il
+// turno piu lungo che la persona puo fare quel giorno (PianoRegole.idoneita), con il tetto dei
+// giorni a settimana (PianoRegole.oreRaggiungibili). Solo per chi ha giorni di lavoro o giorni a
+// settimana; null per gli altri. Ritorna { massimo, motivo, nota }.
+const _pianoOrePrefCache = {};
+function _pianoOrePreferenze(nome, ym) {
+  const c = nome && _pianoCollabInfo(nome);
+  if (!c || !ym) return null;
+  const nG = _pianoUltimoGiorno(ym);
+  const da = ym + '-01';
+  const a = ym + '-' + String(nG).padStart(2, '0');
+  const tratti =
+    typeof pianoScelteSegmenti === 'function' ? pianoScelteSegmenti(c, da, a) : [{ da: da, a: a, info: c }];
+  const limita = (i) => i && (PianoRegole.giorniDiLavoro(i).length || parseInt(i.giorni_settimana) > 0);
+  if (!tratti.some((t) => limita(t.info))) return null;
+  const righeTutte = ym === _pianoMeseSel && typeof _pianoRighe !== 'undefined' ? _pianoRighe : [];
+  const idx = typeof _pianoScelteIdx !== 'undefined' ? _pianoScelteIdx : null;
+  const firma = [
+    c.giorni_lavoro,
+    c.giorni_settimana,
+    c.solo_notti,
+    c.solo_diurni,
+    c.turni_bloccati,
+    c.turni_consentiti,
+    c.percentuale,
+    (pianoTurniCache || []).length,
+    _pianoReparto(),
+  ].join('|');
+  const chiave = nome + '|' + ym;
+  const m = _pianoOrePrefCache[chiave];
+  if (
+    m &&
+    m.firma === firma &&
+    m.idx === idx &&
+    m.righe === righeTutte &&
+    m.n === righeTutte.length &&
+    Date.now() - m.t < 60000
+  )
+    return m.v;
+  const cella = {};
+  righeTutte.forEach((r) => r.collaboratore === nome && (cella[String(r.data).substring(0, 10)] = r));
+  const pct = parseFloat(c.percentuale) || 1;
+  const turni = _pianoTurniReparto();
+  const memo = {}; // firma scelte|dow -> ore del turno piu lungo
+  const giorni = [];
+  let motivo = '';
+  for (let g = 1; g <= nG; g++) {
+    const d = ym + '-' + String(g).padStart(2, '0');
+    if (!_pianoOperativoIl(nome, d)) continue;
+    const dt = new Date(d + 'T12:00:00');
+    const dow = dt.getDay();
+    const lun = new Date(dt);
+    lun.setDate(dt.getDate() - ((dow + 6) % 7));
+    const t = tratti.find((x) => d >= x.da && d <= x.a) || tratti[tratti.length - 1];
+    const info = t.info || c;
+    const r = cella[d];
+    if (r && r.codice && !_pianoIsLavoro(r.codice) && String(r.codice).toUpperCase() !== 'C') {
+      const o = _pianoOreDiRiga(r, pct) || 0;
+      if (o > 0 || _pianoDomenicaEsclusa(r.codice)) {
+        giorni.push({ sett: dataLocaleISO(lun), fisse: o, lavoro: 0 });
+        continue;
+      }
+    }
+    const k = [info.giorni_lavoro, info.solo_notti, info.solo_diurni, dow].join('|');
+    if (!(k in memo)) {
+      let best = 0;
+      if (PianoRegole.lavoraNelGiorno(info, dow))
+        turni.forEach((tu) => {
+          if (!PianoRegole.idoneita(info, tu, _pianoCtxIdoneita({ dow: dow })).ok) return;
+          best = Math.max(
+            best,
+            _pianoOreDiRiga({ collaboratore: nome, data: d, codice: tu.codice, reparto_dip: tu.reparto_dip }, pct) || 0,
+          );
+        });
+      memo[k] = best;
+    }
+    giorni.push({ sett: dataLocaleISO(lun), fisse: 0, lavoro: memo[k], cap: parseInt(info.giorni_settimana) || 0 });
+    if (limita(info)) {
+      const gl = PianoRegole.giorniDiLavoro(info).map((x) => ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'][x]);
+      const gs = parseInt(info.giorni_settimana) || 0;
+      motivo =
+        (gl.length ? 'solo ' + (gl.length > 1 ? gl.slice(0, -1).join(', ') + ' e ' + gl[gl.length - 1] : gl[0]) : '') +
+        (gs ? (gl.length ? ', ' : '') + gs + (gs === 1 ? ' giorno' : ' giorni') + ' a settimana' : '');
+    }
+  }
+  const massimo = PianoRegole.oreRaggiungibili(giorni);
+  const v = { massimo: massimo, motivo: motivo, nota: PianoRegole.oreMinimoNota(motivo, massimo) };
+  _pianoOrePrefCache[chiave] = { firma: firma, idx: idx, righe: righeTutte, n: righeTutte.length, t: Date.now(), v: v };
+  return v;
 }
 // GIORNO DI LAVORO (decisione del titolare 05.10): un turno, oppure un codice di
 // lavoro che non e un turno (JG, ufficio, uscita per servizio, corsi, formazione).
@@ -739,6 +845,89 @@ function _pianoFunzioniEsentiRiposi() {
 function _pianoEsenteRiposi(info, esenti) {
   return !!(info && (esenti || _pianoFunzioniEsentiRiposi()).has(String(info.funzione || '').toUpperCase()));
 }
+// DOMENICHE NON CONTEGGIATE PER LE PREFERENZE (richiesta del titolare 23/10/2026; regola in
+// PianoRegole.domenicheSospese). UNA funzione per bozza, Migliora, Controlla le regole, tabella
+// Domeniche, Avvisi (anche di fine anno), avviso "perde la domenica" e Benessere.
+// Mese ym di una persona: le scelte sono quelle valide nel mese (storico, js/piano-scelte.js); il
+// mese non conta se le preferenze che lo impediscono valgono per almeno meta dei suoi giorni
+// (come i mesi di contratto). Ritorna null (si conta) o { motivo, nota }.
+const _pianoDomSospCache = {};
+function _pianoDomSospesaMese(nome, ym) {
+  if (!nome || !ym || String(_pianoRegolaVal('turno_prima_domenica_libera')).toUpperCase() !== 'TRUE') return null;
+  const c = _pianoCollabInfo(nome);
+  if (!c) return null;
+  const idx = typeof _pianoScelteIdx !== 'undefined' ? _pianoScelteIdx : null;
+  const chiave = nome + '|' + ym + '|' + _pianoReparto();
+  const firma = [
+    c.giorni_lavoro,
+    c.giorni_settimana,
+    c.solo_notti,
+    c.solo_diurni,
+    c.turni_bloccati,
+    c.turni_consentiti,
+    c.turni_solo_a_mano,
+    c.funzione,
+    (pianoTurniCache || []).length,
+  ].join('|');
+  const m = _pianoDomSospCache[chiave];
+  if (m && m.firma === firma && m.idx === idx && Date.now() - m.t < 60000) return m.v;
+  const nG = _pianoUltimoGiorno(ym);
+  const da = ym + '-01';
+  const a = ym + '-' + String(nG).padStart(2, '0');
+  const tratti =
+    typeof pianoScelteSegmenti === 'function' ? pianoScelteSegmenti(c, da, a) : [{ da: da, a: a, info: c }];
+  const sabatiMese = [];
+  for (let g = 1; g <= nG; g++) {
+    const iso = ym + '-' + String(g).padStart(2, '0');
+    if (new Date(iso + 'T12:00:00').getDay() === 6) sabatiMese.push(iso);
+  }
+  let giorniSosp = 0;
+  let motivo = null;
+  tratti.forEach((t) => {
+    const info = t.info || c;
+    if (!PianoRegole.domenicheSospesePossibili(info)) return; // la maggior parte: subito
+    const sabati = sabatiMese.filter((s) => s >= t.da && s <= t.a);
+    const prova = sabati.length ? sabati : sabatiMese;
+    const turni = _pianoTurniReparto()
+      .filter((tu) => PianoRegole.idoneita(info, tu, _pianoCtxIdoneita({ dow: 6 })).ok)
+      .map((tu) => ({ codice: tu.codice, tardi: prova.every((s) => !_pianoSabatoEntro23(tu.codice, s, null)) }));
+    const r = PianoRegole.domenicheSospese(info, turni);
+    if (!r) return;
+    giorniSosp += Math.round((new Date(t.a + 'T12:00:00') - new Date(t.da + 'T12:00:00')) / 86400000) + 1;
+    motivo = r.motivo;
+  });
+  const v = giorniSosp * 2 >= nG ? { motivo: motivo, nota: PianoRegole.domenicheSospeseNota(motivo) } : null;
+  _pianoDomSospCache[chiave] = { firma: firma, idx: idx, t: Date.now(), v: v };
+  return v;
+}
+// mesi 'MM' dell anno in cui le domeniche della persona non si contano (vedi sopra)
+function _pianoDomMesiSospesi(nome, anno) {
+  const out = [];
+  if (!nome) return out;
+  for (let m = 1; m <= 12; m++) {
+    const mm = String(m).padStart(2, '0');
+    if (_pianoDomSospesaMese(nome, anno + '-' + mm)) out.push(mm);
+  }
+  return out;
+}
+// diritto dell anno per le tabelle (Domeniche, Avvisi, avviso della cella): senza data di inizio
+// il valore della regola, salvo i mesi non conteggiati (allora in proporzione ai mesi che restano)
+function _pianoDomDirittoDi(contr) {
+  const regola = parseInt(_pianoRegolaVal('domeniche_libere_anno')) || 12;
+  return contr.inizioMancante && !(contr.sospesi || []).length ? regola : contr.diritto;
+}
+// la nota grigia dei mesi non conteggiati (o '' se si contano tutti)
+function _pianoDomNotaSospesi(nome, contr) {
+  const s = (contr && contr.sospesi) || [];
+  if (!s.length) return '';
+  const anno = contr.anno;
+  const v = _pianoDomSospesaMese(nome, anno + '-' + s[s.length - 1]) || {};
+  const MS = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
+  return (
+    (v.nota || PianoRegole.domenicheSospeseNota('')) +
+    (s.length < 12 ? ', ' + s.map((x) => MS[parseInt(x) - 1]).join(' ') : '')
+  );
+}
 // Mappa malattie del Diario per mese, ricalcolata quando cambia il Diario
 // (lunghezza/oggetto di datiCache) o dopo 10 secondi.
 const _pianoMalDiarioCache = {};
@@ -781,6 +970,7 @@ async function _pianoDomenicheValideAnno(nome, anno) {
   for (let d = new Date(anno, 0, 1, 12); d.getFullYear() === anno; d.setDate(d.getDate() + 1)) {
     if (d.getDay() !== 0) continue;
     const ds = anno + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    if (_pianoDomSospesaMese(nome, ds.substring(0, 7))) continue; // non conteggiate (preferenze)
     if (!per[ds]) {
       // fuori dal rapporto non si puo dare
       if ((!ini || ds >= ini) && (!fin || ds <= fin)) daPianificare++;
@@ -795,8 +985,14 @@ async function _pianoDomenicheValideAnno(nome, anno) {
   const oggi = _pianoOggiStr();
   const daMese = oggi.substring(0, 4) === String(anno) ? oggi.substring(5, 7) : oggi < anno + '' ? '00' : '13';
   const contr = _pianoDomContratto(nome, anno, [...mesi], daMese);
-  const minimo = contr.inizioMancante ? parseInt(_pianoRegolaVal('domeniche_libere_anno')) || 12 : contr.diritto;
-  return { valide: n, daPianificare: daPianificare, minimo: minimo, inizioMancante: contr.inizioMancante };
+  const minimo = _pianoDomDirittoDi(contr);
+  return {
+    valide: n,
+    daPianificare: daPianificare,
+    minimo: minimo,
+    inizioMancante: contr.inizioMancante,
+    conCella: (ds) => !!per[ds],
+  };
 }
 // Un cambio toglie una domenica libera valida? Guarda la domenica della cella (se la
 // cella e domenica) o quella dopo (se la cella e sabato). righe = celle della persona
@@ -811,6 +1007,8 @@ function _pianoDomenicaPersa(dstr, codiceNuovo, righe, nomeP) {
   const rd = per[dom];
   const rs = per[sab];
   const nome = nomeP || ((righe || []).find((r) => r && r.collaboratore) || {}).collaboratore;
+  // domeniche non conteggiate per le preferenze: non si perde nulla (_pianoDomSospesaMese)
+  if (_pianoDomSospesaMese(nome, dom.substring(0, 7))) return null;
   if (!_pianoDomenicaValida(rd && rd.codice, rs && rs.codice, sab, rs, undefined, nome)) return null;
   const nuovoDom = dow === 0 ? codiceNuovo : rd && rd.codice;
   const nuovoSab = dow === 6 ? { codice: codiceNuovo } : rs;
@@ -827,10 +1025,15 @@ async function _pianoTestoDomenicaPersa(nome, dom) {
   const anno = parseInt(dom.substring(0, 4));
   const conto = await _pianoDomenicheValideAnno(nome, anno);
   const min = conto.minimo;
-  const ora = conto.valide;
+  // la domenica che si perde e libera e valida; se e ancora vuota (nessuna cella) il conto
+  // dell anno la mette fra quelle da pianificare: qui conta fra le valide (controllo
+  // 23/10/2026: «scenderebbero da 0 a 0»)
+  const vuota = conto.conCella ? !conto.conCella(dom) : false;
+  const ora = conto.valide + (vuota ? 1 : 0);
+  const daPian = Math.max(0, conto.daPianificare - (vuota ? 1 : 0));
   const dopo = Math.max(0, ora - 1);
   // sotto il minimo solo se neanche le domeniche ancora da pianificare bastano
-  const sotto = dopo + conto.daPianificare < min;
+  const sotto = dopo + daPian < min;
   return (
     (sotto ? 'ATTENZIONE, NON ARRIVA PIU AL MINIMO: ' : '') +
     nome +
@@ -844,8 +1047,10 @@ async function _pianoTestoDomenicaPersa(nome, dom) {
     dopo +
     ' (minimo ' +
     min +
-    (conto.inizioMancante ? ', data di inizio mancante' : ' secondo i mesi di contratto') +
-    (conto.daPianificare ? ', ancora ' + conto.daPianificare + ' domeniche da pianificare' : '') +
+    (conto.inizioMancante
+      ? ' calcolato sui mesi con il piano: manca la data di inizio nella scheda'
+      : ' secondo i mesi di contratto') +
+    (daPian ? ', ancora ' + daPian + (daPian === 1 ? ' domenica' : ' domeniche') + ' da pianificare' : '') +
     ')'
   );
 }
@@ -923,6 +1128,7 @@ async function _pianoCaricaDomAnno(ym, rep) {
     });
     Object.keys(perNome).forEach((nome) => {
       perNome[nome].mesi.forEach((mm) => {
+        if (_pianoDomSospesaMese(nome, anno + '-' + mm)) return; // domeniche non conteggiate (preferenze)
         for (
           let d = new Date(anno, parseInt(mm) - 1, 1, 12);
           d.getMonth() === parseInt(mm) - 1;
@@ -960,7 +1166,12 @@ function _pianoDomAnnoDi(ym, rep) {
 function _pianoDomContratto(nome, anno, mesiPiano, daMese) {
   const info = (nome && _pianoCollabInfo(nome)) || {};
   const dir = parseInt(_pianoRegolaVal('domeniche_libere_anno')) || 12;
-  const c = PianoRegole.domenicheContratto(parseInt(anno), info.data_assunzione, info.data_fine_rapporto, dir);
+  // i mesi in cui le preferenze non permettono una domenica valida non contano (_pianoDomSospesaMese)
+  const sospesi = _pianoDomMesiSospesi(nome, parseInt(anno));
+  const c = Object.assign(
+    PianoRegole.domenicheContratto(parseInt(anno), info.data_assunzione, info.data_fine_rapporto, dir, sospesi),
+    { sospesi: sospesi, anno: parseInt(anno) },
+  );
   if (c.inizioMancante || !mesiPiano) return c;
   const conPiano = new Set(mesiPiano);
   const mesi = c.mesi.filter((mm) => conPiano.has(mm) || mm >= (daMese || '00'));
@@ -994,7 +1205,7 @@ function _pianoDomAttese(nome, ym, dati) {
       if (mm > mese) restanti += dati.domMese[mm] || 0;
     });
   } else {
-    diritto = dirittoRegola;
+    diritto = _pianoDomDirittoDi(contr);
     const mesi = new Set(p.mesi);
     mesi.add(mese);
     let dom = 0;
@@ -1031,6 +1242,7 @@ function _pianoDomAttese(nome, ym, dati) {
     restanti: restanti,
     mesiContratto: contr.inizioMancante ? null : contr.mesi.length,
     inizioMancante: contr.inizioMancante,
+    sospesi: contr.sospesi || [],
   };
 }
 function _pianoCtxViolazioni(ym) {
@@ -1163,6 +1375,17 @@ function _pianoViolazioniPersona(nome, righeMese, righeSett, ctx) {
           aggiungi(g, tot + ' giorni lavorativi consecutivi (max ' + maxCons + ')');
           segnalata = true;
         }
+        // SERIE CHE CONTINUA NEL MESE DOPO gia scritto (controllo del 23/10/2026: ai Tavoli
+        // Migliora faceva 26.11-02.12, 7 giorni, con dicembre protetto, e nessuno lo vedeva):
+        // l ultimo giorno del mese conta anche i giorni di lavoro dopo
+        if (maxCons && g === nGiorni && !segnalata) {
+          let tot = consec;
+          for (let k = g + 1; k <= nGiorni + 14 && _pianoIsLavoro(giorni[k] || ''); k++) tot++;
+          if (tot > maxCons) {
+            aggiungi(g, tot + ' giorni lavorativi consecutivi con il mese dopo (max ' + maxCons + ')');
+            segnalata = true;
+          }
+        }
       } else {
         consec = 0;
         segnalata = false;
@@ -1283,7 +1506,9 @@ function _pianoViolazioniPersona(nome, righeMese, righeSett, ctx) {
   // la domenica conta solo se il sabato si finisce entro le 23)
   if (ctx.domeniche && righeMese.length) {
     const info = _pianoCollabInfo(nome);
-    if (info && !_pianoEsenteRiposi(info)) {
+    // domeniche non conteggiate per le preferenze (_pianoDomSospesaMese): niente violazione ne
+    // avviso del sabato; la nota grigia la mostra il riquadro di Controlla le regole
+    if (info && !_pianoEsenteRiposi(info) && !_pianoDomSospesaMese(nome, ym)) {
       // stato di ogni domenica (stesso giudizio della bozza: _pianoStatoDomenica) e verdetto
       // sul mese con la regola unica PianoRegole.domenicheLibereMese
       const stati = [];
@@ -1901,58 +2126,99 @@ function _pianoCalcolaViolazioni() {
   _pianoPreferenzeImpedite().forEach((v) => metti({ nome: v.nome, giorno: 0, msg: v.msg, celle: [] }));
   return { celle: celle, lista: lista };
 }
-// PREFERENZE IMPEDITE DALLE REGOLE: chi ha la spunta Preferisce (turno preferito, impostazione
-// turno_preferito_sigle) ma non puo fare quel turno per le regole del settore. Stesso motore
-// della bozza (PianoRegole.idoneita, senza giorno). Ritorna [{ nome, sigla, msg }]: per una
-// regola "chi fa cosa" il rimedio e la sigla fra i Turni consentiti (Preferenze collaboratori).
-function _pianoPreferenzeImpedite() {
-  const cp = typeof _pianoColonnePreferenze === 'function' ? _pianoColonnePreferenze() : { preferiti: [] };
-  if (!cp.preferiti.length) return [];
+// PREFERENZE NON RISPETTABILI (titolare 23/10/2026: "se io metto una preferenza, il programma la
+// deve rispettare"). Le preferenze esplicite valgono piu delle regole generiche di funzione e di
+// gruppo (PianoRegole.turniPersonali, nel motore unico PianoRegole.idoneita); qui restano solo i
+// casi in cui una preferenza e DAVVERO impossibile: competenza o area mancante (Formazione o
+// affiancamento), campo richiesto dal gruppo, tipo di turno vietato nel gruppo, turno bloccato o
+// in contrasto con Solo diurni / Solo notti, livello, turno riservato per nome ad altri, giorni di
+// lavoro senza nessun turno possibile. Un motivo in una riga con il rimedio.
+// Per una persona: [{ sigla, msg }] (msg = "motivo: rimedio").
+function _pianoPreferenzeNonRispettabili(c) {
+  if (!c || c.attivo === false || c.turni_solo_a_mano) return [];
   const out = [];
-  const regole = typeof _pianoRegoleTurnoFunzione === 'function' ? _pianoRegoleTurnoFunzione() : [];
-  const testoRegola = (id) => {
-    const rg = regole.find((x) => x.id === id);
-    if (!rg) return 'una regola di gruppo';
-    const [turni, fz] = String(rg.valore || '').split(':');
-    const tipo = String(rg.tipo_regola || '').toLowerCase();
-    if (tipo === 'turni_solo_funzioni')
-      return (
-        '"' +
-        String(turni || '')
-          .split(',')
-          .join(', ') +
-        ' solo ' +
-        String(fz || '')
-          .split(',')
-          .join(', ') +
-        '"'
-      );
-    return '"' + (rg.valore || '') + '"';
-  };
-  collaboratoriCache
-    .filter((c) => c.attivo !== false && c.prefers_l1 && _pianoAppartieneAlReparto(c) && !c.turni_solo_a_mano)
-    .forEach((c) =>
-      cp.preferiti.forEach((sig) => {
-        const t = _pianoTurnoInfo(sig);
-        if (!t) return;
-        const r = PianoRegole.idoneita(c, t, _pianoCtxIdoneita({ dow: null }));
-        if (r.ok) return;
-        const msg =
-          r.passo === 'funzione_turno'
-            ? 'preferisce ' +
-              sig +
-              ' ma la regola ' +
-              (r.regole || []).map(testoRegola).join(' e ') +
-              ' lo esclude: aggiungi ' +
-              sig +
-              ' nei suoi Turni consentiti (Piano › Impostazioni › Preferenze collaboratori)'
-            : 'preferisce ' +
-              sig +
-              ' ma non lo può fare (' +
-              (r.motivo || 'area ' + (t.gruppo || '') + ' non abilitata o regola del settore') +
-              '): controlla Formazione e Preferenze collaboratori';
-        out.push({ nome: c.nome, sigla: sig, msg: msg });
+  const sigle = _pianoTurniPreferitiSigle();
+  const personali = PianoRegole.turniPersonali(c, sigle);
+  const tipo = (t) => String(t.tipo || '').toLowerCase();
+  const ctx = _pianoCtxIdoneita({ dow: null });
+  personali.forEach((sig) => {
+    const t = _pianoTurniReparto().find((x) => String(x.codice).toUpperCase() === sig);
+    const da = c.prefers_l1 && sigle.includes(sig) ? 'preferisce ' + sig : sig + ' fra i Turni consentiti';
+    if (!t) {
+      out.push({ sigla: sig, msg: da + ': il turno non esiste nel settore: correggi la sigla nelle Preferenze' });
+      return;
+    }
+    const r = PianoRegole.idoneita(c, t, ctx);
+    if (r.ok) return;
+    const gr = String(t.gruppo || '').toUpperCase();
+    const comp = Object.keys(_pianoCompetenzeGruppi()).find(
+      (k) => String(_pianoCompetenzeGruppi()[k]).toUpperCase() === gr,
+    );
+    let msg;
+    if (r.passo === 'area' || r.passo === 'area_funzioni')
+      msg =
+        sig +
+        ' richiede la competenza ' +
+        (comp ? comp.toUpperCase() : gr) +
+        ': spuntala in Formazione (o metti ' +
+        gr +
+        ' in Affiancato in, oppure in Turni consentiti scegli «anche senza formazione» per ' +
+        sig +
+        ')';
+    else if (r.passo === 'campo')
+      msg = sig + ' richiede ' + r.valore + ' nella scheda: completa la scheda del collaboratore';
+    else if (r.passo === 'tipo_vietato')
+      msg = 'il gruppo ' + gr + ' non fa turni ' + tipo(t) + ': cambia la regola del gruppo o la preferenza';
+    else if (r.passo === 'bloccato') msg = sig + ' e fra i suoi Turni bloccati: toglilo da una delle due';
+    else if (r.passo === 'solo_diurni') msg = sig + ' e notturno ma ha Solo diurni: togli una delle due';
+    else if (r.passo === 'solo_notti') msg = sig + ' non e notturno ma ha Solo notturni: togli una delle due';
+    else if (r.passo === 'funzione_turno')
+      msg = (r.motivo || sig + ': regola del settore') + ': rivedi la regola di gruppo o la preferenza';
+    else if (r.passo === 'copertura_area') msg = sig + ' fuori dall area della sua copertura (' + r.gruppi + ')';
+    else msg = sig + ' non possibile (' + r.passo + ')';
+    out.push({ sigla: sig, msg: da + ' · ' + msg });
+  });
+  // preferisce un turno che ha messo "solo se serve": le due scelte si contraddicono
+  PianoRegole.turniConsentitiVoci(c)
+    .filter((v) => v.seServe && c.prefers_l1 && sigle.includes(v.sigla))
+    .forEach((v) =>
+      out.push({
+        sigla: v.sigla,
+        msg:
+          'preferisce ' +
+          v.sigla +
+          ' ma ' +
+          v.sigla +
+          ' e fra i Turni consentiti «solo se serve»: togli Preferisce oppure scegli «sempre»',
       }),
+    );
+  // giorni di lavoro senza nessun turno possibile (es. solo domenica, ma i turni della domenica
+  // sono tutti di un area che non ha)
+  const giorni = PianoRegole.giorniDiLavoro(c);
+  const NOMI_G = ['domenica', 'lunedi', 'martedi', 'mercoledi', 'giovedi', 'venerdi', 'sabato'];
+  const turni = _pianoTurniReparto();
+  const vuoti = giorni.filter(
+    (dow) => !turni.some((t) => PianoRegole.idoneita(c, t, _pianoCtxIdoneita({ dow: dow })).ok),
+  );
+  if (giorni.length && vuoti.length)
+    out.push({
+      sigla: '',
+      msg:
+        'giorni di lavoro: nessun turno possibile il ' +
+        vuoti.map((x) => NOMI_G[x]).join(', ') +
+        ' con le sue preferenze e competenze: controlla Formazione, Solo diurni / notturni e Turni bloccati',
+    });
+  return out;
+}
+// tutte le persone del settore (Controlla le regole, spia nelle Preferenze): [{ nome, sigla, msg }]
+function _pianoPreferenzeImpedite() {
+  const out = [];
+  collaboratoriCache
+    .filter((c) => c.attivo !== false && _pianoAppartieneAlReparto(c) && !c.turni_solo_a_mano)
+    .forEach((c) =>
+      _pianoPreferenzeNonRispettabili(c).forEach((x) =>
+        out.push({ nome: c.nome, sigla: x.sigla, msg: 'preferenza non rispettabile: ' + x.msg }),
+      ),
     );
   return out;
 }
@@ -2673,6 +2939,43 @@ function _pianoHtmlBlocchi(bl) {
       '</ul>',
   };
 }
+// NOTE GRIGIE di Controlla le regole: chi nel mese ha le domeniche non conteggiate per le
+// preferenze (_pianoDomSospesaMese). Non e una violazione: si legge, non si corregge.
+// Anche le ORE sotto il minimo per le preferenze (_pianoLimitiOre: notaPreferenze).
+function _pianoNoteOrePreferenze(ym) {
+  const out = [];
+  if (ym !== _pianoMeseSel) return out;
+  const nG = _pianoUltimoGiorno(ym);
+  const ore = {};
+  (_pianoRighe || []).forEach((r) => {
+    if (!String(r.data).startsWith(ym)) return;
+    const info = _pianoCollabInfo(r.collaboratore) || {};
+    ore[r.collaboratore] = (ore[r.collaboratore] || 0) + (_pianoOreDiRiga(r, parseFloat(info.percentuale) || 1) || 0);
+  });
+  Object.keys(ore)
+    .sort((a, b) => a.localeCompare(b))
+    .forEach((n) => {
+      const lim = _pianoLimitiOre(n, nG);
+      if (lim.notaPreferenze && ore[n] < lim.minPreferenze) out.push({ nome: n, nota: lim.notaPreferenze });
+    });
+  return out;
+}
+function _pianoHtmlDomSospese(ym) {
+  const righe = [];
+  if (_pianoRegolaVal('domeniche_libere_anno') != null) {
+    const nomi = [...new Set((_pianoRighe || []).map((r) => r.collaboratore))].sort((a, b) => a.localeCompare(b));
+    nomi.forEach((n) => {
+      const v = _pianoDomSospesaMese(n, ym);
+      if (v) righe.push('<b>' + escP(n) + '</b>: ' + escP(v.nota));
+    });
+  }
+  _pianoNoteOrePreferenze(ym).forEach((x) => righe.push('<b>' + escP(x.nome) + '</b>: ' + escP(x.nota)));
+  return righe.length
+    ? '<div class="pavv-dom-sospese" style="color:var(--muted);font-size:var(--fs-sm,.8125rem);margin-top:4px">' +
+        righe.join('<br>') +
+        '</div>'
+    : '';
+}
 function _pianoRenderViolazioni() {
   const el = document.getElementById('piano-violazioni');
   if (!el || _pianoViolLista === null) return;
@@ -2681,6 +2984,10 @@ function _pianoRenderViolazioni() {
     bl = _pianoBlocchiMese();
   } catch (e) {}
   const hb = _pianoHtmlBlocchi(bl);
+  let hs = '';
+  try {
+    hs = _pianoHtmlDomSospese(_pianoMeseSel);
+  } catch (e) {}
   if (!_pianoViolLista.length) {
     el.innerHTML =
       '<div class="pavv pavv-ok"><div class="pavv-riga"><i class="icx icx-check"></i><span class="pavv-tit">Controllo delle regole:</span> nessun problema nel mese.' +
@@ -2689,7 +2996,9 @@ function _pianoRenderViolazioni() {
           '<button type="button" class="btn-act pavv-apri" aria-expanded="false" onclick="pianoAvvisiApri(this)">Mostra l\'elenco</button></div><div class="pavv-corpo">' +
           hb.corpo
         : '') +
-      '</div></div>';
+      '</div>' +
+      hs +
+      '</div>';
     return;
   }
   const rg = _pianoRiepilogoGravita(_pianoViolLista);
@@ -2711,7 +3020,9 @@ function _pianoRenderViolazioni() {
     '<span class="pavv-nota">celle in rosso nel calendario</span><button type="button" class="btn-act pavv-apri" aria-expanded="false" onclick="pianoAvvisiApri(this)">Mostra l\'elenco</button></div><div class="pavv-corpo">' +
     _pianoElencoAvvisi(voci) +
     hb.corpo +
-    '</div></div>';
+    '</div>' +
+    hs +
+    '</div>';
 }
 
 // ================================================================
@@ -2764,7 +3075,25 @@ function _pianoIdoneoStatico(n, t, dowG, idoneita) {
     }),
   ).ok;
 }
-async function generaBozzaPiano(usaCoperture) {
+// opz (facoltativo): { blocchi: true } = bozza a blocchi (js/piano-blocchi.js: prima lo schema
+// lavoro/riposo di ognuno, poi i turni dentro lo schema); { secondiSchema } tempo dello schema
+// UNA BOZZA ALLA VOLTA (controllo 23/10/2026, D2): una seconda bozza partita mentre la prima
+// lavora (doppio clic) cancellava le C e riapplicava le vacanze sotto la prima
+let _pianoBozzaInCorso = false;
+async function generaBozzaPiano(usaCoperture, opz) {
+  if (_pianoBozzaInCorso) {
+    if (!window._pianoAutoInCorso) toastErrore('Una bozza è già in preparazione su questo PC: aspetta che finisca.');
+    return;
+  }
+  _pianoBozzaInCorso = true;
+  try {
+    return await _generaBozzaPianoEsegui(usaCoperture, opz);
+  } finally {
+    _pianoBozzaInCorso = false;
+  }
+}
+async function _generaBozzaPianoEsegui(usaCoperture, opz) {
+  opz = opz || {};
   // GENERAZIONE AUTOMATICA (js/piano-auto.js): niente domande e niente messaggi,
   // il risultato va nel resoconto; i permessi li controlla il database
   // (lasciapassare limitato al mese e al settore prenotati)
@@ -2777,11 +3106,20 @@ async function generaBozzaPiano(usaCoperture) {
   const ym = _pianoMeseSel;
   await _pianoCaricaDomAnno(ym, _pianoReparto()).catch(() => {});
   const domAnnoB = _pianoDomAnnoDi(ym);
+  // SCHEMA A BLOCCHI (js/piano-blocchi.js, facoltativo): si calcola dopo le vacanze, vedi candidatoOk
+  let schemaB = null;
   const nGiorni = _pianoUltimoGiorno(ym);
   // PAUSE (15/10/2026): la bozza lascia respirare la pagina ogni ~40 ms (prima restava ferma
   // fino a 60 secondi). Le pause non cambiano nessuna scelta: stessa bozza, cella per cella.
   let tPausaB = Date.now();
   const pausaB = async () => {
+    // Ferma di Prepara il mese (piano-core.js, D6): si esce alla pausa, prima della conferma
+    // anche Ferma di Prepara più mesi (auto.mesi, D-N2): si esce alla pausa e il mese torna com era
+    if (window._pianoBozzaFerma && (!auto || auto.mesi)) {
+      const eF = new Error('Prepara il mese fermato');
+      eF.pianoFermata = true;
+      throw eF;
+    }
     if (Date.now() - tPausaB < 40) return;
     await new Promise((r) => setTimeout(r, 0));
     tPausaB = Date.now();
@@ -2842,10 +3180,24 @@ async function generaBozzaPiano(usaCoperture) {
     g = g2;
   }
   // Step 0 come Turnivo: prima le vacanze (V protette + C + WD)
+  window._pianoBozzaFase = 'Vacanze e congedi del mese…';
   if (!usaCoperture) await _applicaVacanzeMese(false);
+  window._pianoBozzaFase = 'Assegno i turni…';
   // ricarico includendo le celle degli ALTRI reparti dei multi-reparto
   // (stessa funzione scalabile di renderPiano)
   _pianoRighe = await _pianoCaricaMeseSettore(da, a, _pianoReparto());
+  // BOZZA A BLOCCHI: lo schema legge le vacanze appena scritte; se non riesce, la bozza di sempre
+  if (opz.blocchi && !usaCoperture && typeof pianoSchemaBlocchi === 'function') {
+    try {
+      const sch = await pianoSchemaBlocchi({ secondi: opz.secondiSchema });
+      schemaB = { cella: sch.cella, libero: false, info: sch.info };
+      window._pianoUltimoSchema = sch.cella;
+    } catch (e) {
+      console.error('[schema a blocchi]', e);
+      schemaB = null;
+    }
+    _pianoRighe = await _pianoCaricaMeseSettore(da, a, _pianoReparto());
+  }
   const { maxCons, minRiposo } = _pianoLimitiLegge();
   // storia per idoneità (chi ha già fatto quel gruppo) e familiarità:
   // tutte le assegnazioni passate del settore (le più recenti prima)
@@ -3018,6 +3370,7 @@ async function generaBozzaPiano(usaCoperture) {
       .map((x) => x.trim().toUpperCase())
       .filter(Boolean),
   );
+  const prefRangeB = typeof _ricercaPreferitoRange === 'function' ? _ricercaPreferitoRange(nomi, storia, ym) : {};
   const contaTipo = (n, tipo) => {
     let k = 0;
     for (let d = 1; d <= nGiorni; d++) {
@@ -3123,7 +3476,12 @@ async function generaBozzaPiano(usaCoperture) {
   const ctxCgf = {
     ym: ym,
     nGiorni: nGiorni,
-    cella: cella,
+    // con lo schema a blocchi i recuperi vanno nei giorni di riposo dello schema
+    cella: schemaB
+      ? new Proxy(cella, {
+          get: (o, k) => o[k] || (schemaB.cella[k] && schemaB.cella[k] !== 'R' ? 'L' : undefined),
+        })
+      : cella,
     malattie: malattie,
     compleanni: compleanni,
     fabbTot: fabbTot,
@@ -3210,9 +3568,30 @@ async function generaBozzaPiano(usaCoperture) {
     if (!domenicheAttive) return true;
     if (dowG !== 0 && !(dowG === 6 && g + 1 <= nGiorni)) return true;
     if (_pianoEsenteRiposi(_pianoCollabInfo(n), esentiRiposi)) return true;
+    if (_pianoDomSospesaMese(n, ym)) return true; // domeniche non conteggiate (preferenze)
     const conto = contoDom(n);
     const dopo = statiDomeniche(n, g, codice);
     if (PianoRegole.domenicheLibereMese(dopo, conto).raggiungibile) return true;
+    // BOZZA A BLOCCHI (23/10/2026): il sabato oltre le 23 dato per coprire un posto vale come in
+    // Controlla le regole (avviso, non legge, se a fine anno si recupera: domenicheVerdetto), con le
+    // domeniche ancora vuote come le prevede lo schema; mai un turno che fa nascere una violazione
+    // di legge delle domeniche che prima non c era (anche la domenica di chi e indietro)
+    if (schemaB && parSab.copertura && conto) {
+      const conSchema = (st0, gIgn) =>
+        st0.map((st, i) => {
+          if (st !== 'libera') return st;
+          const gd = domenicheMese[i];
+          const sD = gd === gIgn || cella[n + '|' + gd] ? '' : schemaB.cella[n + '|' + gd];
+          const sS = gd - 1 === gIgn || cella[n + '|' + (gd - 1)] ? '' : schemaB.cella[n + '|' + (gd - 1)];
+          if (sD && sD !== 'R') return 'lavoro';
+          if (sS === 'N') return 'sabato_tardi';
+          return st;
+        });
+      const legDopo = PianoRegole.domenicheVerdetto(conSchema(dopo, g), conto, parSab).legge;
+      if (!legDopo) return true;
+      const legPrima = PianoRegole.domenicheVerdetto(conSchema(statiDomeniche(n, null, null), g), conto, parSab).legge;
+      if (!legPrima) return false;
+    }
     return PianoRegole.domenicaTurnoAmmesso(statiDomeniche(n, null, null), dopo, conto, domenicheRigido);
   };
   // SABATO OLTRE LE 23 PER CHI E INDIETRO (decisione del titolare 15/10/2026): il turno del
@@ -3228,6 +3607,7 @@ async function generaBozzaPiano(usaCoperture) {
     const k = domenicheMese.indexOf(g + 1);
     const conto = contoDom(n);
     if (k < 0 || !conto || _pianoEsenteRiposi(_pianoCollabInfo(n), esentiRiposi)) return false;
+    if (_pianoDomSospesaMese(n, ym)) return false; // domeniche non conteggiate (preferenze)
     const dopo = statiDomeniche(n, g, codice);
     if (dopo[k] !== 'sabato_tardi') return false;
     const prima = statiDomeniche(n, g, '');
@@ -3302,7 +3682,16 @@ async function generaBozzaPiano(usaCoperture) {
     while (k <= g + 7 && String(codDi(n, k) || '').toUpperCase() === 'C') k++;
     return ['V', 'V1'].includes(String(codDi(n, k) || '').toUpperCase());
   };
+  // SCHEMA A BLOCCHI (js/piano-blocchi.js, facoltativo): nei giorni di riposo dello schema la
+  // persona non riceve turni, nei giorni di lavoro solo turni del tipo dello schema (presto,
+  // giorno, notte). Senza schema niente cambia. La passata finale dei posti scoperti lo ignora
+  // (la copertura viene prima dei blocchi).
   const candidatoOk = (n, f, t, g, dstr, dowG, ignoraOccupato, oreDelta, nonCopre) => {
+    if (schemaB && !schemaB.libero) {
+      const sch = schemaB.cella[n + '|' + g];
+      if (sch === 'R') return false;
+      if (sch && typeof _pianoBlocchiTipoTurno === 'function' && _pianoBlocchiTipoTurno(t) !== sch) return false;
+    }
     const esistente = cella[n + '|' + g];
     if (diurnoPreV && String(t.tipo || '').toUpperCase() === 'NOTTURNO' && primaDelleVacanze(n, g)) return false;
     if (altroSettore[n + '|' + g]) return false; // quel giorno lavora in un altro settore
@@ -3475,6 +3864,63 @@ async function generaBozzaPiano(usaCoperture) {
     return cand.length > 0 && cand.every((n) => tipoMapp(n, f.turno_codice) === 'PRINCIPALE');
   };
   let giroRiservati = false;
+  // assegnazione del giorno g con lo schema a blocchi (vedi riempiMese)
+  const _pianoSchemaAssegnaGiorno = async (g) => {
+    const dstrM = ym + '-' + String(g).padStart(2, '0');
+    const dowM = new Date(dstrM + 'T12:00:00').getDay();
+    const lista = [];
+    for (const f of fabbG[g] || []) {
+      const t = _pianoTurnoInfo(f.turno_codice);
+      if (!t) continue;
+      const have = nomiCella.filter((n) => cella[n + '|' + g] === f.turno_codice && !altroSettore[n + '|' + g]).length;
+      for (let q = have; q < f.quantita; q++) lista.push({ f: f, t: t });
+    }
+    const chi = nomi.filter((n) => {
+      const sc = schemaB.cella[n + '|' + g];
+      return sc && sc !== 'R' && (!cella[n + '|' + g] || cella[n + '|' + g] === 'WD');
+    });
+    if (!lista.length || !chi.length) return;
+    const memo = {};
+    const ok = (n, k) => {
+      const key = n + '|' + lista[k].f.turno_codice;
+      if (!(key in memo)) memo[key] = candidatoOk(n, lista[k].f, lista[k].t, g, dstrM, dowM, false, 0);
+      return memo[key];
+    };
+    const postoDi = new Map();
+    const prova = (k, visti) => {
+      for (const n of chi) {
+        if (visti.has(n) || !ok(n, k)) continue;
+        visti.add(n);
+        const altro = postoDi.has(n) ? postoDi.get(n) : -1;
+        if (altro < 0 || prova(altro, visti)) {
+          postoDi.set(n, k);
+          return true;
+        }
+      }
+      return false;
+    };
+    for (let k = 0; k < lista.length; k++) prova(k, new Set());
+    for (const [n, k] of postoDi) {
+      await pausaB();
+      const { f, t } = lista[k];
+      if (!candidatoOk(n, f, t, g, dstrM, dowM, false, 0)) continue;
+      const eraWd = cella[n + '|' + g] === 'WD';
+      cella[n + '|' + g] = f.turno_codice;
+      assegnatiRun.add(n + '|' + g);
+      registraAssegnazione(n, f.turno_codice, g);
+      oreMese[n] = (oreMese[n] || 0) + (parseFloat(t.durata_ore) || 0);
+      if (eraWd && rigaDi[n + '|' + g]) sostituzioniWd.push({ id: rigaDi[n + '|' + g].id, codice: f.turno_codice });
+      else
+        nuove.push({
+          collaboratore: n,
+          data: dstrM,
+          codice: f.turno_codice,
+          protetto: false,
+          generato: true,
+          reparto_dip: _pianoReparto(),
+        });
+    }
+  };
   const riempiMese = async () => {
     for (let g = 1; g <= nGiorni; g++) {
       if (giorniChiusi.has(g)) continue; // giorno chiuso: resta com'e'
@@ -3520,6 +3966,11 @@ async function generaBozzaPiano(usaCoperture) {
         };
         postiG.sort((a, b) => primoC(b) - primoC(a) || possibili.get(a) - possibili.get(b));
       }
+      // SCHEMA A BLOCCHI: i posti del giorno si danno tutti insieme a chi lavora nello schema
+      // (abbinamento persona-posto con le regole di sempre, candidatoOk), cosi nessuno dei giorni
+      // di lavoro dello schema resta senza turno per l ordine dei posti. Quello che resta lo fa il
+      // giro di sempre qui sotto.
+      if (schemaB && !giroRiservati) await _pianoSchemaAssegnaGiorno(g);
       for (const f of postiG) {
         await pausaB();
         ((f) => {
@@ -3584,7 +4035,7 @@ async function generaBozzaPiano(usaCoperture) {
                 if (t2 && t2.tipo === 'NOTTURNO' && !_pianoIsLavoro(cella[n + '|' + (g - 1)] || '')) p += 4;
               }
               // domeniche: chi ne ha gia' lavorate di piu' nel mese viene dopo
-              if (dowG === 0 && _pianoRegolaVal('domeniche_libere_anno') != null) {
+              if (dowG === 0 && _pianoRegolaVal('domeniche_libere_anno') != null && !_pianoDomSospesaMese(n, ym)) {
                 p += contaDomeniche(n) * 1.5;
                 // conto ANNUALE: chi e indietro con le domeniche libere lavora la domenica
                 // per ultimo (recupera), chi e avanti per primo
@@ -3593,7 +4044,16 @@ async function generaBozzaPiano(usaCoperture) {
               }
               // preferisce L1 (2 collaboratrici in produzione Turnivo); le sigle vengono
               // dall impostazione turno_preferito_sigle (senza: L1, come prima)
-              if (infoP.prefers_l1 && turniPrefL1.has(String(f.turno_codice).toUpperCase())) p -= 1;
+              // fino a quanti ne fa di solito (abitudini dei mesi passati, _ricercaPreferitoRange): poi
+              // il turno preferito non passa piu avanti (prima Preferisce L1 dava 12-13 L1 su 15 turni)
+              if (infoP.prefers_l1 && turniPrefL1.has(String(f.turno_codice).toUpperCase())) {
+                const pr = prefRangeB[n];
+                let k = 0;
+                if (pr)
+                  for (let d = 1; d <= nGiorni; d++)
+                    if (turniPrefL1.has(String(cella[n + '|' + d] || '').toUpperCase())) k++;
+                if (!pr || k < pr.max) p -= 1;
+              }
               p += qualita(n);
               // minimo_livello_giorno non ancora soddisfatto: privilegia chi ha il livello
               for (const rg of _pianoRegoleGruppoDi((t.gruppo || '').toUpperCase()).concat(_pianoRegoleGruppoDi('*'))) {
@@ -3670,6 +4130,8 @@ async function generaBozzaPiano(usaCoperture) {
                 // AMMESSO: dopo tutti quelli per cui il turno e normale
                 // (la regola "turni al mese nell area" fa passare avanti il primo turno del mese)
                 amm: tipoMapp(n, f.turno_codice) === 'AMMESSO' && !minimoFzChiede(n, t, g, dowG) && !manca ? 1 : 0,
+                // turno "solo se serve" per la persona (Turni consentiti): solo se nessun altro
+                ss: _pianoSoloSeServe(n, f.turno_codice) ? 1 : 0,
                 // WD = giorno in cui DEVE lavorare (attorno alle vacanze): prima di tutti
                 wd: cella[n + '|' + g] === 'WD' ? 0 : 1,
                 area: manca ? 0 : 1,
@@ -3690,6 +4152,8 @@ async function generaBozzaPiano(usaCoperture) {
               .map((x) => Object.assign(x, { sab: sabatoTardiPerde(x.n, g, dowG, f.turno_codice) ? 1 : 0 }))
               .sort(
                 (x, y) =>
+                  // turno "solo se serve" per la persona: dopo TUTTI gli altri idonei
+                  x.ss - y.ss ||
                   // sabato oltre le 23 a chi e indietro con le domeniche: solo se nessun altro
                   x.sab - y.sab ||
                   x.cop - y.cop ||
@@ -4032,6 +4496,7 @@ async function generaBozzaPiano(usaCoperture) {
   let tappatiFine = 0;
   if (scopertiFinali.length) {
     passataFinale = true;
+    if (schemaB) schemaB.libero = true;
     const liberoFine = (n, g) => {
       const c = cella[n + '|' + g];
       return !c || c === 'WD' || (c === 'C' && wdDiventatiC.has(n + '|' + g));
@@ -4484,6 +4949,8 @@ async function generaBozzaPiano(usaCoperture) {
     renderPiano();
     return;
   }
+  window._pianoBozzaFase = 'Bozza pronta: conferma per scriverla';
+  window._pianoBozzaScrive = true; // da qui Ferma non vale piu (si risponde alla conferma)
   if (
     !auto &&
     !(await chiediConferma(
@@ -4526,6 +4993,7 @@ async function generaBozzaPiano(usaCoperture) {
     await _pianoRipristinaUltimoSnapshot("Bozza annullata: il mese è tornato com'era");
     return;
   }
+  window._pianoBozzaFase = 'Scrivo la bozza…';
   try {
     for (const idC of daCancellareCgf) await secDel('piano', 'id=eq.' + idC);
     let inseriteTot = 0;
@@ -4565,6 +5033,7 @@ async function generaBozzaPiano(usaCoperture) {
         congedi: nCongedi,
         riposiDaSistemare: riposiRestano.slice(),
         blocchiChiusi: blocchiChiusi,
+        schema: schemaB ? schemaB.info : null,
       };
       return;
     }
@@ -4613,7 +5082,10 @@ async function generaBozzaPiano(usaCoperture) {
 // mai, nei giorni aperti come in quelli chiusi: il modulo ND 1187 segue le celle ND del
 // mese (modulo-nd.js) e uno Svuota lo toglieva o lo accorciava da solo; le malattie si
 // tolgono dalla loro registrazione. Restano in assenze, fuori da aperte e chiuse.
-const PIANO_SVUOTA_TIENI = ['ND', 'M', 'M1'];
+// ASS (controllo 23/10/2026, D4): l assenza in attesa di certificato e una registrazione
+// «Assenza» del Diario con il Rapporto, come la malattia: prima Svuota TUTTE la toglieva e
+// la registrazione restava
+const PIANO_SVUOTA_TIENI = ['ND', 'M', 'M1', 'ASS'];
 function _pianoSvuotaCalcola(righe, ym, ultimo, bloccato) {
   let daAperto = null;
   for (let g = 1; g <= ultimo; g++) {
@@ -4700,7 +5172,7 @@ async function cancellaBozzaPiano() {
     (sv.assenze.length
       ? '<p style="margin-bottom:14px;font-size:var(--fs-md,.875rem)">Restano sempre ' +
         sv.assenze.length +
-        ' assenze (ND del modulo 1187, malattie M): si tolgono dalla cella o dalla loro registrazione, mai con Svuota.</p>'
+        ' assenze (ND del modulo 1187, malattie M e assenze ASS del Diario): si tolgono dalla cella o dalla loro registrazione, mai con Svuota.</p>'
       : '') +
     '<div class="pwd-modal-btns"><button class="btn-modal-cancel" onclick="document.getElementById(\'pwd-modal\').classList.add(\'hidden\')">Annulla</button>' +
     '<button class="btn-modal-ok" onclick="eseguiCancellaPiano(false)">Solo senza lucchetto (' +
@@ -4714,7 +5186,11 @@ async function cancellaBozzaPiano() {
     '</div>';
   document.getElementById('pwd-modal').classList.remove('hidden');
 }
-async function eseguiCancellaPiano(tutto, ancheChiusi) {
+// una alla volta con le altre operazioni lunghe del Piano (pianoLunga in piano-core.js, D2)
+function eseguiCancellaPiano(tutto, ancheChiusi) {
+  return pianoLunga('Svuota il mese', () => _eseguiCancellaPianoEsegui(tutto, ancheChiusi));
+}
+async function _eseguiCancellaPianoEsegui(tutto, ancheChiusi) {
   // solo le celle generate = Genera piano; anche le protette = Cancellazioni di massa
   if (!_pianoAzioneAutoConsentita(tutto ? 'cancella' : 'genera')) return;
   if (ancheChiusi === undefined) {

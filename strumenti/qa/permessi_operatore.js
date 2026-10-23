@@ -1,5 +1,5 @@
-// PROVA DEI PERMESSI DEGLI OPERATORI NEL DATABASE (migrazioni 20260911, 20260913, 20260914 e 20260915;
-// regola del permesso Ripristinare una versione del mese)
+// PROVA DEI PERMESSI DEGLI OPERATORI NEL DATABASE (migrazioni 20260911, 20260913, 20260914, 20260915,
+// 20260926 e 20260928 (controllo C); regola del permesso Ripristinare una versione del mese)
 // Per ogni falla: la prova che la riproduce (deve risultare CHIUSA) e le azioni legittime
 // che devono continuare a funzionare (OK). Passa dal servizio REST come il programma
 // (http://127.0.0.1:8000/rest/v1/rpc/...), con la chiave pubblica della copia locale.
@@ -64,12 +64,14 @@ function pulisci() {
     delete from registrazioni where nome like 'W1B %' or testo like 'W1B %';
     delete from piano where collaboratore like 'W1B %';
     delete from collaboratori where nome like 'W1B %';
+    delete from collab_scelte_storico where collaboratore like 'W1B %' or collaboratore like 'W4C %';
     delete from promemoria where titolo like 'W1B %';
     delete from consegne_turno where messaggio like 'W1B %';
     delete from punti_eventi where collaboratore like 'W1B %';
     delete from costi_maison where nome like 'W1B %';
     delete from spese_extra where beneficiario like 'W1B %';
     delete from maison_budget where nome like 'W1B %';
+    delete from inventario where note like 'W9N%';
     delete from push_subscriptions where endpoint like 'W1B %';
     delete from operatori_auth where nome like 'W1B %';
     delete from login_attempts where nome like 'W1B %';
@@ -89,6 +91,21 @@ function pulisci() {
     delete from log_attivita where operatore like 'W4C %';
     delete from operatori_auth where nome like 'W4C %';
     update impostazioni set valore = (valore::jsonb - 'W4C Op Slots')::text where chiave = 'operatori_reparto' and valore::jsonb ? 'W4C Op Slots';
+    -- 20260928 (QC: controllo C)
+    delete from hr_eventi where collaboratore like 'W1B %' or collaboratore like 'QC %';
+    delete from moduli where collaboratore like 'W1B %' or collaboratore like 'QC %';
+    delete from rapporti_giornalieri where sup_note like 'QC %';
+    delete from consegne_turno where messaggio like 'QC %';
+    delete from punti_eventi where collaboratore like 'QC %';
+    delete from piano where collaboratore like 'QC %';
+    delete from piano_storico where collaboratore like 'QC %' or collaboratore like 'W1B %';
+    delete from registrazioni where nome like 'QC %';
+    delete from collab_scelte_storico where collaboratore like 'QC %';
+    delete from collaboratori where nome like 'QC %';
+    delete from log_attivita where dettaglio like 'QC %' or dettaglio like 'W1B Omonimo%' or operatore like 'QC %';
+    delete from operator_sessions where operatore like 'QC %' or operatore like 'W1B %';
+    delete from operatori_auth where nome like 'QC %';
+    update impostazioni set valore = (valore::jsonb - 'W1B Legacy' - 'W1B Omonimo')::text where chiave in ('operatori_reparto', 'profili_operatori', 'operatori_accessi_extra') and valore ~ '^\\s*\\{' and (valore::jsonb ? 'W1B Legacy' or valore::jsonb ? 'W1B Omonimo');
   `);
 }
 
@@ -217,8 +234,11 @@ function pulisci() {
     chiusa(await si(PIS, 'punti_eventi', { collaboratore: 'W1B Collab Slots', punti: 999, azione: 'copertura', data_evento: D, operatore: 'Pistocchi Mara' }), 'copertura con punti diversi da quelli configurati');
     chiusa(await si(PIS, 'punti_eventi', { collaboratore: 'W1B Collab Slots', punti: 20, azione: 'competenza', data_evento: D, operatore: 'Pistocchi Mara' }), 'punti competenza senza il permesso Competenze');
     const ptCop = JSON.parse(sql(`select valore from impostazioni where chiave = 'punti_config'`)).azioni.find((a) => a.key === 'copertura').punti;
-    r = await si(PIS, 'punti_eventi', { collaboratore: 'W1B Collab Slots', punti: ptCop, azione: 'copertura', descrizione: 'W1B cop', data_evento: D, operatore: 'Pistocchi Mara' });
-    funziona(r, 'popup copertura: punti configurati da qualsiasi operatore');
+    // 20260928: la copertura si riferisce a una malattia vera (qui M nel piano di oggi)
+    const OGGI = sql(`select (now() at time zone 'Europe/Zurich')::date`);
+    sql(`insert into piano (collaboratore, data, codice, reparto_dip, protetto, generato) values ('W1B Assente', '${OGGI}', 'M', 'slots', true, false)`);
+    r = await si(PIS, 'punti_eventi', { collaboratore: 'W1B Collab Slots', punti: ptCop, azione: 'copertura', descrizione: 'W1B cop', data_evento: D, operatore: 'Pistocchi Mara', rif_assente: 'W1B Assente', rif_data: OGGI });
+    funziona(r, 'popup copertura: punti configurati da qualsiasi operatore (malattia vera)');
     if (r.ok) funziona(await sd(PIS, 'punti_eventi', `id = '${r.body.id}'`), 'e li toglie (Annulla, per id)');
     const PT_MAN = sql(`select id from punti_eventi where descrizione = 'W1B manuale'`);
     await sd(PIS, 'punti_eventi', `id = '${PT_MAN}'`);
@@ -311,6 +331,20 @@ function pulisci() {
     chiusa(await su(PIS, 'collaboratori', `nome LIKE 'W1B%'`, { solo_diurni: true }), 'collaboratori modificati in blocco con un filtro largo');
     funziona(await su(PIS, 'collaboratori', `id = '${C_SLOTS}'`, { solo_diurni: true }), 'preferenze del piano di un collaboratore del proprio settore');
     esito(sql(`select solo_diurni from collaboratori where nome = 'W1B Collab Slots'`) === 't', '        salvate');
+    // DATA "VALIDA DAL" DELLE SCELTE (migrazione 20260927): la cambia solo chi modifica le preferenze
+    const nStorico = () => sql(`select count(*)||'|'||coalesce(max(valido_dal)::text,'') from collab_scelte_storico where collaboratore_id = ${C_SLOTS} and campo = 'solo_diurni'`);
+    const primaSt = nStorico();
+    const dal = (t, c, d) => rpc('scelte_storico_imposta_dal', { p_token: t, p_collaboratore_id: Number(c), p_campo: 'solo_diurni', p_data: d });
+    chiusa(await dal(SAN, C_SLOTS, null), 'senza permesso (preferenze del piano): scelta resa valida da sempre');
+    chiusa(await dal(SAN, C_SLOTS, '2026-01-01'), 'senza permesso: data di inizio di una scelta cambiata');
+    esito(nStorico() === primaSt, '        lo storico non e cambiato', nStorico());
+    chiusa(await dal(PIS, C_TAV, null), 'data di inizio della scelta di un collaboratore di un altro settore');
+    chiusa(await dal(PIS, C_SLOTS, '2099-01-01'), 'data di inizio nel futuro');
+    funziona(await dal(PIS, C_SLOTS, '2026-01-01'), 'responsabile del settore: scelta valida dal 01.01.2026');
+    esito(nStorico().endsWith('|2026-01-01'), '        storico spostato al 01.01.2026', nStorico());
+    funziona(await dal(PIS, C_SLOTS, null), 'responsabile del settore: scelta valida da sempre');
+    esito(nStorico() === '0|', '        storico della scelta tolto (vale da sempre)', nStorico());
+    esito(sql(`select count(*) from log_attivita where azione = 'Piano: scelta valida dal' and dettaglio like 'W1B Collab Slots %'`) === '2', '        due righe nel registro');
 
     });
     await S(async () => {
@@ -497,15 +531,21 @@ function pulisci() {
 
     // punti: copertura una volta per motivo, massimo 5 in 24 ore
     const ptC = JSON.parse(sql(`select valore from impostazioni where chiave = 'punti_config'`)).azioni.find((a) => a.key === 'copertura').punti;
-    const cop = (t, desc) => si(t, 'punti_eventi', { collaboratore: 'W4C Tav', punti: ptC, azione: 'copertura', descrizione: desc, data_evento: D, operatore: 'x' });
-    funziona(await cop(PIS, 'W4C copertura del 01.02'), 'punti copertura (popup) senza Punti e premi');
-    chiusa(await cop(PIS, 'W4C copertura del 01.02'), 'punti copertura doppi: stesso collaboratore e motivo');
-    chiusa(await cop(W4, 'W4C copertura del 01.02'), 'punti copertura doppi da un altro operatore');
-    chiusa(await cop(PIS, ''), 'punti copertura senza motivo');
-    for (let i = 2; i <= 5; i++) await cop(PIS, 'W4C copertura n.' + i);
+    // 20260928: ogni copertura con il suo fatto (malattia di W4C Assente, un giorno diverso)
+    const OGGI4 = sql(`select (now() at time zone 'Europe/Zurich')::date`);
+    const giornoW4 = (k) => sql(`select (${lit(OGGI4)}::date + ${k})::text`);
+    sql(`insert into piano (collaboratore, data, codice, reparto_dip, protetto, generato)
+         select 'W4C Assente', ${lit(OGGI4)}::date + g, 'M', 'slots', true, false from generate_series(0, 6) g`);
+    const cop = (t, desc, k) =>
+      si(t, 'punti_eventi', { collaboratore: 'W4C Tav', punti: ptC, azione: 'copertura', descrizione: desc, data_evento: D, operatore: 'x', rif_assente: 'W4C Assente', rif_data: giornoW4(k || 0) });
+    funziona(await cop(PIS, 'W4C copertura del 01.02', 0), 'punti copertura (popup) senza Punti e premi');
+    chiusa(await cop(PIS, 'W4C copertura del 01.02', 0), 'punti copertura doppi: stesso collaboratore e motivo');
+    chiusa(await cop(W4, 'W4C copertura del 01.02', 0), 'punti copertura doppi da un altro operatore');
+    chiusa(await cop(PIS, '', 1), 'punti copertura senza motivo');
+    for (let i = 2; i <= 5; i++) await cop(PIS, 'W4C copertura n.' + i, i);
     esito(sql(`select count(*) from punti_eventi where collaboratore = 'W4C Tav' and azione = 'copertura'`) === '5', 'FUNZIONA 5 coperture diverse nello stesso giorno');
-    chiusa(await cop(PIS, 'W4C copertura n.6'), 'punti copertura: la sesta in 24 ore');
-    funziona(await cop(HR, 'W4C copertura del 01.02'), 'doppio accredito consapevole con Punti e premi');
+    chiusa(await cop(PIS, 'W4C copertura n.6', 6), 'punti copertura: la sesta in 24 ore');
+    funziona(await cop(HR, 'W4C copertura del 01.02', 0), 'doppio accredito consapevole con Punti e premi');
 
     // chat: un solo gruppo Tutti
     const giaTutti = sql(`select count(*) from chat_groups where tipo = 'tutti'`) !== '0';
@@ -718,6 +758,298 @@ function pulisci() {
       } finally {
         sql(`update impostazioni set valore = ${lit(visPrima)} where chiave = 'visibilita'`);
         esito(sql(`select valore from impostazioni where chiave = 'visibilita'`) === visPrima, '        visibilita rimessa com era');
+      }
+    });
+    // INVENTARIO E MAISON PER SETTORE (migrazione 20260926): prima secure_read dava a ogni
+    // operatore i movimenti dell inventario e i costi Maison (con i buoni) di tutti i settori
+    await S(async () => {
+      console.log('\n== 14) inventario e Maison per settore (migrazione 20260926)');
+      sql(`insert into inventario (categoria, tipo, movimento, quantita, cliente, data_movimento, note, operatore, reparto_dip) values
+        ('buono', 'BU', 'entrata', 5, '', '2031-03-01', 'W9N slots', 'x', 'slots'),
+        ('buono', 'CG', 'entrata', 4, '', '2031-03-01', 'W9N tavoli', 'x', 'tavoli');
+        insert into maison_budget (nome, categoria, reparto_dip) values ('W1B Cliente Tav', 'bl', 'tavoli');`);
+      const I_SL = sql(`select id from inventario where note = 'W9N slots'`);
+      const I_TAV = sql(`select id from inventario where note = 'W9N tavoli'`);
+      const note = async (t) => {
+        const x = await sr(t, 'inventario', `note LIKE 'W9N%'`, 'note');
+        return x.ok ? x.body.map((y) => y.note).join(',') : 'ERRORE ' + x.msg;
+      };
+      esito((await note(PIS)) === 'W9N slots', 'CHIUSA  inventario di un altro settore non visibile (responsabile Slots)', await note(PIS));
+      esito((await note(BON)) === 'W9N tavoli', 'CHIUSA  inventario di un altro settore non visibile (responsabile Tavoli)', await note(BON));
+      esito((await note(CAMP)) === 'W9N slots,W9N tavoli', 'FUNZIONA chi lavora in tutti i settori legge tutto l inventario', await note(CAMP));
+      esito((await note(ADM)) === 'W9N slots,W9N tavoli', 'FUNZIONA amministratore legge l inventario di tutti i settori', await note(ADM));
+      chiusa(await su(PIS, 'inventario', `id = '${I_TAV}'`, { quantita: 99 }), 'movimento dell inventario di un altro settore modificato');
+      chiusa(await sd(PIS, 'inventario', `id = '${I_TAV}'`), 'movimento dell inventario di un altro settore cancellato');
+      esito(sql(`select quantita from inventario where id = ${I_TAV}`) === '4', '        il movimento Tavoli c e ancora, com era');
+      chiusa(
+        await si(PIS, 'inventario', { categoria: 'buono', tipo: 'BU', movimento: 'entrata', quantita: 1, note: 'W9N nuovo tav', reparto_dip: 'tavoli' }),
+        'carico nell inventario di un altro settore',
+      );
+      chiusa(await su(PIS, 'inventario', `id = '${I_SL}'`, { reparto_dip: 'tavoli' }), 'movimento spostato in un altro settore');
+      const nuovo = await si(PIS, 'inventario', { categoria: 'buono', tipo: 'BU', movimento: 'entrata', quantita: 2, note: 'W9N nuovo slots', reparto_dip: 'slots' });
+      funziona(nuovo, 'carico nell inventario del proprio settore');
+      funziona(await su(PIS, 'inventario', `id = '${nuovo.body && nuovo.body.id}'`, { quantita: 3 }), 'modifica di un movimento del proprio settore');
+      funziona(await sd(PIS, 'inventario', `id = '${nuovo.body && nuovo.body.id}'`), 'cancellazione di un movimento del proprio settore');
+      funziona(await su(ADM, 'inventario', `id = '${I_TAV}'`, { quantita: 6 }), 'amministratore modifica l inventario di un altro settore');
+      // buoni Maison (costi) e clienti di un altro settore
+      let r2 = await sr(PIS, 'costi_maison', `nome LIKE 'W1B%'`);
+      esito(
+        r2.ok && r2.body.some((x) => x.reparto_dip === 'slots') && !r2.body.some((x) => x.reparto_dip === 'tavoli'),
+        'CHIUSA  costi e buoni Maison di un altro settore non visibili',
+        JSON.stringify((r2.body || []).map((x) => x.reparto_dip)),
+      );
+      r2 = await sr(PIS, 'maison_budget', `nome LIKE 'W1B%'`);
+      esito(r2.ok && r2.body.length === 1 && r2.body[0].reparto_dip === 'slots', 'CHIUSA  clienti Maison di un altro settore non visibili', JSON.stringify((r2.body || []).map((x) => x.nome + ':' + x.reparto_dip)));
+      r2 = await sr(ADM, 'costi_maison', `nome LIKE 'W1B%'`);
+      esito(r2.ok && r2.body.some((x) => x.reparto_dip === 'tavoli'), 'FUNZIONA amministratore legge la Maison di tutti i settori');
+      // clienti Maison: categoria di ogni tipo di buono, Togli = Cestino
+      const MB = sql(`select id from maison_budget where nome = 'W1B Cliente'`);
+      funziona(await su(PIS, 'maison_budget', `id = '${MB}'`, { categoria: 'cg' }), 'categoria CG (Coupon Gourmet) per un cliente');
+      funziona(await su(PIS, 'maison_budget', `id = '${MB}'`, { categoria: '' }), 'cliente senza categoria (prima il vincolo la rifiutava)');
+      chiusa(await su(PIS, 'maison_budget', `id = '${MB}'`, { categoria: 'Non valida!' }), 'categoria che non e una sigla');
+      const compleanni = async () => {
+        const x = await sr(HR, 'maison_budget', `nome LIKE 'W1B%'`);
+        return x.ok ? x.body.length : -1;
+      };
+      esito((await compleanni()) === 1, 'FUNZIONA compleanno del cliente letto senza la pagina Maison');
+      funziona(await su(PIS, 'maison_budget', `id = '${MB}'`, { eliminato: true, eliminato_da: 'Pistocchi Mara', eliminato_at: new Date().toISOString() }), 'cliente tolto (nel Cestino)');
+      esito((await compleanni()) === 0, 'CHIUSA  compleanno di un cliente tolto non piu mostrato');
+      funziona(await su(PIS, 'maison_budget', `id = '${MB}'`, { eliminato: false, eliminato_da: null, eliminato_at: null }), 'cliente rimesso dal Cestino');
+    });
+    // CONTROLLO C (migrazioni 20260928_sicurezza_permessi_dati e _pulizia_operatori): ogni
+    // difetto trovato con le chiamate REST dirette, e le azioni legittime che restano
+    await S(async () => {
+      console.log('\n== 15) controllo C (migrazione 20260928)');
+      const visPrima = sql(`select valore from impostazioni where chiave = 'visibilita'`);
+      const ptPrima = sql(`select valore from impostazioni where chiave = 'punti_config'`);
+      const profPrima = sql(`select coalesce((select valore from impostazioni where chiave = 'profili_operatori'), '')`);
+      const repPrima = sql(`select coalesce((select valore from impostazioni where chiave = 'operatori_reparto'), '')`);
+      const listaPrima = sql(`select coalesce((select valore from impostazioni where chiave = 'operatori_lista'), '')`);
+      const consPrima = sql(`select coalesce((select valore from impostazioni where chiave = 'conservazione_anni'), '<nessuna>')`);
+      const inizio = sql(`select now()`);
+      const OGGI = sql(`select (now() at time zone 'Europe/Zurich')::date`);
+      const visAggiungi = (k, nomi) =>
+        sql(`update impostazioni set valore = (valore::jsonb || jsonb_build_object(${lit(k)}, jsonb_build_object('tipo', 'selezionati', 'operatori', ${lit(JSON.stringify(nomi))}::jsonb)))::text where chiave = 'visibilita'`);
+      const conta = (q) => Number(sql(q));
+      try {
+        sql(`insert into collaboratori (nome, attivo, reparto_dip, data_nascita, data_assunzione, categoria) values
+               ('QC Slots', true, 'slots', '1990-01-01', '2020-01-01', 2), ('QC Tav', true, 'tavoli', '1985-05-05', '2019-02-02', 3),
+               ('QC Assente', true, 'slots', null, null, null);
+             insert into collaboratori (nome, attivo, reparto_dip, reparti_extra) values ('QC Tav Extra', true, 'tavoli', 'slots');`);
+        // ---- C1 Storico HR
+        const hr = (t, tipo, desc, rep) => si(t, 'hr_eventi', { collaboratore: 'QC Slots', tipo, descrizione: desc || 'QC ' + tipo, data_evento: OGGI, reparto_dip: rep || 'slots' });
+        for (const tipo of ['premio', 'livello', 'formazione', 'nota', 'impiego', 'cessazione', 'categoria'])
+          chiusa(await hr(PIS, tipo), 'C1 Storico HR "' + tipo + '" scritto con Storico HR solo vedere (prima: 5 tipi su 6 accettati)');
+        funziona(await hr(HR, 'nota', 'QC nota HR'), 'C1 chi ha Storico HR modificare scrive una nota');
+        visAggiungi('gestione_competenze', ['Pistocchi Mara']);
+        visAggiungi('gestione_impiego', ['Pistocchi Mara']);
+        funziona(await hr(PIS, 'formazione', 'QC Competenza certificata: Cassa'), 'C1 formazione certificata da chi ha Competenze (flusso della Formazione)');
+        funziona(await hr(PIS, 'livello', 'QC Raggiunto il livello L2'), 'C1 passaggio di livello da chi ha Competenze');
+        funziona(await hr(PIS, 'nota', 'Percentuale impiego: 80% (era 100%)'), 'C1 nota della percentuale da chi ha Impiego');
+        chiusa(await hr(PIS, 'nota', 'QC nota libera'), 'C1 nota libera nello Storico HR con il solo Impiego');
+        funziona(await hr(PIS, 'impiego', 'Impiego: Jolly (era Fisso)'), 'C1 cambio di impiego da chi ha Impiego');
+        chiusa(await hr(PIS, 'formazione', 'QC formazione Tavoli', 'tavoli'), 'C1 Storico HR scritto in un altro settore');
+        chiusa(await hr(PIS, 'premio', 'QC premio'), 'C1 premio senza Punti e premi (anche con Competenze)');
+        sql(`update impostazioni set valore = ${lit(visPrima)} where chiave = 'visibilita'`);
+
+        // ---- C2 e C3 punti automatici
+        const ptCfg = JSON.parse(ptPrima);
+        const pCop = ptCfg.azioni.find((a) => a.key === 'copertura').punti;
+        const pCam = (ptCfg.azioni.find((a) => a.key === 'cambio_turno') || {}).punti;
+        const pNeg = (ptCfg.azioni.find((a) => a.key === 'disponibilita_negata') || {}).punti;
+        sql(`insert into piano (collaboratore, data, codice, reparto_dip, protetto, generato) values
+               ('QC Assente', '${OGGI}', 'M', 'slots', true, false), ('QC Assente', (${lit(OGGI)}::date + 1), 'M', 'slots', true, false),
+               ('QC Slots', (${lit(OGGI)}::date + 2), 'S5', 'slots', false, false)`);
+        const pt = (t, d) => si(t, 'punti_eventi', Object.assign({ collaboratore: 'QC Slots', punti: pCop, azione: 'copertura', data_evento: '2031-01-01', reparto_dip: 'slots' }, d));
+        chiusa(await pt(PIS, { descrizione: 'QC motivo inventato 1' }), 'C3 copertura +' + pCop + ' con un motivo inventato (prima: 5 al giorno)');
+        chiusa(await pt(PIS, { descrizione: 'QC cop finta', rif_assente: 'QC Tav', rif_data: OGGI }), 'C3 copertura per un assenza che non c e');
+        chiusa(await pt(PIS, { descrizione: 'QC cop vecchia', rif_assente: 'QC Assente', rif_data: '2025-01-01' }), 'C3 copertura per un fatto di troppo tempo fa');
+        chiusa(await pt(PIS, { collaboratore: 'QC Assente', descrizione: 'QC cop se stesso', rif_assente: 'QC Assente', rif_data: OGGI }), 'C3 copertura all assente stesso');
+        r = await pt(PIS, { descrizione: 'Copertura per QC Assente del oggi', rif_assente: 'QC Assente', rif_data: OGGI });
+        funziona(r, 'C3 copertura dal popup per una malattia vera (piano)');
+        const ID_COP = r.body && r.body.id;
+        esito(sql(`select data_evento::text from punti_eventi where id = ${Number(ID_COP) || 0}`) === OGGI, '        data della riga = oggi (scritta dal database)');
+        chiusa(await pt(PIS, { descrizione: 'QC stesso fatto altro testo', rif_assente: 'QC Assente', rif_data: OGGI }), 'C3 seconda copertura per lo stesso fatto (altro testo)');
+        funziona(await pt(PIS, { collaboratore: 'QC Tav Extra', descrizione: 'QC copre anche lui', rif_assente: 'QC Assente', rif_data: OGGI }), 'C3 secondo collega che copre la stessa malattia (2 giornate)');
+        chiusa(await pt(PIS, { collaboratore: 'QC Tav', descrizione: 'QC terzo', rif_assente: 'QC Assente', rif_data: OGGI }), 'C3 terza copertura per una malattia di 2 giornate');
+        funziona(await pt(PIS, { punti: pNeg, azione: 'disponibilita_negata', collaboratore: 'QC Tav', descrizione: 'QC rifiuto', rif_assente: 'QC Assente', rif_data: OGGI }), 'C3 rifiuto della disponibilita per la stessa malattia');
+        // malattia dal Diario (registrazione, senza piano)
+        sql(`insert into registrazioni (nome, tipo, testo, data, operatore, reparto_dip) values ('QC Assente', 'Malattia', 'QC dal 10/10/2026 al 11/10/2026', '2026-10-10 08:00+02', 'x', 'slots')`);
+        funziona(await pt(PIS, { descrizione: 'QC cop dal Diario', rif_assente: 'QC Assente', rif_data: '2026-10-10' }), 'C3 copertura per una malattia registrata nel Diario');
+        // cambio turno: la cella cambiata nel piano (storico)
+        chiusa(await pt(PIS, { punti: pCam, azione: 'cambio_turno', descrizione: 'QC cambio finto', rif_assente: 'QC Slots', rif_data: OGGI }), 'C3 cambio turno senza una cella cambiata');
+        sql(`update piano set codice = 'S7' where collaboratore = 'QC Slots' and data = (${lit(OGGI)}::date + 2)`);
+        funziona(await pt(PIS, { punti: pCam, azione: 'cambio_turno', descrizione: 'QC cambio vero', rif_assente: 'QC Slots', rif_data: sql(`select (${lit(OGGI)}::date + 2)::text`) }), 'C3 cambio turno accettato (cella cambiata nel piano)');
+        funziona(await pt(HR, { descrizione: 'QC manuale HR' }), 'C3 chi ha Punti e premi assegna senza riferimento');
+        // C2 cancellazioni
+        const ID_ADM = sql(`insert into punti_eventi (collaboratore, punti, azione, descrizione, data_evento, operatore, reparto_dip) values ('QC Slots', ${pNeg}, 'disponibilita_negata', 'QC admin', current_date, 'Admin', 'slots') returning id`);
+        chiusa(await sd(PIS, 'punti_eventi', `id = '${ID_ADM}'`), 'C2 punti di un altro tolti senza Punti e premi (prima: cancellati)');
+        esito(conta(`select count(*) from punti_eventi where id = ${ID_ADM}`) === 1, '        la riga c e ancora');
+        funziona(await sd(PIS, 'punti_eventi', `id = '${ID_COP}'`), 'C2 la propria copertura appena scritta si toglie (Annulla, Rimuovi)');
+        const ID_VEC = sql(`select id from punti_eventi where descrizione = 'QC cop dal Diario'`);
+        sql(`update punti_eventi set created_at = now() - interval '2 hours' where id = ${ID_VEC}`);
+        chiusa(await sd(PIS, 'punti_eventi', `id = '${ID_VEC}'`), 'C2 la propria copertura di 2 ore fa senza Punti e premi');
+        funziona(await sd(HR, 'punti_eventi', `id = '${ID_VEC}'`), 'C2 chi ha Punti e premi la toglie');
+        // C15 punti di livello del settore
+        const ptSet = Object.assign({}, ptCfg, { per_settore: Object.assign({}, ptCfg.per_settore || {}, { slots: { punti_livello: { 3: 30 }, premi_livello: {} } }) });
+        sql(`update impostazioni set valore = ${lit(JSON.stringify(ptSet))} where chiave = 'punti_config'`);
+        visAggiungi('gestione_competenze', ['Pistocchi Mara']);
+        const glob3 = Number((ptCfg.punti_livello || {})['3']) || 0;
+        funziona(await pt(PIS, { punti: 30, azione: 'livello_3', descrizione: 'QC livello 3 slots' }), 'C15 punti di livello "propri del settore" (Slots L3 = 30) da chi ha Competenze');
+        chiusa(await pt(PIS, { punti: 31, azione: 'livello_3', descrizione: 'QC livello 3 sbagliato' }), 'C15 punti di livello diversi da quelli del settore');
+        if (glob3 !== 30) chiusa(await pt(PIS, { collaboratore: 'QC Tav', reparto_dip: 'tavoli', punti: 30, azione: 'livello_3', descrizione: 'QC livello 3 tav' }), 'C15 valore degli Slots usato per un collaboratore Tavoli (vale quello di tutti)');
+        sql(`update impostazioni set valore = ${lit(ptPrima)} where chiave = 'punti_config'`);
+        sql(`update impostazioni set valore = ${lit(visPrima)} where chiave = 'visibilita'`);
+
+        // ---- C4 Registro
+        r = await si(PIS, 'log_attivita', { azione: 'QC Eliminazione definitiva', dettaglio: 'QC falso operatore', created_at: '2025-01-01T00:00:00Z' });
+        esito(r.ok && r.body.operatore === 'Pistocchi Mara' && String(r.body.created_at).startsWith(OGGI), 'CHIUSA  C4 riga del Registro retrodatata e senza autore (autore e ora del server)', JSON.stringify(r.body).slice(0, 160));
+        r = await si(ADM, 'log_attivita', { operatore: 'Qualcun altro', azione: 'QC admin', dettaglio: 'QC admin', created_at: '2025-01-01T00:00:00Z' });
+        esito(r.ok && r.body.operatore === 'Admin' && String(r.body.created_at).startsWith(OGGI), 'CHIUSA  C4 anche l amministratore: autore e ora del server', JSON.stringify(r.body).slice(0, 160));
+
+        // ---- C5 Consegne
+        sql(`insert into consegne_turno (data_giornata, turno_uscente, operatore, messaggio, reparto_dip, destinatario) values
+               ('${OGGI}', 'PRESTO', 'Pistocchi Mara', 'QC per tutti', 'slots', 'tutti'),
+               ('${OGGI}', 'PRESTO', 'Pistocchi Mara', 'QC per Camponovo', 'slots', 'HR, Camponovo Andrea'),
+               ('${OGGI}', 'PRESTO', 'Pistocchi Mara', 'QC per HR', 'slots', 'HR'),
+               ('${OGGI}', 'PRESTO', 'Bonelli Flavio', 'QC tavoli', 'tavoli', 'tutti')`);
+        const cons = async (t) => {
+          const x = await sr(t, 'consegne_turno', `messaggio LIKE 'QC%'`, 'messaggio');
+          return x.ok ? x.body.map((y) => y.messaggio).join(',') : 'ERRORE ' + x.msg;
+        };
+        esito((await cons(CAMP)) === 'QC per Camponovo,QC per tutti,QC tavoli', 'CHIUSA  C5 consegne lette senza la pagina: solo quelle per lui (avviso all accesso)', await cons(CAMP));
+        esito((await cons(PIS)) === 'QC per Camponovo,QC per HR,QC per tutti', 'FUNZIONA C5 chi ha la pagina legge le consegne del suo settore', await cons(PIS));
+        esito((await cons(BON)) === 'QC tavoli', 'CHIUSA  C5 consegne di un altro settore', await cons(BON));
+
+        // ---- C6 chiavi AI
+        visAggiungi('assistente', ['Pistocchi Mara']);
+        visAggiungi('ai_moduli', ['Bonelli Flavio']);
+        chiusa(await rpc('get_ai_key', { p_token: CAMP, p_fornitore: 'groq' }), 'C6 chiave AI a chi non ha Assistente ne IA nei moduli (prima: a ogni sessione)');
+        chiusa(await rpc('get_groq_key', { p_token: CAMP }), 'C6 chiave Groq a chi non ha i permessi');
+        funziona(await rpc('get_ai_key', { p_token: PIS, p_fornitore: 'groq' }), 'C6 chiave AI a chi ha la pagina Assistente');
+        funziona(await rpc('get_ai_key', { p_token: BON, p_fornitore: 'groq' }), 'C6 chiave AI a chi ha IA nei moduli');
+        funziona(await rpc('get_ai_key', { p_token: ADM, p_fornitore: 'groq' }), 'C6 chiave AI all amministratore');
+        sql(`update impostazioni set valore = ${lit(visPrima)} where chiave = 'visibilita'`);
+
+        // ---- C7 dati di altri settori
+        sql(`insert into hr_eventi (collaboratore, tipo, descrizione, data_evento, operatore, reparto_dip) values ('QC Tav', 'nota', 'QC hr tav', '${OGGI}', 'x', 'tavoli'), ('QC Tav Extra', 'nota', 'QC hr extra', '${OGGI}', 'x', 'tavoli'), ('QC Slots', 'nota', 'QC hr slots', '${OGGI}', 'x', 'slots');
+             insert into moduli (tipo, collaboratore, operatore, reparto_dip) values ('cambio_turno', 'QC Tav', 'x', 'tavoli'), ('cambio_turno', 'QC Slots', 'x', 'slots');
+             insert into rapporti_giornalieri (data_rapporto, turno, sup_note, operatore, reparto_dip) values ('2031-03-01', 'PRESTO', 'QC rapporto tav', 'x', 'tavoli');
+             insert into punti_eventi (collaboratore, punti, azione, descrizione, data_evento, operatore, reparto_dip) values ('QC Tav', 10, 'apprezzamento', 'QC punti tav', '${OGGI}', 'x', 'tavoli');
+             insert into piano (collaboratore, data, codice, commento, reparto_dip, protetto, generato) values ('QC Tav', '${OGGI}', 'M', 'QC malattia tav', 'tavoli', true, false), ('QC Tav Extra', '${OGGI}', 'T1', '', 'tavoli', false, false);`);
+        const leggi = async (t, tab, f) => {
+          const x = await sr(t, tab, f);
+          return x.ok ? x.body.length : -1;
+        };
+        esito((await leggi(PIS, 'hr_eventi', `descrizione LIKE 'QC hr%'`)) === 2, 'CHIUSA  C7 Storico HR Tavoli letto da Slots (restano Slots e chi lavora anche negli Slots)', String(await leggi(PIS, 'hr_eventi', `descrizione LIKE 'QC hr%'`)));
+        esito((await leggi(CAMP, 'hr_eventi', `descrizione LIKE 'QC hr%'`)) === 3, 'FUNZIONA C7 chi ha tutti i settori legge tutto lo Storico HR');
+        esito((await leggi(PIS, 'moduli', `collaboratore LIKE 'QC%'`)) === 1, 'CHIUSA  C7 moduli Tavoli letti da Slots');
+        esito((await leggi(PIS, 'rapporti_giornalieri', `sup_note LIKE 'QC%'`)) === 0 && (await leggi(BON, 'rapporti_giornalieri', `sup_note LIKE 'QC%'`)) === 1, 'CHIUSA  C7 Rapporto Tavoli letto da Slots (Tavoli lo legge)');
+        esito((await leggi(PIS, 'punti_eventi', `descrizione = 'QC punti tav'`)) === 0, 'CHIUSA  C7 punti Tavoli letti da Slots');
+        esito((await leggi(PIS, 'piano', `collaboratore = 'QC Tav'`)) === 0, 'CHIUSA  C7 piano (e malattie) di una persona dei Tavoli letto da Slots');
+        esito((await leggi(PIS, 'piano', `collaboratore = 'QC Tav Extra'`)) === 1, 'FUNZIONA C7 piano di chi lavora anche negli Slots (reparti extra) per le coperture');
+        r = await sr(PIS, 'collaboratori', `nome LIKE 'QC%'`, 'nome');
+        const cT = (r.body || []).find((x) => x.nome === 'QC Tav') || {};
+        const cS = (r.body || []).find((x) => x.nome === 'QC Slots') || {};
+        esito(r.ok && cT.nome && cT.data_nascita == null && cT.data_assunzione == null && cT.categoria == null, 'CHIUSA  C7 data di nascita, contratto e categoria di un collaboratore Tavoli letti da Slots', JSON.stringify(cT).slice(0, 160));
+        esito(cS.data_nascita === '1990-01-01' && cS.categoria === 2, 'FUNZIONA C7 i dati del proprio settore restano', JSON.stringify(cS).slice(0, 120));
+        r = await sr(CAMP, 'collaboratori', `nome = 'QC Tav'`);
+        esito(r.ok && r.body[0] && r.body[0].data_nascita === '1985-05-05', 'FUNZIONA C7 chi ha tutti i settori vede la data di nascita');
+        chiusa(await rpc('piano_storico_al', { p_token: PIS, p_reparto: 'tavoli', p_ym: OGGI.slice(0, 7), p_quando: new Date().toISOString() }), 'C7 versioni del piano Tavoli lette da Slots');
+        chiusa(await rpc('piano_storico_momenti', { p_token: PIS, p_reparto: 'tavoli', p_ym: OGGI.slice(0, 7) }), 'C7 momenti del piano Tavoli letti da Slots');
+        chiusa(await rpc('piano_storico_cella', { p_token: PIS, p_collaboratore: 'QC Tav', p_data: OGGI }), 'C7 storia di una cella Tavoli letta da Slots');
+        funziona(await rpc('piano_storico_cella', { p_token: PIS, p_collaboratore: 'QC Tav Extra', p_data: OGGI }), 'C7 storia della cella di chi lavora anche negli Slots');
+        funziona(await rpc('piano_storico_momenti', { p_token: PIS, p_reparto: 'slots', p_ym: OGGI.slice(0, 7) }), 'C7 versioni del piano del proprio settore');
+        const MOD_T = sql(`select id from moduli where collaboratore = 'QC Tav'`);
+        chiusa(await su(PIS, 'moduli', `id = '${MOD_T}'`, { eliminato: true, eliminato_da: 'Pistocchi Mara' }), 'C7 modulo Tavoli cestinato da Slots');
+
+        // ---- C8 operatore rimosso
+        const pw = pbkdf2('Omonimo12345', 'W1B Omonimo');
+        funziona(await rpc('add_operator', { p_nome: 'W1B Omonimo', p_hash: pw, p_token: ADM }), 'C8 amministratore crea un operatore');
+        sql(`update impostazioni set valore = (valore::jsonb || '{"QC_voce": {"tipo": "selezionati", "operatori": ["W1B Omonimo", "Pistocchi Mara"]}}'::jsonb)::text where chiave = 'visibilita';
+             update impostazioni set valore = (valore::jsonb || '{"W1B Omonimo": "sup"}'::jsonb)::text where chiave = 'profili_operatori';
+             update impostazioni set valore = (valore::jsonb || '{"W1B Omonimo": "tavoli"}'::jsonb)::text where chiave = 'operatori_reparto';`);
+        r = await rpc('remove_operator', { p_nome: 'W1B Omonimo', p_token: ADM });
+        esito(r.ok && r.body && r.body.success, 'FUNZIONA C8 amministratore rimuove l operatore', JSON.stringify(r.body));
+        esito(sql(`select (valore::jsonb -> 'QC_voce' -> 'operatori')::text from impostazioni where chiave = 'visibilita'`) === '["Pistocchi Mara"]', 'CHIUSA  C8 il nome dell operatore rimosso resta nelle voci di Visibilita', sql(`select (valore::jsonb -> 'QC_voce')::text from impostazioni where chiave = 'visibilita'`));
+        esito(sql(`select (valore::jsonb ? 'W1B Omonimo')::text from impostazioni where chiave = 'profili_operatori'`) === 'false' && sql(`select (valore::jsonb ? 'W1B Omonimo')::text from impostazioni where chiave = 'operatori_reparto'`) === 'false', 'CHIUSA  C8 profilo e settore dell operatore rimosso restano');
+        funziona(await rpc('add_operator', { p_nome: 'W1B Omonimo', p_hash: pw, p_token: ADM }), 'C8 nuovo operatore con lo stesso nome');
+        const tOm = tok('W1B Omonimo', false);
+        tutteSessioni.push(tOm);
+        esito(sql(`select _sessione_permesso(${lit(tOm)}, 'QC_voce')`) === 'f', 'CHIUSA  C8 il nuovo omonimo eredita i permessi del rimosso');
+        esito(conta(`select count(*) from impostazioni, jsonb_each(valore::jsonb) x where chiave = 'visibilita' and jsonb_typeof(x.value) = 'object' and (x.value -> 'operatori') ? 'Pisano Pamela'`) === 0, 'CHIUSA  C8 "Pisano Pamela" (non piu operatore) tolta da Visibilita (migrazione)');
+        // remove_operator risponde success:false senza errore: si guarda la risposta
+        r = await rpc('remove_operator', { p_nome: 'W1B Omonimo', p_token: PIS });
+        esito(r.ok && r.body && r.body.success === false && conta(`select count(*) from operatori_auth where nome = 'W1B Omonimo'`) === 1, 'CHIUSA  C8 operatore rimosso da chi non e amministratore', JSON.stringify(r.body));
+        await rpc('remove_operator', { p_nome: 'W1B Omonimo', p_token: ADM });
+
+        // ---- C9 password
+        r = await rpc('add_operator', { p_nome: 'QC Corta', p_hash: 'abcd', p_token: ADM });
+        esito(r.ok && r.body && r.body.success === false && conta(`select count(*) from operatori_auth where nome = 'QC Corta'`) === 0, 'CHIUSA  C9 password in chiaro o corta al posto dell impronta (add_operator)', JSON.stringify(r.body));
+        r = await rpc('force_change_pwd', { p_nome: 'Camponovo Andrea', p_new_hash: '1234', p_deve_cambiare: true, p_token: ADM });
+        esito(r.ok && r.body && r.body.success === false, 'CHIUSA  C9 reimpostazione con un valore che non e un impronta', JSON.stringify(r.body));
+        r = await rpc('change_op_pwd', { p_nome: 'Camponovo Andrea', p_old_hash: pbkdf2('ProvaLocale1!', 'Camponovo Andrea'), p_new_hash: 'corta', p_token: null });
+        esito(r.ok && r.body && r.body.success === false, 'CHIUSA  C9 cambio password con un valore che non e un impronta', JSON.stringify(r.body));
+        r = await rpc('verify_login', { p_nome: 'Camponovo Andrea', p_hash: pbkdf2('ProvaLocale1!', 'Camponovo Andrea') });
+        esito(r.ok && r.body && r.body.valid, 'FUNZIONA C9 la password di prima resta valida', JSON.stringify(r.body).slice(0, 80));
+        if (r.body && r.body.session_token) tutteSessioni.push(r.body.session_token);
+        // la regola del programma (js/realtime.js): la stessa funzione che usano le schermate
+        const path = require('path');
+        const rtFile = [path.join(__dirname, '..', '..', 'js', 'realtime.js'), path.join(__dirname, '..', '..', 'sito2', 'js', 'realtime.js')].find((f) => fs.existsSync(f));
+        const rt = rtFile ? fs.readFileSync(rtFile, 'utf8') : '';
+        const m = rt.match(/const PASSWORD_MIN[\s\S]*?\nfunction regolaPassword[\s\S]*?\n}\n/);
+        const regola = m ? new Function(m[0] + '; return regolaPassword;')() : null;
+        esito(!!regola && !!regola('abcd') && !!regola('abcdefghij') && !!regola('1234567890') && !!regola('Abc12345') && regola('Casino2026x') === '' && regola('passwordlunga1') === '', 'CHIUSA  C9 programma: password corte o senza lettere/numeri rifiutate (10 caratteri, lettere e numeri)', m ? '' : 'regolaPassword non trovata');
+
+        // ---- C10 e C19 (programma; qui la regola del database)
+        sql(`update impostazioni set valore = (valore::jsonb || '{"piano": "tutti"}'::jsonb)::text where chiave = 'visibilita'`);
+        esito(sql(`select _pagina_visibile(${lit(CAMP)}, 'piano')`) === 't', 'FUNZIONA C10 Piano "Tutti" scritto esplicito: lo vedono gli operatori');
+        sql(`update impostazioni set valore = (valore::jsonb - 'piano')::text where chiave = 'visibilita'`);
+        esito(sql(`select _pagina_visibile(${lit(CAMP)}, 'piano')`) === 'f', '        (senza voce resta al solo amministratore: per questo il programma scrive "tutti")');
+        sql(`update impostazioni set valore = ${lit(visPrima)} where chiave = 'visibilita'`);
+
+        // ---- C17 pulizia
+        chiusa(await rpc('cleanup_old_data', { p_token: PIS }), 'C17 pulizia avviata da un operatore (prima: da chiunque)');
+        sql(`insert into impostazioni (chiave, valore) values ('conservazione_anni', '5') on conflict (chiave) do update set valore = '5'`);
+        sql(`insert into log_attivita (operatore, azione, dettaglio, created_at) values ('x', 'QC', 'QC 6 anni fa', now() - interval '6 years'), ('x', 'QC', 'QC 2 anni fa', now() - interval '2 years')`);
+        r = await rpc('cleanup_old_data', { p_token: ADM });
+        esito(r.ok && r.body && r.body.anni === 5, 'FUNZIONA C17 pulizia dell amministratore con gli anni di conservazione (5)', JSON.stringify(r.body));
+        esito(conta(`select count(*) from log_attivita where dettaglio = 'QC 2 anni fa'`) === 1, 'CHIUSA  C17 Registro di 2 anni fa cancellato (prima: oltre 12 mesi)');
+        esito(conta(`select count(*) from log_attivita where dettaglio = 'QC 6 anni fa'`) === 0, 'FUNZIONA C17 Registro oltre i 5 anni cancellato');
+
+        // ---- C18 backup
+        r = await rpc('leggi_backup_extra', { p_token: ADM, p_tabella: 'piano_storico', p_dal: new Date(Date.now() - 86400000).toISOString(), p_limit: 5, p_offset: 0 });
+        esito(r.ok && Array.isArray(r.body), 'FUNZIONA C18 backup: storico del piano per l amministratore', r.msg);
+        r = await rpc('leggi_backup_extra', { p_token: ADM, p_tabella: 'piano_auto_esecuzioni', p_limit: 5 });
+        esito(r.ok && Array.isArray(r.body) && !(r.body[0] && 'token' in r.body[0]), 'FUNZIONA C18 backup: esecuzioni automatiche senza il lasciapassare', JSON.stringify(r.body).slice(0, 100));
+        chiusa(await rpc('leggi_backup_extra', { p_token: PIS, p_tabella: 'piano_storico' }), 'C18 storico del piano letto da un operatore con la funzione del backup');
+        chiusa(await rpc('leggi_backup_extra', { p_token: ADM, p_tabella: 'operatori_auth' }), 'C18 password nel backup');
+
+        // ---- C20 collaboratore nuovo
+        chiusa(await si(PIS, 'collaboratori', { nome: 'QC Cento', attivo: true, reparto_dip: 'slots', percentuale: 100 }), 'C20 collaboratore con percentuale 100 (10000%) senza Impiego');
+        chiusa(await si(PIS, 'collaboratori', { nome: 'QC Resp', attivo: true, reparto_dip: 'slots', funzione: 'RESP', is_jolly: true }), 'C20 collaboratore RESP e Jolly senza Impiego');
+        chiusa(await si(HR, 'collaboratori', { nome: 'QC Cento HR', attivo: true, reparto_dip: 'slots', percentuale: 100 }), 'C20 percentuale 100 anche con Impiego (vincolo 0-1)');
+        funziona(await si(HR, 'collaboratori', { nome: 'QC Sup HR', attivo: true, reparto_dip: 'slots', percentuale: 0.8, funzione: 'SUP', is_jolly: true }), 'C20 chi ha Impiego crea un SUP Jolly all 80%');
+        funziona(await si(PIS, 'collaboratori', { nome: 'QC Dal Diario', attivo: true, reparto_dip: 'slots' }), 'C20 collaboratore nuovo dal Diario (solo nome e settore)');
+        funziona(await si(PIS, 'collaboratori', { nome: 'QC Orfano', attivo: true, reparto_dip: 'slots', percentuale: 1 }), 'C20 collaboratore dai turni orfani (100%)');
+        const C_SUP = sql(`select id from collaboratori where nome = 'QC Sup HR'`);
+        chiusa(await su(HR, 'collaboratori', `id = '${C_SUP}'`, { percentuale: 50 }), 'C20 percentuale 50 (5000%) in modifica');
+        visAggiungi('piano_auto_import', ['Pistocchi Mara']);
+        funziona(await si(PIS, 'collaboratori', { nome: 'QC Da File', attivo: true, reparto_dip: 'slots', funzione: 'HOST', percentuale: 0.8, is_jolly: false }), 'C20 collaboratore nuovo dall import del piano (chi importa da file)');
+        chiusa(await si(PIS, 'collaboratori', { nome: 'QC Resp File', attivo: true, reparto_dip: 'slots', funzione: 'RESP' }), 'C20 RESP dall import senza Impiego');
+        sql(`update impostazioni set valore = ${lit(visPrima)} where chiave = 'visibilita'`);
+      } finally {
+        sql(`update impostazioni set valore = ${lit(visPrima)} where chiave = 'visibilita'`);
+        sql(`update impostazioni set valore = ${lit(ptPrima)} where chiave = 'punti_config'`);
+        if (profPrima) sql(`update impostazioni set valore = ${lit(profPrima)} where chiave = 'profili_operatori'`);
+        if (repPrima) sql(`update impostazioni set valore = ${lit(repPrima)} where chiave = 'operatori_reparto'`);
+        if (listaPrima) sql(`update impostazioni set valore = ${lit(listaPrima)} where chiave = 'operatori_lista'`);
+        if (consPrima === '<nessuna>') sql(`delete from impostazioni where chiave = 'conservazione_anni'`);
+        else sql(`update impostazioni set valore = ${lit(consPrima)} where chiave = 'conservazione_anni'`);
+        sql(`delete from registrazioni where nome like 'QC %';
+             delete from operatori_auth where nome = 'W1B Omonimo';
+             delete from log_attivita where created_at >= ${lit(inizio)} and (dettaglio like 'QC %' or dettaglio like 'W1B Omonimo%' or azione like 'QC %' or azione = 'Pulizia automatica')`);
+        esito(sql(`select valore from impostazioni where chiave = 'visibilita'`) === visPrima && sql(`select valore from impostazioni where chiave = 'punti_config'`) === ptPrima, '        visibilita e punti rimessi com erano');
       }
     });
     sql(`delete from operator_sessions where token in (${tutteSessioni.map(lit).join(',') || "''"})`);

@@ -174,5 +174,23 @@ ok(/pianoSceltaNota\(c, 'solo_diurni'\)/.test(leggi('js/piano-impostazioni.js'))
 ok(/pianoScelteCambiate\(\)/.test(leggi('js/realtime.js')), 'salvataggio di una scelta: storico riletto');
 ok(/js\/piano-scelte\.js/.test(leggi('index.html')) && /piano-scelte\.js/.test(leggi('sw.js')), 'file caricato');
 
+// DATA "VALIDA DAL" MODIFICABILE (migrazione 20260927, scelte_storico_imposta_dal)
+{
+  const vs = { id: 69, nome: 'Prova Venerdi', giorni_lavoro: '5,6', solo_notti: true };
+  const salvata = [
+    { id: 1, collaboratore_id: 69, campo: 'giorni_lavoro', valore: '5,6', valore_prima: '', valido_dal: '2026-10-08' },
+  ];
+  ok(S.sceltaValidaIl(vs, 'giorni_lavoro', '2026-06-15', salvata) === null, 'salvata l 08.10: a giugno nessuna scelta');
+  ok(S.sceltaValidaIl(vs, 'giorni_lavoro', '2026-06-15', []) === '5,6', 'da sempre (righe tolte): vale anche a giugno');
+  const spostata = [Object.assign({}, salvata[0], { valido_dal: '2026-05-01' })];
+  ok(
+    S.sceltaValidaIl(vs, 'giorni_lavoro', '2026-06-15', spostata) === '5,6' &&
+      S.sceltaValidaIl(vs, 'giorni_lavoro', '2026-04-15', spostata) === null,
+    'valida dal 01.05: giugno con la scelta, aprile senza',
+  );
+  ok(S.validaDal(vs, 'giorni_lavoro', []).dal === null, 'nota: da sempre');
+  ok(/scelte_storico_imposta_dal/.test(leggi('js/piano-scelte.js')), 'Preferenze: data di inizio dal database');
+}
+
 console.log('\n' + passati + ' passati, ' + falliti + ' falliti');
 process.exit(falliti ? 1 : 0);

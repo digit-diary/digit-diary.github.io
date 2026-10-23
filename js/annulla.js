@@ -63,7 +63,7 @@
     'collab_congedi_np',
   ];
   // tabelle con il Cestino: una creazione annullata finisce li
-  const CON_CESTINO = ['registrazioni', 'moduli'];
+  const CON_CESTINO = ['registrazioni', 'moduli', 'valutazioni'];
   // colonna che identifica la riga, se non e "id" (note_fissate: una riga per registrazione)
   const CHIAVI = { note_fissate: 'registrazione_id' };
   const chiave = (t) => CHIAVI[t] || 'id';
@@ -155,7 +155,7 @@
     function etichettaAuto() {
       const op = st.pendenti[0];
       if (!op) return 'Modifica';
-      const t = op.tipo === 'imp' ? 'impostazioni' : op.table;
+      const t = op.tipo === 'imp' ? 'impostazioni' : op.table || 'punti_eventi';
       const verbo = op.tipo === 'post' ? 'Aggiunta' : op.tipo === 'del' ? 'Eliminazione' : 'Modifica';
       return verbo + ' ' + parola(t) + (st.pendenti.length > 1 ? ' (+' + (st.pendenti.length - 1) + ')' : '');
     }
@@ -218,14 +218,18 @@
       if (uguale(prima, valore)) return;
       aggiungi({ tipo: 'imp', chiave: chiave, prima: prima, dopo: valore == null ? '' : String(valore) });
     }
-    function chiudiGruppo(etichetta) {
+    // completa: il testo intero dell azione (l etichetta e accorciata per le finestre);
+    // serve a chi rilegge il passo (riga «Annullato» dello Storico HR, controllo 23/10 D13)
+    function chiudiGruppo(etichetta, completa) {
       if (occupato()) return;
       if (st.timer != null) {
         canale.annullaAttesa(st.timer);
         st.timer = null;
       }
       if (!st.pendenti.length) return;
-      st.pila.push({ etichetta: etichetta || etichettaAuto(), ops: st.pendenti, quando: canale.adesso() });
+      const g = { etichetta: etichetta || etichettaAuto(), ops: st.pendenti, quando: canale.adesso() };
+      if (completa && completa !== g.etichetta) g.completa = completa;
+      st.pila.push(g);
       st.pendenti = [];
       while (st.pila.length > opz.limite) st.pila.shift();
       notifica();
@@ -298,6 +302,9 @@
         await canale.imp(op.chiave, op.prima == null ? '' : op.prima);
       } else if (op.tipo === 'rinomina') {
         await canale.rinomina(op.a, op.da); // al contrario, in tutto il programma
+      } else if (op.tipo === 'rpc') {
+        // azione fatta da una funzione del database (proposte di punti): la sua inversa
+        await canale.rpc(op.annulla);
       }
     }
     async function riapplica(op) {
@@ -325,6 +332,8 @@
         await canale.imp(op.chiave, op.dopo);
       } else if (op.tipo === 'rinomina') {
         await canale.rinomina(op.da, op.a);
+      } else if (op.tipo === 'rpc') {
+        await canale.rpc(op.ripristina);
       }
     }
     async function annulla() {
@@ -400,6 +409,12 @@
     }
     // AZIONE COMPOSTA che il canale sa invertire da sola (es. rinomina di un collaboratore
     // in tutte le tabelle): entra nella pila come un azione unica con la sua etichetta
+    // passo fatto da una funzione del database dentro un azione in corso (es. la ripetizione
+    // del promemoria creata insieme al Fatto): entra nello stesso gruppo di Annulla
+    function dopoRpc(op) {
+      if (occupato() || !op) return;
+      aggiungi(op);
+    }
     function azione(op, etichetta) {
       if (occupato()) return;
       chiudiGruppo();
@@ -434,6 +449,7 @@
       ripristina,
       senzaTraccia,
       azione,
+      dopoRpc,
       stato,
       onCambio,
       azzera,
@@ -566,6 +582,8 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     del: (t, f) => secDel(t, f),
     imp: (k, v) => setImp(k, v),
     rinomina: (da, a) => _rinominaCollaboratoreTutto(da, a),
+    // { fn, params }: funzione del database con la sessione di chi e collegato
+    rpc: (x) => _conSessione((t) => _rpcSicura(x.fn, Object.assign({ p_token: t }, x.params || {})), getOpToken()),
     // riga o impostazione cambiata da un collega dopo l azione: si chiede prima di annullare
     chiedi: (testo) => chiediConferma(testo, { titolo: 'Modifica di un altro operatore' }),
     adesso: () => new Date().toISOString(),
@@ -663,6 +681,59 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
             : '';
   }
   window._annullaAggiornaBarra = _annullaAggiornaBarra;
+  // BARRETTA DI ANNULLA E AVVISI DELLE COPERTURE FERMI IN BASSO (decisione del titolare dopo
+  // la riverifica 4): la barretta in basso a sinistra, gli avvisi («Chi ha coperto», #cop-avvisi)
+  // sopra di lei. Non si spostano mai; quando si vedono, in fondo alla pagina c e uno spazio alto
+  // quanto loro (#spazio-fissi), cosi scorrendo fino in fondo nessun comando resta sotto.
+  // (Prima cercavano un posto libero e saltavano su e giu mentre si scorreva.)
+  function _annullaSpazio() {
+    let sp = document.getElementById('spazio-fissi');
+    if (!sp) {
+      sp = document.createElement('div');
+      sp.id = 'spazio-fissi';
+      sp.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(sp);
+    } else if (sp.nextElementSibling && sp.parentNode === document.body) {
+      document.body.appendChild(sp); // sempre l ultimo, dopo cio che il programma aggiunge
+    }
+    let alto = 0;
+    ['annulla-bar', 'cop-avvisi'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el || el.style.display === 'none') return;
+      const r = el.getBoundingClientRect();
+      if (r.height) alto = Math.max(alto, innerHeight - r.top);
+    });
+    const h = alto ? Math.ceil(alto + 12) + 'px' : '0px';
+    if (sp.style.height !== h) sp.style.height = h;
+  }
+  let _annSpazioAtteso = false;
+  const _annullaSpazioPresto = () => {
+    if (_annSpazioAtteso) return;
+    _annSpazioAtteso = true;
+    requestAnimationFrame(() => {
+      _annSpazioAtteso = false;
+      _annullaSpazio();
+    });
+  };
+  if (typeof window.addEventListener === 'function' && typeof requestAnimationFrame === 'function') {
+    window.addEventListener('resize', _annullaSpazioPresto);
+    if (typeof MutationObserver === 'function')
+      new MutationObserver((ls) => {
+        // solo quando cambiano la barretta, gli avvisi o il loro posto nella pagina
+        if (
+          ls.some(
+            (l) => l.target === document.body || (l.target.closest && l.target.closest('#annulla-bar, #cop-avvisi')),
+          )
+        )
+          _annullaSpazioPresto();
+      }).observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['style', 'class'],
+      });
+  }
+  window._annullaSpazio = _annullaSpazio;
   // dopo un annullamento i dati in memoria vanno riletti e la pagina ridisegnata
   // MALATTIE annullate o ripristinate: il piano non fa parte di Annulla, quindi le M si
   // riallineano allo stato della registrazione prima e dopo (come quando si crea, si
@@ -717,7 +788,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     // CERTIFICATO RICEVUTO annullato o rimesso (assenze.js): lo Storico HR e un registro (le
     // righe le cancella solo l amministratore), si aggiunge una riga che lo dice
     // Lo stesso per CERTIFICATO NON RICEVUTO (assenza non giustificata)
-    const mCert = /^Certificato (non )?ricevuto · ([^·]+?) · (.+)$/.exec(String(g.etichetta || ''));
+    const mCert = /^Certificato (non )?ricevuto · ([^·]+?) · (.+)$/.exec(String(g.completa || g.etichetta || ''));
     if (mCert && typeof _insertHrEvento === 'function')
       await window.Annulla.senzaTraccia(() =>
         _insertHrEvento(

@@ -222,11 +222,31 @@ function getPuntiConfig() {
     inventario: Array.isArray(cfg.inventario) ? cfg.inventario : [],
   };
 }
+// INCENTIVI SPENTI = NESSUNA TRACCIA (decisione del titolare 23/10/2026): con l interruttore
+// «Incentivi attivi» spento non si vedono punti, premi, contatori e pulsanti dei punti in
+// tutto il programma (Formazione, scheda e PDF del collaboratore, Confronta, Diario, Home,
+// Registro, statistiche); resta solo Configurazione incentivi e premi, per riaccenderli.
+// I punti gia dati restano nel database e tornano visibili quando si riaccende. Un solo
+// punto di verita: incentiviAttivi (assegnazione) parte da qui.
+function incentiviVisibili(cfgP) {
+  return (cfgP || getPuntiConfig()).attivo !== false;
+}
+// testi fissi della pagina (index.html) con i punti: menu e sottotitolo di Formazione
+function incentiviAggiornaTesti() {
+  if (typeof document === 'undefined') return;
+  const vis = incentiviVisibili();
+  const nav = document.querySelector('.nav-tab[data-page="formazione"]');
+  if (nav) nav.title = vis ? 'Competenze, livelli e punti dei collaboratori' : 'Competenze e livelli dei collaboratori';
+  const cont = document.getElementById('formazione-content');
+  const sott = cont && cont.previousElementSibling ? cont.previousElementSibling.querySelector('p') : null;
+  if (sott)
+    sott.textContent = vis ? 'Chi sa fare cosa: livelli, specialità e punti' : 'Chi sa fare cosa: livelli e specialità';
+}
 // Il sistema incentivi (o la singola azione) e' acceso? Un solo punto di
 // verita' usato ovunque: assegnazione punti E apertura dei popup.
 function incentiviAttivi(azioneKey) {
   const cfg = getPuntiConfig();
-  if (cfg.attivo === false) return false;
+  if (!incentiviVisibili(cfg)) return false;
   if (azioneKey) {
     const az = (cfg.azioni || []).find((a) => a.key === azioneKey);
     if (az && az.attiva === false) return false;
@@ -256,6 +276,15 @@ function puntiLivelloDi(lv, rep, cfgP) {
 function premioLivelloDi(lv, rep, cfgP) {
   const p = _incLivelloVoce('premi_livello', lv, rep, cfgP);
   return p == null ? '' : String(p);
+}
+// PUNTI DEL PASSAGGIO DI LIVELLO (C27, decisione del titolare 23/10/2026): chi salta dei
+// livelli (L1 -> L3) riceve punti e premio SOLO del livello raggiunto, non di quelli saltati.
+// Prima i punti si davano per ogni livello fra prima e dopo (L2 + L3). Ritorna [{ lv, punti }]:
+// vuoto senza passaggio o con 0 punti configurati per quel livello.
+function puntiPassaggioLivello(prima, dopo, rep, cfgP) {
+  if (!(dopo > prima)) return [];
+  const pl = puntiLivelloDi(dopo, rep, cfgP);
+  return pl ? [{ lv: dopo, punti: pl }] : [];
 }
 // premi di livello del settore, per l elenco "Passaggio livello" dei traguardi
 function premiLivelloDelSettore(rep, cfgP) {
@@ -308,7 +337,7 @@ function _attesePremi() {
 function _notificaIncentivo(nome, titolo, corpo, soloPrivato) {
   if (typeof inviaPush !== 'function') return;
   const mode = getPuntiConfig().notifiche;
-  if (mode === 'off') return;
+  if (mode === 'off' || !incentiviVisibili()) return;
   if (mode === 'tutti' && !soloPrivato) {
     inviaPush(['tutti'], titolo, corpo, 'general');
     return;
@@ -1086,6 +1115,9 @@ function renderFormazione() {
   const adm = isAdmin();
   const puoPunti = typeof puoModificare === 'function' ? puoModificare('gestione_punti') : adm;
   const puoComp = typeof puoModificare === 'function' ? puoModificare('gestione_competenze') : adm;
+  // incentivi spenti: niente colonna Punti, assegnazione, traguardi e punti delle formazioni
+  const incVis = incentiviVisibili();
+  incentiviAggiornaTesti();
   const comps = getCompetenzeReparto();
   _formCaricaOrdinePiano();
   // anche chi COPRE questo settore da un altro (reparti extra / copertura, es. un collaboratore
@@ -1098,10 +1130,16 @@ function renderFormazione() {
       typeof _pianoAppartieneAlReparto === 'function' &&
       _pianoAppartieneAlReparto(c, currentReparto),
   );
+  // solo chi e in servizio: la fine contratto gia passata (ultimo giorno di lavoro prima di
+  // oggi) non conta fra i "collaboratori attivi" ne nei conteggi per livello (C26), come
+  // benessere e organico dalla v461
+  const _oggiFz = dataLocaleISO(new Date());
+  const _inServizioFz = (c) => !c.data_fine_rapporto || String(c.data_fine_rapporto).substring(0, 10) >= _oggiFz;
   const collabs = _formOrdineComePiano(
     getCollaboratoriReparto()
       .filter((c) => c.attivo !== false)
-      .concat(_copre),
+      .concat(_copre)
+      .filter(_inServizioFz),
   );
   // COMANDI IN TESTA: configurazione della scala del settore aperto e proposta dai turni
   const puoProporre = adm || (typeof puoModificare === 'function' && puoModificare('gestione_formazioni'));
@@ -1118,6 +1156,8 @@ function renderFormazione() {
         : '') +
       '</div>';
   if (adm) html += _fzAvvisoScollegate();
+  // PUNTI DA APPROVARE (punti-proposte.js): proposte di chi non gestisce i punti
+  if (typeof puntiProposteCardHtml === 'function') html = puntiProposteCardHtml() + html;
   // PERSONE PER LIVELLO: una sola riga, ogni persona contata una volta al gradino piu alto
   // certificato (il livello effettivo, quello del Piano); chi ha la scala parziale e contato
   // anche a parte in "Scala incompleta". I totali per competenza stanno in fondo alla matrice.
@@ -1234,9 +1274,9 @@ function renderFormazione() {
       '</th>';
   });
   html +=
-    '<th class="fz-col-livello">Livello</th><th class="num">Punti ' +
-    new Date().getFullYear() +
-    '</th></tr></thead><tbody>';
+    '<th class="fz-col-livello">Livello</th>' +
+    (incVis ? '<th class="num">Punti ' + new Date().getFullYear() + '</th>' : '') +
+    '</tr></thead><tbody>';
   collabs.forEach((c) => {
     const sc = livelloScalaDi(c);
     const lv = sc ? sc.effettivo : 0;
@@ -1298,11 +1338,15 @@ function renderFormazione() {
     html +=
       '<td class="num fz-col-livello">' +
       livelloEtichettaHtml(c) +
-      '</td><td class="num"><strong style="color:' +
-      (pts < 0 ? 'var(--accent)' : 'var(--accent2)') +
-      '">' +
-      pts +
-      '</strong></td></tr>';
+      '</td>' +
+      (incVis
+        ? '<td class="num"><strong style="color:' +
+          (pts < 0 ? 'var(--accent)' : 'var(--accent2)') +
+          '">' +
+          pts +
+          '</strong></td>'
+        : '') +
+      '</tr>';
   });
   html += '</tbody>';
   // totali per competenza: quante persone la sanno fare (prima erano riquadri in alto
@@ -1320,248 +1364,255 @@ function renderFormazione() {
             '</td>',
         )
         .join('') +
-      '<td></td><td></td></tr></tfoot>';
+      (incVis ? '<td></td><td></td>' : '<td></td>') +
+      '</tr></tfoot>';
   html += '</table></div></div>';
 
-  // PUNTI · assegnazione rapida + registro
-  html += '<div class="main-card"><div class="card-header">Punti · assegnazione</div><div class="form-area">';
-  if (puoPunti) {
-    const cfg = getPuntiConfig();
-    html += '<div class="form-row" style="grid-template-columns:1fr 1fr 1fr auto;gap:10px;align-items:flex-end">';
-    html +=
-      '<div class="field"><label>Collaboratore</label><select id="pt-collab" style="padding:10px">' +
-      collabs.map((c) => '<option>' + escP(c.nome) + '</option>').join('') +
-      '</select></div>';
-    html +=
-      '<div class="field"><label>Azione</label><select id="pt-azione" style="padding:10px">' +
-      cfg.azioni
-        .map(
-          (a) =>
-            '<option value="' +
-            escP(a.key) +
-            '">' +
-            escP(a.label) +
-            ' (' +
-            (a.punti > 0 ? '+' : '') +
-            a.punti +
-            ')</option>',
-        )
-        .join('') +
-      '<option value="manuale">Punti manuali...</option></select></div>';
-    html +=
-      '<div class="field"><label>Nota (opzionale)</label><input type="text" id="pt-nota" placeholder="Es: copertura turno del 15/08 per..."></div>';
-    html += '<button class="btn-add-tipo" onclick="assegnaPuntiRapido()">+ Assegna</button></div>';
-    html +=
-      '<p style="color:var(--muted);font-size:var(--fs-sm,.8125rem);margin-top:6px">I punti si guadagnano con azioni positive (coperture, formazione, apprezzamenti). Le malattie NON tolgono mai punti: solo il rifiuto esplicito di una disponibilità richiesta può essere conteggiato, se configurato.</p>';
-  } else {
-    html +=
-      '<p style="color:var(--muted);font-size:var(--fs-md,.875rem)">I punti vengono assegnati dal responsabile.</p>';
-  }
-  html += '</div>';
-  // registro eventi punti: cerca per nome/voce + ordinamento
-  const cercaSt = ((window._formStoricoCerca || '') + '').toLowerCase();
-  const srtF = window._formStoricoSort || { campo: 'data_evento', dir: -1 };
-  let eventi = getPuntiReparto();
-  if (cercaSt)
-    eventi = eventi.filter((p) =>
-      ((p.collaboratore || '') + ' ' + (p.azione || '') + ' ' + (p.descrizione || '')).toLowerCase().includes(cercaSt),
-    );
-  eventi = eventi.slice().sort((a, b) => {
-    const d =
-      srtF.campo === 'punti'
-        ? srtF.dir * ((a.punti || 0) - (b.punti || 0))
-        : srtF.dir * String(a[srtF.campo] || '').localeCompare(String(b[srtF.campo] || ''));
-    return d || (b.data_evento || '').localeCompare(a.data_evento || '');
-  });
-  eventi = eventi.slice(0, cercaSt ? 200 : 60);
-  html += '<div style="padding:0 16px 16px">';
-  html +=
-    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">' +
-    '<input type="text" value="' +
-    _escAttr(window._formStoricoCerca || '') +
-    '" placeholder="Cerca nome o voce nello storico..." onchange="window._formStoricoCerca=this.value;renderFormazione()" class="campo-cerca"></div>';
-  if (!eventi.length) html += '<p style="color:var(--muted);padding:10px">Nessun punto assegnato finora.</p>';
-  else {
-    const thSort = (campo, label, cls) =>
-      '<th' +
-      (cls ? ' class="' + cls + '"' : '') +
-      ' style="cursor:pointer" title="Clicca per ordinare" onclick="formStoricoSort(\'' +
-      campo +
-      '\')">' +
-      label +
-      (srtF.campo === campo
-        ? srtF.dir === 1
-          ? ' &#9650;'
-          : ' &#9660;'
-        : ' <span style="opacity:.35">&#8597;</span>') +
-      '</th>';
-    html +=
-      '<table class="collab-table"><thead><tr>' +
-      thSort('data_evento', 'Data') +
-      thSort('collaboratore', 'Collaboratore') +
-      thSort('punti', 'Punti', 'num') +
-      thSort('azione', 'Azione') +
-      thSort('descrizione', 'Nota') +
-      thSort('operatore', 'Da') +
-      (adm ? '<th></th>' : '') +
-      '</tr></thead><tbody>';
-    const azLabels = { premio: 'Premio consegnato', premio_attesa: 'In attesa premio' };
-    getPuntiConfig().azioni.forEach((a) => (azLabels[a.key] = a.label));
-    eventi.forEach((p) => {
+  // PUNTI · assegnazione rapida + registro, TRAGUARDI E PREMI: solo con gli incentivi accesi
+  if (incVis) {
+    html += '<div class="main-card"><div class="card-header">Punti · assegnazione</div><div class="form-area">';
+    if (puoPunti) {
+      const cfg = getPuntiConfig();
+      // classe con la sua regola per il telefono: lo stile scritto qui vinceva sulla regola del
+      // telefono e Nota e "+ Assegna" finivano fuori dallo schermo (controllo C, C13)
+      html += '<div class="form-row fz-punti-assegna">';
       html +=
-        '<tr><td style="white-space:nowrap">' +
-        new Date(p.data_evento + 'T12:00:00').toLocaleDateString('it-IT') +
-        '</td><td><strong>' +
-        escP(p.collaboratore) +
-        '</strong></td><td class="num"><strong style="color:' +
-        (p.punti < 0 ? 'var(--accent)' : p.punti > 0 ? 'var(--c-verde,#2c6e49)' : 'var(--muted)') +
-        '">' +
-        (p.punti > 0 ? '+' : '') +
-        p.punti +
-        '</strong></td><td>' +
-        escP(azLabels[p.azione] || p.azione) +
-        '</td><td style="color:var(--muted);font-size:var(--fs-md,.875rem)">' +
-        escP(p.descrizione || '') +
-        '</td><td style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">' +
-        escP(p.operatore || '') +
-        '</td>' +
-        (adm
-          ? '<td><button class="btn-act del" onclick="eliminaPuntiEvento(' +
-            p.id +
-            ')" style="font-size:var(--fs-sm,.8125rem)">X</button></td>'
-          : '') +
-        '</tr>';
-    });
-    html += '</tbody></table>';
-  }
-  html += '</div></div>';
-
-  // TRAGUARDI PREMI
-  const cfgP = getPuntiConfig();
-  html +=
-    '<div class="main-card"><div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">Traguardi e premi' +
-    (adm || puoPunti
-      ? '<span style="display:flex;align-items:center;gap:6px"><select id="ri-anno" style="padding:4px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);font-size:var(--fs-sm,.8125rem)">' +
-        [0, 1, 2, 3]
-          .map((d) => {
-            const a = new Date().getFullYear() - d;
-            return '<option value="' + a + '">' + a + '</option>';
-          })
-          .join('') +
-        '</select><button class="btn-export btn-export-pdf" onclick="esportaReportIncentiviPDF()" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px">Report Incentivi PDF</button></span>'
-      : '') +
-    '</div><div style="padding:16px">';
-  html +=
-    '<p style="color:var(--muted);font-size:var(--fs-md,.875rem);margin-bottom:10px">Soglie punti: ' +
-    cfgP.soglie.map((s) => '<strong>' + s.punti + '</strong> = ' + escP(s.premio)).join(' · ') +
-    ' · Passaggio livello: ' +
-    Object.entries(premiLivelloDelSettore(currentReparto, cfgP))
-      .map(([l, p]) => escP(livelloSigla(l)) + ' = ' + escP(p))
-      .join(' · ') +
-    '</p>';
-  // limiti mensili: consegnati/limite del mese corrente + attese con priorità
-  const soglieConLimite = cfgP.soglie.filter((s) => parseInt(s.limite_mese) > 0);
-  const attese = _attesePremi();
-  if (soglieConLimite.length || attese.length) {
-    const ymCorr = oggiLocale().substring(0, 7);
-    html +=
-      '<div style="padding:8px 12px;background:var(--paper2);border:1px solid var(--line);border-radius:3px;margin-bottom:12px">';
-    if (soglieConLimite.length) {
+        '<div class="field"><label>Collaboratore</label><select id="pt-collab" style="padding:10px">' +
+        collabs.map((c) => '<option>' + escP(c.nome) + '</option>').join('') +
+        '</select></div>';
       html +=
-        '<p style="font-size:var(--fs-sm,.8125rem);margin:0 0 4px"><strong>Premi del mese:</strong> ' +
-        soglieConLimite
-          .map((s) => {
-            const usati = _consegnatiMesePremio(s.premio, ymCorr);
-            const lim = parseInt(s.limite_mese);
-            const pieno = usati >= lim;
-            const inv = s.inventario ? (cfgP.inventario.find((i) => i.nome === s.inventario) || {}).qta : null;
-            return (
-              escP(s.premio) +
-              ' <strong style="color:' +
-              (pieno ? 'var(--accent)' : 'var(--c-verde,#2c6e49)') +
+        '<div class="field"><label>Azione</label><select id="pt-azione" style="padding:10px">' +
+        cfg.azioni
+          .map(
+            (a) =>
+              '<option value="' +
+              escP(a.key) +
               '">' +
-              usati +
-              '/' +
-              lim +
-              '</strong>' +
-              (pieno ? ' (esaurito)' : '') +
-              (inv != null ? ' · magazzino: ' + inv : '')
-            );
-          })
-          .join(' &nbsp;·&nbsp; ') +
-        '</p>';
-    }
-    if (attese.length) {
+              escP(a.label) +
+              ' (' +
+              (a.punti > 0 ? '+' : '') +
+              a.punti +
+              ')</option>',
+          )
+          .join('') +
+        '<option value="manuale">Punti manuali...</option></select></div>';
       html +=
-        '<p style="font-size:var(--fs-sm,.8125rem);margin:0"><strong>In attesa (priorità dal mese dopo):</strong></p>' +
-        attese
-          .map((a) => {
-            const prem = (a.descrizione || '').replace(/^In attesa premio:\s*/i, '');
-            return (
-              '<div style="font-size:var(--fs-sm,.8125rem);display:flex;align-items:center;gap:8px;padding:2px 0">' +
-              '<span>&#9203; <strong>' +
-              escP(a.collaboratore) +
-              '</strong> · ' +
-              escP(prem) +
-              ' <span style="color:var(--muted)">(dal ' +
-              new Date((a.data_evento || '') + 'T12:00:00').toLocaleDateString('it-IT') +
-              ')</span></span>' +
-              (adm || puoPunti
-                ? '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px" onclick="registraPremioConsegnato(\'' +
-                  _jsArg(a.collaboratore) +
-                  "','" +
-                  _jsArg(prem) +
-                  '\')">Consegna ora</button>'
-                : '') +
-              '</div>'
-            );
-          })
-          .join('');
+        '<div class="field"><label>Nota (opzionale)</label><input type="text" id="pt-nota" placeholder="Es: copertura turno del 15/08 per..."></div>';
+      html += '<button class="btn-add-tipo" onclick="assegnaPuntiRapido()">+ Assegna</button></div>';
+      html +=
+        '<p style="color:var(--muted);font-size:var(--fs-sm,.8125rem);margin-top:6px">I punti si guadagnano con azioni positive (coperture, formazione, apprezzamenti). Le malattie NON tolgono mai punti: solo il rifiuto esplicito di una disponibilità richiesta può essere conteggiato, se configurato.</p>';
+    } else {
+      html +=
+        '<p style="color:var(--muted);font-size:var(--fs-md,.875rem)">I punti vengono assegnati dal responsabile.</p>';
     }
     html += '</div>';
-  }
-  const conPunti = collabs
-    .map((c) => ({
-      nome: c.nome,
-      c: c,
-      punti: puntiTotali(c.nome),
-      lv: livelloEffettivoDi(c),
-    }))
-    .filter((x) => x.punti !== 0 || x.lv > 0)
-    .sort((a, b) => b.punti - a.punti);
-  if (!conPunti.length) html += '<p style="color:var(--muted)">Nessun traguardo in corso.</p>';
-  else {
-    conPunti.forEach((x) => {
-      const next = prossimaSoglia(x.punti);
-      const raggiunti = sogliePremiRaggiunti(x.nome);
-      const maxS = cfgP.soglie.length ? Math.max(...cfgP.soglie.map((s) => s.punti)) : 100;
-      const pct = Math.max(0, Math.min(100, Math.round((x.punti / maxS) * 100)));
-      html +=
-        '<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><strong style="min-width:170px">' +
-        escP(x.nome) +
-        '</strong>' +
-        livelloEtichettaHtml(x.c, { compatto: true }) +
-        '<span style="font-weight:700;color:var(--accent2)">' +
-        x.punti +
-        ' pt</span><div class="budget-bar" style="flex:1;min-width:120px;height:6px"><div class="budget-bar-fill" style="width:' +
-        pct +
-        '%;background:var(--accent2)"></div></div>' +
-        (next
-          ? '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">-' +
-            (next.punti - x.punti) +
-            ' a: ' +
-            escP(next.premio) +
-            '</span>'
-          : '<span style="font-size:var(--fs-sm,.8125rem);color:var(--c-verde,#2c6e49);font-weight:700">Tutte le soglie raggiunte!</span>') +
-        (raggiunti.length
-          ? '<span style="font-size:var(--fs-sm,.8125rem);color:var(--c-verde,#2c6e49)"><i class="icx icx-trofeo"></i> ' +
-            raggiunti.map(escP).join(', ') +
-            '</span>'
-          : '') +
-        '</div></div>';
+    // registro eventi punti: cerca per nome/voce + ordinamento
+    const cercaSt = ((window._formStoricoCerca || '') + '').toLowerCase();
+    const srtF = window._formStoricoSort || { campo: 'data_evento', dir: -1 };
+    let eventi = getPuntiReparto();
+    if (cercaSt)
+      eventi = eventi.filter((p) =>
+        ((p.collaboratore || '') + ' ' + (p.azione || '') + ' ' + (p.descrizione || ''))
+          .toLowerCase()
+          .includes(cercaSt),
+      );
+    eventi = eventi.slice().sort((a, b) => {
+      const d =
+        srtF.campo === 'punti'
+          ? srtF.dir * ((a.punti || 0) - (b.punti || 0))
+          : srtF.dir * String(a[srtF.campo] || '').localeCompare(String(b[srtF.campo] || ''));
+      return d || (b.data_evento || '').localeCompare(a.data_evento || '');
     });
+    eventi = eventi.slice(0, cercaSt ? 200 : 60);
+    html += '<div style="padding:0 16px 16px">';
+    html +=
+      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">' +
+      '<input type="text" value="' +
+      _escAttr(window._formStoricoCerca || '') +
+      '" placeholder="Cerca nome o voce nello storico..." onchange="window._formStoricoCerca=this.value;renderFormazione()" class="campo-cerca"></div>';
+    if (!eventi.length) html += '<p style="color:var(--muted);padding:10px">Nessun punto assegnato finora.</p>';
+    else {
+      const thSort = (campo, label, cls) =>
+        '<th' +
+        (cls ? ' class="' + cls + '"' : '') +
+        ' style="cursor:pointer" title="Clicca per ordinare" onclick="formStoricoSort(\'' +
+        campo +
+        '\')">' +
+        label +
+        (srtF.campo === campo
+          ? srtF.dir === 1
+            ? ' &#9650;'
+            : ' &#9660;'
+          : ' <span style="opacity:.35">&#8597;</span>') +
+        '</th>';
+      html +=
+        '<div class="fz-punti-storico"><table class="collab-table"><thead><tr>' +
+        thSort('data_evento', 'Data') +
+        thSort('collaboratore', 'Collaboratore') +
+        thSort('punti', 'Punti', 'num') +
+        thSort('azione', 'Azione') +
+        thSort('descrizione', 'Nota') +
+        thSort('operatore', 'Da') +
+        (adm ? '<th></th>' : '') +
+        '</tr></thead><tbody>';
+      const azLabels = { premio: 'Premio consegnato', premio_attesa: 'In attesa premio' };
+      getPuntiConfig().azioni.forEach((a) => (azLabels[a.key] = a.label));
+      eventi.forEach((p) => {
+        html +=
+          '<tr><td style="white-space:nowrap">' +
+          new Date(p.data_evento + 'T12:00:00').toLocaleDateString('it-IT') +
+          '</td><td><strong>' +
+          escP(p.collaboratore) +
+          '</strong></td><td class="num"><strong style="color:' +
+          (p.punti < 0 ? 'var(--accent)' : p.punti > 0 ? 'var(--c-verde,#2c6e49)' : 'var(--muted)') +
+          '">' +
+          (p.punti > 0 ? '+' : '') +
+          p.punti +
+          '</strong></td><td>' +
+          escP(azLabels[p.azione] || p.azione) +
+          '</td><td style="color:var(--muted);font-size:var(--fs-md,.875rem)">' +
+          escP(p.descrizione || '') +
+          '</td><td style="color:var(--muted);font-size:var(--fs-sm,.8125rem)">' +
+          escP(p.operatore || '') +
+          '</td>' +
+          (adm
+            ? '<td><button class="btn-act del" onclick="eliminaPuntiEvento(' +
+              p.id +
+              ')" style="font-size:var(--fs-sm,.8125rem)">X</button></td>'
+            : '') +
+          '</tr>';
+      });
+      html += '</tbody></table></div>';
+    }
+    html += '</div></div>';
+
+    // TRAGUARDI PREMI
+    const cfgP = getPuntiConfig();
+    html +=
+      '<div class="main-card"><div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">Traguardi e premi' +
+      (adm || puoPunti
+        ? '<span style="display:flex;align-items:center;gap:6px"><select id="ri-anno" style="padding:4px;border:1px solid var(--line);border-radius:2px;background:var(--paper);color:var(--ink);font-size:var(--fs-sm,.8125rem)">' +
+          [0, 1, 2, 3]
+            .map((d) => {
+              const a = new Date().getFullYear() - d;
+              return '<option value="' + a + '">' + a + '</option>';
+            })
+            .join('') +
+          '</select><button class="btn-export btn-export-pdf" onclick="esportaReportIncentiviPDF()" style="font-size:var(--fs-sm,.8125rem);padding:4px 12px">Report Incentivi PDF</button></span>'
+        : '') +
+      '</div><div style="padding:16px">';
+    html +=
+      '<p style="color:var(--muted);font-size:var(--fs-md,.875rem);margin-bottom:10px">Soglie punti: ' +
+      cfgP.soglie.map((s) => '<strong>' + s.punti + '</strong> = ' + escP(s.premio)).join(' · ') +
+      ' · Passaggio livello: ' +
+      Object.entries(premiLivelloDelSettore(currentReparto, cfgP))
+        .map(([l, p]) => escP(livelloSigla(l)) + ' = ' + escP(p))
+        .join(' · ') +
+      '</p>';
+    // limiti mensili: consegnati/limite del mese corrente + attese con priorità
+    const soglieConLimite = cfgP.soglie.filter((s) => parseInt(s.limite_mese) > 0);
+    const attese = _attesePremi();
+    if (soglieConLimite.length || attese.length) {
+      const ymCorr = oggiLocale().substring(0, 7);
+      html +=
+        '<div style="padding:8px 12px;background:var(--paper2);border:1px solid var(--line);border-radius:3px;margin-bottom:12px">';
+      if (soglieConLimite.length) {
+        html +=
+          '<p style="font-size:var(--fs-sm,.8125rem);margin:0 0 4px"><strong>Premi del mese:</strong> ' +
+          soglieConLimite
+            .map((s) => {
+              const usati = _consegnatiMesePremio(s.premio, ymCorr);
+              const lim = parseInt(s.limite_mese);
+              const pieno = usati >= lim;
+              const inv = s.inventario ? (cfgP.inventario.find((i) => i.nome === s.inventario) || {}).qta : null;
+              return (
+                escP(s.premio) +
+                ' <strong style="color:' +
+                (pieno ? 'var(--accent)' : 'var(--c-verde,#2c6e49)') +
+                '">' +
+                usati +
+                '/' +
+                lim +
+                '</strong>' +
+                (pieno ? ' (esaurito)' : '') +
+                (inv != null ? ' · magazzino: ' + inv : '')
+              );
+            })
+            .join(' &nbsp;·&nbsp; ') +
+          '</p>';
+      }
+      if (attese.length) {
+        html +=
+          '<p style="font-size:var(--fs-sm,.8125rem);margin:0"><strong>In attesa (priorità dal mese dopo):</strong></p>' +
+          attese
+            .map((a) => {
+              const prem = (a.descrizione || '').replace(/^In attesa premio:\s*/i, '');
+              return (
+                '<div style="font-size:var(--fs-sm,.8125rem);display:flex;align-items:center;gap:8px;padding:2px 0">' +
+                '<span>&#9203; <strong>' +
+                escP(a.collaboratore) +
+                '</strong> · ' +
+                escP(prem) +
+                ' <span style="color:var(--muted)">(dal ' +
+                new Date((a.data_evento || '') + 'T12:00:00').toLocaleDateString('it-IT') +
+                ')</span></span>' +
+                (adm || puoPunti
+                  ? '<button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:2px 10px" onclick="registraPremioConsegnato(\'' +
+                    _jsArg(a.collaboratore) +
+                    "','" +
+                    _jsArg(prem) +
+                    '\')">Consegna ora</button>'
+                  : '') +
+                '</div>'
+              );
+            })
+            .join('');
+      }
+      html += '</div>';
+    }
+    const conPunti = collabs
+      .map((c) => ({
+        nome: c.nome,
+        c: c,
+        punti: puntiTotali(c.nome),
+        lv: livelloEffettivoDi(c),
+      }))
+      .filter((x) => x.punti !== 0 || x.lv > 0)
+      .sort((a, b) => b.punti - a.punti);
+    if (!conPunti.length) html += '<p style="color:var(--muted)">Nessun traguardo in corso.</p>';
+    else {
+      conPunti.forEach((x) => {
+        const next = prossimaSoglia(x.punti);
+        const raggiunti = sogliePremiRaggiunti(x.nome);
+        const maxS = cfgP.soglie.length ? Math.max(...cfgP.soglie.map((s) => s.punti)) : 100;
+        const pct = Math.max(0, Math.min(100, Math.round((x.punti / maxS) * 100)));
+        html +=
+          '<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><strong style="min-width:170px">' +
+          escP(x.nome) +
+          '</strong>' +
+          livelloEtichettaHtml(x.c, { compatto: true }) +
+          '<span style="font-weight:700;color:var(--accent2)">' +
+          x.punti +
+          ' pt</span><div class="budget-bar" style="flex:1;min-width:120px;height:6px"><div class="budget-bar-fill" style="width:' +
+          pct +
+          '%;background:var(--accent2)"></div></div>' +
+          (next
+            ? '<span style="font-size:var(--fs-sm,.8125rem);color:var(--muted)">-' +
+              (next.punti - x.punti) +
+              ' a: ' +
+              escP(next.premio) +
+              '</span>'
+            : '<span style="font-size:var(--fs-sm,.8125rem);color:var(--c-verde,#2c6e49);font-weight:700">Tutte le soglie raggiunte!</span>') +
+          (raggiunti.length
+            ? '<span style="font-size:var(--fs-sm,.8125rem);color:var(--c-verde,#2c6e49)"><i class="icx icx-trofeo"></i> ' +
+              raggiunti.map(escP).join(', ') +
+              '</span>'
+            : '') +
+          '</div></div>';
+      });
+    }
+    html += '</div></div>';
   }
-  html += '</div></div>';
 
   // REGISTRA FORMAZIONE SVOLTA (admin o permesso gestione_formazioni: es. supervisor)
   const puoForm = adm || (typeof puoModificare === 'function' && puoModificare('gestione_formazioni'));
@@ -1584,7 +1635,7 @@ function renderFormazione() {
       oggiLocale() +
       '" style="padding:9px"></div>';
     html += '<button class="btn-add-tipo" onclick="registraFormazioneSvolta()">+ Registra</button></div>';
-    if (puoPunti) {
+    if (puoPunti && incVis) {
       const azF = getPuntiConfig().azioni.find((a) => a.key === 'sessione_formativa');
       html +=
         '<label style="display:flex;align-items:center;gap:6px;font-size:var(--fs-sm,.8125rem);color:var(--muted);margin-top:8px;cursor:pointer"><input type="checkbox" id="frm-punti" checked> Assegna anche i punti "Sessione formativa completata"' +
@@ -1760,7 +1811,9 @@ function _renderEquitaCard(collabs) {
   }
   conDati.sort((a, b) => (a.categoria || 9) - (b.categoria || 9) || (b.anzGiorni || 0) - (a.anzGiorni || 0));
   html +=
-    '<div style="padding:0 16px 8px;overflow-x:auto"><table class="collab-table"><thead><tr><th>Collaboratore</th><th>Impiego</th><th class="num">Cat.</th><th>Anzianità</th><th class="num">Livello</th><th class="num">Punti</th><th class="num">Valutazione</th><th>Segnalazione</th></tr></thead><tbody>';
+    '<div style="padding:0 16px 8px;overflow-x:auto"><table class="collab-table"><thead><tr><th>Collaboratore</th><th>Impiego</th><th class="num">Cat.</th><th>Anzianità</th><th class="num">Livello</th>' +
+    (incentiviVisibili() ? '<th class="num">Punti</th>' : '') +
+    '<th class="num">Valutazione</th><th>Segnalazione</th></tr></thead><tbody>';
   conDati.forEach((r) => {
     html +=
       '<tr' +
@@ -1775,9 +1828,9 @@ function _renderEquitaCard(collabs) {
       (r.dataAss ? anzianitaLabel(r.dataAss, r.mesiFermo) : '-') +
       '</td><td class="num">' +
       livelloEtichettaHtml(r.c, { compatto: true, vuoto: '-' }) +
-      '</td><td class="num">' +
-      r.punti +
-      '</td><td class="num">' +
+      '</td>' +
+      (incentiviVisibili() ? '<td class="num">' + r.punti + '</td>' : '') +
+      '<td class="num">' +
       (r.media != null ? r.media + '%' : '-') +
       '</td><td style="font-size:var(--fs-sm,.8125rem);color:var(--accent)">' +
       (r.flag ? '<i class="icx icx-avviso"></i> ' + escP(r.flag) : '') +
@@ -1958,10 +2011,15 @@ async function _toggleCompetenzaEsegui(collabId, key, cb) {
     // Traccia nello storico HR: cosa è stato formato, quando e da chi
     if (attiva && typeof _insertHrEvento === 'function') {
       const fmt = ((await chiediTesto('Formatore che ha svolto la formazione (opzionale):', '')) || '').trim();
+      // con i gradini sotto spuntati insieme ("Si, formazione completa"): anche loro nello
+      // Storico HR, prima erano solo nel Registro (C28)
       _insertHrEvento(
         c.nome,
         'formazione',
-        'Competenza certificata: ' + (compDef ? compDef.label : key) + (fmt ? ' · formatore: ' + fmt : ''),
+        'Competenza certificata: ' +
+          (compDef ? compDef.label : key) +
+          (implicate.length ? ' · con i livelli sotto: ' + implicate.join(', ') : '') +
+          (fmt ? ' · formatore: ' + fmt : ''),
       );
     }
     // Rimozione spunta: se per questa competenza erano stati dati punti,
@@ -2022,14 +2080,17 @@ async function _toggleCompetenzaEsegui(collabId, key, cb) {
     // Passaggio livello? (livello COMPLETO, vedi sopra)
     const dopo = livelloDiCollaboratore(c);
     if (dopo > prima) {
-      // Punti configurabili per ogni livello raggiunto (anche più livelli in un colpo)
-      for (let lv = prima + 1; lv <= dopo; lv++) {
-        const pl = puntiLivelloDi(lv, currentReparto);
-        if (pl) await _insertPuntiEvento(c.nome, pl, 'livello_' + lv, 'Raggiunto Livello ' + lv + ' multidisciplinare');
-      }
+      // Punti SOLO del livello raggiunto (C27: i livelli saltati non danno punti)
+      for (const x of puntiPassaggioLivello(prima, dopo, currentReparto))
+        await _insertPuntiEvento(
+          c.nome,
+          x.punti,
+          'livello_' + x.lv,
+          'Raggiunto Livello ' + x.lv + ' multidisciplinare',
+        );
     }
     if (dopo > prima && dopo >= 2) {
-      const premio = premioLivelloDi(dopo, currentReparto);
+      const premio = incentiviVisibili() ? premioLivelloDi(dopo, currentReparto) : '';
       logAzione('Passaggio livello', c.nome + ' → ' + livelloNome(dopo) + ' (livello ' + dopo + ' della scala)');
       if (typeof _insertHrEvento === 'function')
         _insertHrEvento(
@@ -2073,7 +2134,10 @@ async function _toggleCompetenzaEsegui(collabId, key, cb) {
     toast('Errore salvataggio competenza');
   }
 }
-async function _insertPuntiEvento(nome, punti, azione, descrizione) {
+// rif (punti automatici di copertura, cambio turno e rifiuto): { assente, data } = la persona
+// assente (o a cui e cambiato il turno) e il giorno. Il database li controlla con il piano e il
+// Diario: senza "Punti e premi" i punti valgono solo per un fatto vero, una volta (20260928).
+async function _insertPuntiEvento(nome, punti, azione, descrizione, rif) {
   // INTERRUTTORE INCENTIVI: se il sistema (o questa azione) e' spento dalla
   // direzione, non si scrive nulla. Blocco all'origine, cosi' vale per ogni
   // percorso (popup, manuale, automatico) senza doverlo ripetere ovunque.
@@ -2114,7 +2178,9 @@ async function _insertPuntiEvento(nome, punti, azione, descrizione) {
           _fmtIt(_stessoMotivo.data_evento) +
           ':\n"' +
           _desc +
-          '"\n\nAssegnare comunque una SECONDA volta?\nOK = doppio accredito consapevole · Annulla = nessun doppione',
+          '"\n\nAssegnare comunque una SECONDA volta?',
+        // i pulsanti dicono cosa fanno: il testo parlava di "OK", il pulsante era "Conferma" (C29)
+        { ok: 'Assegna una seconda volta', annulla: 'Nessun doppione' },
       ))
     ) {
       toast('Nessun doppione: punti non assegnati a ' + nome);
@@ -2140,7 +2206,7 @@ async function _insertPuntiEvento(nome, punti, azione, descrizione) {
       return false;
     }
   }
-  const r = await secPost('punti_eventi', {
+  const riga = {
     collaboratore: nome,
     punti: punti,
     azione: azione,
@@ -2148,7 +2214,49 @@ async function _insertPuntiEvento(nome, punti, azione, descrizione) {
     data_evento: oggiLocale(),
     operatore: getOperatore(),
     reparto_dip: currentReparto,
-  });
+  };
+  if (rif && rif.assente && rif.data) {
+    riga.rif_assente = rif.assente;
+    riga.rif_data = String(rif.data).substring(0, 10);
+  }
+  if (typeof puoModificare === 'function' && !puoModificare('gestione_punti')) {
+    // SENZA PUNTI E PREMI (decisione del titolare, 20260931_c): niente punti validi, una
+    // PROPOSTA da approvare. Non conta nei totali, nei livelli e nei premi finche chi gestisce
+    // i punti non la approva (Formazione > Punti da approvare). Nomi, punti, autore e giorno
+    // li controlla il database; Annulla la ritira, Ripristina la ripresenta.
+    const x = await _conSessione(
+      (t) =>
+        _rpcSicura('punti_proponi', {
+          p_token: t,
+          p_azione: azione,
+          p_collaboratore: nome,
+          p_assente: (rif && rif.assente) || null,
+          p_data: rif && rif.data ? String(rif.data).substring(0, 10) : null,
+          p_descrizione: descrizione || '',
+        }),
+      getOpToken(),
+      true,
+    );
+    if (x && x.id && typeof _annullaPronto === 'function' && _annullaPronto())
+      window.Annulla.azione(
+        {
+          tipo: 'rpc',
+          annulla: { fn: 'punti_proposte_decidi', params: { p_ids: [x.id], p_decisione: 'ritira' } },
+          ripristina: { fn: 'punti_proposte_decidi', params: { p_ids: [x.id], p_decisione: 'ripresenta' } },
+        },
+        'Proposta di punti: ' + nome,
+      );
+    toast(
+      'Proposta inviata: ' +
+        nome +
+        ' ' +
+        (x && Number(x.punti) > 0 ? '+' : '') +
+        ((x && x.punti) || punti) +
+        ' punti. La approva chi gestisce i punti',
+    );
+    return 'proposta';
+  }
+  const r = await secPost('punti_eventi', riga);
   if (r && r[0]) puntiEventiCache.unshift(r[0]);
   logAzione('Punti assegnati', nome + ' ' + (punti > 0 ? '+' : '') + punti + ' (' + azione + ')');
   if (punti > 0)
@@ -2256,7 +2364,8 @@ async function registraPremioConsegnato(nome, premio) {
               lim +
               ').\n\nMettere ' +
               nome +
-              ' IN ATTESA con priorità dal mese prossimo?\n\nOK = in attesa · Annulla = consegna comunque (fuori limite)',
+              ' IN ATTESA con priorità dal mese prossimo?',
+            { ok: 'Metti in attesa', annulla: 'Consegna comunque (fuori limite)' },
           )
         ) {
           await _insertPuntiEvento(nome, 0, 'premio_attesa', 'In attesa premio: ' + soglia.premio);
@@ -2321,11 +2430,23 @@ async function eliminaPuntiEvento(id) {
     toast('Non hai il permesso');
     return;
   }
-  if (!(await chiediConferma('Eliminare questo movimento punti?'))) return;
+  // chi, quanti punti, perche e di quando: nella domanda e nel Registro (prima solo "ID 42", C30)
+  const ev = (puntiEventiCache || []).find((p) => p.id === id);
+  const descr = ev
+    ? ev.collaboratore +
+      ' · ' +
+      (ev.punti > 0 ? '+' : '') +
+      ev.punti +
+      ' punti · ' +
+      (ev.descrizione || ev.azione || '') +
+      ' · ' +
+      new Date(ev.data_evento + 'T12:00:00').toLocaleDateString('it-IT')
+    : 'movimento n. ' + id;
+  if (!(await chiediConferma('Eliminare questo movimento punti?\n\n' + descr, { ok: 'Elimina' }))) return;
   try {
     await secDel('punti_eventi', 'id=eq.' + id);
     puntiEventiCache = puntiEventiCache.filter((p) => p.id !== id);
-    logAzione('Punti evento eliminato', 'ID ' + id);
+    logAzione('Punti evento eliminato', descr + ' (n. ' + id + ')');
     renderFormazione();
     toast('Eliminato');
   } catch (e) {
@@ -2345,15 +2466,18 @@ function _matriceRows() {
     'Collaboratore',
     ...comps.map((k) => k.label + (parseInt(k.livello) ? ' (L' + parseInt(k.livello) + ')' : '')),
     'Livello',
-    'Punti ' + new Date().getFullYear(),
   ];
+  // incentivi spenti: niente colonna dei punti nell esportazione
+  const inc = incentiviVisibili();
+  if (inc) head.push('Punti ' + new Date().getFullYear());
   const rows = collabs.map((c) => {
-    return [
+    const r = [
       c.nome,
       ...comps.map((k) => ((c.competenze || {})[k.key] === true ? 'SI' : '-')),
       livelloEtichettaTesto(c),
-      puntiTotali(c.nome),
     ];
+    if (inc) r.push(puntiTotali(c.nome));
+    return r;
   });
   return { head, rows };
 }
@@ -2448,6 +2572,10 @@ async function esportaReportIncentiviPDF() {
       toastErrore('Non riesco a preparare il PDF: controlla la connessione internet e riprova');
       return;
     }
+  }
+  if (!incentiviVisibili()) {
+    toast('Incentivi spenti: il report si prepara con gli incentivi attivi');
+    return;
   }
   const anno = parseInt((document.getElementById('ri-anno') || {}).value) || new Date().getFullYear();
   const azLabels = {};
@@ -2601,7 +2729,9 @@ function _renderFormazioneConfig() {
     (cfgP.attivo ? ' checked' : '') +
     ' onchange="toggleIncentiviGlobale(this.checked)" style="width:18px;height:18px;margin-right:10px"><b>Incentivi attivi</b>' +
     '<span style="margin-left:8px;color:var(--muted);font-size:var(--fs-sm,.8125rem)">' +
-    (cfgP.attivo ? 'accesi: punti e popup funzionano' : 'SPENTI: nessun punto e nessun popup in tutto il programma') +
+    (cfgP.attivo
+      ? 'accesi: punti e popup funzionano'
+      : 'SPENTI: punti e premi nascosti in tutto il programma (quelli già dati restano salvati e tornano riaccendendo)') +
     '</span></label>';
   // punti azioni (ciascuna con la sua spunta attiva/disattiva)
   html +=
@@ -2742,7 +2872,8 @@ function _renderFormazioneConfig() {
         '" questo settore parte da questi valori e li cambia solo per sé.') +
     '</p>';
   html +=
-    '<p style="font-size:var(--fs-sm,.8125rem);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Punti al raggiungimento del livello (0 = disattivato)</p>';
+    '<p style="font-size:var(--fs-sm,.8125rem);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 6px">Punti al raggiungimento del livello (0 = disattivato)</p>' +
+    '<p style="font-size:var(--fs-sm,.8125rem);color:var(--muted);margin:0 0 6px">Chi salta dei livelli (es. da L1 a L3) riceve punti e premio solo del livello raggiunto, non di quelli saltati.</p>';
   for (let l = 1; l <= _lvMaxT; l++) {
     html +=
       '<div class="tipo-item"><div class="tipo-item-name">Livello ' +
@@ -3543,7 +3674,7 @@ async function toggleIncentiviGlobale(on) {
   const cfg = getPuntiConfig();
   cfg.attivo = !!on;
   await savePuntiConfig(cfg);
-  toast(on ? 'Incentivi ACCESI' : 'Incentivi SPENTI: nessun punto e nessun popup');
+  toast(on ? 'Incentivi ACCESI' : 'Incentivi SPENTI: punti e premi nascosti, nessun popup');
   if (typeof renderFormazione === 'function') renderFormazione();
 }
 // Accende/spegne una singola azione degli incentivi
@@ -3777,7 +3908,8 @@ function eventiCopertura(assente, dataRif, dataFine) {
 // Senza periodo scritto vale il giorno della registrazione.
 function _periodoCopertura(entry) {
   const dal = _dataRifCopertura(entry);
-  const m = (entry.testo || '').match(/al (\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  // «al» come parola: prima trovava l «al» dentro «dal 08/09/2026» e la fine era il primo giorno
+  const m = (entry.testo || '').match(/(?:^|[^A-Za-zÀ-ü])al (\d{1,2})\/(\d{1,2})\/(\d{4})/);
   const al = m ? m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0') : dal;
   return { dal: dal, al: al };
 }
@@ -3943,9 +4075,13 @@ function _renderPopupCopertura() {
             p.punti +
             '</span><span style="color:var(--muted);font-size:var(--fs-sm,.8125rem);flex:1">' +
             (p.azione === 'copertura' ? 'copertura' : 'rifiuto disponibilità') +
-            '</span><button class="btn-act del" style="font-size:var(--fs-sm,.8125rem)" onclick="_rimuoviEventoCopertura(' +
-            p.id +
-            ')">Rimuovi</button></div>',
+            '</span>' +
+            (puntiAutomaticiRimovibili(p)
+              ? '<button class="btn-act del" style="font-size:var(--fs-sm,.8125rem)" onclick="_rimuoviEventoCopertura(' +
+                p.id +
+                ')">Rimuovi</button>'
+              : '') +
+            '</div>',
         )
         .join('') +
       '</div>';
@@ -4031,9 +4167,32 @@ function _renderPopupCopertura() {
   pwdModalSeAnnullata(() => _chiudiPopupCopertura(false));
   document.getElementById('pwd-modal').classList.remove('hidden');
 }
+// C2 (controllo C): senza "Punti e premi" si tolgono solo i punti automatici scritti da se
+// stessi nell ultima ora (stessa regola del database, secure_delete); gli altri restano a chi
+// gestisce i punti
+function puntiAutomaticiRimovibili(p) {
+  if (!p) return false;
+  if (
+    (typeof isAdmin === 'function' && isAdmin()) ||
+    (typeof puoModificare === 'function' && puoModificare('gestione_punti'))
+  )
+    return true;
+  const t = p.created_at
+    ? Date.parse(
+        String(p.created_at)
+          .replace(' ', 'T')
+          .replace(/([+-]\d{2})$/, '$1:00'),
+      )
+    : NaN;
+  return p.operatore === getOperatore() && !isNaN(t) && Date.now() - t < 59 * 60 * 1000;
+}
 async function _rimuoviEventoCopertura(id) {
   const p = puntiEventiCache.find((x) => x.id === id);
   if (!p) return;
+  if (!puntiAutomaticiRimovibili(p)) {
+    toast('Questi punti li toglie chi ha il permesso Punti e premi (o chi li ha scritti, entro un ora)', 6000);
+    return;
+  }
   if (
     !(await chiediConferma(
       'Rimuovere "' +
@@ -4072,39 +4231,53 @@ async function _chiudiPopupCopertura(conferma) {
     const azNeg = cfg.azioni.find((a) => a.key === 'disponibilita_negata');
     // Chi copre non può essere anche tra i rifiuti
     const negatiValidi = negati.filter((n) => n !== chi);
-    try {
-      if (chi && azCop) {
-        await _insertPuntiEvento(
-          chi,
-          azCop.punti,
-          modoCambio ? 'cambio_turno' : 'copertura',
-          (modoCambio ? 'Cambio turno per esigenze accettato, del ' : 'Copertura per ' + ctx.assente + ' del ') +
+    // il fatto a cui si riferiscono i punti (controllato dal database): assenza o cambio
+    const rifCop = { assente: ctx.assente, data: ctx.dataRif };
+    // ogni persona per conto suo (riverifica 3 L2): se la copertura e rifiutata dal database i
+    // rifiuti si registrano lo stesso (prima stavano nello stesso try e si perdevano)
+    const fatti = [];
+    const errori = [];
+    let proposte = 0;
+    const una = async (nome, punti, azione, desc) => {
+      try {
+        const esito = await _insertPuntiEvento(nome, punti, azione, desc, rifCop);
+        if (esito) {
+          fatti.push(nome + ' ' + (punti > 0 ? '+' : '') + punti);
+          if (esito === 'proposta') proposte++;
+        }
+      } catch (e) {
+        errori.push(nome + ': ' + ((e && e.message) || e));
+      }
+    };
+    if (chi && azCop)
+      await una(
+        chi,
+        azCop.punti,
+        modoCambio ? 'cambio_turno' : 'copertura',
+        (modoCambio ? 'Cambio turno per esigenze accettato, del ' : 'Copertura per ' + ctx.assente + ' del ') +
+          dataLabel +
+          (nota ? ' · ' + nota : ''),
+      );
+    if (azNeg)
+      for (const n of negatiValidi)
+        await una(
+          n,
+          azNeg.punti,
+          'disponibilita_negata',
+          (modoCambio
+            ? 'Disponibilità negata per cambio turno del '
+            : 'Disponibilità negata per assenza di ' + ctx.assente + ' del ') +
             dataLabel +
             (nota ? ' · ' + nota : ''),
         );
-      }
-      if (azNeg) {
-        for (const n of negatiValidi) {
-          await _insertPuntiEvento(
-            n,
-            azNeg.punti,
-            'disponibilita_negata',
-            (modoCambio
-              ? 'Disponibilità negata per cambio turno del '
-              : 'Disponibilità negata per assenza di ' + ctx.assente + ' del ') +
-              dataLabel +
-              (nota ? ' · ' + nota : ''),
-          );
-        }
-      }
-      const parti = [];
-      if (chi && azCop) parti.push(chi + ' +' + azCop.punti);
-      if (negatiValidi.length && azNeg)
-        parti.push(negatiValidi.length + ' rifiut' + (negatiValidi.length === 1 ? 'o' : 'i') + ' ' + azNeg.punti);
-      if (parti.length) toast('Punti registrati: ' + parti.join(' · '));
-    } catch (e) {
-      toast('Errore registrazione punti');
-    }
+    if (fatti.length)
+      toast(
+        (proposte ? 'Proposte inviate: ' : 'Punti registrati: ') +
+          fatti.join(' · ') +
+          (proposte ? '. Le approva chi gestisce i punti' : ''),
+        5000,
+      );
+    if (errori.length) toastErrore('Punti non registrati per ' + errori.join(' · '), 9000);
   }
   document.getElementById('pwd-modal').classList.add('hidden');
   window._copCtx = null;
@@ -4237,7 +4410,7 @@ function _renderPanoramicaHrCard(collabs) {
   html += kpi(fissi, 'Fissi', 'var(--c-verdeacqua,#1a7a6d)');
   html += kpi(jolly, 'Jolly', 'var(--c-arancio,#e67e22)');
   if (senza) html += kpi(senza, 'Senza inquadramento', 'var(--muted)');
-  html += kpi(premiAnno, 'Premi consegnati ' + anno, 'var(--c-oro,#b8860b)');
+  if (incentiviVisibili()) html += kpi(premiAnno, 'Premi consegnati ' + anno, 'var(--c-oro,#b8860b)');
   if (senzaVal && puoVedereValutazioni()) html += kpi(senzaVal, 'Senza valutazione', 'var(--c-rosso,#8a1c1c)');
   html += kpi(fmtCHF(spesaGiubAnno) + ' CHF', 'Giubilei erogati ' + anno, 'var(--c-oro,#8b6914)');
   html += kpi(fmtCHF(spesaGiubTot) + ' CHF', 'Giubilei totali storici', 'var(--c-oro,#8b6914)');
@@ -4359,6 +4532,7 @@ async function certificaCompetenzaDaPiano(nome, key, chiediPunti) {
       'formazione',
       'Competenza certificata: ' +
         (compAtt ? compAtt.label : key) +
+        (implicate.length ? ' · con i livelli sotto: ' + implicate.join(', ') : '') +
         (fmt ? ' · formatore: ' + fmt : '') +
         (chiediPunti === 'livelli' ? ' · dai turni del piano' : ''),
     );
@@ -4377,12 +4551,10 @@ async function certificaCompetenzaDaPiano(nome, key, chiediPunti) {
         'Competenza certificata: ' + (compAtt ? compAtt.label : key) + ' (dai turni del piano)',
       );
     const dopo = livDi(c);
-    for (let lv = prima + 1; lv <= dopo; lv++) {
-      const pl = puntiLivelloDi(lv, repC, cfgP);
-      if (pl) await _insertPuntiEvento(nome, pl, 'livello_' + lv, 'Raggiunto Livello ' + lv + ' multidisciplinare');
-    }
+    for (const x of puntiPassaggioLivello(prima, dopo, repC, cfgP))
+      await _insertPuntiEvento(nome, x.punti, 'livello_' + x.lv, 'Raggiunto Livello ' + x.lv + ' multidisciplinare');
     if (dopo > prima && dopo >= 2) {
-      const premio = premioLivelloDi(dopo, repC, cfgP);
+      const premio = incentiviVisibili(cfgP) ? premioLivelloDi(dopo, repC, cfgP) : '';
       logAzione('Passaggio livello', nome + ' → Livello ' + dopo + ' (dai turni del piano)');
       if (typeof _insertHrEvento === 'function')
         _insertHrEvento(nome, 'livello', 'Raggiunto Livello ' + dopo + ' multidisciplinare (dai turni del piano)');
@@ -4409,10 +4581,8 @@ async function certificaCompetenzaDaPiano(nome, key, chiediPunti) {
         'Competenza certificata: ' + (compAtt ? compAtt.label : key),
       );
     const dopo = livDi(c);
-    for (let lv = prima + 1; lv <= dopo; lv++) {
-      const pl = puntiLivelloDi(lv, repC);
-      if (pl) await _insertPuntiEvento(nome, pl, 'livello_' + lv, 'Raggiunto Livello ' + lv + ' multidisciplinare');
-    }
+    for (const x of puntiPassaggioLivello(prima, dopo, repC))
+      await _insertPuntiEvento(nome, x.punti, 'livello_' + x.lv, 'Raggiunto Livello ' + x.lv + ' multidisciplinare');
     if (dopo > prima) await _proponiContrattoFisso(c, dopo);
   }
   toast(nome + ' certificato: ' + (compAtt ? compAtt.label : key));

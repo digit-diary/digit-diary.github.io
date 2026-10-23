@@ -106,7 +106,7 @@ function renderStatistiche() {
     '</div><div class="stat-label">Collaboratori</div></div><div class="stat"><div class="stat-num red">' +
     nErr +
     '</div><div class="stat-label">' +
-    nomeCorrente('Errore') +
+    _plurale(nomeCorrente('Errore')) +
     _trendBadge(_errCurr, _errPrev, _tPrevName) +
     '</div></div><div class="stat"><div class="stat-num teal">' +
     _nMalStat +
@@ -124,7 +124,7 @@ function renderStatistiche() {
       : '') +
     '<div class="stat"><div class="stat-num gold">' +
     (totImp ? fmtCHF(totImp) : '0') +
-    '</div><div class="stat-label">Importo totale</div></div></div>';
+    '</div><div class="stat-label" title="Somma degli importi di ammanchi ed eccedenze, senza segno">Totale differenze (ammanchi ed eccedenze)</div></div></div>';
   // Grafico mensile (full width, primo)
   const tipiCount = {};
   _ds.forEach((e) => {
@@ -292,8 +292,8 @@ function renderStatistiche() {
   const cr = Object.entries(cd).sort((a, b) => b[1].tot - a[1].tot),
     tp = tutti.filter((t) => _ds.some((e) => e.tipo === t.nome));
   let th =
-    '<table class="collab-table"><thead><tr><th>Collaboratore</th><th class="num">Tot</th>' +
-    tp.map((t) => '<th class="num">' + t.nome + '</th>').join('') +
+    '<table class="collab-table"><thead><tr><th>Collaboratore</th><th class="num" title="Numero di registrazioni (la malattia e contata in giorni nella sua colonna)">Registrazioni</th>' +
+    tp.map((t) => '<th class="num">' + escP(t.nome) + (t.nome === _tipoMalStat ? ' (giorni)' : '') + '</th>').join('') +
     '</tr></thead><tbody>';
   cr.forEach(([n, d]) => {
     const ne = _jsArg(n);
@@ -464,6 +464,14 @@ function renderChart(id, type, data, opts) {
 }
 
 // EXPORT CSV
+// CELLA DEL CSV DEL DIARIO: tutto tra virgolette (nomi, tipi e testi con «;» o virgolette
+// restano nella loro colonna) e un testo che inizia con = + - @ non diventa una formula
+// nell Excel (A32: prima solo la descrizione era tra virgolette e «=..» si eseguiva)
+function _csvCellaDiario(v) {
+  let t = String(v == null ? '' : v);
+  if (/^[=+\-@\t\r]/.test(t) && !/^-?\d+(,\d+)?$/.test(t)) t = "'" + t;
+  return '"' + t.replace(/"/g, '""') + '"';
+}
 function esportaCSV() {
   const f = getFiltrati();
   if (!f.length) {
@@ -479,13 +487,14 @@ function esportaCSV() {
       e.nome,
       e.tipo,
       e.reparto || '',
-      '"' + e.testo.replace(/"/g, '""').replace(/\n/g, ' ') + '"',
-      e.importo || '',
+      String(e.testo || '').replace(/\n/g, ' '),
+      // virgola dei decimali: con il «;» l Excel italiano leggeva 12.50 come testo (A32)
+      e.importo ? String(e.importo).replace('.', ',') : '',
       e.valuta || '',
       e.operatore || '',
     ]);
   });
-  const blob = new Blob(['\uFEFF' + rows.map((r) => r.join(';')).join('\n')], {
+  const blob = new Blob(['\uFEFF' + rows.map((r) => r.map(_csvCellaDiario).join(';')).join('\n')], {
     type: 'text/csv;charset=utf-8',
   });
   Object.assign(document.createElement('a'), {
@@ -700,17 +709,20 @@ function _rdPeriodo() {
     labelPrec: 'mese precedente',
   };
 }
+// plurale semplice del nome di un tipo per le etichette ("Errore" -> "Errori"; solo la prima
+// parola: "Errore cassa" -> "Errori cassa")
+function _plurale(nome) {
+  return String(nome || '').replace(/^(\S+)/, (w) =>
+    /[eo]$/i.test(w) ? w.slice(0, -1) + 'i' : /a$/i.test(w) ? w.slice(0, -1) + 'e' : w,
+  );
+}
+// giorni di malattia contati come a schermo e nella scheda (_contaGiorniMalattia, js/utils.js)
 function _rdGiorniMalattia(entries) {
-  let g = 0;
-  entries.forEach((e) => {
-    const m = (e.testo || '').match(/(\d+)\s*giorni/);
-    g += m ? parseInt(m[1]) : 1;
-  });
-  return g;
+  return entries.reduce((g, e) => g + _contaGiorniMalattia(e), 0);
 }
 async function esportaReportDirezionePDF() {
   if (!isAdmin()) {
-    toastErrore('Il report della direzione lo crea l amministratore');
+    toastErrore("Il report della direzione lo crea l'amministratore");
     return;
   }
   if (!window.jspdf) {
@@ -763,6 +775,8 @@ async function esportaReportDirezionePDF() {
     const collabs = getCollaboratoriReparto().filter((c) => c.attivo !== false);
     const fissi = collabs.filter((c) => c.impiego === 'fisso').length;
     const jolly = collabs.filter((c) => c.impiego === 'jolly').length;
+    // chi non ha l'impiego impostato (prima non compariva: 0 fissi + 1 jolly su 63)
+    const senzaImpiego = collabs.filter((c) => !c.impiego).length;
     const partTime = collabs.filter((c) => c.percentuale != null && parseFloat(c.percentuale) < 1).length;
     // persone per gradino piu alto certificato (livello effettivo, come in Formazione e nel
     // Piano), su tutta la scala del settore: prima tre colonne fisse L1-L3 perdevano L4-L6
@@ -779,7 +793,7 @@ async function esportaReportDirezionePDF() {
         .sort((a, b) => a - b)
         .map((n) => livelloSigla(n, r.key) + ': ' + liv[n])
         .join(', ') + (parziali ? ' (parziali: ' + parziali + ')' : '');
-    righeOrganico.push([r.label, collabs.length, fissi, jolly, partTime, livTesto || '-']);
+    righeOrganico.push([r.label, collabs.length, fissi, jolly, senzaImpiego || '-', partTime, livTesto || '-']);
     tot.collab += collabs.length;
 
     const dati = getDatiReparto();
@@ -791,7 +805,9 @@ async function esportaReportDirezionePDF() {
     const errAmm = err.reduce((s2, e) => s2 + (/ammanco/i.test(e.testo || '') ? parseFloat(e.importo) || 0 : 0), 0);
     const errEcc = err.reduce((s2, e) => s2 + (/eccedenza/i.test(e.testo || '') ? parseFloat(e.importo) || 0 : 0), 0);
     const amm = dati.filter((e) => e.tipo === tipoAmm && _rdInPeriodo(e.data, per.da, per.a)).length;
-    malPrecTot += dati.filter((e) => e.tipo === tipoMal && _rdInPeriodo(e.data, per.daPrec, per.aPrec)).length;
+    malPrecTot += _rdGiorniMalattia(
+      dati.filter((e) => e.tipo === tipoMal && _rdInPeriodo(e.data, per.daPrec, per.aPrec)),
+    );
     errPrecTot += dati.filter((e) => e.tipo === tipoErr && _rdInPeriodo(e.data, per.daPrec, per.aPrec)).length;
     const mods = getModuliReparto().filter((m) => _rdInPeriodo(m.created_at || m.data_modulo, per.da, per.a));
     const allin = mods.filter((m) => m.tipo === 'allineamento').length;
@@ -799,7 +815,7 @@ async function esportaReportDirezionePDF() {
     const appr = mods.filter((m) => m.tipo === 'apprezzamento').length;
     righeMese.push([
       r.label,
-      mal.length + (malG > mal.length ? ' (' + malG + ' gg)' : ''),
+      malG + (mal.length ? ' (' + mal.length + ' reg.)' : ''),
       err.length,
       fmtCHF(errChf) + (errAmm || errEcc ? ' (-' + fmtCHF(errAmm) + ' / +' + fmtCHF(errEcc) + ')' : ''),
       amm,
@@ -894,10 +910,13 @@ async function esportaReportDirezionePDF() {
     doc.autoTable(
       Object.assign({}, stile, {
         startY: y,
-        head: [['Settore', 'Collaboratori', 'Fissi', 'Jolly', 'Part-time', 'Persone per livello']],
+        head: [
+          ['Settore', 'Collaboratori', 'Fissi', 'Jolly', 'Impiego da impostare', 'Part-time', 'Persone per livello'],
+        ],
         body: righeOrganico,
-        foot: [['Totale', tot.collab, '', '', '', '']],
-        columnStyles: Object.assign({}, stile.columnStyles, { 5: { halign: 'left' } }),
+        showFoot: 'lastPage',
+        foot: [['Totale', tot.collab, '', '', '', '', '']],
+        columnStyles: Object.assign({}, stile.columnStyles, { 6: { halign: 'left' } }),
         footStyles: {
           fillColor: [240, 236, 228],
           textColor: [26, 18, 8],
@@ -919,12 +938,24 @@ async function esportaReportDirezionePDF() {
     doc.autoTable(
       Object.assign({}, stile, {
         startY: y,
-        head: [['Settore', 'Malattie', 'Errori', 'Errori CHF', 'Amm. verbali', 'Allineamenti', 'RDI', 'Apprezzamenti']],
+        head: [
+          [
+            'Settore',
+            'Malattia (giorni)',
+            'Errori',
+            'Errori CHF',
+            'Amm. verbali',
+            'Allineamenti',
+            'RDI',
+            'Apprezzamenti',
+          ],
+        ],
         body: righeMese,
+        showFoot: 'lastPage',
         foot: [
           [
             'Totale',
-            tot.mal + (tot.malG > tot.mal ? ' (' + tot.malG + ' gg)' : ''),
+            tot.malG + (tot.mal ? ' (' + tot.mal + ' reg.)' : ''),
             tot.err,
             fmtCHF(tot.errChf) +
               (tot.errAmm || tot.errEcc ? ' (-' + fmtCHF(tot.errAmm) + ' / +' + fmtCHF(tot.errEcc) + ')' : ''),
@@ -948,7 +979,7 @@ async function esportaReportDirezionePDF() {
     doc.setTextColor(100);
     const trend = (cur, prec, label) => label + ': ' + cur + ' (' + per.labelPrec + ': ' + (prec || 0) + ')';
     doc.text(
-      trend(tot.mal, malPrecTot, 'Malattie') + '   ·   ' + trend(tot.err, errPrecTot, 'Errori cassa'),
+      trend(tot.malG, malPrecTot, 'Malattia (giorni)') + '   ·   ' + trend(tot.err, errPrecTot, 'Errori cassa'),
       14,
       y + 2,
     );
@@ -956,30 +987,34 @@ async function esportaReportDirezionePDF() {
     y += 10;
   }
   if (sezSvi) {
-    sezioneRd('Sviluppo del personale e incentivi');
+    // incentivi spenti (incentiviVisibili, formazione.js): niente colonne Punti e Premi
+    const incR = typeof incentiviVisibili !== 'function' || incentiviVisibili();
+    const senzaInc = (riga) => (incR ? riga : riga.filter((_, i) => i !== 2 && i !== 3));
+    sezioneRd(incR ? 'Sviluppo del personale e incentivi' : 'Sviluppo del personale');
     doc.autoTable(
       Object.assign({}, stile, {
         startY: y,
         head: [
-          [
+          senzaInc([
             'Settore',
             'Formazioni svolte',
             'Punti assegnati',
             'Premi consegnati',
             'Giubilei CHF',
             'Valutazioni ' + (annoDa === annoA ? annoDa : annoDa + '-' + annoA),
-          ],
+          ]),
         ],
-        body: righeSviluppo,
+        body: righeSviluppo.map(senzaInc),
+        showFoot: 'lastPage',
         foot: [
-          [
+          senzaInc([
             'Totale',
             tot.form,
             tot.punti,
             tot.premi,
             !puoVedereStoricoHr() ? 'riservato' : tot.giub ? fmtCHF(tot.giub) : '-',
             '',
-          ],
+          ]),
         ],
         footStyles: {
           fillColor: [240, 236, 228],
