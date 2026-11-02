@@ -684,7 +684,7 @@ function _pianoOrePreferenze(nome, ym) {
 // Conta ovunque allo stesso modo: giorni di fila, riposo minimo, 4+1+1, domenica non
 // libera. Elenco nella regola "codici_lavoro" (sigle separate da virgola); senza
 // regola valgono quelle qui sotto. Una cella vuota NON e lavoro (= riposo).
-const _PIANO_CODICI_LAVORO = 'JG,U,US,CS,LRD,F,1F,AMM';
+const _PIANO_CODICI_LAVORO = 'JG,U,US,CS,LRD,F,1F';
 let _pianoCodLavCache = null;
 function _pianoCodiciLavoro() {
   // si rilegge solo se cambiano le regole o il settore (si chiama migliaia di volte)
