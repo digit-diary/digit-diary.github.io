@@ -41,7 +41,7 @@ async function checkPwd() {
       document.getElementById('login-overlay').classList.add('hidden');
       document.getElementById('operatore-display').textContent = 'Operatore: ' + nome;
       var loginSettore = document.getElementById('login-settore');
-      if (loginSettore && loginSettore.value) currentReparto = loginSettore.value;
+      currentReparto = settoreDopoAccesso(nome, loginSettore ? loginSettore.value : '') || currentReparto;
       _ricordaSettore(true);
       applicaTemaOperatore();
       registraPushSubscription();
@@ -596,7 +596,7 @@ async function tentaBiometrico() {
       return;
     }
     var loginSettore = document.getElementById('login-settore');
-    if (loginSettore && loginSettore.value) currentReparto = loginSettore.value;
+    currentReparto = settoreDopoAccesso(stored.op, loginSettore ? loginSettore.value : '') || currentReparto;
     _ricordaSettore(true);
     document.getElementById('login-overlay').classList.add('hidden');
     document.getElementById('operatore-display').textContent = 'Operatore: ' + stored.op;

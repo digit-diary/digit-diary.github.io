@@ -4060,14 +4060,18 @@ window.addEventListener('load', async () => {
       if (cached) operatoriAuthCache = JSON.parse(cached);
     } catch (e) {}
   }
-  // Carica operatori dal DB per il login (leggero, senza loadAll)
-  try {
-    const _opLogin = await sbRpc('list_operators');
-    if (_opLogin && _opLogin.length) {
-      operatoriAuthCache = _opLogin;
-      localStorage.setItem('_cache_operatori_auth', JSON.stringify(_opLogin));
-    }
-  } catch (e) {}
+  // Carica dal DB settori e operatori per il login (leggero, senza loadAll): login_elenco
+  // da anche i settori aggiunti e il settore di ogni operatore; list_operators resta il
+  // ripiego (solo nomi) se il database non la ha ancora.
+  if (!(await caricaLoginElenco())) {
+    try {
+      const _opLogin = await sbRpc('list_operators');
+      if (_opLogin && _opLogin.length) {
+        operatoriAuthCache = _opLogin;
+        localStorage.setItem('_cache_operatori_auth', JSON.stringify(_opLogin));
+      }
+    } catch (e) {}
+  }
   // Populate login dropdown
   aggiornaLoginOperatori();
   if (_isSessionValid()) {

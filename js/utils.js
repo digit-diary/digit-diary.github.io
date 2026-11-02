@@ -1263,15 +1263,20 @@ function opzioniRepartoHtml(selezionato, conEntrambi) {
   });
   return h;
 }
-// Select settore nella schermata di login: popolato dalla cache locale
-// (le impostazioni non sono leggibili prima del login)
+// Select settore nella schermata di login. Prima dell accesso le impostazioni non sono
+// leggibili: l elenco arriva dal server con login_elenco() (settori attivi e settore di ogni
+// operatore, 20260933_a), cosi un settore nuovo compare anche su un PC mai usato. La cache
+// locale serve solo se il server non risponde.
+let _loginElenco = null;
 function popolaLoginSettore() {
   const sel = document.getElementById('login-settore');
   if (!sel) return;
-  let lista = null;
-  try {
-    lista = JSON.parse(localStorage.getItem('_cache_reparti') || 'null');
-  } catch (e) {}
+  let lista = _loginElenco && _loginElenco.settori && _loginElenco.settori.length ? _loginElenco.settori : null;
+  if (!lista) {
+    try {
+      lista = JSON.parse(localStorage.getItem('_cache_reparti') || 'null');
+    } catch (e) {}
+  }
   if (!lista || !lista.length) lista = getReparti().map((r) => ({ key: r.key, label: r.label }));
   const cur = sel.value;
   sel.innerHTML = lista.map((r) => '<option value="' + r.key + '">' + escP(r.label) + '</option>').join('');
@@ -1282,6 +1287,42 @@ function _salvaCacheReparti() {
   try {
     localStorage.setItem('_cache_reparti', JSON.stringify(getReparti().map((r) => ({ key: r.key, label: r.label }))));
   } catch (e) {}
+}
+// Elenco della schermata di accesso dal server: settori attivi e settore di ogni operatore.
+// Restituisce true se e arrivato. Senza risposta (rete assente, database senza 20260933_a)
+// restano la cache locale e list_operators.
+async function caricaLoginElenco() {
+  let r = null;
+  try {
+    r = await sbRpc('login_elenco');
+  } catch (e) {
+    r = null;
+  }
+  if (!r || !Array.isArray(r.settori) || !Array.isArray(r.operatori)) return false;
+  _loginElenco = r;
+  operatoriAuthCache = r.operatori.map((o) => ({ nome: o.nome, ruolo: o.ruolo }));
+  const mappa = {};
+  r.operatori.forEach((o) => {
+    mappa[o.nome] = o.settore || 'entrambi';
+  });
+  operatoriRepartoMap = mappa;
+  try {
+    localStorage.setItem('_cache_reparti', JSON.stringify(r.settori.map((s) => ({ key: s.key, label: s.label }))));
+    localStorage.setItem('_cache_operatori_auth', JSON.stringify(operatoriAuthCache));
+    localStorage.setItem('_cache_operatori_reparto', JSON.stringify(mappa));
+  } catch (e) {}
+  popolaLoginSettore();
+  return true;
+}
+// Settore in cui entra chi accede: un operatore con un solo settore entra sempre nel suo
+// (o in uno dei settori dei suoi accessi extra, se ha scelto quello), come setReparto.
+function settoreDopoAccesso(nome, scelto) {
+  const proprio = (nome && operatoriRepartoMap && operatoriRepartoMap[nome]) || 'entrambi';
+  if (proprio === 'entrambi') return scelto;
+  if (!scelto || scelto === proprio) return proprio;
+  const extra = typeof _accessiExtraDi === 'function' ? _accessiExtraDi(nome) : null;
+  if (extra && extra[scelto]) return scelto;
+  return proprio;
 }
 
 // ---- Ripristino scroll dopo il refresh ----
