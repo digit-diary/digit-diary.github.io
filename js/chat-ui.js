@@ -1019,7 +1019,7 @@ function renderNoteChat(partner) {
       headerLabel = escP(headerGruppo);
     } else {
       const rep = _gidChat.replace('__gruppo_', '');
-      headerLabel = rep === 'tutti' ? 'Tutti' : 'Tutti ' + (rep === 'slots' ? 'Slots' : 'Tavoli');
+      headerLabel = rep === 'tutti' ? 'Tutti' : 'Tutti ' + escP(repartoLabel(rep));
       membri = operatoriAuthCache
         .map((o) => o.nome)
         .filter((n) => {

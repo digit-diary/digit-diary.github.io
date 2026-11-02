@@ -707,7 +707,7 @@ async function caricaStatisticheAnnoPiano(forza) {
       // ore realmente lavorate: base per le indennita' degli ausiliari
       o.oreLav += _pianoOreEffettiveTurno(t, r);
     } else if (cs) {
-      if (r.codice === 'V' || r.codice === 'V1') o.v++;
+      if (r.codice === 'V') o.v++;
       if (r.codice === 'M' || r.codice === 'M1') o.m++;
       // CGF goduto, ma se quel giorno c'e' malattia il recupero non e' stato
       // goduto e il credito resta (come per le vacanze)
@@ -2969,7 +2969,7 @@ async function _vacRestituiteNellAnno(anno) {
       'piano?codice=eq.M&data=gte.' + anno + '-01-01&data=lte.' + anno + '-12-31&select=collaboratore,data,commento',
     )) || []
   ).forEach((r) => {
-    if (/(?:era|^Ex) V1?\b/.test(String(r.commento || ''))) out[r.collaboratore] = (out[r.collaboratore] || 0) + 1;
+    if (/(?:era|^Ex) V\b/.test(String(r.commento || ''))) out[r.collaboratore] = (out[r.collaboratore] || 0) + 1;
   });
   return out;
 }

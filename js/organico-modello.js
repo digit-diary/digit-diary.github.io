@@ -37,7 +37,7 @@
     jollyPct: 0.8, // ausiliari: percentuale su cui si pianifica
     livelloServizio: 0.95, // giorni in cui una malattia improvvisa deve trovare copertura
     codiciMalattia: ['M', 'M1', 'I', 'I1'],
-    codiciVacanza: ['V', 'V1'],
+    codiciVacanza: ['V'],
     codiciCgf: ['CGF'],
     codiciCongedoNp: ['CNP'],
     // assenze retribuite o impegni fuori dai turni del fabbisogno

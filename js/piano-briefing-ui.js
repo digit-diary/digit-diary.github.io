@@ -2550,7 +2550,7 @@ async function _pianoInserisciCorsoEsegui() {
       continue;
     }
     const nomeC =
-      c === 'V' || c === 'V1'
+      c === 'V'
         ? 'vacanza'
         : c === 'M' || c === 'M1'
           ? 'malattia'

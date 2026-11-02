@@ -413,7 +413,7 @@ async function _ricercaPrepara(opz) {
     for (let k = 0; k < 8; k++) {
       x.setDate(x.getDate() + 1);
       const c = codFisso(n, dataLocaleISO(x));
-      if (c === 'V' || c === 'V1') return true;
+      if (c === 'V') return true;
       if (c !== 'C') return false;
     }
     return false;

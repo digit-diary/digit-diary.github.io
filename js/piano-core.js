@@ -50,7 +50,6 @@ function _repartoDi(r) {
 // condizionale dell'Excel del casinò). I codici non elencati restano bianchi.
 const PIANO_COLORI_SPECIALI = {
   V: '#00B0F0',
-  V1: '#00B0F0',
   CGF: '#00B0F0',
   M: '#FFFF00',
   M1: '#FFFF00',
@@ -103,6 +102,9 @@ function _pianoVisOk(chiave) {
   return true;
 }
 function pianoTabVisibile(id) {
+  // briefing e pause spenti per il settore (Impostazioni > Settori): scheda assente per tutti
+  if (id === 'briefing' && typeof repartoConBriefing === 'function' && !repartoConBriefing(_pianoReparto()))
+    return false;
   return _pianoVisOk('ptab_' + id);
 }
 function pianoTabModificabile(id) {
@@ -489,6 +491,7 @@ function _pianoCtxIdoneita(extra) {
       livelloDi: (i) => _pianoLivelloNelSettore(i),
       fannoTutto: (fz) => _pianoFunzioniFannoTutto().has(fz),
       accompagnamentoDi: (i) => _pianoAccompagnamentoDi(i),
+      areaLibera: () => _pianoSettoreSenzaAree(),
     },
     extra || {},
   );
@@ -558,6 +561,46 @@ const _COMPETENZE_GRUPPI_DEFAULT = {
 // turni): per loro i collegamenti si scelgono a mano. Le competenze rimaste scollegate
 // le elenca _pianoCompetenzeScollegate (avviso in Formazione).
 const _PIANO_SETTORI_COLLEGAMENTI_A_MANO = ['slots', 'tavoli', 'valet', 'cleaning'];
+// SETTORE NUOVO SENZA AREE (difetto del 01/11/2026): un settore aggiunto (non fra quelli di
+// prima) in cui nessuna competenza di Formazione apre un gruppo dei suoi turni. Li l area di
+// lavoro non si puo certificare, quindi non ferma nessuno: decidono la funzione (Turni per
+// funzione: senza voci = tutti i turni del settore), le regole di gruppo e le preferenze.
+// Appena una competenza apre un gruppo del settore vale la Formazione, come altrove.
+let _pianoSenzaAreeMemo = null;
+function _pianoSettoreSenzaAree(rep) {
+  rep = rep || (typeof _pianoReparto === 'function' ? _pianoReparto() : 'slots');
+  if (_PIANO_SETTORI_COLLEGAMENTI_A_MANO.includes(rep)) return false;
+  const mappa = _pianoCompetenzeGruppi();
+  const m = _pianoSenzaAreeMemo;
+  if (m && m.rep === rep && m.mappa === mappa && m.turni === pianoTurniCache && m.n === pianoTurniCache.length)
+    return m.v;
+  const gruppi = new Set(
+    (pianoTurniCache || [])
+      .filter((t) => t.attivo !== false && _repartoDi(t) === rep)
+      .map((t) => String(t.gruppo || '').toUpperCase())
+      .filter(Boolean),
+  );
+  const v = !Object.keys(mappa).some((k) => mappa[k] && gruppi.has(String(mappa[k]).toUpperCase()));
+  _pianoSenzaAreeMemo = { rep: rep, mappa: mappa, turni: pianoTurniCache, n: pianoTurniCache.length, v: v };
+  return v;
+}
+// PERSONE SENZA NESSUN TURNO POSSIBILE nel settore (difetto del 01/11/2026): per la scheda
+// Funzioni e per Controlla il sistema. Stesso motore della bozza (PianoRegole.idoneita) su tutti
+// i turni attivi del settore, senza giorno; chi ha «Turni solo a mano» non conta.
+// -> [{ nome, funzione }]
+function _pianoSenzaTurniPossibili(rep) {
+  rep = rep || _pianoReparto();
+  const turni = (pianoTurniCache || []).filter((t) => t.attivo !== false && _repartoDi(t) === rep);
+  if (!turni.length) return [];
+  const ctxDi = (n) =>
+    _pianoCtxIdoneita({
+      storiaDi: () => (typeof _pianoStoriaGruppiDi === 'function' ? _pianoStoriaGruppiDi(n) : null),
+    });
+  return (collaboratoriCache || [])
+    .filter((c) => c.attivo !== false && _repartoDi(c) === rep && !c.turni_solo_a_mano)
+    .filter((c) => !turni.some((t) => PianoRegole.idoneita(c, t, ctxDi(c.nome)).ok))
+    .map((c) => ({ nome: c.nome, funzione: String(c.funzione || '').toUpperCase() }));
+}
 function _pianoCompetenzeGruppoUnico() {
   const out = {};
   const tutte = typeof getCompetenzeConfigAll === 'function' ? getCompetenzeConfigAll() : {};
@@ -1228,8 +1271,8 @@ function _pianoRitornoDaMalattia(r, sigla) {
       motivo_blocco: pm.motivo_blocco || null,
       prima_malattia: null,
     };
-  // celle scritte prima della colonna: come prima (protette solo V, V1 e CGF)
-  const out = { codice: sigla, protetto: ['V', 'V1', 'CGF'].includes(sigla), commento: '' };
+  // celle scritte prima della colonna: come prima (protette solo V e CGF; V1 non e una vacanza)
+  const out = { codice: sigla, protetto: ['V', 'CGF'].includes(sigla), commento: '' };
   if (r && r.prima_malattia !== undefined) out.prima_malattia = null;
   return out;
 }
@@ -1306,7 +1349,7 @@ function _pianoOreDiRiga(r, pct) {
 // regole (jolly_codici_gia_pagati) senza toccare il programma.
 function _pianoCodiciGiaNellaPagaJolly() {
   const v = _pianoRegolaVal('jolly_codici_gia_pagati');
-  return String(v == null || v === '' ? 'V,V1' : v)
+  return String(v == null || v === '' ? 'V' : v)
     .split(',')
     .map((s) => s.trim().toUpperCase())
     .filter(Boolean);

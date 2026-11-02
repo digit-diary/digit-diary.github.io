@@ -2730,8 +2730,33 @@ function _setInvCategorieReparto(lista) {
   obj[currentReparto] = lista;
   inventarioCategorieExtra = obj;
 }
+// CATEGORIE DELL INVENTARIO PER SETTORE (decisione del titolare 01/11/2026): le crea, rinomina
+// e toglie chi ha la pagina Inventario nel proprio settore (o in un settore extra con la
+// modifica), oltre all amministratore. Il database controlla che cambino solo le categorie dei
+// settori dell operatore (upsert_impostazione, migrazione 20260932_b). Buoni e Sigarette
+// (nomi, nascondi) restano dell amministratore.
+function _invPuoGestireCategorie() {
+  if (isAdmin()) return true;
+  if (typeof isVis === 'function' && !isVis('inventario')) return false;
+  if (typeof _inRepartoExtra === 'function' && _inRepartoExtra())
+    return typeof _extraPuoModificare === 'function' && _extraPuoModificare();
+  return true;
+}
+// true = salvato. Se il database rifiuta (permesso, settore) si dice il motivo e si rileggono
+// le categorie salvate, cosi la pagina non mostra una categoria che non esiste
 async function _saveInvCategorieExtra() {
-  await setImp('inventario_categorie_extra', JSON.stringify(inventarioCategorieExtra));
+  try {
+    await setImp('inventario_categorie_extra', JSON.stringify(inventarioCategorieExtra));
+    return true;
+  } catch (e) {
+    toastErrore('Categorie dell inventario non salvate: ' + ((e && e.message) || e), 8000);
+    try {
+      const v = await getImp('inventario_categorie_extra');
+      inventarioCategorieExtra = v ? JSON.parse(v) : {};
+    } catch (_) {}
+    renderInventario();
+    return false;
+  }
 }
 function _renderInvTabs() {
   const wrap = document.getElementById('inv-tabs');
@@ -2754,7 +2779,7 @@ function _renderInvTabs() {
     b.onclick = () => switchInvTab(cat.key);
     wrap.appendChild(b);
   });
-  if (isAdmin()) {
+  if (_invPuoGestireCategorie()) {
     const add = document.createElement('button');
     add.className = 'inv-tab-admin';
     add.style.cssText = stile + ';border-style:dashed;color:var(--accent2);border-color:var(--accent2)';
@@ -2762,6 +2787,8 @@ function _renderInvTabs() {
     add.title = 'Aggiungi una categoria inventario personalizzata';
     add.onclick = aggiungiCategoriaInventario;
     wrap.appendChild(add);
+  }
+  if (isAdmin()) {
     // categorie base nascoste: si rimettono da qui
     if (_invConBase())
       ['buoni', 'sigarette']
@@ -2803,7 +2830,9 @@ function renderInventario() {
       '<p style="color:var(--muted);padding:20px;text-align:center">Nessuna categoria inventario per il settore ' +
       escP(repartoLabel(currentReparto)) +
       '.' +
-      (isAdmin() ? ' Usa "+ Categoria" per crearne una (es. Prodotti pulizia, Pettorine, Chiavi...).' : '') +
+      (_invPuoGestireCategorie()
+        ? ' Usa "+ Categoria" per crearne una (es. Prodotti pulizia, Pettorine, Chiavi...).'
+        : '') +
       '</p>';
     return;
   }
@@ -2826,6 +2855,10 @@ function switchInvTab(tab) {
 }
 // --- Gestione categorie custom (admin) ---
 async function aggiungiCategoriaInventario() {
+  if (!_invPuoGestireCategorie()) {
+    toastErrore('Categorie dell inventario: serve la pagina Inventario nel tuo settore');
+    return;
+  }
   const nome = await chiediTesto('Nome della nuova categoria inventario (es: Accendini, Gadget, Ombrelli...):');
   if (nome === null) return;
   const label = nome.trim();
@@ -2845,13 +2878,14 @@ async function aggiungiCategoriaInventario() {
     return;
   }
   _setInvCategorieReparto([...getInvCategorieExtra(), { key, label }]);
-  await _saveInvCategorieExtra();
+  if (!(await _saveInvCategorieExtra())) return;
   logAzione('Inventario: categoria aggiunta', label);
   _invTab = key;
   renderInventario();
   toast('Categoria "' + label + '" aggiunta');
 }
 async function rinominaCategoriaInventario(key) {
+  if (!_invPuoGestireCategorie()) return;
   const cat = getInvCategorieExtra().find((c) => c.key === key);
   if (!cat) return;
   const nuovo = await chiediTesto('Nuovo nome per "' + cat.label + '":', cat.label);
@@ -2860,11 +2894,12 @@ async function rinominaCategoriaInventario(key) {
   if (!label) return;
   const vecchio = cat.label;
   cat.label = label;
-  await _saveInvCategorieExtra();
+  if (!(await _saveInvCategorieExtra())) return;
   logAzione('Inventario: categoria rinominata', vecchio + ' → ' + label);
   renderInventario();
 }
 async function rimuoviCategoriaInventario(key) {
+  if (!_invPuoGestireCategorie()) return;
   const cat = getInvCategorieExtra().find((c) => c.key === key);
   if (!cat) return;
   const nMov = getInventarioReparto().filter((r) => r.categoria === key).length;
@@ -2878,7 +2913,7 @@ async function rimuoviCategoriaInventario(key) {
   )
     return;
   _setInvCategorieReparto(getInvCategorieExtra().filter((c) => c.key !== key));
-  await _saveInvCategorieExtra();
+  if (!(await _saveInvCategorieExtra())) return;
   logAzione('Inventario: categoria rimossa', cat.label);
   _invTab = _invTabDefault();
   renderInventario();
@@ -2914,7 +2949,7 @@ function _giacenzeCustom(catKey) {
 function renderInventarioCustom(cat) {
   const el = document.getElementById('inv-section-custom');
   if (!el) return;
-  const adm = isAdmin();
+  const adm = _invPuoGestireCategorie();
   const giacenze = _giacenzeCustom(cat.key);
   const articoli = Object.entries(giacenze)
     .filter(([, v]) => v > 0)

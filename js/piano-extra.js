@@ -4617,7 +4617,7 @@ async function _pianoAvvisiLenti(forza) {
             d.startsWith(anno + '-') &&
             mesiPersona[v.collaboratore + '|' + d.substring(5, 7)] &&
             !ok[v.collaboratore + '|' + d] &&
-            !['V', 'V1', 'M', 'M1'].includes(perG[v.collaboratore + '|' + d]),
+            !['V', 'M', 'M1'].includes(perG[v.collaboratore + '|' + d]),
         );
         if (!giorni.length) return;
         out.vacanze.push({

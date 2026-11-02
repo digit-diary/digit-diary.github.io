@@ -3488,7 +3488,7 @@ async function _pianoSincronizzaCongedoNp(c, rimuovi) {
 // ASS (assenza in attesa di certificato) come la M: la domenica era di lavoro e non si e
 // lavorata, non conta ne a favore ne contro (diventa M con il certificato)
 function _pianoDomenicaEsclusa(cod) {
-  return cod === 'V' || cod === 'V1' || cod === 'M' || cod === 'M1' || cod === 'ASS';
+  return cod === 'V' || cod === 'M' || cod === 'M1' || cod === 'ASS';
 }
 // REGOLA CGF: il festivo che cade di DOMENICA non matura compensazione
 function _festivoCgfDefault(dstr) {
@@ -3599,7 +3599,7 @@ function _pianoPiazzaCgf(nome, quanti, ctx) {
   const maxMese = parseInt(_pianoRegolaVal('cgf_max_mese'));
   const dist = parseInt(_pianoRegolaVal('cgf_distanza_giorni'));
   const noVac = String(_pianoRegolaVal('cgf_non_con_vacanze') || 'TRUE').toUpperCase() === 'TRUE';
-  const isV = (c) => c === 'V' || c === 'V1';
+  const isV = (c) => c === 'V';
   const cgfNelMese = () => {
     let n = 0;
     for (let g = 1; g <= ctx.nGiorni; g++) if (ctx.cella[nome + '|' + g] === 'CGF') n++;

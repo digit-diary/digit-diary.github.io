@@ -1346,6 +1346,26 @@ async function controlloSalute() {
       }
     }
 
+    // 3-quater) persone del settore aperto che non possono fare nessun turno (funzione senza i
+    // turni giusti, Formazione, regole di gruppo o preferenze): la bozza non darebbe loro niente.
+    // Serve la configurazione del Piano gia caricata (si apre il Piano almeno una volta)
+    if (
+      typeof _pianoSenzaTurniPossibili === 'function' &&
+      typeof pianoTurniCache !== 'undefined' &&
+      pianoTurniCache.some((t) => (t.reparto_dip || 'slots') === currentReparto)
+    ) {
+      const senza = _pianoSenzaTurniPossibili(currentReparto);
+      add(
+        senza.length ? 'attenzione' : 'ok',
+        'Turni possibili (' + repartoLabel(currentReparto) + ')',
+        senza.length
+          ? senza.map((x) => x.nome + (x.funzione ? ' (' + x.funzione + ')' : '')).join(', ') +
+              ': nessun turno del settore è possibile. Controlla Piano › Impostazioni › Turni per funzione, la Formazione e le preferenze.'
+          : 'Ogni collaboratore attivo del settore può fare almeno un turno.',
+        '',
+      );
+    }
+
     // 4) disattivati che hanno ancora turni
     const disattiviConTurni = [
       ...new Set(

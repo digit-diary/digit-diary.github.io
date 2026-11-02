@@ -1,6 +1,6 @@
 // Correzioni del controllo QA "audit B" (23/10/2026): Moduli, Maison, Inventario, Statistiche,
 // Valutazioni e scheda collaboratore. Ogni blocco prova la funzione vera estratta dal file del
-// programma; dove serve confronta con il comportamento di prima (codice del commit HEAD).
+// programma; dove serve confronta con il comportamento di prima (codice di v461, commit 9209abb).
 // Come si lancia: node test/moduli-maison-valutazioni.test.js
 const fs = require('fs');
 const path = require('path');
@@ -9,7 +9,7 @@ const radice = path.join(__dirname, '..');
 const leggi = (f) => fs.readFileSync(path.join(radice, 'js', f), 'utf8');
 const leggiHead = (f) => {
   try {
-    return execSync('git show HEAD:js/' + f, { cwd: radice, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    return execSync('git show 9209abb:js/' + f, { cwd: radice, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
   } catch (e) {
     return null;
   }

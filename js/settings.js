@@ -2329,6 +2329,21 @@ function renderSettoriUI() {
       '> <b>Buoni e sigarette (Maison)</b>' +
       (custom ? '' : ' <span>sempre attivi nei settori di base</span>') +
       '</label>';
+    // BRIEFING E PAUSE (decisione del titolare 01/11/2026): per i settori aggiunti si sceglie
+    // qui (briefing:true/false in reparti_config, letto da repartoConBriefing); senza la spunta
+    // il Piano non mostra la scheda Briefing (foglio del giorno e pause). Slots e Tavoli sempre
+    const conBrief = typeof repartoConBriefing === 'function' ? repartoConBriefing(r.key) : true;
+    html +=
+      '<label class="st-maison" title="' +
+      (custom
+        ? 'Se spuntata, il Piano del settore ha la scheda Briefing: foglio del giorno e pause'
+        : 'Nei settori di base il briefing è sempre attivo') +
+      '"><input type="checkbox"' +
+      (conBrief ? ' checked' : '') +
+      (custom ? ' onchange="salvaBriefingSettore(\'' + r.key + '\',this.checked)"' : ' disabled') +
+      '> <b>Briefing e pause</b>' +
+      (custom ? '' : ' <span>sempre attivi nei settori di base</span>') +
+      '</label>';
     // pagine abilitate per questo settore
     html += '<div style="display:flex;flex-wrap:wrap;gap:4px 14px;padding-left:4px">';
     Object.entries(PAGINE_REPARTO).forEach(([pk, plabel]) => {
@@ -2438,6 +2453,15 @@ async function toggleAttivoSettore(key) {
 // Casella "Buoni e sigarette (Maison)" di un settore aggiunto: scrive maison true/false
 // nel settore (reparti_config), la stessa proprieta che repartoConMaison legge
 async function salvaMaisonSettore(key, on) {
+  await _salvaFlagSettore(key, 'maison', on, 'Settore: Maison', 'buoni e sigarette');
+}
+async function salvaBriefingSettore(key, on) {
+  await _salvaFlagSettore(key, 'briefing', on, 'Settore: briefing', 'briefing e pause');
+  if (typeof _pianoTab !== 'undefined' && _pianoTab === 'briefing' && !on && typeof renderPiano === 'function')
+    renderPiano();
+}
+// interruttore di un settore aggiunto (maison, briefing) salvato in reparti_config
+async function _salvaFlagSettore(key, campo, on, azione, cosa) {
   if (!isAdmin()) {
     toast('Non hai il permesso');
     renderSettoriUI();
@@ -2446,7 +2470,7 @@ async function salvaMaisonSettore(key, on) {
   const lista = getRepartiCustom().map((x) => Object.assign({}, x));
   const r = lista.find((x) => x.key === key);
   if (!r) return;
-  r.maison = !!on;
+  r[campo] = !!on;
   const prima = repartiConfig;
   repartiConfig = lista;
   if (!(await _salvaRepartiConfig())) {
@@ -2454,9 +2478,9 @@ async function salvaMaisonSettore(key, on) {
     renderSettoriUI();
     return;
   }
-  logAzione('Settore: Maison', r.label + ' · buoni e sigarette ' + (on ? 'attivi' : 'non attivi'));
+  logAzione(azione, r.label + ' · ' + cosa + ' ' + (on ? 'attivi' : 'non attivi'));
   renderSettoriUI();
-  toast(r.label + ': buoni e sigarette ' + (on ? 'attivi' : 'non attivi'));
+  toast(r.label + ': ' + cosa + ' ' + (on ? 'attivi' : 'non attivi'));
 }
 async function salvaPaginaSettore(repKey, pageKey, abilitata) {
   if (!repartiPagineCfg || typeof repartiPagineCfg !== 'object') repartiPagineCfg = {};

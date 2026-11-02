@@ -684,7 +684,7 @@ function _pianoOrePreferenze(nome, ym) {
 // Conta ovunque allo stesso modo: giorni di fila, riposo minimo, 4+1+1, domenica non
 // libera. Elenco nella regola "codici_lavoro" (sigle separate da virgola); senza
 // regola valgono quelle qui sotto. Una cella vuota NON e lavoro (= riposo).
-const _PIANO_CODICI_LAVORO = 'JG,U,US,CS,LRD,F,1F';
+const _PIANO_CODICI_LAVORO = 'JG,U,US,CS,LRD,F,1F,AMM';
 let _pianoCodLavCache = null;
 function _pianoCodiciLavoro() {
   // si rilegge solo se cambiano le regole o il settore (si chiama migliaia di volte)
@@ -1411,7 +1411,7 @@ function _pianoViolazioniPersona(nome, righeMese, righeSett, ctx) {
       // solo il giorno subito prima della V: con le C prima delle vacanze (c_prima_dopo_vacanza)
       // quel giorno e una C e la regola non scattava mai. Ora si salta il blocco di C e si guarda
       // il giorno prima (16/10/2026). Il giorno nel mese prima resta del mese prima.
-      if (ctx.diurnoPreV && (cod === 'V' || cod === 'V1') && !['V', 'V1'].includes(String(giorni[g - 1] || ''))) {
+      if (ctx.diurnoPreV && cod === 'V' && String(giorni[g - 1] || '') !== 'V') {
         let k = g - 1;
         while (k >= g - 7 && String(giorni[k] || '').toUpperCase() === 'C') k--;
         if (k >= 1 && _pianoIsLavoro(giorni[k] || '')) {
@@ -3680,7 +3680,7 @@ async function _generaBozzaPianoEsegui(usaCoperture, opz) {
   const primaDelleVacanze = (n, g) => {
     let k = g + 1;
     while (k <= g + 7 && String(codDi(n, k) || '').toUpperCase() === 'C') k++;
-    return ['V', 'V1'].includes(String(codDi(n, k) || '').toUpperCase());
+    return String(codDi(n, k) || '').toUpperCase() === 'V';
   };
   // SCHEMA A BLOCCHI (js/piano-blocchi.js, facoltativo): nei giorni di riposo dello schema la
   // persona non riceve turni, nei giorni di lavoro solo turni del tipo dello schema (presto,

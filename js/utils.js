@@ -1128,6 +1128,12 @@ function settoreNomeDocumento(testo) {
   const r = getRepartiTutti().find((x) => x.label === testo || x.key === testo);
   return r ? repartoNomeDocumento(r.key) : testo;
 }
+// SETTORE CON BRIEFING E PAUSE (decisione del titolare 01/11/2026): la proprieta briefing del
+// settore in reparti_config; senza (Slots, Tavoli e i settori di prima) il briefing c e
+function repartoConBriefing(key) {
+  const info = getRepartoInfo(key);
+  return !(info && info.briefing === false);
+}
 function repartoColore(key) {
   const r = getRepartoInfo(key);
   return r && r.colore ? r.colore : 'var(--muted)';

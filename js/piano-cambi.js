@@ -1442,7 +1442,7 @@ function _pianoStatoTurniDaRighe(nome, righe, giorno) {
     .map((r) => {
       const d = String(r.data).substring(0, 10);
       const codice = _pianoSiglaSottoMalattia(r);
-      const libero = !codice || ['C', 'V', 'V1', 'CGF', 'WD', 'ND', 'M', 'M1'].includes(codice);
+      const libero = !codice || ['C', 'V', 'CGF', 'WD', 'ND', 'M', 'M1'].includes(codice);
       const chi = libero
         ? null
         : (giorno || []).find((y) => String(y.data).substring(0, 10) === d && _pianoCopreMalattiaDi(y, nome));

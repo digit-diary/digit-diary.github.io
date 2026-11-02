@@ -391,10 +391,12 @@
     const voci = mapp
       ? mapp.filter((m) => m.tipo === 'PRINCIPALE' || m.tipo === 'AMMESSO').map((m) => m.turno_codice)
       : [];
-    if (settoriC && !haSettore && !campoGrant) return false;
+    // settore nuovo senza aree di Formazione (ctx.areaLibera): l area non ferma (v. idoneita)
+    const libera = typeof ctx.areaLibera === 'function' && ctx.areaLibera();
+    if (settoriC && !haSettore && !campoGrant && !libera) return false;
     // con la sola storia, come la bozza: una mappatura con turni principali o ammessi
     // decide da sola; altrimenti serve il gruppo gia fatto (o un lasciapassare)
-    if (storia && !haSettore && !campoGrant && !voci.length) return false;
+    if (storia && !haSettore && !campoGrant && !voci.length && !libera) return false;
     const personaliI = turniPersonali(
       info,
       typeof ctx.turniPreferiti === 'function' ? ctx.turniPreferiti() : info._preferiti,
@@ -431,7 +433,8 @@
   // null se la storia non e letta (allora l area non ferma); regoleGruppoDi(gruppo);
   // campoOk(info, valore); mappFunzione(funzione); regoleTurnoFunzione(); livelloDi(info);
   // fannoTutto(funzione); accompagnamentoDi(info) -> elenco aree; coperturaDi(info) ->
-  // {gruppi} se viene da un altro settore; dow (giorno JS) o null.
+  // {gruppi} se viene da un altro settore; dow (giorno JS) o null; areaLibera() -> true nel
+  // settore nuovo senza aree di Formazione (l area non ferma).
   // Ritorna { ok, esito: 'si' | 'serve' | 'no', passo, ... dati per spiegarlo }.
   function idoneita(info, turno, ctx) {
     info = info || {};
@@ -547,22 +550,29 @@
         comuni,
       );
     }
-    if (!haArea && !lasciapassare) return no('area', Object.assign({ conSettori: !!settoriC }, comuni));
+    // SETTORE NUOVO SENZA AREE (difetto del 01/11/2026): nessuna competenza di Formazione apre
+    // i gruppi dei suoi turni (ctx.areaLibera). Una persona nuova non ha ne Formazione ne storia
+    // e restava senza nessun turno, anche con la funzione su «tutti i turni del settore»: qui
+    // l area non ferma. Le regole di gruppo (funzioni ammesse, tipi vietati) restano sopra.
+    const areaLibera = !haArea && !lasciapassare && typeof ctx.areaLibera === 'function' && ctx.areaLibera();
+    if (!haArea && !lasciapassare && !areaLibera) return no('area', Object.assign({ conSettori: !!settoriC }, comuni));
     const cop = typeof ctx.coperturaDi === 'function' ? ctx.coperturaDi(info) : null;
     if (cop && cop.gruppi && String(cop.gruppi).toUpperCase() !== gruppoT)
       return no('copertura_area', { gruppi: String(cop.gruppi).toUpperCase() });
     return si(
       lasciapassare
         ? 'area_' + lasciapassare.via
-        : !haAreaPropria && affiancato
-          ? 'area_affiancamento'
-          : !haAreaPropria && senzaArea
-            ? 'area_eccezione'
-            : settoriC
-              ? 'area_settori'
-              : storia
-                ? 'area_storia'
-                : 'area_sconosciuta',
+        : areaLibera
+          ? 'area_libera'
+          : !haAreaPropria && affiancato
+            ? 'area_affiancamento'
+            : !haAreaPropria && senzaArea
+              ? 'area_eccezione'
+              : settoriC
+                ? 'area_settori'
+                : storia
+                  ? 'area_storia'
+                  : 'area_sconosciuta',
       Object.assign({ lasciapassare: lasciapassare }, comuni),
     );
   }

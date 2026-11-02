@@ -88,6 +88,16 @@ function _renderPianoFunzioniCard() {
     h +=
       '<tr><td colspan="5" class="fz-sett-vuoto" style="text-align:left">Nessuna funzione: aggiungine una qui sotto.</td></tr>';
   h += '</tbody></table></div>';
+  // chi non puo fare nessun turno del settore (funzione, Formazione, regole di gruppo o
+  // preferenze lo escludono da tutti): la bozza non gli darebbe mai niente
+  const senza = typeof _pianoSenzaTurniPossibili === 'function' ? _pianoSenzaTurniPossibili(rep) : [];
+  if (senza.length)
+    h +=
+      '<p class="fz-sett-avviso" role="status" style="margin:8px 0 0;color:var(--accent);font-weight:600">' +
+      (senza.length === 1 ? '1 persona non può' : senza.length + ' persone non possono') +
+      ' fare nessun turno del settore: ' +
+      senza.map((x) => escP(x.nome) + (x.funzione ? ' (' + escP(x.funzione) + ')' : '')).join(', ') +
+      '. Controlla Turni per funzione, la Formazione e le preferenze (con «Chi può fare cosa» vedi il motivo).</p>';
   h +=
     '<div class="fz-sett-nuova"><div class="field"><label for="fz-nuova-sigla">Sigla</label><input type="text" id="fz-nuova-sigla" maxlength="12" placeholder="es. DI" onkeydown="if(event.key===\'Enter\'){event.preventDefault();pianoFunzioneAggiungi()}"></div>' +
     '<div class="field" style="flex:1;min-width:200px"><label for="fz-nuova-nome">Nome per esteso</label><input type="text" id="fz-nuova-nome" maxlength="40" placeholder="es. Ispettore di gioco" onkeydown="if(event.key===\'Enter\'){event.preventDefault();pianoFunzioneAggiungi()}"></div>' +
@@ -305,7 +315,8 @@ async function aggiungiPianoMappatura() {
         fz +
         ' in ' +
         repartoLabel(_pianoReparto()) +
-        ' potranno fare SOLO ' +
+        (nPers === 1 ? ' potrà' : ' potranno') +
+        ' fare SOLO ' +
         turno +
         ' (e gli altri turni che aggiungerai come PRINCIPALE o AMMESSO).\n\nPer singole persone si usa invece Regole di gruppo, "Turni riservati a collaboratori scelti".\n\nConfermi?'
       : 'Nessun collaboratore di ' +
