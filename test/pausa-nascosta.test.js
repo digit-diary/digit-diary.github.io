@@ -7,7 +7,9 @@
  *    scoperti, proposte della Formazione) non resta nessuna pausa con setTimeout(0);
  *  - _pianoSveglia (js/piano-core.js): schermo acceso solo mentre un operazione lunga e in
  *    corso e la pagina e visibile, una sola richiesta, rilasciato alla fine; se il browser
- *    rifiuta si continua senza errori.
+ *    rifiuta si continua senza errori;
+ *  - pianoOrologio (js/utils.js): a pagina nascosta il tempo conta il lavoro al ritmo della
+ *    pagina visibile, cosi freni e durate danno lo stesso lavoro (Migliora: stesse iterazioni).
  *   node test/pausa-nascosta.test.js
  */
 const fs = require('fs');
@@ -150,6 +152,52 @@ function estrai(src, nome) {
     errore = e;
   }
   ok(!errore && !T.lock(), 'se il browser rifiuta si continua senza errori');
+
+  // 5) orologio di lavoro: a pagina nascosta conta il lavoro al ritmo della pagina visibile
+  const orol = estrai(utils, 'pianoPaginaNascosta') + '\n' + estrai(utils, 'pianoOrologio');
+  let ora = 1000;
+  const doc5 = { visibilityState: 'visible' };
+  const ctx5 = { Date: { now: () => ora }, document: doc5 };
+  vm.createContext(ctx5);
+  vm.runInContext(orol + '\nthis.pianoOrologio = pianoOrologio;', ctx5);
+  const o = ctx5.pianoOrologio();
+  ora += 100;
+  let tm = o.passo(1000); // visibile: 1000 di lavoro in 100 ms
+  ok(tm === 100, 'visibile: conta il tempo reale (' + tm + ')');
+  doc5.visibilityState = 'hidden';
+  ora += 2000; // nascosta: lo stesso lavoro ci mette 20 volte tanto
+  tm = o.passo(1000);
+  ok(tm === 200, 'nascosta: 1000 di lavoro valgono 100 ms come a pagina visibile (' + tm + ')');
+  ok(o.nascosto() === 2000, 'tempo reale a pagina nascosta tenuto a parte (' + o.nascosto() + ')');
+  doc5.visibilityState = 'visible';
+  ora += 50;
+  tm = o.passo(500);
+  ok(tm === 250, 'tornata visibile: di nuovo il tempo reale (' + tm + ')');
+  // partita gia nascosta: nessun ritmo misurato, conta il tempo reale (come prima)
+  doc5.visibilityState = 'hidden';
+  const o2 = ctx5.pianoOrologio();
+  ora += 700;
+  tm = o2.passo(10);
+  ok(tm === 700, 'partita nascosta senza ritmo: tempo reale (' + tm + ')');
+  // una ricerca a numero fisso di iterazioni con il freno: visibile e nascosta fanno le stesse
+  const giri = (lento) => {
+    doc5.visibilityState = 'visible';
+    const oo = ctx5.pianoOrologio();
+    let fatte = 0;
+    const freno = 2 * 60000;
+    const tot = 42000;
+    while (fatte < tot) {
+      if (oo.passo(0) > freno) break;
+      if (fatte === 2000 && lento) doc5.visibilityState = 'hidden'; // PC bloccato dopo poco
+      ora += doc5.visibilityState === 'hidden' ? 25 * 20 : 25; // 25 iterazioni = 25 ms (x20 nascosta)
+      oo.passo(25);
+      fatte += 25;
+    }
+    return fatte;
+  };
+  const gv = giri(false);
+  const gn = giri(true);
+  ok(gv === 42000 && gn === 42000, 'Migliora: stesse iterazioni visibile ' + gv + ' e con il PC bloccato ' + gn);
 
   console.log(passati + ' passati, ' + falliti + ' falliti');
   process.exitCode = falliti ? 1 : 0;

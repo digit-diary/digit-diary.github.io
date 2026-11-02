@@ -550,7 +550,6 @@ async function pianoSchemaBlocchi(opz) {
   const mobili = [];
   for (let i = 0; i < N; i++) for (let g = 1; g <= nG; g++) if (amm[i][g]) mobili.push([i, g]);
   const msTot = Math.max(1, opz.secondi != null ? opz.secondi : 20) * 1000;
-  const inizio = Date.now();
   let it = 0;
   let accettate = 0;
   // una mossa: celle cambiate [[i, g, nuovo]]; ritorna true se tenuta
@@ -587,11 +586,16 @@ async function pianoSchemaBlocchi(opz) {
   };
   const annulla = (mosse, vecchi) => mosse.forEach(([i, g], k) => (s[i][g] = vecchi[k]));
   const tipiAmm = (i, g) => ['P', 'D', 'N'].filter((ti) => ammessoTipo(i, g, ti));
+  // DURATA SULL OROLOGIO DI LAVORO (utils.js, 02/11/2026): a pagina nascosta la pagina va
+  // 15-20 volte piu lenta; i secondi dello schema contano il lavoro fatto al ritmo della pagina
+  // visibile, cosi lo schema fa lo stesso lavoro (e la stessa discesa della temperatura)
+  const orologio = pianoOrologio();
+  let trascorso = 0;
   let tPausa = Date.now();
-  while (Date.now() - inizio < msTot) {
+  while (trascorso < msTot) {
     for (let rip = 0; rip < 200; rip++) {
       it++;
-      const fr = Math.min(1, (Date.now() - inizio) / msTot);
+      const fr = Math.min(1, trascorso / msTot);
       const temp = 120 * Math.pow(0.01, fr) + 0.5;
       const [i, g] = mobili[Math.floor(rnd() * mobili.length)];
       const r = rnd();
@@ -653,6 +657,7 @@ async function pianoSchemaBlocchi(opz) {
       }
       if (cor < migliore.c - 1e-9) migliore = { c: cor, s: s.map((x) => x.slice()) };
     }
+    trascorso = orologio.passo(200);
     if (Date.now() - tPausa > 40) {
       await pianoCedi();
       tPausa = Date.now();

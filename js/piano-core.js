@@ -4553,6 +4553,7 @@ async function pianoLunga(etichetta, fn) {
   }
   _pianoLungaInCorso = etichetta;
   document.body.classList.add('piano-lunga');
+  if (typeof pianoNascostoAzzera === 'function') pianoNascostoAzzera();
   _pianoSveglia();
   try {
     return await fn();
@@ -4639,7 +4640,8 @@ function _pianoPrepPannello() {
       (window._pianoBozzaFase || s.fase || 'Preparo la bozza…') +
       ' · ' +
       (sec < 60 ? sec + ' s' : Math.floor(sec / 60) + ' min ' + (sec % 60) + ' s') +
-      (s.ferma ? '\nMi fermo: il mese torna com era.' : '');
+      (s.ferma ? '\nMi fermo: il mese torna com era.' : '') +
+      (typeof pianoNascostoNota === 'function' && pianoNascostoNota() ? '\n' + pianoNascostoNota() : '');
   const f = document.getElementById('pp-ferma');
   if (f) {
     // dopo la conferma la bozza si scrive: non si ferma piu a meta

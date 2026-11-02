@@ -623,7 +623,8 @@ function _pianoMesiPannello() {
     (s.ym ? ' (' + _pianoMesiLabel(s.ym) + ')' : '') +
     ' · ' +
     (s.fase || '') +
-    (s.ferma ? '\nMi fermo: questo mese si interrompe, i mesi fatti restano.' : '');
+    (s.ferma ? '\nMi fermo: questo mese si interrompe, i mesi fatti restano.' : '') +
+    (typeof pianoNascostoNota === 'function' && pianoNascostoNota() ? '\n' + pianoNascostoNota() : '');
   const t = document.getElementById('pm-testo');
   if (t) {
     t.textContent = testo;

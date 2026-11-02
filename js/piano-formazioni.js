@@ -1060,12 +1060,15 @@ async function _formCercaProposte(r, seq) {
       // un buco lasciato dalla formazione si copre (1000) anche se serve un cambio (400);
       // una regola violata pesa sempre di piu
       const motore = PianoRicerca.crea(prep.problema, { pesoScoperto: 1000, pesoCambio: 400, seme: 7 + i });
-      const t0 = Date.now();
-      while (Date.now() - t0 < ms && !fermato) {
-        motore.passo(40, (Date.now() - t0) / ms);
+      // durata sull orologio di lavoro (utils.js): a pagina nascosta stesso lavoro, solo piu lento
+      const orologio = pianoOrologio();
+      let trascorso = 0;
+      while (trascorso < ms && !fermato) {
+        motore.passo(40, trascorso / ms);
+        trascorso = orologio.passo(40);
         prog(
           'Proposta ' + (i + 1) + ' di ' + cand.length + ': dal ' + _formGg(c.inizio),
-          (i + (Date.now() - t0) / ms) / cand.length,
+          (i + Math.min(1, trascorso / ms)) / cand.length,
         );
         await pianoCedi();
       }

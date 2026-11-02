@@ -43,6 +43,74 @@ function pianoCedi() {
     _cediCanale.port2.postMessage(0);
   });
 }
+// OROLOGIO DI LAVORO (02/11/2026, decisione del titolare). A pagina nascosta (altra scheda, PC
+// bloccato) Chrome fa girare la pagina 15-20 volte piu lenta (misurato: 1 s di calcolo -> 17-24 s),
+// anche senza pause. Con i freni a tempo reale Migliora si fermava prima (meno iterazioni,
+// risultato diverso da quello a pagina visibile) e lo schema a blocchi lavorava meno. Questo
+// orologio conta il tempo reale solo a pagina visibile; a pagina nascosta conta il LAVORO fatto
+// (n = iterazioni, giri...) al ritmo misurato a pagina visibile nella stessa operazione: lo
+// stesso lavoro vale lo stesso tempo, quindi freni e durate danno lo stesso lavoro della
+// pagina visibile (con il PC bloccato ci mette solo di piu). Se l operazione parte gia
+// nascosta (nessun ritmo misurato) conta il tempo reale, come prima.
+// Uso: const o = pianoOrologio(); ... o.passo(n) -> millisecondi "di lavoro" dall inizio.
+function pianoPaginaNascosta() {
+  return typeof document !== 'undefined' && document.visibilityState === 'hidden';
+}
+function pianoOrologio() {
+  let ultimo = Date.now();
+  let visMs = 0;
+  let visLavoro = 0;
+  let nascostoEq = 0;
+  let nascostoReale = 0;
+  return {
+    passo(n) {
+      const ora = Date.now();
+      const dt = ora - ultimo;
+      ultimo = ora;
+      if (!pianoPaginaNascosta()) {
+        visMs += dt;
+        visLavoro += n || 0;
+      } else {
+        nascostoReale += dt;
+        nascostoEq += visLavoro > 0 && visMs > 0 ? (n || 0) * (visMs / visLavoro) : dt;
+      }
+      return visMs + nascostoEq;
+    },
+    // millisecondi reali passati a pagina nascosta (per l avviso "piu lento")
+    nascosto: () => nascostoReale,
+  };
+}
+// TEMPO IN SECONDO PIANO DELL OPERAZIONE LUNGA IN CORSO: per dire nei riquadri di avanzamento
+// che, mentre il Diario era nascosto, il lavoro e andato avanti piu lento (il risultato e lo stesso)
+let _nascostoDa = null;
+let _nascostoMs = 0;
+function pianoNascostoAzzera() {
+  _nascostoMs = 0;
+  _nascostoDa = pianoPaginaNascosta() ? Date.now() : null;
+}
+function pianoNascostoMs() {
+  return _nascostoMs + (_nascostoDa != null ? Date.now() - _nascostoDa : 0);
+}
+function pianoNascostoNota() {
+  const ms = pianoNascostoMs();
+  if (ms < 5000) return '';
+  const min = Math.round(ms / 60000);
+  return (
+    'Il Diario è stato in secondo piano o con il PC bloccato per ' +
+    (min < 1 ? 'meno di un minuto' : min === 1 ? '1 minuto' : min + ' minuti') +
+    ': lì il lavoro continua ma va più lento (il risultato non cambia).'
+  );
+}
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  document.addEventListener('visibilitychange', () => {
+    if (pianoPaginaNascosta()) {
+      if (_nascostoDa == null) _nascostoDa = Date.now();
+    } else if (_nascostoDa != null) {
+      _nascostoMs += Date.now() - _nascostoDa;
+      _nascostoDa = null;
+    }
+  });
+}
 // Giorno (ora locale) di un valore salvato: un istante con l ora ("...T22:30:00Z")
 // diventa il giorno svizzero; una data semplice ("2026-10-05") resta com e.
 function giornoDi(v) {

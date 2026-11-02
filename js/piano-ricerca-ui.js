@@ -916,18 +916,20 @@ async function pianoRicercaCalcola(secondi, onPasso, opz) {
   );
   const msFreno = Math.max(1, secondi) * 1000 * RICERCA_TEMPO_FRENO;
   const FETTA = 25; // ~30 ms: la pagina resta usabile
-  const inizio = Date.now();
+  // freno sull orologio di lavoro (utils.js): il tempo a pagina nascosta non lo fa scattare prima
+  const orologio = pianoOrologio();
   let fatte = 0;
   let troncata = false;
   let ultimiScoperti = null;
   window._ricercaFerma = false;
   while (fatte < totIter && !window._ricercaFerma) {
-    if (Date.now() - inizio > msFreno) {
+    if (orologio.passo(0) > msFreno) {
       troncata = true;
       break;
     }
     const n = Math.min(FETTA, totIter - fatte);
     const m = motore.passo(0, fatte / totIter, n);
+    orologio.passo(n);
     ultimiScoperti = m.scoperti;
     fatte += n;
     if (onPasso) onPasso({ frazione: fatte / totIter, scoperti: m.scoperti, punteggio: m.punteggio });
@@ -1050,7 +1052,8 @@ async function pianoMigliora(opz) {
         const pass = Math.round((Date.now() - t0) / 1000);
         if (x.rifinitura) {
           barra.style.width = '100%';
-          testo.textContent = 'Ultimi ritocchi (posti scoperti, blocchi, sabati): ancora qualche secondo.';
+          testo.textContent =
+            'Ultimi ritocchi (posti scoperti, blocchi, sabati): ancora qualche secondo.' + _ricercaNotaNascosta();
           return;
         }
         barra.style.width = Math.round(x.frazione * 100) + '%';
@@ -1061,7 +1064,8 @@ async function pianoMigliora(opz) {
           pass +
           ' secondi). Posti scoperti in questo momento: ' +
           x.scoperti +
-          '.';
+          '.' +
+          _ricercaNotaNascosta();
       },
       { variante: opz.variante || 0 },
     );
@@ -1155,6 +1159,12 @@ async function pianoMigliora(opz) {
   if (esito === 'riprova') return pianoMiglioraRiprova();
   if (esito !== 'applica') return;
   await _ricercaScrivi(res);
+}
+
+// avviso nella barra di Migliora: a pagina nascosta il lavoro continua piu lento (utils.js)
+function _ricercaNotaNascosta() {
+  const n = typeof pianoNascostoNota === 'function' ? pianoNascostoNota() : '';
+  return n ? ' ' + n : '';
 }
 
 // FINESTRA DEL RISULTATO con piu di due pulsanti (Lascia, Riprova, Applica): stesso aspetto
