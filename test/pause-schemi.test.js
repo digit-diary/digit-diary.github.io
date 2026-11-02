@@ -248,15 +248,68 @@ const v22 = c.varianti.find((v) => v.sigla === 'S22');
 const c22 = v22.contenuto || c;
 const s3col22 = PC.blocchi(c22).find((b) => b.base === 4 && b.post === 'S3');
 ok(s3col22 && s3col22.righe.some((x) => x.pos === 'R23' && x.ini === 1200), 'anche nella variante S22');
-// S3 non formato al rec: R23 non a S3
+// senza S1, R23 in pausa SEMPRE 20.00-20.30 (regola «Senza S1: R23 alle 20.00»), in tutte e due
+// le varianti: nessuna riga R23 20.30-21.00, nessuna sovrapposizione
+const r23Sera = (cc) => {
+  const l = [];
+  PC.blocchi(cc).forEach((b) =>
+    b.righe.forEach((x) => x.pos === 'R23' && x.ini >= 1170 && x.ini < 1290 && l.push(b.post + ' ' + x.ini)),
+  );
+  return l.sort();
+};
+// S7C formato anche al rec (colonna BG3 con la Reception): la sequenza di notte la fa lui
+COLLAB.S7CP = ['SALA', 'REC'];
+c = ctx._peGeneraSlots(righe, '2026-10-12');
+c.varianti.forEach((v) =>
+  eq(r23Sera(v.contenuto || c), ['S3 1200'], 'variante ' + v.sigla + ': R23 solo 20.00-20.30, da S3'),
+);
+const pers = ctx._pcPersone(righe, '2026-10-12');
+c.varianti.forEach((v) => {
+  const cc = v.contenuto || c;
+  const pp = PC.pausePersone(cc, pers, cc.biglietti);
+  const prima = pp['R23P'].alternative[0].pause[0];
+  eq([prima.ini, prima.fin], [1200, 1230], 'variante ' + v.sigla + ': prima pausa di R23 20.00-20.30');
+  const s7c = PC.blocchi(cc).find((b) => b.base === 7 && b.post === 'S7C');
+  const seq = s7c.righe.filter((x) => x.ini >= 1320 && x.ini < 1395).map((x) => x.pos + ' ' + x.ini);
+  eq(seq, ['PAUSA 1320', 'S3 1335', 'R24 1350', 'R23 1380'], 'variante ' + v.sigla + ': S7C 22.00 pausa, S3, R24, R23');
+});
+// domenica uguale
+c = ctx._peGeneraSlots(righe, '2026-10-11');
+eq(r23Sera(c), ['S3 1200'], 'domenica: R23 20.00-20.30 da S3');
+// S3 non formato al rec: il cambio lo da S7C (BG3) se formato, altrimenti riga rossa
 COLLAB.S3P = ['SALA', 'CASSA'];
 c = ctx._peGeneraSlots(righe, '2026-10-12');
-const s3n = PC.blocchi(c).find((b) => b.base === 4 && b.post === 'S3');
-ok(
-  !s3n || !s3n.righe.some((x) => x.pos === 'R23' && x.ini < 1260),
-  'S3 non formato al rec: niente cambio R23 serale da lui',
-);
+eq(r23Sera(c), ['S7C 1200'], 'S3 non formato al rec: R23 20.00-20.30 da S7C');
+// S3 al rec ma non in cassa: non sa dare tutte le pause, il cambio lo da S7C
+COLLAB.S3P = ['SALA', 'REC'];
+c = ctx._peGeneraSlots(righe, '2026-10-12');
+eq(r23Sera(c), ['S7C 1200'], 'S3 senza cassa: R23 20.00-20.30 da S7C');
+// senza S1 e senza sostituti (S22 e C23 assenti): stessa regola
 COLLAB.S3P = ['SALA', 'REC', 'CASSA'];
+const nessuno = righe.filter((r) => !['S22', 'C23'].includes(r.turno));
+c = ctx._peGeneraSlots(nessuno, '2026-10-12');
+eq(r23Sera(c), ['S3 1200'], 'senza S1 ne sostituti: R23 20.00-20.30 da S3');
+COLLAB.S3P = ['SALA', 'REC'];
+c = ctx._peGeneraSlots(nessuno, '2026-10-12');
+eq(r23Sera(c), ['S7C 1200'], 'senza sostituti e S3 senza cassa: da S7C');
+COLLAB.S3P = ['SALA', 'CASSA'];
+COLLAB.S7CP = ['SALA'];
+c = ctx._peGeneraSlots(righe, '2026-10-12');
+const rossa = Object.keys(c.celle).some((k) => /^20\.00 - 20\.30\s*\[!\]$/.test(String(c.celle[k].v)));
+ok(r23Sera(c).length === 1 && rossa, 'nessuno formato al rec: R23 20.00-20.30 in rosso');
+COLLAB.S3P = ['SALA', 'REC', 'CASSA'];
+// regola spenta: come v464 (cambio di R23 dopo la fine del sostituto)
+ctx._briefPauseCfgObj = { schemi: { slots: { r23Prima: { attivo: false } } } };
+c = ctx._peGeneraSlots(righe, '2026-10-12');
+ok(c && r23Sera(c).length >= 1, 'regola spenta: R23 serale con lo schema di prima');
+ctx._briefPauseCfgObj = {};
+// due R23: il secondo alle 20.30
+const due = righe.concat([{ nome: 'R23B', nomeFull: 'R23B', turno: 'R23' }]);
+COLLAB.R23B = ['REC'];
+c = ctx._peGeneraSlots(due, '2026-10-12');
+eq(r23Sera(c).length, 2, 'due R23: due cambi serali');
+ok(r23Sera(c).some((x) => / 1200$/.test(x)) && r23Sera(c).some((x) => / 1230$/.test(x)), 'due R23: 20.00 e 20.30');
+delete COLLAB.R23B;
 // sostituto non valido (S22 senza cassa ne rec): un solo foglio, niente scelta
 COLLAB.S22P = ['SALA'];
 c = ctx._peGeneraSlots(righe, '2026-10-12');

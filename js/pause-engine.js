@@ -179,14 +179,26 @@ function _peRegolePause(settore) {
 //        ognuno valido il programma prepara un foglio e il responsabile sceglie
 //   boSupTutto: true  chi ha BO o SUP vale formato in sala, reception e cassa (come prima);
 //        spento valgono solo le spunte della Formazione
-const _PE_SCHEMI_PRED = { r24: { attivo: true, giorni: [] }, sostituti: { S1: ['S22', 'C23'] }, boSupTutto: true };
+//   r23Prima: {attivo}  senza S1 (con o senza S22/C23), domenica-giovedi, R23 fa la prima
+//        pausa 20.00-20.30 (decisione del titolare 02/11/2026): il cambio lo da S3 (libero in
+//        sala dalle 20.00) se e formato in cassa e al rec, altrimenti la colonna BG3 (S7C) se
+//        fa il rec, altrimenti la riga resta in rosso. Con S1 resta R23 20.30-21.00 da S1
+const _PE_SCHEMI_PRED = {
+  r24: { attivo: true, giorni: [] },
+  sostituti: { S1: ['S22', 'C23'] },
+  boSupTutto: true,
+  r23Prima: { attivo: true },
+};
 function _peSchemi(settore) {
   const sett = settore || _peSettoreCorrente();
   const s = (_briefPauseCfg().schemi || {})[sett] || {};
   const pred =
-    sett === 'slots' ? _PE_SCHEMI_PRED : { r24: { attivo: false, giorni: [] }, sostituti: {}, boSupTutto: true };
+    sett === 'slots'
+      ? _PE_SCHEMI_PRED
+      : { r24: { attivo: false, giorni: [] }, sostituti: {}, boSupTutto: true, r23Prima: { attivo: false } };
   return {
     r24: Object.assign({}, pred.r24, s.r24 || {}),
+    r23Prima: Object.assign({}, pred.r23Prima, s.r23Prima || {}),
     sostituti: Object.assign({}, pred.sostituti, s.sostituti || {}),
     boSupTutto: s.boSupTutto == null ? pred.boSupTutto : s.boSupTutto !== false,
   };
@@ -1588,6 +1600,8 @@ function _peAggiustaBG1(ctx, bg) {
 // completamento (pausa da solo o riga segnalata). La sala non deve restare vuota piu di prima.
 function _peSegnaSostituto(ctx, bg1, dom, numS22, hasR24) {
   ctx.sost = null;
+  // domenica-giovedi senza S1, con o senza sostituto: vale la regola di R23 alle 20.00
+  ctx.senzaS1 = !ctx.dT['S1'];
   if (ctx.dT['S1'] || !bg1.nBG1 || !(bg1.isS22 || bg1.bg1IsC23)) return;
   const PC = window.PauseControlli;
   if (!PC) return;
@@ -1610,6 +1624,105 @@ function _peSegnaSostituto(ctx, bg1, dom, numS22, hasR24) {
       : [],
   };
 }
+// SENZA S1, domenica-giovedi (con S22 o C23 che lo sostituiscono, e anche senza nessun
+// sostituto): R23 in pausa 20.00-20.30 (prima 20.30-21.00). Si tolgono le righe R23 della sera
+// (19.30-21.30) e si rimette il cambio alle 20.00: prima S3 (dalle 20.00 e in sala, cosi S7C
+// resta in sala e c e una persona in piu) ma solo se e formato in cassa E al rec (sa dare tutte
+// le pause), poi la colonna BG3 se fa il rec; sempre libero, senza lasciare la sala vuota piu
+// di prima. Con un secondo R23 il suo cambio va alle 20.30, con lo
+// stesso ordine. Se nessuno puo, la riga va dove c e posto e resta in rosso.
+function _peR23Serale(c, ctx, righe, dstr) {
+  const PC = window.PauseControlli;
+  const prop = [];
+  if (!PC || !ctx.senzaS1 || !_peSchemi('slots').r23Prima.attivo) return prop;
+  const nR23 = _peConta(ctx.dT, 'R23');
+  if (!nR23) return prop;
+  ctx.r23Serale = true;
+  const persone = _pcPersone(righe, dstr);
+  const vuota = () =>
+    PC.salaVuota(c, persone, PC.pausePersone(c, persone, c.biglietti), c.biglietti).reduce(
+      (s, b) => s + b.fin - b.ini,
+      0,
+    );
+  const principali = () => PC.blocchi(c).filter((b) => !b.personale && !/ALT/.test(b.post) && b.r <= 6);
+  // 1. via le righe R23 della sera: tornano libere (SALA, REC o CASSA come la colonna)
+  principali().forEach((b) => {
+    const libera = (b.righe.find((x) => _PC_LIBERE.includes(x.pos)) || { pos: 'SALA' }).pos;
+    b.righe.forEach((x) => {
+      if (x.pos !== 'R23' || x.ini < 1170 || x.ini >= 1290) return;
+      const a = c.celle[x.r + '|' + b.base];
+      const z = c.celle[x.r + '|' + (b.base + 1)];
+      if (!a || !z) return;
+      a.v = libera;
+      a.bg = _peColoreSettore(libera);
+      z.bg = a.bg;
+      delete a.per;
+      delete a.prop;
+      delete z.prop;
+      delete a.fg;
+      delete z.fg;
+      z.v = String(z.v).replace(/\s*\[!\]\s*$/, '');
+    });
+  });
+  // 2. i cambi: 20.00-20.30 (e 20.30-21.00 per il secondo R23)
+  const nomiR23 = (ctx.dT['R23'] || []).map((x) => String(x).trim());
+  // l orario e una decisione del titolare: la sistemazione automatica non lo sposta
+  const fissa = (base, ini) => {
+    const b = PC.blocchi(c).find((y) => y.base === base && y.righe.some((x) => x.pos === 'R23' && x.ini === ini));
+    const x = b && b.righe.find((y) => y.pos === 'R23' && y.ini === ini);
+    if (x && c.celle[x.r + '|' + base]) c.celle[x.r + '|' + base].fissa = 1;
+  };
+  const fasce = nR23 >= 2 ? [1200, 1230] : [1200];
+  fasce.forEach((ini, k) => {
+    const fin = ini + 30;
+    const per = nomiR23[k] || '';
+    const ordine = () => {
+      const l = principali();
+      const s3 = l.filter((b) => b.post === 'S3' && b.base !== 1);
+      const bg3 = l.filter((b) => b.base === 7 && b.post !== 'S3');
+      return s3.concat(bg3);
+    };
+    let fatto = null;
+    for (const b of ordine()) {
+      if (!b.nome || !_pePuoCoprire(ctx.dc, b.nome, 'R23')) continue;
+      // S3 solo se sa dare tutte le pause (formato in cassa e al rec), decisione del titolare
+      if (b.post === 'S3' && !_pePuoCoprire(ctx.dc, b.nome, 'C0')) continue;
+      const riga = b.righe.find((x) => _PC_LIBERE.includes(x.pos) && x.ini <= ini && fin <= x.fin);
+      if (!riga) continue;
+      const copia = JSON.stringify({ celle: c.celle, nR: c.nR });
+      const prima = vuota();
+      _pcInserisciCambio(c, b.base, riga, 'R23', ini, fin, per);
+      if (vuota() > prima) {
+        const x = JSON.parse(copia);
+        c.celle = x.celle;
+        c.nR = x.nR;
+        continue;
+      }
+      fissa(b.base, ini);
+      fatto = b;
+      break;
+    }
+    if (!fatto) {
+      // nessuno formato e libero: la riga va dove c e posto e resta in rosso
+      for (const b of ordine()) {
+        const riga = b.righe.find((x) => _PC_LIBERE.includes(x.pos) && x.ini <= ini && fin <= x.fin);
+        if (!riga) continue;
+        _pcInserisciCambio(c, b.base, riga, 'R23', ini, fin, per);
+        fissa(b.base, ini);
+        const r = PC.blocchi(c)
+          .find((y) => y.base === b.base && y.r === b.r)
+          .righe.find((x) => x.pos === 'R23' && x.ini === ini);
+        if (r) _peWarn({ celle: c.celle }, r.r, b.base, _pbOra(ini) + ' - ' + _pbOra(fin));
+        fatto = b;
+        prop.push({ modo: 'scoperta', nome: per, turno: 'R23', ini: ini, fin: fin, chi: b.nome, chiTurno: b.post });
+        break;
+      }
+      return;
+    }
+    prop.push({ modo: 'cambio', nome: per, turno: 'R23', ini: ini, fin: fin, chi: fatto.nome, chiTurno: fatto.post });
+  });
+  return prop;
+}
 function _peAssegnaOrfane(c, ctx, righe, dstr) {
   const PC = window.PauseControlli;
   const prop = [];
@@ -1628,6 +1741,8 @@ function _peAssegnaOrfane(c, ctx, righe, dstr) {
     PC.blocchi(c).some((b) => !b.personale && b.righe.some((x) => x.pos === o.pos && x.ini < o.fin && x.fin > o.ini));
   const lista = [];
   sost.righeS1.forEach((o) => {
+    // R23 della sera: con la regola «Senza S1: R23 alle 20.00» l ha gia sistemato _peR23Serale
+    if (ctx.r23Serale && o.pos === 'R23' && o.ini < 1290) return;
     if (o.fin > sost.fin && !coperta(o)) lista.push(Object.assign({ da: null }, o));
   });
   const b1 = principale(1);
@@ -2701,7 +2816,7 @@ function _peGeneraSlotsUna(righeTutte, dstr, forzaBG1) {
     if (form.affiancati.length) out.formazione = form.affiancati;
     if (ctx.dc._nonTrovati && ctx.dc._nonTrovati.length) out.nonTrovati = ctx.dc._nonTrovati.slice();
     if (ctx.sost) out.sostituto = { sigla: ctx.sost.sigla, nome: ctx.sost.nome };
-    const orfane = _peAssegnaOrfane(out, ctx, righe, dstr);
+    const orfane = _peR23Serale(out, ctx, righe, dstr).concat(_peAssegnaOrfane(out, ctx, righe, dstr));
     const completate = orfane.concat(_peCompletaPause(out, ctx, righe, dstr));
     const spostate = _peRisolviSalaVuota(out, righe, dstr).concat(_peOttimizza(out, righe, dstr));
     const proposte = completate.concat(spostate);
@@ -2782,6 +2897,20 @@ function _pcPunteggio(c, persone, dettaglio) {
   if (dettaglio) return { v: v, vRegole: vRegole, attesa: attesa, avvisi: avvisi, vuota: vuota };
   return v;
 }
+// RIGHE FISSE (cella con fissa: 1): orari decisi dal titolare (es. R23 20.00-20.30 senza S1)
+// che la sistemazione automatica e il risolutore della sala vuota non spostano, ne
+// direttamente ne scambiandoli con la riga vicina
+function _peFisse(c) {
+  const out = [];
+  Object.keys(c.celle).forEach((k) => {
+    const a = c.celle[k];
+    if (!a || !a.fissa) return;
+    const [r, col] = k.split('|').map(Number);
+    const iv = _pbIntervallo((c.celle[r + '|' + (col + 1)] || {}).v);
+    if (iv) out.push(col + '|' + a.v + '|' + iv.ini + '|' + iv.fin);
+  });
+  return out.sort().join(',');
+}
 function _peOttimizza(c, righe, dstr) {
   const PC = window.PauseControlli;
   const out = [];
@@ -2810,6 +2939,7 @@ function _peOttimizza(c, righe, dstr) {
     const msg = _pbSincronizza(c, prima, b.base);
     return !msg.some((m) => /non spostat/.test(m));
   };
+  const fisse = _peFisse(c);
   try {
     let attuale = _pcPunteggio(c, persone, true).vRegole;
     // regole che non si scambiano con niente: la sala vuota e gli avvisi non
@@ -2822,6 +2952,7 @@ function _peOttimizza(c, righe, dstr) {
         .forEach((b) => {
           b.righe.forEach((x) => {
             if (_PC_LIBERE.includes(x.pos)) return;
+            if ((c.celle[x.r + '|' + b.base] || {}).fissa) return;
             [
               [-1, 'quarto'],
               [1, 'quarto'],
@@ -2829,7 +2960,7 @@ function _peOttimizza(c, righe, dstr) {
               [1, 'scambio'],
             ].forEach(([dir, tipo]) => {
               const f = fermo();
-              if (muovi(b, x, dir, tipo)) {
+              if (muovi(b, x, dir, tipo) && _peFisse(c) === fisse) {
                 const det = _pcPunteggio(c, persone, true);
                 // solo problemi veri (sala vuota, avvisi, pause ai bordi del turno): nelle
                 // giornate normali lo schema resta com e; le attese lunghe sono un avviso
@@ -2905,6 +3036,7 @@ function _peRisolviSalaVuota(c, righe, dstr) {
   const vuota = () => PC.salaVuota(c, persone, PC.pausePersone(c, persone, c.biglietti), c.biglietti).length;
   if (!vuota()) return out;
   let attuale = _pcPunteggio(c, persone, true).vRegole;
+  const fisse = _peFisse(c);
   for (let giro = 0; giro < 8 && vuota(); giro++) {
     let meglio = null;
     PC.blocchi(c)
@@ -2913,10 +3045,11 @@ function _peRisolviSalaVuota(c, righe, dstr) {
         b.righe.forEach((x) => {
           // si spostano pause e cambi, non le righe libere
           if (_PC_LIBERE.includes(x.pos)) return;
+          if ((c.celle[x.r + '|' + b.base] || {}).fissa) return;
           [-1, 1].forEach((dir) => {
             const copia = JSON.stringify({ celle: c.celle, nR: c.nR });
             const r2 = _pbScambia(c, b.base, x.r, dir);
-            if (r2) {
+            if (r2 && _peFisse(c) === fisse) {
               const v = _pcPunteggio(c, persone, true).vRegole;
               if (v < attuale && (!meglio || v < meglio.v)) meglio = { v: v, b: b, x: x, dir: dir, r2: r2 };
             }
@@ -6200,6 +6333,11 @@ function _peSchemiHtml(GG, GGV) {
     dis +
     '></div>' +
     '<div style="color:var(--muted)">Quando manca S1 il programma prepara un foglio per ogni sostituto presente (S22 e C23 sono gli schemi che sanno dare le pause di S1) e te li propone, il migliore per primo. Il sostituto da i cambi solo nel suo orario e dove è formato; quelli dopo la fine del suo turno (es. R23 alle 20.30) li da chi fa le pause di notte (S3), se formato e libero, altrimenti la colonna BG3.</div>' +
+    '<label style="display:inline-flex;align-items:center;gap:4px"><input type="checkbox" id="pcfg-r23prima"' +
+    (s.r23Prima.attivo ? ' checked' : '') +
+    dis +
+    '> Senza S1: R23 in pausa alle 20.00-20.30 (domenica-giovedì)</label>' +
+    '<div style="color:var(--muted)">Quando S1 manca (le sue pause le dà S22 o C23, oppure nessuno), la prima pausa di R23 è alle 20.00 invece che alle 20.30: il cambio lo dà S3 (dalle 20.00 è libero in sala) se è formato in cassa e al rec; altrimenti S7C o chi è nella colonna BG3, se fa il rec; altrimenti la riga resta in rosso. Con S1 presente resta R23 20.30-21.00 da S1.</div>' +
     '<label style="display:inline-flex;align-items:center;gap:4px"><input type="checkbox" id="pcfg-bosup"' +
     (s.boSupTutto ? ' checked' : '') +
     dis +
@@ -6229,6 +6367,7 @@ async function peSchemiSalva() {
     },
     sostituti: { S1: sost.filter((x, i, a) => ['S22', 'C23'].includes(x) && a.indexOf(x) === i) },
     boSupTutto: !!(document.getElementById('pcfg-bosup') || {}).checked,
+    r23Prima: { attivo: !!(document.getElementById('pcfg-r23prima') || {}).checked },
   };
   const cfg = Object.assign({}, c0, { schemi: schemi });
   if (!(await salvaImp('piano_pause_cfg', JSON.stringify(cfg)))) {
@@ -6243,7 +6382,9 @@ async function peSchemiSalva() {
       ' · sostituti S1: ' +
       (schemi.slots.sostituti.S1.join(', ') || 'nessuno') +
       ' · BO/SUP ovunque ' +
-      (schemi.slots.boSupTutto ? 'si' : 'no'),
+      (schemi.slots.boSupTutto ? 'si' : 'no') +
+      ' · senza S1 R23 alle 20.00 ' +
+      (schemi.slots.r23Prima.attivo ? 'si' : 'no'),
   );
   toast('Salvato: vale per le prossime pause generate');
 }
