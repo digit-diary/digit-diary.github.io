@@ -166,6 +166,7 @@ async function _pianoAutoEsegui(rep, ym, minuti) {
   };
   const auto = { rep: rep, ym: ym, inizio: Date.now(), fase: '' };
   window._pianoAutoInCorso = auto;
+  if (typeof _pianoSveglia === 'function') _pianoSveglia(); // schermo acceso (piano-core.js)
   _pianoAutoBanner();
   const nGiorni = _pianoUltimoGiorno(ym);
   const da = ym + '-01';
@@ -383,6 +384,7 @@ async function _pianoAutoEsegui(rep, ym, minuti) {
     _pianoViolCelle = {};
     _pianoViolLista = null;
     window._pianoAutoInCorso = null;
+    if (typeof _pianoSveglia === 'function') _pianoSveglia();
   }
   esito.messaggio = righe.join('\n');
   esito.secondi = Math.round((Date.now() - auto.inizio) / 1000);

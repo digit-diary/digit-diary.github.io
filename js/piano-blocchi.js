@@ -654,7 +654,7 @@ async function pianoSchemaBlocchi(opz) {
       if (cor < migliore.c - 1e-9) migliore = { c: cor, s: s.map((x) => x.slice()) };
     }
     if (Date.now() - tPausa > 40) {
-      await new Promise((x) => setTimeout(x, 0));
+      await pianoCedi();
       tPausa = Date.now();
     }
   }

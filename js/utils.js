@@ -16,6 +16,33 @@ function dataLocaleISO(d) {
 function oggiLocale() {
   return dataLocaleISO(new Date());
 }
+// PAUSE DELLE OPERAZIONI LUNGHE ANCHE CON LA PAGINA NASCOSTA (02/11/2026). Prepara il mese,
+// Migliora, Prepara piu mesi e le proposte della Formazione lasciano respirare la pagina ogni
+// ~40 ms (barra, Ferma). Con setTimeout(0), a pagina nascosta (altra scheda, PC bloccato con
+// Win+L, finestra coperta) Chrome concede al massimo un giro al secondo e dopo 5 minuti uno al
+// minuto: misurato su Slots dicembre, la bozza passava da pochi secondi a minuti e Migliora si
+// fermava al freno di tempo con una parte delle iterazioni (risultato diverso). I messaggi di
+// un MessageChannel non hanno quel freno: stessa pausa (la pagina disegna e legge i clic),
+// velocita piena anche in secondo piano, stesse scelte (nessun calcolo dipende dalla pausa).
+let _cediCanale = null;
+const _cediCoda = [];
+function pianoCedi() {
+  if (typeof MessageChannel !== 'function') return new Promise((r) => setTimeout(r, 0));
+  if (!_cediCanale) {
+    _cediCanale = new MessageChannel();
+    _cediCanale.port1.onmessage = () => {
+      const r = _cediCoda.shift();
+      // in node (test) la porta tiene vivo il processo solo finche c e una pausa in attesa
+      if (!_cediCoda.length && typeof _cediCanale.port1.unref === 'function') _cediCanale.port1.unref();
+      if (r) r();
+    };
+  }
+  if (typeof _cediCanale.port1.ref === 'function') _cediCanale.port1.ref();
+  return new Promise((r) => {
+    _cediCoda.push(r);
+    _cediCanale.port2.postMessage(0);
+  });
+}
 // Giorno (ora locale) di un valore salvato: un istante con l ora ("...T22:30:00Z")
 // diventa il giorno svizzero; una data semplice ("2026-10-05") resta com e.
 function giornoDi(v) {

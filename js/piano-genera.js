@@ -3121,7 +3121,7 @@ async function _generaBozzaPianoEsegui(usaCoperture, opz) {
       throw eF;
     }
     if (Date.now() - tPausaB < 40) return;
-    await new Promise((r) => setTimeout(r, 0));
+    await pianoCedi();
     tPausaB = Date.now();
   };
   const da = ym + '-01';

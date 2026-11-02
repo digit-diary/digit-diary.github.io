@@ -54,8 +54,9 @@ vm.runInContext(
       '_pianoTurnoInfo',
       'pianoLungaOccupato',
       'pianoLunga',
+      '_pianoSveglia',
     ]),
-    'let _pianoLungaInCorso = null;',
+    'let _pianoLungaInCorso = null; let _pianoSvegliaLock = null; let _pianoSvegliaRichiesta = null;',
     estrai('piano-genera.js', ['PIANO_SVUOTA_TIENI', '_pianoSvuotaCalcola']),
     estrai('piano-schede.js', [
       '_vacCRiempimento',

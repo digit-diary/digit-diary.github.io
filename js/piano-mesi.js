@@ -378,7 +378,7 @@ async function _pianoMesiEsegui(piano, ui) {
       break;
     }
     coda = riga.stato === 'fatto' ? await _pianoMesiCodaMese(ym, piano.rep) : null;
-    await new Promise((x) => setTimeout(x, 0)); // la pagina respira fra un mese e l altro
+    await pianoCedi(); // la pagina respira fra un mese e l altro (anche nascosta, utils.js)
   }
   return { righe: righe, fermato: fermato };
 }

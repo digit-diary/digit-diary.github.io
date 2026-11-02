@@ -931,13 +931,13 @@ async function pianoRicercaCalcola(secondi, onPasso, opz) {
     ultimiScoperti = m.scoperti;
     fatte += n;
     if (onPasso) onPasso({ frazione: fatte / totIter, scoperti: m.scoperti, punteggio: m.punteggio });
-    await new Promise((x) => setTimeout(x, 0));
+    await pianoCedi();
   }
   // RIFINITURE CON LE PAUSE (15/10/2026): prima un blocco unico fino a 60 secondi, pagina ferma
   // e Ferma senza effetto; ora pezzi di ~40 ms. Stesso risultato, cella per cella.
   if (onPasso) onPasso({ frazione: 1, scoperti: ultimiScoperti, rifinitura: true });
   const ris = await motore.risultatoAsync(
-    () => new Promise((x) => setTimeout(x, 0)),
+    () => pianoCedi(),
     () => !!window._ricercaFerma,
   );
   const fermata = !!window._ricercaFerma;

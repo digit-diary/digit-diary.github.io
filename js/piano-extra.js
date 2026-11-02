@@ -5665,7 +5665,7 @@ async function _pianoAnalisiScoperti(ym) {
   let tPausaA = Date.now();
   for (const s of scoperti) {
     if (Date.now() - tPausaA > 40) {
-      await new Promise((r) => setTimeout(r, 0));
+      await pianoCedi();
       tPausaA = Date.now();
     }
     analisi.push(

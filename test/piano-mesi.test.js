@@ -94,6 +94,8 @@ function creaCtx(db, log) {
     parseInt,
     parseFloat,
     setTimeout: (f) => f(),
+    // pause delle operazioni lunghe (utils.js): qui subito, come setTimeout sopra
+    pianoCedi: () => Promise.resolve(),
     MESI_FULL: [
       'Gennaio',
       'Febbraio',

@@ -4553,12 +4553,61 @@ async function pianoLunga(etichetta, fn) {
   }
   _pianoLungaInCorso = etichetta;
   document.body.classList.add('piano-lunga');
+  _pianoSveglia();
   try {
     return await fn();
   } finally {
     _pianoLungaInCorso = null;
     document.body.classList.remove('piano-lunga');
+    _pianoSveglia();
   }
+}
+// PC ACCESO E AVVISO PRIMA DI USCIRE DURANTE LE OPERAZIONI LUNGHE (02/11/2026). Finche e in
+// corso un operazione lunga (Prepara il mese, Migliora, Prepara piu mesi, generazione
+// automatica...) lo schermo non si spegne da solo: Screen Wake Lock, dove il browser lo
+// concede (solo a pagina visibile; quando la pagina torna visibile si richiede di nuovo;
+// se non e permesso si continua senza). Chi chiude o ricarica la pagina riceve l avviso del
+// browser: uscendo, l operazione si interrompe. Le pause del calcolo non dipendono piu dalla
+// pagina visibile (pianoCedi, utils.js): con il PC bloccato il lavoro continua.
+let _pianoSvegliaLock = null;
+let _pianoSvegliaRichiesta = null;
+async function _pianoSveglia() {
+  try {
+    const serve = !!pianoLungaOccupato();
+    if (serve) {
+      if (_pianoSvegliaLock || _pianoSvegliaRichiesta) return;
+      if (typeof navigator === 'undefined' || !navigator.wakeLock || document.visibilityState !== 'visible') return;
+      _pianoSvegliaRichiesta = navigator.wakeLock.request('screen');
+      const l = await _pianoSvegliaRichiesta;
+      _pianoSvegliaRichiesta = null;
+      if (!pianoLungaOccupato()) {
+        l.release().catch(() => {});
+        return;
+      }
+      _pianoSvegliaLock = l;
+      l.addEventListener('release', () => {
+        if (_pianoSvegliaLock === l) _pianoSvegliaLock = null;
+      });
+    } else if (_pianoSvegliaLock) {
+      const l = _pianoSvegliaLock;
+      _pianoSvegliaLock = null;
+      await l.release();
+    }
+  } catch (e) {
+    // non concesso (risparmio energetico, pagina non attiva, browser senza Wake Lock): si continua
+    _pianoSvegliaRichiesta = null;
+  }
+}
+if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window._pianoSvegliaBound) {
+  window._pianoSvegliaBound = true;
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') _pianoSveglia();
+  });
+  window.addEventListener('beforeunload', (e) => {
+    if (!pianoLungaOccupato()) return;
+    e.preventDefault();
+    e.returnValue = '';
+  });
 }
 // RIQUADRO DI PREPARA IL MESE (D6): fase, tempo passato e Ferma, come Prepara più mesi.
 // Ferma vale fino alla conferma della bozza: la bozza si interrompe alla pausa successiva
