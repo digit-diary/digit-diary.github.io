@@ -172,6 +172,30 @@ function _peRegolePause(settore) {
   });
   return out;
 }
+// SCHEMI DEGLI SLOTS (decisioni del titolare 02/11/2026), in piano_pause_cfg.schemi[settore]:
+//   r24: {attivo, giorni}  R24 fa la prima pausa 22.30-23.00 e S3 la sua 22.15-22.30 (anche
+//        quando la colonna dei cambi di notte ha la Reception); giorni vuoti = sempre
+//   sostituti: {S1: ['S22','C23']}  chi da le pause al posto di chi manca, in ordine: per
+//        ognuno valido il programma prepara un foglio e il responsabile sceglie
+//   boSupTutto: true  chi ha BO o SUP vale formato in sala, reception e cassa (come prima);
+//        spento valgono solo le spunte della Formazione
+const _PE_SCHEMI_PRED = { r24: { attivo: true, giorni: [] }, sostituti: { S1: ['S22', 'C23'] }, boSupTutto: true };
+function _peSchemi(settore) {
+  const sett = settore || _peSettoreCorrente();
+  const s = (_briefPauseCfg().schemi || {})[sett] || {};
+  const pred =
+    sett === 'slots' ? _PE_SCHEMI_PRED : { r24: { attivo: false, giorni: [] }, sostituti: {}, boSupTutto: true };
+  return {
+    r24: Object.assign({}, pred.r24, s.r24 || {}),
+    sostituti: Object.assign({}, pred.sostituti, s.sostituti || {}),
+    boSupTutto: s.boSupTutto == null ? pred.boSupTutto : s.boSupTutto !== false,
+  };
+}
+// R24 in pausa 22.30-23.00 e S3 22.15-22.30 in questo giorno della settimana
+function _peR24Dopo(dow) {
+  const r = _peSchemi('slots').r24;
+  return !!r.attivo && _peGiorniOk(r, dow);
+}
 function _peRegola(tipo, settore) {
   return _peRegolePause(settore).find((r) => r.tipo === tipo) || null;
 }
@@ -417,26 +441,50 @@ function _peSettoreTurno(t) {
 }
 
 // ---------- competenze (dai settori effettivi della Formazione) ----------
-// lettere: S=sala, R=reception (esclusa se in accompagnamento), C=cassa
+// lettere: S=sala, R=reception (esclusa se in accompagnamento), C=cassa.
+// FORMAZIONE SEMPRE (decisione del titolare 02/11/2026): chi non si trova fra i
+// collaboratori NON e formato (prima valeva formato ovunque) e finisce nell elenco
+// dc._nonTrovati, che il foglio mostra come avviso. La persona si riconosce dal nome
+// intero (nomeFull), come nel resto del programma: niente abbinamenti per pezzi del
+// nome o per la prima parola (con due cognomi uguali si leggeva la persona sbagliata).
+// BO e SUP valgono formati in sala, reception e cassa solo se l impostazione
+// «BO e SUP danno il cambio su tutte le posizioni» e attiva (predefinita, come prima).
 function _peCompetenze(righe) {
   const d = {};
+  const nonTrovati = [];
+  const boSup = _peSchemi('slots').boSupTutto;
   (righe || []).forEach((r) => {
     if (!r.nome) return;
-    const info = r.nomeFull ? _pianoCollabInfo(r.nomeFull) : null;
-    if (!info) return;
+    const chiave = r.nome.toUpperCase().trim();
+    const info = typeof _pianoCollabInfo === 'function' ? _pianoCollabInfo(String(r.nomeFull || r.nome).trim()) : null;
+    if (!info) {
+      if (d[chiave] === undefined) {
+        d[chiave] = '';
+        nonTrovati.push(String(r.nome).trim());
+      }
+      return;
+    }
     let sett = [];
     try {
       sett = typeof _pianoSettoriEffettivi === 'function' ? _pianoSettoriEffettivi(info) || [] : [];
     } catch (e) {}
     const acc = typeof _pianoAccompagnamentoDi === 'function' ? _pianoAccompagnamentoDi(info) : [];
+    const tutto = boSup && (sett.includes('BO') || sett.includes('SUP'));
     let comp = '';
-    if (sett.includes('SALA') || sett.includes('BO') || sett.includes('SUP')) comp += 'S';
-    if ((sett.includes('REC') || sett.includes('BO') || sett.includes('SUP')) && !acc.includes('REC')) comp += 'R';
-    if (sett.includes('CASSA') || sett.includes('BO') || sett.includes('SUP')) comp += 'C';
-    d[r.nome.toUpperCase().trim()] = comp;
+    if (sett.includes('SALA') || tutto) comp += 'S';
+    if ((sett.includes('REC') || tutto) && !acc.includes('REC')) comp += 'R';
+    if (sett.includes('CASSA') || tutto) comp += 'C';
+    d[chiave] = comp;
   });
-  return d;
+  // nessuno trovato = collaboratori non caricati (non persone sconosciute): come prima,
+  // senza dati di Formazione nessun controllo
+  const out = nonTrovati.length && nonTrovati.length === Object.keys(d).length ? {} : d;
+  // proprieta non enumerabile: Object.keys(dc) resta l elenco delle persone
+  Object.defineProperty(out, '_nonTrovati', { value: out === d ? nonTrovati : [], enumerable: false });
+  return out;
 }
+// senza nessun dato di Formazione (es. collaboratori non ancora caricati) tutti valgono
+// formati come sempre; con i dati, chi non e nell elenco non e formato
 function _pePuoCoprire(dc, bg, pos) {
   if (!dc || !Object.keys(dc).length || !bg) return true;
   let sett = '';
@@ -445,14 +493,9 @@ function _pePuoCoprire(dc, bg, pos) {
   else if (u === 'REC' || u[0] === 'R') sett = 'R';
   else if (u === 'SALA' || u[0] === 'S') sett = 'S';
   else return true;
-  const bgU = bg.toUpperCase().trim();
+  const bgU = String(bg).toUpperCase().trim();
   if (dc[bgU] !== undefined) return dc[bgU].includes(sett);
-  const k = Object.keys(dc).find((x) => x.includes(bgU) || bgU.includes(x));
-  if (k) return dc[k].includes(sett);
-  const bgFirst = bgU.split(' ')[0];
-  const k2 = Object.keys(dc).find((x) => x.split(' ')[0] === bgFirst);
-  if (k2) return dc[k2].includes(sett);
-  return true;
+  return false;
 }
 
 // ---------- foglio virtuale (stessa vista dell'Excel) ----------
@@ -563,6 +606,12 @@ function _pePuoBG3(ctx, nome) {
 }
 function _peTrovaBG1(ctx) {
   const dT = ctx.dT;
+  // variante scelta fra i sostituti di S1 (Impostazioni pause, «Chi sostituisce chi da
+  // le pause»): S22 o C23 danno le pause al posto di S1 che manca
+  if (ctx.forzaBG1 === 'S22' && dT['S22'])
+    return { nBG1: _peGPN(dT, 'S22'), lblBG1: 'S22', orBG1: '11.40 - 20.00', isS22: true };
+  if (ctx.forzaBG1 === 'C23' && dT['C23'])
+    return { nBG1: _peGPN(dT, 'C23'), lblBG1: 'C23', orBG1: '11.40 - 20.10', isS22: false, forzaC23: true };
   let out = { nBG1: '', lblBG1: '???', orBG1: '', isS22: false };
   if (dT['S1']) {
     const cand = _peGPN(dT, 'S1');
@@ -681,8 +730,10 @@ function _pePatternS22(sh, ctx, col, nBG1, numS22) {
   r = _peSS(sh, r, col, 'SALA', '18.45 - 19.30');
   r = _peSPP(sh, ctx, r, col, 'S5', '19.30 - 20.00', nBG1);
 }
-// s3PausaPrima (lunedi-giovedi): quando S3 fa R24, la pausa e alle 22.15 e R24 dopo,
-// 22.30-23.00; la domenica resta R24 22.15-22.45 e pausa 22.45
+// s3PausaPrima (regola «R24 alle 22.30» in Impostazioni pause, predefinita sempre): S3 va
+// in pausa alle 22.15 e R24 dopo, 22.30-23.00, anche quando i cambi di notte li da la
+// colonna BG3 con la Reception (decisione del titolare 02/11/2026: prima in quel caso R24
+// andava alle 22.15 e S3 alle 22.45, e la domenica sempre). Spenta: lo schema di prima.
 function _pePatternS3(sh, ctx, col, nS3, hasR24, bg3FaRec, s3PausaPrima) {
   let r = 7;
   r = _peSS(sh, r, col, 'SALA', '20.00 - 20.30');
@@ -690,7 +741,11 @@ function _pePatternS3(sh, ctx, col, nS3, hasR24, bg3FaRec, s3PausaPrima) {
   r = _peSPP(sh, ctx, r, col, 'C5', '21.00 - 21.30', nS3);
   r = _peSPP(sh, ctx, r, col, 'C20', '21.30 - 22.00', nS3);
   if (hasR24) {
-    if (bg3FaRec) {
+    if (bg3FaRec && s3PausaPrima) {
+      r = _peSS(sh, r, col, 'SALA', '22.00 - 22.15');
+      r = _peSS(sh, r, col, 'PAUSA', '22.15 - 22.30');
+      r = _peSS(sh, r, col, 'SALA', '22.30 - 23.30');
+    } else if (bg3FaRec) {
       r = _peSS(sh, r, col, 'SALA', '22.00 - 22.45');
       r = _peSS(sh, r, col, 'PAUSA', '22.45 - 23.00');
       r = _peSS(sh, r, col, 'SALA', '23.00 - 23.30');
@@ -819,7 +874,12 @@ function _pePatternBG3_S7C(
       r = _peSPP(sh, ctx, r, col, 'S7', '21.30 - 22.00', nBG3);
       r = _peSS(sh, r, col, 'PAUSA', '22.00 - 22.15');
       if (hasR24) {
-        if (bg3FaRec) {
+        if (bg3FaRec && s3PausaPrima) {
+          r = _peSN(sh, ctx, r, col, 'S3', '22.15 - 22.30', nS3, nBG3);
+          r = _peSPP(sh, ctx, r, col, 'R24', '22.30 - 23.00', bgRec);
+          r = _peSPP(sh, ctx, r, col, 'R23', '23.00 - 23.15', bgRec);
+          r = _peSS(sh, r, col, 'SALA', '23.15 - 23.30');
+        } else if (bg3FaRec) {
           r = _peSPP(sh, ctx, r, col, 'R24', '22.15 - 22.45', bgRec);
           r = _peSN(sh, ctx, r, col, 'S3', '22.45 - 23.00', nS3, nBG3);
           r = _peSPP(sh, ctx, r, col, 'R23', '23.00 - 23.15', bgRec);
@@ -870,10 +930,13 @@ function _pePatternBG3_S7C(
       r = _peSPP(sh, ctx, r, col, 'S7', '21.30 - 22.00', nBG3);
       r = _peSS(sh, r, col, 'PAUSA', '22.00 - 22.15');
       if (hasR24) {
-        if (!bg3FaRec && s3PausaPrima) {
-          // S3 in pausa alle 22.15 (lunedi-giovedi), poi fa R24
+        if (s3PausaPrima) {
+          // S3 in pausa alle 22.15, poi R24 22.30-23.00 (lo copre S3 o, con la Reception, BG3)
           r = _peSN(sh, ctx, r, col, 'S3', '22.15 - 22.30', nS3, nBG3);
-          r = _peSS(sh, r, col, 'SALA', '22.30 - 23.15');
+          if (bg3FaRec) {
+            r = _peSPP(sh, ctx, r, col, 'R24', '22.30 - 23.00', bgRec);
+            r = _peSPP(sh, ctx, r, col, 'R23', '23.00 - 23.15', bgRec);
+          } else r = _peSS(sh, r, col, 'SALA', '22.30 - 23.15');
         } else {
           if (bg3FaRec) r = _peSPP(sh, ctx, r, col, 'R24', '22.15 - 22.45', bgRec);
           else r = _peSS(sh, r, col, 'SALA', '22.15 - 22.45');
@@ -954,10 +1017,13 @@ function _pePatternBG3_S7C(
     }
     r = _peSPP(sh, ctx, r, col, salaBreakLbl, '22.00 - 22.15', nBG3);
     if (hasR24) {
-      if (!bg3FaRec && s3PausaPrima) {
-        // S3 in pausa alle 22.15 (lunedi-giovedi), poi fa R24
+      if (s3PausaPrima) {
+        // S3 in pausa alle 22.15, poi R24 22.30-23.00 (lo copre S3 o, con la Reception, BG3)
         r = _peSN(sh, ctx, r, col, 'S3', '22.15 - 22.30', nS3, nBG3);
-        r = _peSS(sh, r, col, 'SALA', '22.30 - 23.15');
+        if (bg3FaRec) {
+          r = _peSPP(sh, ctx, r, col, 'R24', '22.30 - 23.00', bgRec);
+          r = _peSPP(sh, ctx, r, col, 'R23', '23.00 - 23.15', bgRec);
+        } else r = _peSS(sh, r, col, 'SALA', '22.30 - 23.15');
       } else {
         if (bg3FaRec) r = _peSPP(sh, ctx, r, col, 'R24', '22.15 - 22.45', bgRec);
         else r = _peSS(sh, r, col, 'SALA', '22.15 - 22.45');
@@ -1029,10 +1095,13 @@ function _pePatternBG3_S5(sh, ctx, col, nBG3, bgRec, nS3, bg3DaR23Sera, hasR24, 
   r = _peSPP(sh, ctx, r, col, 'S7', '21.30 - 22.00', nBG3);
   r = _peSS(sh, r, col, 'PAUSA', '22.00 - 22.15');
   if (hasR24) {
-    if (!bg3FaRec && s3PausaPrima) {
-      // S3 in pausa alle 22.15 (lunedi-giovedi), poi fa R24
+    if (s3PausaPrima) {
+      // S3 in pausa alle 22.15, poi R24 22.30-23.00 (lo copre S3 o, con la Reception, BG3)
       r = _peSN(sh, ctx, r, col, 'S3', '22.15 - 22.30', nS3, nBG3);
-      r = _peSS(sh, r, col, 'SALA', '22.30 - 23.15');
+      if (bg3FaRec) {
+        r = _peSPP(sh, ctx, r, col, 'R24', '22.30 - 23.00', bgRec);
+        r = _peSPP(sh, ctx, r, col, 'R23', '23.00 - 23.15', bgRec);
+      } else r = _peSS(sh, r, col, 'SALA', '22.30 - 23.15');
     } else {
       if (bg3FaRec) r = _peSPP(sh, ctx, r, col, 'R24', '22.15 - 22.45', bgRec);
       else r = _peSS(sh, r, col, 'SALA', '22.15 - 22.45');
@@ -1131,7 +1200,7 @@ function _pePatternBG3_S8C(sh, ctx, col, nBG3) {
   r = _peSS(sh, r, col, 'SALA', '01.45 - 02.00');
   r = _peSS(sh, r, col, 'SALA', '02.00 - 04.00');
 }
-function _pePatternBG3_S31(sh, ctx, col, nBG3, nS3, hasR24, bg3FaRec) {
+function _pePatternBG3_S31(sh, ctx, col, nBG3, nS3, hasR24, bg3FaRec, s3PausaPrima) {
   let r = 7;
   r = _peSS(sh, r, col, 'SALA', '16.00 - 18.45');
   r = _peSS(sh, r, col, 'PAUSA', '18.45 - 19.00');
@@ -1142,9 +1211,16 @@ function _pePatternBG3_S31(sh, ctx, col, nBG3, nS3, hasR24, bg3FaRec) {
     r = _peSS(sh, r, col, 'PAUSA', '21.00 - 21.30');
     r = _peSPP(sh, ctx, r, col, 'S7', '21.30 - 22.00', nBG3);
     r = _peSS(sh, r, col, 'SALA', '22.00 - 22.15');
-    if (bg3FaRec) r = _peSPP(sh, ctx, r, col, 'R24', '22.15 - 22.45', nBG3);
-    else r = _peSS(sh, r, col, 'SALA', '22.15 - 22.45');
-    r = _peSN(sh, ctx, r, col, 'S3', '22.45 - 23.00', nS3, nBG3);
+    if (s3PausaPrima) {
+      // S3 in pausa alle 22.15, poi R24 22.30-23.00
+      r = _peSN(sh, ctx, r, col, 'S3', '22.15 - 22.30', nS3, nBG3);
+      if (bg3FaRec) r = _peSPP(sh, ctx, r, col, 'R24', '22.30 - 23.00', nBG3);
+      else r = _peSS(sh, r, col, 'SALA', '22.30 - 23.00');
+    } else {
+      if (bg3FaRec) r = _peSPP(sh, ctx, r, col, 'R24', '22.15 - 22.45', nBG3);
+      else r = _peSS(sh, r, col, 'SALA', '22.15 - 22.45');
+      r = _peSN(sh, ctx, r, col, 'S3', '22.45 - 23.00', nS3, nBG3);
+    }
     if (bg3FaRec) r = _peSPP(sh, ctx, r, col, 'R23', '23.00 - 23.15', nBG3);
     else r = _peSS(sh, r, col, 'SALA', '23.00 - 23.15');
     r = _peSS(sh, r, col, 'SALA', '23.15 - 23.30');
@@ -1473,6 +1549,11 @@ function _peAggiustaBG1(ctx, bg) {
     nS1Orig: '',
     lblS1Orig: '',
   };
+  if (bg.forzaC23) {
+    out.bg1IsC23 = true;
+    return out;
+  }
+  if (ctx.forzaBG1 === 'S22') return out;
   if (out.isS22 && out.nBG1) {
     if (!_pePuoCoprire(dc, out.nBG1, 'C0') && !_pePuoCoprire(dc, out.nBG1, 'R22') && nC23bg) {
       out.nBG1 = nC23bg;
@@ -1497,6 +1578,115 @@ function _peAggiustaBG1(ctx, bg) {
     }
   }
   return out;
+}
+
+// ---------- S1 MANCA: chi lo sostituisce (decisione del titolare 02/11/2026) ----------
+// Quando manca S1 le sue pause le da un sostituto (S22 o C23) fino alla fine del suo turno.
+// I cambi dello schema di S1 che cadono dopo (es. R23 alle 20.30: S22 finisce alle 20.00)
+// e quelli per cui il sostituto non e formato li da chi fa le pause di notte (colonna Q2,
+// di solito S3) se e formato e libero, altrimenti la colonna BG3; altrimenti restano al
+// completamento (pausa da solo o riga segnalata). La sala non deve restare vuota piu di prima.
+function _peSegnaSostituto(ctx, bg1, dom, numS22, hasR24) {
+  ctx.sost = null;
+  if (ctx.dT['S1'] || !bg1.nBG1 || !(bg1.isS22 || bg1.bg1IsC23)) return;
+  const PC = window.PauseControlli;
+  if (!PC) return;
+  const tmp = _peSheet();
+  _peScrHeader(tmp, 5, 1, 'S1', 'S1', '14.00 - 21.00', _PE_CLR.giallo);
+  if (dom && _peGPN(ctx.dT, 'R4')) _pePatternS1_Dom(tmp, ctx, 1, '');
+  else _pePatternS1_Standard(tmp, ctx, '', numS22, hasR24);
+  const b = PC.blocchi({ celle: tmp.celle, nR: _peMaxR(tmp) }).find((x) => x.base === 1);
+  const o = (ctx.orari || {})[bg1.lblBG1];
+  let fin = o ? o.fin : bg1.lblBG1 === 'C23' ? 1210 : 1200;
+  if (o && o.ini < _peInizio()) fin += 1440;
+  ctx.sost = {
+    sigla: bg1.lblBG1,
+    nome: bg1.nBG1,
+    fin: fin,
+    righeS1: b
+      ? b.righe
+          .filter((x) => !_PC_LIBERE.includes(x.pos) && x.pos !== 'PAUSA')
+          .map((x) => ({ pos: x.pos, ini: x.ini, fin: x.fin }))
+      : [],
+  };
+}
+function _peAssegnaOrfane(c, ctx, righe, dstr) {
+  const PC = window.PauseControlli;
+  const prop = [];
+  const sost = ctx.sost;
+  if (!PC || !sost) return prop;
+  const persone = _pcPersone(righe, dstr);
+  const vuota = () =>
+    PC.salaVuota(c, persone, PC.pausePersone(c, persone, c.biglietti), c.biglietti).reduce(
+      (s, b) => s + b.fin - b.ini,
+      0,
+    );
+  // colonne principali (intestazione in alto), non le colonnine personali
+  const principale = (base) =>
+    PC.blocchi(c).find((b) => b.base === base && !b.personale && !/ALT/.test(b.post) && b.r <= 6) || null;
+  const coperta = (o) =>
+    PC.blocchi(c).some((b) => !b.personale && b.righe.some((x) => x.pos === o.pos && x.ini < o.fin && x.fin > o.ini));
+  const lista = [];
+  sost.righeS1.forEach((o) => {
+    if (o.fin > sost.fin && !coperta(o)) lista.push(Object.assign({ da: null }, o));
+  });
+  const b1 = principale(1);
+  if (b1 && b1.nome) {
+    const libera = (b1.righe.find((x) => _PC_LIBERE.includes(x.pos)) || { pos: 'SALA' }).pos;
+    b1.righe.forEach((x) => {
+      if (_PC_LIBERE.includes(x.pos) || x.pos === 'PAUSA') return;
+      if (!_pePuoCoprire(ctx.dc, b1.nome, x.pos)) lista.push({ pos: x.pos, ini: x.ini, fin: x.fin, da: x.r, libera });
+    });
+  }
+  lista.forEach((o) => {
+    let fatto = null;
+    for (const base of [4, 7]) {
+      const b = principale(base);
+      if (!b || !b.nome || !_pePuoCoprire(ctx.dc, b.nome, o.pos)) continue;
+      for (const d of [0, -15, -30, 15, 30]) {
+        const ini = o.ini + d;
+        const fin = o.fin + d;
+        const riga = b.righe.find((x) => _PC_LIBERE.includes(x.pos) && x.ini <= ini && fin <= x.fin);
+        if (!riga) continue;
+        const copia = JSON.stringify({ celle: c.celle, nR: c.nR });
+        const prima = vuota();
+        if (o.da != null) {
+          // la riga del sostituto non formato torna libera
+          const a = c.celle[o.da + '|1'];
+          const z = c.celle[o.da + '|2'];
+          if (a && z) {
+            a.v = o.libera;
+            a.bg = _peColoreSettore(o.libera);
+            z.bg = a.bg;
+            delete a.fg;
+            delete z.fg;
+            z.v = String(z.v).replace(/\s*\[!\]\s*$/, '');
+          }
+        }
+        _pcInserisciCambio(c, base, riga, o.pos, ini, fin);
+        if (vuota() > prima) {
+          const x = JSON.parse(copia);
+          c.celle = x.celle;
+          c.nR = x.nR;
+          continue;
+        }
+        fatto = { b: b, ini: ini, fin: fin };
+        break;
+      }
+      if (fatto) break;
+    }
+    if (fatto)
+      prop.push({
+        modo: 'cambio',
+        nome: _peGPN(ctx.dT, o.pos) || '',
+        turno: o.pos,
+        ini: fatto.ini,
+        fin: fatto.fin,
+        chi: fatto.b.nome,
+        chiTurno: fatto.b.post,
+      });
+  });
+  return prop;
 }
 
 // ---------- generatori giornata (port dei 3 layout) ----------
@@ -1540,6 +1730,7 @@ function _peGeneraLunGio(sh, ctx, dataStr) {
     haS7C = false;
   }
   const lblQ2 = _peScegliQ2(ctx, bgCassa, nS3, s3FaCassa, nC20, bg1.bg1IsC23, true, bg3.nBG3);
+  const s3PausaPrima = _peR24Dopo(_peDow());
 
   let sotto = 'PAUSE ' + bg1.lblBG1;
   if (lblQ2) sotto += ' - ' + lblQ2;
@@ -1558,7 +1749,7 @@ function _peGeneraLunGio(sh, ctx, dataStr) {
 
   // Q2
   const bg3FaRec = _pePuoCoprire(dc, bg3.bgRec, 'R23');
-  _peEseguiQ2(sh, ctx, lblQ2, nS3, nC23bg, nC20, nS22, bg3.nBG3, hasR24, bg3FaRec, true);
+  _peEseguiQ2(sh, ctx, lblQ2, nS3, nC23bg, nC20, nS22, bg3.nBG3, hasR24, bg3FaRec, s3PausaPrima);
 
   // Q3
   const bg3DaR23Sera = bg1.isS22 || bg1.bg1IsC23 || (bgCassa !== 'S1' && !bg1FaRec);
@@ -1580,11 +1771,23 @@ function _peGeneraLunGio(sh, ctx, dataStr) {
         hasR24,
         bg3FaRec,
         _peConta(dT, 'S7'),
-        true,
+        s3PausaPrima,
       );
       break;
     case 'S5':
-      _pePatternBG3_S5(sh, ctx, 7, bg3.nBG3, bg3.bgRec, nS3, bg3DaR23Sera, hasR24, lblQ2 === 'S7', bg3FaRec, true);
+      _pePatternBG3_S5(
+        sh,
+        ctx,
+        7,
+        bg3.nBG3,
+        bg3.bgRec,
+        nS3,
+        bg3DaR23Sera,
+        hasR24,
+        lblQ2 === 'S7',
+        bg3FaRec,
+        s3PausaPrima,
+      );
       break;
     case 'S3':
       _pePatternBG3_S3(sh, ctx, 7, bg3.nBG3, bg3.bgRec, bg3DaR23Sera);
@@ -1593,7 +1796,7 @@ function _peGeneraLunGio(sh, ctx, dataStr) {
       _pePatternBG3_S8C(sh, ctx, 7, bg3.nBG3);
       break;
     case 'S31':
-      _pePatternBG3_S31(sh, ctx, 7, bg3.nBG3, nS3, hasR24, bg3FaRec);
+      _pePatternBG3_S31(sh, ctx, 7, bg3.nBG3, nS3, hasR24, bg3FaRec, s3PausaPrima);
       if (hasR24 && dT['C20']) {
         const startC20 = _peMaxR(sh) + 3;
         _peScrHeader(sh, startC20, 7, 'C20', _peGPN(dT, 'C20'), '19.40 - 03.10', _PE_CLR.cassa);
@@ -1603,6 +1806,7 @@ function _peGeneraLunGio(sh, ctx, dataStr) {
       }
       break;
   }
+  _peSegnaSostituto(ctx, bg1, false, numS22, hasR24);
   if (bg1.bg1IsC23 && bg1.nS1Orig) {
     const startS1 = _peMaxR(sh) + 3;
     _peScrHeader(sh, startS1, 1, bg1.lblS1Orig, bg1.nS1Orig, '14.00 - 21.00', _PE_CLR.sala);
@@ -1634,6 +1838,7 @@ function _peGeneraDomenica(sh, ctx, dataStr) {
     haS7C = false;
   }
   const lblQ2d = _peScegliQ2(ctx, '', nS3, s3FaCassa, nC20, bg1.bg1IsC23, false, bg3.nBG3);
+  const s3PausaPrima = _peR24Dopo(_peDow());
 
   let sotto = 'PAUSE ' + bg1.lblBG1;
   if (lblQ2d) sotto += ' - ' + lblQ2d;
@@ -1650,7 +1855,7 @@ function _peGeneraDomenica(sh, ctx, dataStr) {
   else _pePatternS1_Standard(sh, ctx, bg1.nBG1, numS22, hasR24);
 
   const bg3FaRec = _pePuoCoprire(dc, bg3.bgRec, 'R23');
-  _peEseguiQ2(sh, ctx, lblQ2d, nS3, nC23bg, nC20, _peGPN(dT, 'S22'), bg3.nBG3, hasR24, bg3FaRec);
+  _peEseguiQ2(sh, ctx, lblQ2d, nS3, nC23bg, nC20, _peGPN(dT, 'S22'), bg3.nBG3, hasR24, bg3FaRec, s3PausaPrima);
 
   const bg3DaR23Sera = bg1.isS22 || bg1.bg1IsC23;
   switch (bg3.lblBG3) {
@@ -1671,10 +1876,23 @@ function _peGeneraDomenica(sh, ctx, dataStr) {
         hasR24,
         bg3FaRec,
         _peConta(dT, 'S7'),
+        s3PausaPrima,
       );
       break;
     case 'S5':
-      _pePatternBG3_S5(sh, ctx, 7, bg3.nBG3, bg3.bgRec, nS3, bg3DaR23Sera, hasR24, lblQ2d === 'S7', bg3FaRec);
+      _pePatternBG3_S5(
+        sh,
+        ctx,
+        7,
+        bg3.nBG3,
+        bg3.bgRec,
+        nS3,
+        bg3DaR23Sera,
+        hasR24,
+        lblQ2d === 'S7',
+        bg3FaRec,
+        s3PausaPrima,
+      );
       break;
     case 'S3':
       _pePatternBG3_S3(sh, ctx, 7, bg3.nBG3, bg3.bgRec, false);
@@ -1683,7 +1901,7 @@ function _peGeneraDomenica(sh, ctx, dataStr) {
       _pePatternBG3_S8C(sh, ctx, 7, bg3.nBG3);
       break;
     case 'S31':
-      _pePatternBG3_S31(sh, ctx, 7, bg3.nBG3, nS3, hasR24, bg3FaRec);
+      _pePatternBG3_S31(sh, ctx, 7, bg3.nBG3, nS3, hasR24, bg3FaRec, s3PausaPrima);
       if (hasR24 && dT['C20']) {
         const sc = _peMaxR(sh) + 3;
         _peScrHeader(sh, sc, 7, 'C20', _peGPN(dT, 'C20'), '19.40 - 03.10', _PE_CLR.cassa);
@@ -1693,6 +1911,7 @@ function _peGeneraDomenica(sh, ctx, dataStr) {
       }
       break;
   }
+  _peSegnaSostituto(ctx, bg1, true, numS22, hasR24);
   let startExtra = _peMaxR(sh) + 3;
   if (bg1.bg1IsC23 && bg1.nS1Orig) {
     _peScrHeader(sh, startExtra, 1, bg1.lblS1Orig, bg1.nS1Orig, '14.00 - 21.00', _PE_CLR.sala);
@@ -2375,7 +2594,63 @@ function _pcFormazione(righe) {
     affiancati: affiancati,
   };
 }
+// MANCA S1 (decisione del titolare 02/11/2026): per ogni sostituto valido dell elenco
+// «Chi sostituisce chi da le pause» (predefinito S22, poi C23) si prepara un foglio
+// completo (schema, completamento, ottimizzatore) e si confrontano con il punteggio del
+// foglio (sala vuota, avvisi, attese). Si restituisce il migliore con l elenco delle
+// varianti: il responsabile sceglie e si salva solo quella scelta (briefGeneraPause).
 function _peGeneraSlots(righeTutte, dstr) {
+  const valide = (_pcFormazione(righeTutte).righe || []).filter((r) => r && r.nome && r.turno);
+  const sig = (r) => String(r.turno).trim().toUpperCase();
+  const sigle = new Set(valide.map(sig));
+  // sostituto valido: presente e formato almeno in cassa o in reception (i cambi che da
+  // al posto di S1); quelli per cui non e formato passano a S3/BG3
+  const dc = _peCompetenze(valide);
+  const valido = (x) => {
+    const r = valide.find((y) => sig(y) === x);
+    const n = r ? String(r.nome).trim() : '';
+    return !!n && (_pePuoCoprire(dc, n, 'C0') || _pePuoCoprire(dc, n, 'R22'));
+  };
+  const cand = sigle.has('S1')
+    ? []
+    : (_peSchemi('slots').sostituti.S1 || [])
+        .map((x) => String(x).trim().toUpperCase())
+        .filter((x, i, a) => ['S22', 'C23'].includes(x) && sigle.has(x) && a.indexOf(x) === i && valido(x));
+  if (cand.length < 2) return _peGeneraSlotsUna(righeTutte, dstr, cand[0] || null);
+  const persone = _pcPersone(righeTutte, dstr);
+  const varianti = [];
+  cand.forEach((sigla) => {
+    const c = _peGeneraSlotsUna(righeTutte, dstr, sigla);
+    if (!c) return;
+    const voto = _pcPunteggio(c, persone, true);
+    const nome = (c.celle['5|2'] || {}).v || '';
+    // righe rosse (cambio dato da chi non e formato) pesano come un avviso
+    const rosse = Object.keys(c.celle).filter((k) => /\[!\]\s*$/.test(String(c.celle[k].v))).length;
+    varianti.push({
+      sigla: sigla,
+      nome: nome,
+      punteggio: voto.v + 5000 * rosse,
+      vuota: voto.vuota,
+      avvisi: voto.avvisi + rosse,
+      c: c,
+    });
+  });
+  if (!varianti.length) return null;
+  const migliore = varianti.slice().sort((a, b) => a.punteggio - b.punteggio)[0];
+  const out = migliore.c;
+  if (varianti.length > 1)
+    out.varianti = varianti.map((v) => ({
+      sigla: v.sigla,
+      nome: v.nome,
+      punteggio: v.punteggio,
+      vuota: v.vuota,
+      avvisi: v.avvisi,
+      scelta: v === migliore,
+      contenuto: v === migliore ? null : v.c,
+    }));
+  return out;
+}
+function _peGeneraSlotsUna(righeTutte, dstr, forzaBG1) {
   _peImpostaInizio(righeTutte);
   const form = _pcFormazione(righeTutte);
   const righe = form.righe;
@@ -2400,7 +2675,15 @@ function _peGeneraSlots(righeTutte, dstr) {
     dT[turno].push(nome);
   });
   if (!Object.keys(dT).length) return null;
-  const ctx = { dT: dT, dN: dN, dc: _peCompetenze(righe), orari: _peOrariTurni(), c8Nomi: c8Nomi, c8Cd: c8Cd };
+  const ctx = {
+    dT: dT,
+    dN: dN,
+    dc: _peCompetenze(righe),
+    orari: _peOrariTurni(),
+    c8Nomi: c8Nomi,
+    c8Cd: c8Cd,
+    forzaBG1: forzaBG1 || null,
+  };
   // il giorno vale solo durante questo calcolo: anche se qualcosa si ferma a meta (prima
   // restava impostato e le regole di un altro giorno valevano fino a una ricarica)
   window._peDowCorrente = dow;
@@ -2416,7 +2699,10 @@ function _peGeneraSlots(righeTutte, dstr) {
     const out = { tipo: 'slots', celle: sh.celle, nR: _peMaxR(sh), tipoGiorno: tipoGiorno };
     if (biglietto) out.biglietti = [biglietto];
     if (form.affiancati.length) out.formazione = form.affiancati;
-    const completate = _peCompletaPause(out, ctx, righe, dstr);
+    if (ctx.dc._nonTrovati && ctx.dc._nonTrovati.length) out.nonTrovati = ctx.dc._nonTrovati.slice();
+    if (ctx.sost) out.sostituto = { sigla: ctx.sost.sigla, nome: ctx.sost.nome };
+    const orfane = _peAssegnaOrfane(out, ctx, righe, dstr);
+    const completate = orfane.concat(_peCompletaPause(out, ctx, righe, dstr));
     const spostate = _peRisolviSalaVuota(out, righe, dstr).concat(_peOttimizza(out, righe, dstr));
     const proposte = completate.concat(spostate);
     if (proposte.length) out.proposte = proposte;
@@ -3583,6 +3869,46 @@ async function briefGeneraPause() {
     window._peJg = null;
     window._peCassaVenSab = null;
   }
+  // MANCA S1: piu fogli possibili (un sostituto ciascuno); il responsabile sceglie e si
+  // salva solo quello scelto
+  if (contenuto && Array.isArray(contenuto.varianti) && contenuto.varianti.length > 1) {
+    const v = contenuto.varianti;
+    const lbl = (x) =>
+      x.sigla +
+      ' ' +
+      x.nome +
+      ' dà le pause di S1' +
+      (x.scelta ? ' (consigliato)' : '') +
+      ': sala vuota ' +
+      (x.vuota ? x.vuota + ' min' : 'mai') +
+      ', ' +
+      (x.avvisi ? x.avvisi + ' avvisi' : 'nessun avviso');
+    const sc = await chiediModulo(
+      'Oggi manca S1: chi dà le sue pause? Il programma ha preparato un foglio per ogni sostituto (Impostazioni pause, «Chi sostituisce chi dà le pause»). Il primo è il migliore.',
+      [
+        {
+          titolo: 'Sostituto di S1',
+          campi: [
+            {
+              id: 'sost',
+              tipo: 'scelta',
+              valore: v.find((x) => x.scelta).sigla,
+              opzioni: v
+                .slice()
+                .sort((a, b) => a.punteggio - b.punteggio)
+                .map((x) => ({ valore: x.sigla, etichetta: lbl(x) })),
+            },
+          ],
+        },
+      ],
+      { titolo: 'Pause senza S1', ok: 'Usa questo foglio' },
+    );
+    if (!sc) return;
+    const scelta = v.find((x) => x.sigla === sc.sost) || v.find((x) => x.scelta);
+    if (scelta.contenuto) contenuto = scelta.contenuto;
+    logAzione('Pause senza S1', _briefData + ': cambi da ' + scelta.sigla + ' ' + scelta.nome);
+  }
+  if (contenuto) delete contenuto.varianti;
   if (contenuto && sceltaCassa) contenuto.cassaVenSab = sceltaCassa;
   if (contenuto && Object.keys(jg.jg).length) contenuto.jg = jg.jg;
   if (!contenuto) {
@@ -5334,6 +5660,16 @@ function _pcAvvisiFoglio(c) {
     Object.assign({ tipo: 'cambio' }, x),
   );
   if (!c || c.tipo !== 'slots' || !window.PauseControlli || !_briefState) return out;
+  // chi non si trova fra i collaboratori non vale formato: non da cambi (Formazione sempre)
+  if (Array.isArray(c.nonTrovati) && c.nonTrovati.length)
+    out.push({
+      tipo: 'formazione',
+      celle: [],
+      testo:
+        'Non trovati fra i collaboratori, quindi senza Formazione e senza cambi da dare: ' +
+        c.nonTrovati.join(', ') +
+        ' (controlla il nome nel briefing)',
+    });
   const gia = new Set();
   out.forEach((x) => x.celle.forEach((k) => gia.add(k)));
   const persone = _pcPersone(_briefState.righe, _briefData);
@@ -5800,6 +6136,7 @@ function _briefRenderPauseCfg() {
         .join('') +
       '</select><button class="btn-add-tipo" onclick="peOttimizzaSalva()">Salva</button>' +
       '<div style="flex-basis:100%;color:var(--muted)">Nelle giornate normali lo schema resta com e. Solo se c e un problema (sala vuota, pause mancanti, avvisi) il programma sposta cambi e pause come con le frecce, rispettando sempre le regole; applica da solo e chiede conferma solo nei casi eccezionali (postazione senza cambio, avvisi che restano, molte righe spostate). Le attese oltre il massimo compaiono in "Da tenere d occhio". Consigliato 3h: lo schema abituale arriva a 2h45.</div></div>';
+    h += _peSchemiHtml(GG, GGV);
   }
   const repCorr = sett;
   h += '<div style="margin-top:8px"></div>';
@@ -5830,6 +6167,85 @@ function _briefRenderPauseCfg() {
       '<div><button class="btn-export" style="font-size:var(--fs-sm,.8125rem);padding:4px 14px" onclick="salvaPauseCfg()">Salva numeri cassa</button></div>';
   h += '</div></details>';
   return h;
+}
+// SCHEMI DEGLI SLOTS (decisioni del titolare 02/11/2026): R24 alle 22.30, sostituti di S1,
+// BO e SUP su tutte le posizioni. Solo amministratore; vale per le prossime pause generate.
+function _peSchemiHtml(GG, GGV) {
+  const s = _peSchemi('slots');
+  const giorni = s.r24.giorni && s.r24.giorni.length ? s.r24.giorni.map(Number) : [0, 1, 2, 3, 4, 5, 6];
+  const dis = isAdmin() ? '' : ' disabled';
+  return (
+    '<div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;padding:8px 10px;background:var(--paper2);border-radius:3px">' +
+    '<b>Schemi degli Slots</b>' +
+    '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><label style="display:inline-flex;align-items:center;gap:4px"><input type="checkbox" id="pcfg-r24"' +
+    (s.r24.attivo ? ' checked' : '') +
+    dis +
+    '> R24 fa la prima pausa 22.30-23.00 e S3 la sua 22.15-22.30</label> nei giorni: ' +
+    GG.map(
+      (g, k) =>
+        '<label style="display:inline-flex;align-items:center;gap:2px"><input type="checkbox" class="pcfg-r24g" value="' +
+        GGV[k] +
+        '"' +
+        (giorni.includes(GGV[k]) ? ' checked' : '') +
+        dis +
+        '>' +
+        g +
+        '</label>',
+    ).join('') +
+    '</div>' +
+    '<div style="color:var(--muted)">Vale anche quando i cambi di notte li da S7C (o chi e nella colonna BG3) con la Reception: S3 22.15-22.30, R24 22.30-23.00, R23 23.00-23.15. Spento: lo schema di prima (R24 alle 22.15).</div>' +
+    '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">Chi sostituisce chi da le pause (S1), in ordine: <input id="pcfg-sost" value="' +
+    escP((s.sostituti.S1 || []).join(', ')) +
+    '" placeholder="S22, C23" style="width:110px;padding:4px"' +
+    dis +
+    '></div>' +
+    '<div style="color:var(--muted)">Quando manca S1 il programma prepara un foglio per ogni sostituto presente (S22 e C23 sono gli schemi che sanno dare le pause di S1) e te li propone, il migliore per primo. Il sostituto da i cambi solo nel suo orario e dove è formato; quelli dopo la fine del suo turno (es. R23 alle 20.30) li da chi fa le pause di notte (S3), se formato e libero, altrimenti la colonna BG3.</div>' +
+    '<label style="display:inline-flex;align-items:center;gap:4px"><input type="checkbox" id="pcfg-bosup"' +
+    (s.boSupTutto ? ' checked' : '') +
+    dis +
+    '> BO e SUP danno il cambio su tutte le posizioni (sala, reception, cassa)</label>' +
+    '<div style="color:var(--muted)">Spento: anche per BO e SUP valgono solo le spunte della Formazione. Chi non si trova fra i collaboratori non è mai formato e il foglio lo segnala.</div>' +
+    (isAdmin() ? '<div><button class="btn-add-tipo" onclick="peSchemiSalva()">Salva schemi</button></div>' : '') +
+    '</div>'
+  );
+}
+async function peSchemiSalva() {
+  if (!isAdmin()) return;
+  const sost = ((document.getElementById('pcfg-sost') || {}).value || '')
+    .split(/[,;\s]+/)
+    .map((x) => x.trim().toUpperCase())
+    .filter(Boolean);
+  const ignote = sost.filter((x) => !['S22', 'C23'].includes(x));
+  if (ignote.length) {
+    toast('Sostituti di S1: solo S22 e C23 hanno lo schema delle pause di S1 (tolti: ' + ignote.join(', ') + ')');
+  }
+  const giorni = [...document.querySelectorAll('.pcfg-r24g:checked')].map((cb) => parseInt(cb.value));
+  const c0 = _briefPauseCfg();
+  const schemi = Object.assign({}, c0.schemi || {});
+  schemi.slots = {
+    r24: {
+      attivo: !!(document.getElementById('pcfg-r24') || {}).checked,
+      giorni: giorni.length === 7 ? [] : giorni,
+    },
+    sostituti: { S1: sost.filter((x, i, a) => ['S22', 'C23'].includes(x) && a.indexOf(x) === i) },
+    boSupTutto: !!(document.getElementById('pcfg-bosup') || {}).checked,
+  };
+  const cfg = Object.assign({}, c0, { schemi: schemi });
+  if (!(await salvaImp('piano_pause_cfg', JSON.stringify(cfg)))) {
+    toast('Errore salvataggio');
+    return;
+  }
+  window._briefPauseCfgObj = cfg;
+  logAzione(
+    'Schemi pause Slots',
+    'R24 22.30 ' +
+      (schemi.slots.r24.attivo ? 'si' : 'no') +
+      ' · sostituti S1: ' +
+      (schemi.slots.sostituti.S1.join(', ') || 'nessuno') +
+      ' · BO/SUP ovunque ' +
+      (schemi.slots.boSupTutto ? 'si' : 'no'),
+  );
+  toast('Salvato: vale per le prossime pause generate');
 }
 // ---- modulo regole: apertura, campi per tipo, salvataggio ----
 window._pePauseEditIdx = -1;
